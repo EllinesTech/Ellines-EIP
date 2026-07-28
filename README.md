@@ -6,6 +6,8 @@
 
 Powered by **Ellinea AI** · Developed by **Ellines Tech**
 
+**Live:** [eip.ellines.co.ke](https://eip.ellines.co.ke) · Preview: [ellines-eip.pages.dev](https://ellines-eip.pages.dev)
+
 ---
 
 ## What Is This?
@@ -96,6 +98,21 @@ Copy `.env.example` to `.env` and set your Supabase pooler URLs before running I
 5. **Workflows** — approvals, events, scheduled reports
 
 See [docs/02_MVP_Scope_v1.0.md](./docs/02_MVP_Scope_v1.0.md) for full scope.
+
+## Hosting
+
+| Item | Value |
+|------|-------|
+| GitHub | [EllinesTech/Ellines-EIP](https://github.com/EllinesTech/Ellines-EIP) |
+| Cloudflare Pages | `ellines-eip` |
+| Custom domain | `eip.ellines.co.ke` |
+| Deploy | Push to `main` → `.github/workflows/deploy-pages.yml` |
+
+DNS (Cloudflare → `ellines.co.ke` → Records):
+
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | `eip` | `ellines-eip.pages.dev` | Proxied |
 
 ## Brand
 

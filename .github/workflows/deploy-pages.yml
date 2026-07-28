@@ -56,5 +56,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.114.0"
           workingDirectory: apps/web
           command: pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main
