@@ -46,7 +46,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          <img src="/brand/logo-icon.png" alt="" className={styles.brandIcon} />
+          <img src="/brand/logo-mark.png" alt="" className={styles.brandIcon} />
           <div>
             <div className={styles.brandName}>Ellines EIP</div>
             <div className={styles.brandSub}>Intelligence Platform</div>

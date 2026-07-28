@@ -26,6 +26,9 @@
   width: 42px;
   height: 42px;
   object-fit: contain;
+  mix-blend-mode: lighten;
+  background: #0b1020;
+  border-radius: 10px;
 }
 
 .brandName {

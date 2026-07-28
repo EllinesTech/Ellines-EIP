@@ -30,9 +30,15 @@ export default function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <img src="/brand/logo-full.png" alt="Ellines EIP" className="auth-logo" />
+        <div className="auth-brand">
+          <img src="/brand/logo-mark.png" alt="" className="auth-mark" />
+          <div className="auth-brand-text">
+            <span className="ellines">Ellines</span>
+            <span className="eip">EIP</span>
+          </div>
+        </div>
         <h1>Sign in</h1>
-        <p className="subtitle">Access your Enterprise Intelligence Platform</p>
+        <p className="subtitle">Enter your organization workspace</p>
         {error ? <div className="error-banner">{error}</div> : null}
         <form onSubmit={onSubmit}>
           <div className="field">

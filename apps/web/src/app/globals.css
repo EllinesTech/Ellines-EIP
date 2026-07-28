@@ -151,11 +151,45 @@ input {
   font-size: 0.95rem;
 }
 
-.auth-logo {
-  display: block;
-  width: min(220px, 70%);
-  height: auto;
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
   margin: 0 auto 1.5rem;
+}
+
+.auth-mark {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  mix-blend-mode: lighten;
+  background: #0b1020;
+  border-radius: 11px;
+}
+
+.auth-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.auth-brand-text .ellines {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--eip-navy);
+}
+
+.auth-brand-text .eip {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: var(--eip-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .auth-footer {

@@ -32,9 +32,15 @@ export default function RegisterPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <img src="/brand/logo-full.png" alt="Ellines EIP" className="auth-logo" />
+        <div className="auth-brand">
+          <img src="/brand/logo-mark.png" alt="" className="auth-mark" />
+          <div className="auth-brand-text">
+            <span className="ellines">Ellines</span>
+            <span className="eip">EIP</span>
+          </div>
+        </div>
         <h1>Create organization</h1>
-        <p className="subtitle">Start your Ellines EIP workspace</p>
+        <p className="subtitle">Open a new Ellines EIP workspace</p>
         {error ? <div className="error-banner">{error}</div> : null}
         <form onSubmit={onSubmit}>
           <div className="field">
