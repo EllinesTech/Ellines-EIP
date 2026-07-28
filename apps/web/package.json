@@ -1,0 +1,24 @@
+{
+  "name": "@ellines-eip/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "next lint",
+    "deploy:pages": "npm run build && npx wrangler pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main"
+  },
+  "dependencies": {
+    "@ellines-eip/shared": "*",
+    "next": "^15.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.2"
+  }
+}

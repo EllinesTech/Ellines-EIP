@@ -1,0 +1,33 @@
+{
+  "name": "ellines-eip",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ellines EIP (Enterprise Intelligence Platform) — Where Enterprise Systems Think Together",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n identity,web -c magenta,cyan \"npm run dev:identity\" \"npm run dev:web\"",
+    "dev:identity": "npm run dev -w @ellines-eip/identity",
+    "dev:web": "npm run dev -w @ellines-eip/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build -w @ellines-eip/shared",
+    "build:web": "npm run build:shared && npm run build -w @ellines-eip/web",
+    "deploy:pages": "npm run build:web && npx wrangler pages deploy apps/web/out --project-name=ellines-eip --commit-dirty=true --branch=main",
+    "db:push": "npm run prisma:push -w @ellines-eip/identity",
+    "db:generate": "npm run prisma:generate -w @ellines-eip/identity",
+    "db:studio": "npm run prisma:studio -w @ellines-eip/identity",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

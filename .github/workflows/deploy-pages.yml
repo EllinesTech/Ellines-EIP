@@ -1,0 +1,60 @@
+# Auto-deploy Ellines EIP web app to Cloudflare Pages on push to main.
+# Mirrors Ellines Haven / Ellines Tech Website (wrangler pages deploy).
+#
+# Required GitHub Actions secrets:
+#   CLOUDFLARE_API_TOKEN   Account API token with Pages Edit
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
+#
+# Optional build secrets:
+#   NEXT_PUBLIC_API_URL    Identity / API base URL (production)
+#
+# CRITICAL — dual deploy race:
+# Use ONLY this workflow OR Cloudflare Git builds — never both.
+
+name: Deploy Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build shared
+        run: npm run build:shared
+
+      - name: Build web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: npm run build -w @ellines-eip/web
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main

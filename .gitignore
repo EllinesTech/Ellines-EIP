@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.cloudflare
+services/**/.env
+apps/**/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Word temp files
+~$*
+
+# Build artifacts
+*.tsbuildinfo
+coverage/
+
+# Docker volumes
+infra/docker/data/
