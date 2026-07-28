@@ -64,10 +64,11 @@ export default function HomePage() {
   return (
     <main className={styles.page}>
       <div className={styles.atmosphere} aria-hidden>
+        <div className={styles.wash} />
         <div className={styles.grid} />
         <div className={styles.glowA} />
         <div className={styles.glowB} />
-        <div className={styles.beam} />
+        <div className={styles.glowWarm} />
       </div>
 
       <header className={styles.topbar}>
@@ -96,12 +97,13 @@ export default function HomePage() {
         </nav>
       </header>
 
-      {/* 1. Product-surface hero (Linear / Vercel pattern) */}
       <section className={styles.hero}>
         <div className={styles.copy}>
-          <p className={styles.eyebrow}>
-            <span className={styles.liveDot} aria-hidden />
-            Enterprise Intelligence Platform
+          <p className={styles.greeting}>
+            <span className={styles.greetingMark} aria-hidden>
+              <img src="/brand/logo-mark.png" alt="" />
+            </span>
+            Welcome
           </p>
           <h1 className={styles.wordmark}>
             <span className={styles.wordEllines}>Ellines</span>{' '}
@@ -109,13 +111,22 @@ export default function HomePage() {
           </h1>
           <p className={styles.tagline}>Where Enterprise Systems Think Together.</p>
           <p className={styles.support}>
-            The intelligence layer above your ERP, CRM, and operations — powered by{' '}
-            <strong>Ellinea AI</strong>. Ask. Unify. Decide.
+            You’ve arrived at your enterprise intelligence home — the calm layer above ERP, CRM, and
+            operations, powered by <strong>Ellinea AI</strong>. Settle in. Ask when you’re ready.
           </p>
+
+          <div className={styles.actions}>
+            <Link href="/login" className={`btn btn-primary ${styles.actionPrimary}`}>
+              Welcome in
+            </Link>
+            <Link href="/register" className={`btn btn-secondary ${styles.actionSecondary}`}>
+              Create your organization
+            </Link>
+          </div>
 
           <form className={styles.askBar} onSubmit={onAsk}>
             <label className={styles.askLabel} htmlFor="ellinea-ask">
-              Ask Ellinea
+              Or ask Ellinea when you’re ready
             </label>
             <div className={styles.askRow}>
               <input
@@ -129,29 +140,21 @@ export default function HomePage() {
                 Ask
               </button>
             </div>
-            <p className={styles.askHint}>Sign in to run live queries on your connected systems.</p>
+            <p className={styles.askHint}>Sign in once — then run live queries on your connected systems.</p>
           </form>
-
-          <div className={styles.actions}>
-            <Link href="/login" className={`btn btn-primary ${styles.actionPrimary}`}>
-              Enter platform
-            </Link>
-            <Link href="/register" className={`btn btn-secondary ${styles.actionSecondary}`}>
-              Create organization
-            </Link>
-          </div>
         </div>
 
-        <div className={styles.productStage} aria-hidden>
-          <div className={styles.window}>
+        <div className={styles.productStage}>
+          <p className={styles.productCaption}>Inside your workspace</p>
+          <div className={styles.window} aria-hidden>
             <div className={styles.windowBar}>
               <span className={styles.traffic}>
                 <i />
                 <i />
                 <i />
               </span>
-              <span className={styles.windowTitle}>Command Center · live</span>
-              <span className={styles.windowMeta}>Ellinea online</span>
+              <span className={styles.windowTitle}>Command Center</span>
+              <span className={styles.windowMeta}>Ready for you</span>
             </div>
             <div className={styles.windowBody}>
               <aside className={styles.miniSide}>
@@ -167,8 +170,8 @@ export default function HomePage() {
               <div className={styles.miniMain}>
                 <div className={styles.miniHeader}>
                   <div>
-                    <div className={styles.miniOrg}>Acme Holdings</div>
-                    <div className={styles.miniRole}>Chief Executive</div>
+                    <div className={styles.miniOrg}>Your organization</div>
+                    <div className={styles.miniRole}>Good to see you</div>
                   </div>
                   <div className={styles.miniStatus}>
                     <span className={styles.liveDot} />
@@ -197,7 +200,7 @@ export default function HomePage() {
                 <div className={styles.ellineaPanel}>
                   <div className={styles.ellineaHead}>
                     <span>Ellinea AI</span>
-                    <span className={styles.thinking}>reasoning</span>
+                    <span className={styles.thinking}>with you</span>
                   </div>
                   <p className={styles.ellineaQ}>{PROMPTS[promptIndex]}</p>
                   <p className={styles.ellineaA}>
@@ -216,10 +219,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. Trust / sits-above-stack strip */}
       <section className={styles.trust} aria-label="Platform posture">
         <p className={styles.trustLead}>
-          Does not replace your systems. <strong>Connects, understands, and elevates them.</strong>
+          You’re not replacing anything. <strong>You’re connecting what you already trust</strong> —
+          and making it think together.
         </p>
         <div className={styles.trustMetrics}>
           <div>
@@ -241,12 +244,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Capability surfaces */}
       <section id="capabilities" className={styles.capabilities}>
         <div className={styles.sectionHead}>
           <p className={styles.sectionEyebrow}>Capabilities</p>
           <h2>Built like a system — not a brochure</h2>
-          <p>What elite AI platforms show: the work the intelligence can do, not a list of buttons.</p>
+          <p>What you can do once you’re inside — calmly, with clarity.</p>
         </div>
         <div className={styles.capGrid}>
           {CAPABILITIES.map((c) => (
@@ -258,7 +260,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Integration wall */}
       <section className={styles.integrations} aria-label="Connectors">
         <div className={styles.sectionHead}>
           <p className={styles.sectionEyebrow}>Integration layer</p>
@@ -271,7 +272,6 @@ export default function HomePage() {
         </ul>
       </section>
 
-      {/* 5. Ellinea AI showcase */}
       <section id="ellinea" className={styles.ellineaSection}>
         <div className={styles.ellineaCopy}>
           <p className={styles.sectionEyebrow}>Ellinea AI</p>
@@ -281,7 +281,7 @@ export default function HomePage() {
             connected data — so leadership sees the enterprise clearly.
           </p>
           <Link href="/register" className="btn btn-primary">
-            Start with Ellinea
+            Meet Ellinea
           </Link>
         </div>
         <div className={styles.promptDeck} aria-hidden>
@@ -294,17 +294,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. Final CTA */}
       <section className={styles.finalCta}>
         <img src="/brand/logo-mark.png" alt="" className={styles.finalMark} />
-        <h2>Enter Ellines EIP</h2>
+        <h2>You’re welcome here</h2>
         <p>Where Enterprise Systems Think Together.</p>
         <div className={styles.actions}>
           <Link href="/login" className="btn btn-primary">
-            Enter platform
+            Welcome in
           </Link>
           <Link href="/register" className="btn btn-secondary">
-            Create organization
+            Create your organization
           </Link>
         </div>
       </section>
