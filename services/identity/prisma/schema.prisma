@@ -29,6 +29,7 @@ model Organization {
   departments         Department[]
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  enterpriseSnapshot  EnterpriseSnapshot?
 
   @@map("organizations")
 }
@@ -114,4 +115,24 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model EnterpriseSnapshot {
+  id               String   @id @default(cuid())
+  organizationId   String   @unique @map("organization_id")
+  connectorId      String   @map("connector_id")
+  connectorName    String   @map("connector_name")
+  healthScore      Int      @map("health_score")
+  connectedSystems Int      @map("connected_systems")
+  openAlerts       Int      @map("open_alerts")
+  openDecisions    Int      @map("open_decisions")
+  briefHighlight   String   @map("brief_highlight")
+  timeline         Json
+  syncedAt         DateTime @map("synced_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("enterprise_snapshots")
 }

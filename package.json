@@ -13,7 +13,7 @@
     "dev:identity": "npm run dev -w @ellines-eip/identity",
     "dev:web": "npm run dev -w @ellines-eip/web",
     "build": "npm run build --workspaces --if-present",
-    "build:shared": "npm run build -w @ellines-eip/shared",
+    "build:shared": "npm run build -w @ellines-eip/shared && npm run build -w @ellines-eip/connectors-sdk",
     "build:web": "npm run build:shared && npm run build -w @ellines-eip/web",
     "deploy:pages": "npm run build:web && npm run deploy:pages -w @ellines-eip/web",
     "db:push": "npm run prisma:push -w @ellines-eip/identity",

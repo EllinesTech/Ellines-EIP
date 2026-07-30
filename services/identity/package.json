@@ -14,6 +14,7 @@
     "seed:demo": "dotenv -e ../../.env --override -- ts-node --transpile-only prisma/seed-demo.ts"
   },
   "dependencies": {
+    "@ellines-eip/connectors-sdk": "*",
     "@ellines-eip/shared": "*",
     "@nestjs/common": "^11.0.12",
     "@nestjs/config": "^4.0.2",
@@ -32,7 +33,7 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.5",
+    "@nestjs/cli": "^11.0.24",
     "@nestjs/schematics": "^11.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.1",

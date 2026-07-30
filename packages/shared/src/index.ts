@@ -118,3 +118,27 @@ export const SERVICE_PORTS = {
   notification: 3005,
   web: 3100,
 } as const;
+
+/** Normalized enterprise summary for Command Center + Ellinea brief. */
+export interface EnterpriseSummary {
+  organizationId: string;
+  connectorId: string;
+  connectorName: string;
+  healthScore: number;
+  connectedSystems: number;
+  openAlerts: number;
+  openDecisions: number;
+  briefHighlight: string;
+  timeline: { title: string; detail: string }[];
+  syncedAt: string | null;
+  status: 'idle' | 'synced' | 'error';
+}
+
+export interface ConnectorStatus {
+  id: string;
+  name: string;
+  type: 'api' | 'database' | 'file' | 'email' | 'event';
+  status: 'idle' | 'synced' | 'error';
+  lastSyncedAt: string | null;
+  message?: string;
+}

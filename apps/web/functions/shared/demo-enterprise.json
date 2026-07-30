@@ -1,0 +1,21 @@
+{
+  "healthScore": 78,
+  "connectedSystems": 3,
+  "openAlerts": 3,
+  "openDecisions": 5,
+  "briefHighlight": "Operations steady; three branches need attention on inventory risk and overdue approvals.",
+  "timeline": [
+    {
+      "title": "Demo connector online",
+      "detail": "JSON Systems feed synced into the Universal Enterprise Model."
+    },
+    {
+      "title": "Open decisions waiting",
+      "detail": "Five approval items remain across finance and branch ops."
+    },
+    {
+      "title": "Ellinea brief ready",
+      "detail": "Morning summary can be generated from this snapshot."
+    }
+  ]
+}

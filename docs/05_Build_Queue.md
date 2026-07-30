@@ -13,9 +13,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~90% | Access layers landed; Gateway deferred while Integration Hub unlocks live KPIs |
-| **2 — Integration Hub** | ~5% | SDK README + UI placeholder; thin hub next |
-| **3 — Executive Command Center** | ~40% | Role-adaptive Work Console with mock KPIs; live data pending connectors |
-| **4 — Ellinea AI** | ~5% | Brand + placeholder page only |
+| **2 — Integration Hub** | ~25% | Demo JSON connector + enterprise snapshot API |
+| **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
+| **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (UI + same-origin `/api/v1` auth); Nest Identity on Fly optional |
 
@@ -31,7 +31,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.2 | Identity Core | `done` | NestJS: register/login JWT, orgs, branches, depts, invite, roles, AuditLog model |
 | 1.2a | Harden Identity (tests, password reset, role guards on all routes) | `done` | RolesGuard on org writes; forgot/reset password + PasswordResetToken; Jest unit tests |
 | 1.2b | Auth UX complete (register/login/forgot/SSO on live Pages) | `done` | Fixed register `updated_at`; Pages forgot/reset + work-email SSO; login/register UI wired |
-| 1.3 | API Gateway | `todo` | Deferred: Pages Functions + Identity sufficient until multi-service; unlock data via Hub first |
+| 1.3 | API Gateway | `next` | Deferred earlier for Hub; resume after live KPIs landed |
 | 1.4 | Audit Trail | `in_progress` | Prisma model exists; invite/update user audited on Pages + Nest |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform`; see [09_Access_Layers.md](./09_Access_Layers.md) |
 
@@ -41,14 +41,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 2.1 | Connector Framework + SDK | `next` | Thin slice: one JSON connector + enterprise summary API |
+| 2.1 | Connector Framework + SDK | `done` | SDK + Demo JSON connector; snapshot via Pages/Nest; Connectors Sync UI |
 | 2.2 | REST API Connector | `todo` | |
 | 2.3 | PostgreSQL Connector | `todo` | |
-| 2.4 | CSV/File Connector | `todo` | P1 |
+| 2.4 | CSV/File Connector | `todo` | P1 — demo JSON covers file-style path for now |
 | 2.5 | Email Connector | `todo` | P1 |
-| 2.6 | Universal Enterprise Model | `todo` | |
-| 2.7 | Sync Scheduler | `todo` | |
-| 2.x | `services/integration-hub` microservice | `todo` | Scaffold when starting 2.1 |
+| 2.6 | Universal Enterprise Model | `todo` | Snapshot fields are a thin start |
+| 2.7 | Sync Scheduler | `todo` | Manual Sync now for MVP |
+| 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |
 
 ---
 
@@ -56,9 +56,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 3.1 | Executive Dashboard shell | `done` | `/app` Work Console adapts by role (executive/manager/member/admin) with mock KPIs |
-| 3.2 | KPI Widgets (live) | `todo` | Needs connectors / mock data layer |
-| 3.3 | Enterprise Health Score | `todo` | Mock score on Work Console; live composite pending |
+| 3.1 | Executive Dashboard shell | `done` | Role-adaptive Work Console |
+| 3.2 | KPI Widgets (live) | `done` | From `/api/v1/enterprise/summary` after connector sync |
+| 3.3 | Enterprise Health Score | `done` | Snapshot `healthScore` |
 | 3.4 | Enterprise Timeline | `todo` | |
 | 3.5 | Enterprise Search | `todo` | |
 | 3.6 | Notification Center | `todo` | `services/notification` missing |
@@ -69,7 +69,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `todo` | `/app/ellinea` placeholder; `services/ellinea-ai` missing |
+| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `in_progress` | Thin Daily Brief + template Ask Ellinea from snapshot; full LLM later |
 
 ---
 

@@ -5,13 +5,13 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { OrgsModule } from './orgs/orgs.module';
 import { PlatformModule } from './platform/platform.module';
+import { EnterpriseModule } from './enterprise/enterprise.module';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // Load monorepo root .env (services/identity → ../..)
       envFilePath: [
         join(__dirname, '..', '..', '..', '.env'),
         join(__dirname, '..', '.env'),
@@ -22,6 +22,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     OrgsModule,
     PlatformModule,
+    EnterpriseModule,
   ],
   controllers: [HealthController],
 })

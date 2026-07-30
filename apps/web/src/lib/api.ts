@@ -216,3 +216,40 @@ export function listPlatformOrgs() {
 export function listPlatformFlags() {
   return request<FeatureFlag[]>('/api/v1/platform/flags');
 }
+
+export interface EnterpriseSummaryDto {
+  organizationId: string;
+  connectorId: string;
+  connectorName: string;
+  healthScore: number;
+  connectedSystems: number;
+  openAlerts: number;
+  openDecisions: number;
+  briefHighlight: string;
+  timeline: { title: string; detail: string }[];
+  syncedAt: string | null;
+  status: 'idle' | 'synced' | 'error';
+}
+
+export interface ConnectorStatusDto {
+  id: string;
+  name: string;
+  type: string;
+  status: 'idle' | 'synced' | 'error';
+  lastSyncedAt: string | null;
+  message?: string;
+}
+
+export function fetchEnterpriseSummary() {
+  return request<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
+}
+
+export function listConnectors() {
+  return request<ConnectorStatusDto[]>('/api/v1/connectors');
+}
+
+export function syncConnector(connectorId: string) {
+  return request<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
+    method: 'POST',
+  });
+}
