@@ -17,7 +17,10 @@
 
   display: grid;
   grid-template-columns: 248px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   background: var(--dash-bg);
   color: var(--dash-text);
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
@@ -35,9 +38,10 @@
   color: var(--dash-text);
   padding: 1rem 0.7rem 0.85rem;
   border-right: 1px solid var(--dash-line);
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+  min-height: 0;
   z-index: 20;
 }
 
@@ -49,6 +53,7 @@
   border-bottom: 1px solid var(--dash-line);
   margin-bottom: 0.85rem;
   min-height: 3.4rem;
+  flex-shrink: 0;
 }
 
 .brandIcon {
@@ -110,6 +115,7 @@
   background: transparent;
   color: var(--dash-muted);
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -123,9 +129,27 @@
   display: flex;
   flex-direction: column;
   gap: 0.22rem;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.45) transparent;
+}
+
+.nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 999px;
 }
 
 .navLink {
@@ -195,6 +219,7 @@
   padding: 0.75rem 0.25rem 0.15rem;
   border-top: 1px solid var(--dash-line);
   margin-top: 0.65rem;
+  flex-shrink: 0;
 }
 
 .profile {
@@ -287,6 +312,9 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background:
     radial-gradient(ellipse 55% 35% at 85% 0%, rgba(124, 58, 237, 0.12), transparent 55%),
     radial-gradient(ellipse 40% 30% at 10% 20%, rgba(59, 130, 246, 0.08), transparent 50%),
@@ -302,8 +330,7 @@
   background: rgba(11, 14, 20, 0.72);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--dash-line);
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 15;
 }
 
@@ -508,7 +535,26 @@
 .content {
   padding: 1.35rem 1.5rem 5.5rem;
   animation: rise 0.4s ease both;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+}
+
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.35);
+  border-radius: 999px;
 }
 
 .fab {
@@ -607,11 +653,16 @@
   .shell,
   .shellCollapsed {
     grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .sidebar {
     position: relative;
     height: auto;
+    max-height: none;
+    overflow: visible;
     border-right: none;
     border-bottom: 1px solid var(--dash-line);
     padding-bottom: 0.75rem;
@@ -630,6 +681,8 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.35rem;
+    overflow: visible;
+    min-height: 0;
   }
 
   .shellCollapsed .navLink {
@@ -650,7 +703,13 @@
     display: none;
   }
 
+  .main {
+    height: auto;
+    overflow: visible;
+  }
+
   .content {
+    overflow: visible;
     padding: 1.1rem 1rem 5rem;
   }
 
