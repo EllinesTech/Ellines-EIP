@@ -26,7 +26,7 @@ $supabaseUrl = Get-DotEnvValue (Join-Path $root '.env') 'SUPABASE_URL'
 if (-not $supabaseUrl) { $supabaseUrl = Get-DotEnvValue (Join-Path $root '.env') 'NEXT_PUBLIC_SUPABASE_URL' }
 $serviceKey = Get-DotEnvValue (Join-Path $root '.env') 'SUPABASE_SERVICE_ROLE_KEY'
 $jwt = Get-DotEnvValue (Join-Path $root '.env') 'JWT_SECRET'
-if (-not $jwt) { $jwt = 'ellines-eip-dev-secret' }
+if (-not $jwt) { throw 'JWT_SECRET required in .env' }
 
 if (-not $env:CLOUDFLARE_API_TOKEN -or -not $env:CLOUDFLARE_ACCOUNT_ID) {
   throw 'CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID required (.env.cloudflare)'

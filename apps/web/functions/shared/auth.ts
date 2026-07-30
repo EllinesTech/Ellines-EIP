@@ -34,19 +34,24 @@ export function options(): Response {
   return json({ ok: true });
 }
 
+function requireJwtSecret(env: Env): Uint8Array {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be set on Pages');
+  }
+  return new TextEncoder().encode(env.JWT_SECRET);
+}
+
 export async function signAccessToken(
   env: Env,
   payload: { sub: string; email: string; organizationId: string; role: string },
 ): Promise<{ accessToken: string; expiresIn: string }> {
-  const secret = env.JWT_SECRET || 'ellines-eip-dev-secret';
   const expiresIn = env.JWT_EXPIRES_IN || '24h';
   const jose = await import('jose');
-  const key = new TextEncoder().encode(secret);
   const accessToken = await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(expiresIn)
-    .sign(key);
+    .sign(requireJwtSecret(env));
   return { accessToken, expiresIn };
 }
 
@@ -61,14 +66,15 @@ export async function verifyAccessToken(
   env: Env,
   token: string,
 ): Promise<{ sub: string; email: string; organizationId: string; role: string }> {
-  const secret = env.JWT_SECRET || 'ellines-eip-dev-secret';
   const jose = await import('jose');
-  const key = new TextEncoder().encode(secret);
-  const { payload } = await jose.jwtVerify(token, key);
-  return {
-    sub: String(payload.sub || ''),
-    email: String(payload.email || ''),
-    organizationId: String(payload.organizationId || ''),
-    role: String(payload.role || ''),
-  };
+  const { payload } = await jose.jwtVerify(token, requireJwtSecret(env));
+  const sub = typeof payload.sub === 'string' ? payload.sub : '';
+  const email = typeof payload.email === 'string' ? payload.email : '';
+  const organizationId =
+    typeof payload.organizationId === 'string' ? payload.organizationId : '';
+  const role = typeof payload.role === 'string' ? payload.role : '';
+  if (!sub || !email || !organizationId || !role) {
+    throw new Error('Invalid token payload');
+  }
+  return { sub, email, organizationId, role };
 }
