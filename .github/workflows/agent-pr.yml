@@ -30,6 +30,12 @@ jobs:
       - name: Build shared
         run: npm run build:shared
 
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://eip:eip@localhost:5432/ellines_eip
+          DIRECT_URL: postgresql://eip:eip@localhost:5432/ellines_eip
+
       - name: Build web
         run: npm run build -w @ellines-eip/web
         env:
@@ -37,6 +43,9 @@ jobs:
 
       - name: Build identity
         run: npm run build -w @ellines-eip/identity
+        env:
+          DATABASE_URL: postgresql://eip:eip@localhost:5432/ellines_eip
+          DIRECT_URL: postgresql://eip:eip@localhost:5432/ellines_eip
 
   auto-merge:
     name: Auto-merge agent PR
