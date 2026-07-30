@@ -1,29 +1,30 @@
 :root {
-  /* Midnight Command — navy-first, purple as Ellinea accent only */
-  --eip-ink: #070b16;
-  --eip-navy: #0f172a;
-  --eip-panel: #141c2e;
-  --eip-panel-2: #1a2438;
-  --eip-line: rgba(232, 237, 245, 0.1);
-  --eip-line-strong: rgba(232, 237, 245, 0.16);
+  /* Dark EIP Command — mock fidelity, purple/blue accents */
+  --eip-ink: #0b0e14;
+  --eip-navy: #11141d;
+  --eip-panel: #161b26;
+  --eip-panel-2: #1a2030;
+  --eip-line: rgba(255, 255, 255, 0.08);
+  --eip-line-strong: rgba(255, 255, 255, 0.14);
   --eip-mist: #e8edf5;
-  --eip-fog: #f3f6fb;
+  --eip-fog: #0b0e14;
   --eip-muted: #8b95a8;
   --eip-soft: #b8c0d0;
-  --eip-primary: #6f2d8d;
-  --eip-deep-purple: #4a148c;
+  --eip-primary: #7c3aed;
+  --eip-deep-purple: #5b21b6;
   --eip-blue: #3b82f6;
-  --eip-accent: #c4a0e0;
-  --eip-success: #3dd68c;
-  --eip-warn: #e8b84a;
+  --eip-accent: #a78bfa;
+  --eip-success: #10b981;
+  --eip-warn: #f59e0b;
+  --eip-danger: #ef4444;
   --eip-grey: #6b7280;
   --eip-light: #f3f6fb;
   --eip-white: #ffffff;
-  --eip-border: #dce3ef;
-  --eip-gradient: linear-gradient(135deg, #6f2d8d 0%, #2563eb 100%);
+  --eip-border: rgba(255, 255, 255, 0.1);
+  --eip-gradient: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
   --eip-font: 'Exo 2', system-ui, sans-serif;
-  --eip-radius: 12px;
-  --eip-shadow: 0 24px 64px rgba(7, 11, 22, 0.45);
+  --eip-radius: 14px;
+  --eip-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 *,
@@ -41,7 +42,7 @@ body {
   min-height: 100%;
   overflow-x: hidden;
   font-family: var(--eip-font);
-  color: var(--eip-navy);
+  color: var(--eip-mist);
   background: var(--eip-fog);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;

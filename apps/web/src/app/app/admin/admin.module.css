@@ -14,7 +14,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #8b95a8;
 }
 
 .form input,
@@ -25,11 +25,19 @@
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
-  color: #0f172a;
-  border: 1px solid #d5dde9;
+  color: #f4f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
-  background: #fff;
+  background: #0b0e14;
+}
+
+.form input:focus,
+.form select:focus,
+.table select:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.55);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
 
 .primary,
@@ -43,8 +51,9 @@
 }
 
 .primary {
-  background: linear-gradient(135deg, #6f2d8d, #2563eb);
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
   color: #fff;
+  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.35);
 }
 
 .primary:disabled,
@@ -55,26 +64,26 @@
 
 .ghost {
   background: transparent;
-  color: #6f2d8d;
-  border: 1px solid #d5dde9;
+  color: #a78bfa;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .error {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .notice {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
-  background: #f5f3ff;
-  color: #4c1d95;
-  border: 1px solid #ddd6fe;
+  background: rgba(124, 58, 237, 0.12);
+  color: #ddd6fe;
+  border: 1px solid rgba(167, 139, 250, 0.35);
 }
 
 .notice code {
@@ -83,11 +92,11 @@
 
 .tableWrap {
   margin-top: 1.25rem;
-  background: #fff;
-  border: 1px solid #d5dde9;
-  border-radius: 14px;
+  background: #161b26;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   padding: 1rem 1.1rem 1.15rem;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 }
 
 .table {
@@ -102,20 +111,20 @@
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #8b95a8;
   padding: 0.45rem 0.35rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .table td {
   padding: 0.65rem 0.35rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #0f172a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #f4f7fb;
   vertical-align: middle;
 }
 
 .inactive td {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 @media (max-width: 720px) {

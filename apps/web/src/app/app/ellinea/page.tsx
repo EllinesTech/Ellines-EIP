@@ -85,7 +85,9 @@ export default function EllineaPage() {
               font: 'inherit',
               padding: '0.7rem 0.85rem',
               borderRadius: 10,
-              border: '1px solid #d5dde9',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: '#0b0e14',
+              color: '#f4f7fb',
             }}
             aria-label="Question for Ellinea"
           />
@@ -99,7 +101,7 @@ export default function EllineaPage() {
               borderRadius: 10,
               border: 'none',
               color: '#fff',
-              background: 'linear-gradient(135deg, #6f2d8d, #2563eb)',
+              background: 'linear-gradient(135deg, #7c3aed, #3b82f6)',
               cursor: 'pointer',
             }}
           >
@@ -107,7 +109,7 @@ export default function EllineaPage() {
           </button>
         </form>
         {answer ? (
-          <p style={{ marginTop: '1rem', lineHeight: 1.55, color: '#0f172a' }}>{answer}</p>
+          <p style={{ marginTop: '1rem', lineHeight: 1.55, color: '#c4b5fd' }}>{answer}</p>
         ) : null}
       </section>
     </div>
