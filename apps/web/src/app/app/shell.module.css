@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 248px 1fr;
   min-height: 100vh;
-  background: #dce3ef;
+  background: #e8edf5;
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
 }
 
