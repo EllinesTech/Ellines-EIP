@@ -1,0 +1,15 @@
+node_modules
+.git
+.dev-logs
+apps
+infra
+docs
+assets
+*.md
+.env
+.env.*
+!.env.example
+Ellinea AI Logo
+Ellines EIP Logo
+npm-install.log
+pack.log

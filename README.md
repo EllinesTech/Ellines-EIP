@@ -25,6 +25,9 @@ Ellines EIP is an AI-native enterprise intelligence platform that sits **above**
 | [Master Blueprint](./docs/03_Master_Blueprint.md) | Product vision and architecture |
 | [Enterprise Lexicon](./docs/04_Enterprise_Lexicon.md) | Official terminology |
 | [Build Queue](./docs/05_Build_Queue.md) | Live status + ordered agent worklist |
+| [Automation prompt](./docs/06_Automation_Prompt.md) | Cursor Automations instructions |
+| [Demo login](./docs/07_Demo_Login.md) | Live site test account |
+| [Live Identity setup](./docs/08_Live_Identity_Setup.md) | One-time Fly deploy steps |
 | [AGENTS.md](./AGENTS.md) | Instructions for Cursor Cloud Agents |
 
 ## Repository Structure
@@ -108,7 +111,11 @@ See [docs/02_MVP_Scope_v1.0.md](./docs/02_MVP_Scope_v1.0.md) for full scope.
 | GitHub | [EllinesTech/Ellines-EIP](https://github.com/EllinesTech/Ellines-EIP) |
 | Cloudflare Pages | `ellines-eip` |
 | Custom domain | `eip.ellines.co.ke` |
-| Deploy | Push to `main` → `.github/workflows/deploy-pages.yml` |
+| Web deploy | Push to `main` → `.github/workflows/deploy-pages.yml` |
+| Identity API | Fly.io `ellines-eip-identity` → `.github/workflows/deploy-identity.yml` |
+| Demo login | [docs/07_Demo_Login.md](./docs/07_Demo_Login.md) |
+
+**Local sync with agents:** `git pull origin main` (source of truth is GitHub `main`).
 
 DNS (Cloudflare → `ellines.co.ke` → Records):
 

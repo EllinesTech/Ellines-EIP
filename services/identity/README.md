@@ -1,42 +1,37 @@
 # Identity Service
 
-Authentication, organization management, and role-based access control.
-
-## Responsibilities
-
-- User registration and authentication (JWT)
-- Organization and branch management
-- Role-Based Access Control (RBAC)
-- Multi-Factor Authentication (MFA) — v1.1
-- Single Sign-On (SSO) — v1.1
-- Session management
+Authentication, organization management, and role-based access control for **Ellines EIP**.
 
 ## Port
 
-`3001` (default)
+- Local: `3001`
+- Fly: `8080` (`https://ellines-eip-identity.fly.dev`)
 
-## Core Entities
+## Run locally
 
-- `Organization` — top-level tenant
-- `Branch` — multi-site operations
-- `Department` — business units
-- `User` — authenticated identity
-- `Role` — permission sets
-- `Permission` — granular access control
-
-## API Endpoints (planned)
-
-```
-POST   /auth/login
-POST   /auth/register
-POST   /auth/refresh
-GET    /orgs
-POST   /orgs
-GET    /orgs/:id/users
-POST   /orgs/:id/users
-GET    /orgs/:id/roles
+```bash
+# from repo root — needs DATABASE_URL / DIRECT_URL in .env
+npm run db:generate
+npm run db:push
+npm run seed:demo
+npm run dev:identity
 ```
 
-## Status
+Health: http://localhost:3001/api/v1/health
 
-🔲 Not yet implemented — Phase 1 (Priority P0)
+## Deploy (Fly.io)
+
+```bash
+# one-time
+fly apps create ellines-eip-identity -o <org>
+fly secrets set DATABASE_URL="..." DIRECT_URL="..." JWT_SECRET="..." --app ellines-eip-identity
+
+# from repo root
+npm run deploy:identity
+```
+
+CI: `.github/workflows/deploy-identity.yml` (requires `FLY_API_TOKEN` secret).
+
+## Demo login
+
+See [docs/07_Demo_Login.md](../../docs/07_Demo_Login.md).

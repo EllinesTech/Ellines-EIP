@@ -4,7 +4,7 @@
 **Authoritative scope:** [02_MVP_Scope_v1.0.md](./02_MVP_Scope_v1.0.md)  
 **Status key:** `done` · `in_progress` · `next` · `blocked` · `todo`
 
-Cloud Agents and Automations **must pick the first `next` item** (or continue an `in_progress` item), implement it on a branch, open a PR, then mark status in this file in the same PR.
+Cloud Agents and Automations **must pick the first `next` item** (or continue an `in_progress` item), implement it, update status in this file, **build, then land on `main`** (PR + merge preferred) so Pages/Identity deploy. Humans keep local in sync with `git pull origin main`.
 
 ---
 
@@ -17,7 +17,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **3 — Executive Command Center** | ~25% | Shell + placeholder KPIs; no live data |
 | **4 — Ellinea AI** | ~5% | Brand + placeholder page only |
 | **5 — Workflow & Automation** | 0% | Not started |
-| **Hosting** | Live | Cloudflare Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (static web) |
+| **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke); Identity → Fly `ellines-eip-identity` |
 
 **Critical path remaining:** finish Identity/Admin → Integration Hub → live Dashboard → Ellinea AI → Workflows.
 
@@ -84,7 +84,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 - Brand assets (Ellinea + EIP logos, favicons, splash)
 - Splash / login / register / app shell visual refresh
-- Agent workflow: `AGENTS.md`, this queue, `.cursor/environment.json`
+- Agent sync pipeline (land on `main` after build; auto-merge `agent/*` PRs)
+- Identity Fly Dockerfile + deploy workflow + demo seed / login docs
 - Identity invite DTO / package tweaks
 
 ---
@@ -94,10 +95,15 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 1. Read `AGENTS.md` and this queue.
 2. Take the highest-priority `next` (or continue `in_progress`).
 3. Branch: `agent/<id>-short-slug` (e.g. `agent/1.2a-identity-hardening`).
-4. Implement + test locally (`npm run build:web`, identity tests if present).
+4. Implement + run required builds (`build:shared`, web; identity if touched).
 5. Update this file: mark item `done` or leave `in_progress` with notes; set the following item to `next`.
-6. Open a PR against `main`. Do **not** merge. Do **not** push directly to `main`.
-7. Deploy happens only after merge to `main` (existing Cloudflare Pages workflow).
+6. Open a PR to `main`, then **merge** it (or land verified commits on `main`). Never force-push.
+7. Deploy: Pages on `main` push; Identity Fly workflow when identity paths change.
+8. Humans: `git pull origin main` to match what shipped.
+
+Automation prompt copy-paste: [06_Automation_Prompt.md](./06_Automation_Prompt.md)  
+Demo login: [07_Demo_Login.md](./07_Demo_Login.md)  
+Live Identity (Fly) one-time: [08_Live_Identity_Setup.md](./08_Live_Identity_Setup.md)
 
 ---
 

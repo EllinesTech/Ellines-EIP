@@ -9,7 +9,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "dotenv -e ../../.env --override -- prisma migrate dev",
     "prisma:push": "dotenv -e ../../.env --override -- prisma db push",
-    "prisma:studio": "dotenv -e ../../.env --override -- prisma studio"
+    "prisma:studio": "dotenv -e ../../.env --override -- prisma studio",
+    "seed:demo": "dotenv -e ../../.env --override -- ts-node --transpile-only prisma/seed-demo.ts"
   },
   "dependencies": {
     "@ellines-eip/shared": "*",

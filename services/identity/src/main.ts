@@ -14,7 +14,31 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api/v1');
-  app.enableCors({ origin: true, credentials: true });
+
+  const configService = app.get(ConfigService);
+  const corsRaw =
+    configService.get<string>('CORS_ORIGINS') ||
+    'http://localhost:3100,https://eip.ellines.co.ke,https://ellines-eip.pages.dev';
+  const corsOrigins = corsRaw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Allow same-origin / curl / server-to-server (no Origin header)
+      if (!origin || corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -23,12 +47,15 @@ async function bootstrap() {
     }),
   );
 
-  const configService = app.get(ConfigService);
-  const port = configService.get<number>('IDENTITY_SERVICE_PORT', 3001);
+  const port = Number(
+    process.env.PORT ||
+      configService.get<string | number>('IDENTITY_SERVICE_PORT') ||
+      3001,
+  );
 
-  await app.listen(port);
-  console.log(`Ellines EIP Identity Service listening on http://localhost:${port}`);
-  console.log(`Health: http://localhost:${port}/api/v1/health`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Ellines EIP Identity Service listening on 0.0.0.0:${port}`);
+  console.log(`Health: /api/v1/health`);
 }
 
 bootstrap();

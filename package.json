@@ -19,6 +19,8 @@
     "db:push": "npm run prisma:push -w @ellines-eip/identity",
     "db:generate": "npm run prisma:generate -w @ellines-eip/identity",
     "db:studio": "npm run prisma:studio -w @ellines-eip/identity",
+    "seed:demo": "npm run seed:demo -w @ellines-eip/identity",
+    "deploy:identity": "flyctl deploy --config services/identity/fly.toml --dockerfile services/identity/Dockerfile --app ellines-eip-identity",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",

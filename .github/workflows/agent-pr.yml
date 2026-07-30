@@ -1,0 +1,62 @@
+# Verify builds for PRs; auto-merge agent/* and cursor/* branches when green.
+# Landing on main triggers Cloudflare Pages (and Identity Fly when paths match).
+
+name: Agent PR check and auto-merge
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: agent-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build shared
+        run: npm run build:shared
+
+      - name: Build web
+        run: npm run build -w @ellines-eip/web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://ellines-eip-identity.fly.dev' }}
+
+      - name: Build identity
+        run: npm run build -w @ellines-eip/identity
+
+  auto-merge:
+    name: Auto-merge agent PR
+    needs: build
+    if: startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'cursor/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge PR (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --auto \
+            --delete-branch \
+          || gh pr merge "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --delete-branch

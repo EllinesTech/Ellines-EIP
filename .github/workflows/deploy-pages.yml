@@ -48,7 +48,8 @@ jobs:
 
       - name: Build web
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          # Prefer secret; apps/web falls back to Fly URL when unset/empty.
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://ellines-eip-identity.fly.dev' }}
         run: npm run build -w @ellines-eip/web
 
       - name: Deploy to Cloudflare Pages
