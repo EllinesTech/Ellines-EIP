@@ -8,17 +8,25 @@
   position: fixed;
   inset: 0;
   width: 100%;
+  max-width: 100%;
+  height: 100svh;
   height: 100dvh;
+  max-height: 100svh;
   max-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(1rem, 3vh, 1.75rem) clamp(1.25rem, 4vw, 2rem) clamp(5rem, 16vh, 7.5rem);
+  padding:
+    max(0.75rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(2.5rem, env(safe-area-inset-bottom, 0px), 8vh)
+    max(1rem, env(safe-area-inset-left, 0px));
   background: var(--ink);
   color: var(--mist);
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .atmosphere {
@@ -27,15 +35,19 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  contain: paint;
+  isolation: isolate;
 }
 
 .bg {
   position: absolute;
-  inset: -3%;
-  width: 106%;
-  height: 106%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
   object-fit: cover;
   object-position: center bottom;
+  transform-origin: center center;
   animation: bgDrift 32s ease-in-out infinite alternate;
   will-change: transform;
 }
@@ -94,12 +106,14 @@
   flex: 1;
   min-height: 0;
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding-bottom: 0.5rem;
+  overflow: hidden;
   animation: rise 0.8s ease both;
 }
 
@@ -226,9 +240,10 @@
   z-index: 2;
   flex-shrink: 0;
   width: min(100%, 440px);
+  max-width: 100%;
   padding-top: 0.25rem;
   padding-bottom: 0;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .bootBlock {
@@ -356,10 +371,10 @@
 
 @keyframes bgDrift {
   from {
-    transform: scale(1) translate3d(0, 0, 0);
+    transform: scale(1.04) translate3d(0, 0, 0);
   }
   to {
-    transform: scale(1.035) translate3d(-1%, -0.6%, 0);
+    transform: scale(1.1) translate3d(-1.2%, -0.8%, 0);
   }
 }
 
@@ -393,9 +408,7 @@
   }
 
   .bg {
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    transform: none;
   }
 
   .starsA,
@@ -405,5 +418,70 @@
 
   .getStarted:hover {
     transform: none;
+  }
+}
+
+/* Short phones / landscape — compress so nothing forces scroll */
+@media (max-height: 720px) {
+  .page {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .hex {
+    width: min(18vw, 72px);
+  }
+
+  .ellines {
+    font-size: clamp(1.2rem, 3.6vw, 1.65rem);
+  }
+
+  .eip {
+    font-size: clamp(1.55rem, 4.5vw, 2.1rem);
+  }
+
+  .slogan {
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+  }
+
+  .poweredBlock {
+    margin-top: 0.7rem;
+    gap: 0.35rem;
+  }
+
+  .ellineaIcon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .bootBlock {
+    gap: 0.55rem;
+  }
+
+  .getStarted {
+    padding: 0.8rem 1.25rem;
+    max-width: 240px;
+  }
+}
+
+@media (max-height: 560px) {
+  .platform,
+  .slogan,
+  .poweredBlock {
+    display: none;
+  }
+
+  .hex {
+    width: 56px;
+  }
+}
+
+@media (max-width: 380px) {
+  .footer {
+    width: 100%;
+  }
+
+  .getStarted {
+    max-width: 100%;
   }
 }

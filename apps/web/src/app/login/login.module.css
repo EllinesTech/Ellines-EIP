@@ -1,10 +1,14 @@
 .shell {
+  min-height: 100svh;
   min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   background: #05060f;
   color: #eef3fb;
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  overflow-x: hidden;
 }
 
 .brandPanel {

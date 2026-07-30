@@ -36,7 +36,10 @@ html,
 body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
+  overflow-x: hidden;
   font-family: var(--eip-font);
   color: var(--eip-navy);
   background: var(--eip-fog);
@@ -49,10 +52,15 @@ a {
   text-decoration: none;
 }
 
+/* Lock as soon as splash markup exists — don't wait for client useEffect */
+html:has([data-eip-fit]),
+html:has([data-eip-fit]) body,
 html.eip-splash-lock,
 html.eip-splash-lock body {
   overflow: hidden !important;
   height: 100% !important;
+  max-height: 100dvh !important;
+  overscroll-behavior: none;
 }
 
 button,

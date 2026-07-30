@@ -80,9 +80,16 @@ export default function SplashPage() {
   }, []);
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-eip-fit>
       <div className={styles.atmosphere} aria-hidden>
-        <img src="/brand/splash-bg.png" alt="" className={styles.bg} />
+        <img
+          src="/brand/splash-bg.png"
+          alt=""
+          className={styles.bg}
+          width={1536}
+          height={1024}
+          decoding="async"
+        />
         <div className={styles.starsA} />
         <div className={styles.starsB} />
         <div className={styles.bgShade} />
