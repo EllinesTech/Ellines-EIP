@@ -69,7 +69,7 @@ export function useAutofitScale(deps: DependencyList = []) {
         } else {
           setStyle({
             transform: `scale(${scale})`,
-            transformOrigin: 'center top',
+            transformOrigin: 'center center',
             marginBottom: `${Math.round(needH * (scale - 1))}px`,
             width: '100%',
           });
