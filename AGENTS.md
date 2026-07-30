@@ -62,3 +62,14 @@ Agents only open PRs; humans (or protected merge rules) merge.
 ## Out of scope for agents unless the queue says so
 
 Mobile, marketplace, digital twin, autonomous agents, multi-company consolidation (see MVP out-of-scope → v1.1+).
+
+## Cursor Cloud specific instructions
+
+Startup layer: `npm install`, `npm run db:generate` (Prisma client), and `npm run build:shared` are handled by the VM update script — do not repeat them. The notes below cover things the update script cannot do.
+
+- **Local database (not Supabase):** In Cloud there are no Supabase secrets, so a local PostgreSQL 16 (apt) stands in for it, using the same creds as `infra/docker/docker-compose.yml` (`eip` / `eip_dev_password` / `ellines_eip`). Root `.env` (gitignored) points `DATABASE_URL`/`DIRECT_URL` at `localhost:5432`. If real Supabase creds are provided, put them in `.env` instead.
+- **Start Postgres before the identity service** (it is not auto-started on a fresh pod): `sudo pg_ctlcluster 16 main start`. The `identity` service calls `$connect()` on boot and will crash after 5 retries if the DB is down. If `.env` or the `eip` role/DB are missing (fresh snapshot), recreate: role `eip` with password `eip_dev_password`, database `ellines_eip`, then `npm run db:push` to sync the schema.
+- **Schema changes:** `npm run db:push` (Prisma `db push`) syncs the local DB; there are no migration files.
+- **Web dev server runs the full Next.js server** (`next dev`, port 3100). `output: 'export'` only applies when `NODE_ENV=production` (Pages deploy), so `next dev` supports API-backed auth. Auth is client-side (JWT in `localStorage`); the web app calls the identity API at `NEXT_PUBLIC_API_URL` (`http://localhost:3001`).
+- **Lint is not configured.** `npm run lint` → `next lint` in `apps/web` prompts interactively (no ESLint config, and `next lint` is deprecated). It is effectively a no-op / blocks in CI-style runs. `identity` and `shared` have no lint script. Don't treat lint as a gate until ESLint is actually wired up.
+- **Hello-world check:** with both servers up, register an org at `http://localhost:3100/register/` (creates org + owner, redirects to `/app` Command Center), or hit the API directly: `POST http://localhost:3001/api/v1/auth/register`. Health: `http://localhost:3001/api/v1/health`.
