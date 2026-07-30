@@ -1,6 +1,8 @@
 /* Login: fit one viewport — no scroll on typical laptop/phone heights */
 
 .shell {
+  position: fixed;
+  inset: 0;
   height: 100svh;
   height: 100dvh;
   max-height: 100svh;
@@ -13,6 +15,8 @@
   color: #eef3fb;
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .brandPanel {
@@ -179,7 +183,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: clamp(0.6rem, 2vh, 1.25rem) clamp(0.85rem, 2.5vw, 1.5rem);
+  padding: clamp(0.5rem, 1.8vh, 1rem) clamp(0.75rem, 2.2vw, 1.25rem);
   background: rgba(12, 16, 28, 0.95);
   border-left: 1px solid rgba(232, 237, 245, 0.08);
   min-height: 0;
@@ -549,10 +553,9 @@
   .formPanel {
     border-left: none;
     border-top: 1px solid rgba(232, 237, 245, 0.08);
-    justify-content: flex-start;
-    padding: 0.65rem 1rem 0.75rem;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    justify-content: center;
+    padding: 0.5rem 0.85rem 0.65rem;
+    overflow: hidden;
   }
 
   .card {

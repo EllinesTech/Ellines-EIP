@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, setSession } from '@/lib/api';
 import styles from './login.module.css';
+import { useAutofitScale } from './use-autofit-scale';
 
 type AuthTab = 'account' | 'sso';
 
@@ -17,6 +18,9 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const brandFit = useAutofitScale([]);
+  const formFit = useAutofitScale([tab, error, showPassword]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -44,8 +48,15 @@ export default function LoginPage() {
 
   return (
     <div className={styles.shell}>
-      <section className={styles.brandPanel}>
-        <div className={styles.brandStack}>
+      <section
+        className={styles.brandPanel}
+        ref={brandFit.containerRef}
+      >
+        <div
+          className={styles.brandStack}
+          ref={brandFit.contentRef}
+          style={brandFit.contentStyle}
+        >
           <img src="/brand/logo-hex.png?v=3" alt="" className={styles.hex} />
           <div className={styles.wordmark}>
             <span className={styles.ellines}>ELLINES</span>
@@ -69,8 +80,15 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <section className={styles.formPanel}>
-        <div className={styles.card}>
+      <section
+        className={styles.formPanel}
+        ref={formFit.containerRef}
+      >
+        <div
+          className={styles.card}
+          ref={formFit.contentRef}
+          style={formFit.contentStyle}
+        >
           <h1>Welcome back</h1>
           <p className={styles.subtitle}>Sign in to continue to your workspace</p>
 
