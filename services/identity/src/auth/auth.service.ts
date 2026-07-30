@@ -6,9 +6,14 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
@@ -130,6 +135,104 @@ export class AuthService {
         slug: user.organization.slug,
       },
     };
+  }
+
+  /**
+   * Issues a one-time reset token. Always returns a generic message.
+   * Until notification service exists, `resetToken` is included when a user matched
+   * so clients/admins can complete the flow (same MVP pattern as invite temp passwords).
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    const base = {
+      message: 'If that email is registered, a password reset token has been issued.',
+    };
+
+    if (!user || !user.isActive) {
+      return base;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        organizationId: user.organizationId,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: user.organizationId,
+        userId: user.id,
+        action: 'auth.forgot_password',
+        resource: 'user',
+      },
+    });
+
+    return {
+      ...base,
+      resetToken: rawToken,
+      expiresIn: '1h',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = this.hashToken(dto.token);
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!record || record.usedAt || record.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    if (!record.user.isActive) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      });
+      await tx.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      });
+      // Invalidate any other outstanding tokens for this user
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: record.userId,
+          usedAt: null,
+          id: { not: record.id },
+        },
+        data: { usedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: record.organizationId ?? record.user.organizationId,
+          userId: record.userId,
+          action: 'auth.reset_password',
+          resource: 'user',
+        },
+      });
+    });
+
+    return { message: 'Password updated. You can sign in with your new password.' };
+  }
+
+  hashToken(rawToken: string): string {
+    return createHash('sha256').update(rawToken).digest('hex');
   }
 
   private signTokens(userId: string, email: string, organizationId: string, role: string) {

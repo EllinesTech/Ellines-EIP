@@ -12,7 +12,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~60% | Identity + web shell live; gateway / full admin / audit wiring incomplete |
+| **1 — Platform Foundation** | ~70% | Identity hardened (roles + password reset + tests); gateway / full admin / audit wiring incomplete |
 | **2 — Integration Hub** | ~5% | SDK README + UI placeholder only |
 | **3 — Executive Command Center** | ~25% | Shell + placeholder KPIs; no live data |
 | **4 — Ellinea AI** | ~5% | Brand + placeholder page only |
@@ -28,9 +28,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | 1.1 | Monorepo & CI | `done` | Workspaces, Pages deploy workflow; lint/test CI thin |
-| 1.2 | Identity Core | `in_progress` | NestJS: register/login JWT, orgs, branches, depts, invite, roles, AuditLog model |
-| 1.2a | Harden Identity (tests, password reset, role guards on all routes) | `next` | First agent target after landing WIP brand/UI |
-| 1.3 | API Gateway | `todo` | `apps/api-gateway` not present yet |
+| 1.2 | Identity Core | `done` | NestJS: register/login JWT, orgs, branches, depts, invite, roles, AuditLog model |
+| 1.2a | Harden Identity (tests, password reset, role guards on all routes) | `done` | RolesGuard on org writes; forgot/reset password + PasswordResetToken; Jest unit tests |
+| 1.3 | API Gateway | `next` | `apps/api-gateway` not present yet |
 | 1.4 | Audit Trail | `in_progress` | Prisma model exists; not consistently written on all actions |
 | 1.5 | Admin Console | `in_progress` | Settings shows session; no full user/branch/connector admin UI |
 
@@ -82,6 +82,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ## Recently landed on main (2026-07-30)
 
+- Identity hardening (1.2a): RolesGuard, password reset tokens, Jest tests
 - Brand assets (Ellinea + EIP logos, favicons, splash)
 - Splash / login / register / app shell visual refresh
 - Agent sync pipeline (land on `main` after build; auto-merge `agent/*` PRs)
