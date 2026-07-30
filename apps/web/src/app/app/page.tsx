@@ -132,19 +132,7 @@ export default function CommandCenterPage() {
         {home.kpis.map((k) => (
           <article key={k.label} className={styles.kpi}>
             <span>{k.label}</span>
-            <strong
-              className={
-                k.tone === 'ready'
-                  ? styles.ready
-                  : k.tone === 'warn'
-                    ? styles.warn
-                    : k.tone === 'pos'
-                      ? styles.pos
-                      : undefined
-              }
-            >
-              {k.value}
-            </strong>
+            <strong>{k.value}</strong>
             <em
               className={
                 k.tone === 'warn'
