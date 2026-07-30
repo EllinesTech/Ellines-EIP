@@ -78,3 +78,53 @@ export async function verifyAccessToken(
   }
   return { sub, email, organizationId, role };
 }
+
+export async function hashToken(rawToken: string): Promise<string> {
+  const data = new TextEncoder().encode(rawToken);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function randomTokenHex(bytes = 32): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Short-lived passwordless SSO challenge (work email). */
+export async function signSsoChallenge(
+  env: Env,
+  payload: { sub: string; email: string; organizationId: string; role: string },
+): Promise<{ ssoToken: string; expiresIn: string }> {
+  const expiresIn = '15m';
+  const jose = await import('jose');
+  const ssoToken = await new jose.SignJWT({
+    ...payload,
+    purpose: 'sso',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(requireJwtSecret(env));
+  return { ssoToken, expiresIn };
+}
+
+export async function verifySsoChallenge(
+  env: Env,
+  token: string,
+): Promise<{ sub: string; email: string; organizationId: string; role: string }> {
+  const jose = await import('jose');
+  const { payload } = await jose.jwtVerify(token, requireJwtSecret(env));
+  if (payload.purpose !== 'sso') {
+    throw new Error('Invalid SSO token');
+  }
+  const sub = typeof payload.sub === 'string' ? payload.sub : '';
+  const email = typeof payload.email === 'string' ? payload.email : '';
+  const organizationId =
+    typeof payload.organizationId === 'string' ? payload.organizationId : '';
+  const role = typeof payload.role === 'string' ? payload.role : '';
+  if (!sub || !email || !organizationId || !role) {
+    throw new Error('Invalid SSO token payload');
+  }
+  return { sub, email, organizationId, role };
+}

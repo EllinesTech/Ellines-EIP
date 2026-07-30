@@ -96,3 +96,77 @@ describe('AuthService password reset', () => {
     );
   });
 });
+
+describe('AuthService SSO', () => {
+  const prisma = {
+    user: {
+      findUnique: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn(),
+    },
+  } as unknown as PrismaService;
+
+  const jwt = {
+    sign: jest.fn().mockReturnValue('sso.jwt.token'),
+    verify: jest.fn(),
+  } as unknown as JwtService;
+  const auth = new AuthService(prisma, jwt);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (jwt.sign as jest.Mock).mockReturnValue('sso.jwt.token');
+  });
+
+  it('returns generic message without token when email is unknown', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    const result = await auth.ssoRequest({ email: 'missing@example.com' });
+    expect(result.message).toMatch(/SSO/i);
+    expect(result).not.toHaveProperty('ssoToken');
+  });
+
+  it('issues an SSO token for an active user', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'u1',
+      email: 'owner@example.com',
+      organizationId: 'o1',
+      role: 'owner',
+      isActive: true,
+    });
+    (prisma.auditLog.create as jest.Mock).mockResolvedValue({});
+
+    const result = await auth.ssoRequest({ email: 'owner@example.com', provider: 'google' });
+    expect('ssoToken' in result && result.ssoToken).toBe('sso.jwt.token');
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: 'sso', sub: 'u1' }),
+      expect.objectContaining({ expiresIn: '15m' }),
+    );
+  });
+
+  it('verifies SSO token and returns a session', async () => {
+    (jwt.verify as jest.Mock).mockReturnValue({
+      purpose: 'sso',
+      sub: 'u1',
+      email: 'owner@example.com',
+      organizationId: 'o1',
+      role: 'owner',
+    });
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'u1',
+      email: 'owner@example.com',
+      fullName: 'Owner',
+      organizationId: 'o1',
+      role: 'owner',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organization: { id: 'o1', name: 'Org', slug: 'org' },
+    });
+    (prisma.auditLog.create as jest.Mock).mockResolvedValue({});
+    (jwt.sign as jest.Mock).mockReturnValue('access.token');
+
+    const result = await auth.ssoVerify({ token: 'sso.jwt.token' });
+    expect(result.accessToken).toBe('access.token');
+    expect(result.user.email).toBe('owner@example.com');
+  });
+});

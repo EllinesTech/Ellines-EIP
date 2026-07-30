@@ -12,8 +12,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SsoRequestDto } from './dto/sso-request.dto';
+import { SsoVerifyDto } from './dto/sso-verify.dto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const SSO_TOKEN_TTL = '15m';
 
 @Injectable()
 export class AuthService {
@@ -229,6 +232,105 @@ export class AuthService {
     });
 
     return { message: 'Password updated. You can sign in with your new password.' };
+  }
+
+  /**
+   * Passwordless work-email SSO. Until notification service exists, `ssoToken`
+   * is returned when a user matched so the client can complete verify.
+   */
+  async ssoRequest(dto: SsoRequestDto) {
+    const email = dto.email.toLowerCase();
+    const provider = (dto.provider || 'email').toLowerCase();
+    const base = {
+      message:
+        'If that work email is registered, a one-time SSO sign-in link has been issued.',
+    };
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive) {
+      return base;
+    }
+
+    const ssoToken = this.jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        organizationId: user.organizationId,
+        role: user.role,
+        purpose: 'sso',
+      },
+      { expiresIn: SSO_TOKEN_TTL },
+    );
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: user.organizationId,
+        userId: user.id,
+        action: 'auth.sso_request',
+        resource: 'user',
+        metadata: { provider },
+      },
+    });
+
+    return {
+      ...base,
+      ssoToken,
+      expiresIn: SSO_TOKEN_TTL,
+    };
+  }
+
+  async ssoVerify(dto: SsoVerifyDto) {
+    let payload: {
+      sub?: string;
+      email?: string;
+      organizationId?: string;
+      role?: string;
+      purpose?: string;
+    };
+    try {
+      payload = this.jwt.verify(dto.token);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired SSO token');
+    }
+
+    if (
+      payload.purpose !== 'sso' ||
+      !payload.sub ||
+      !payload.email ||
+      !payload.organizationId ||
+      !payload.role
+    ) {
+      throw new UnauthorizedException('Invalid or expired SSO token');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { organization: true },
+    });
+
+    if (!user || !user.isActive || user.email.toLowerCase() !== payload.email.toLowerCase()) {
+      throw new UnauthorizedException('Invalid or expired SSO token');
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: user.organizationId,
+        userId: user.id,
+        action: 'auth.sso_login',
+        resource: 'user',
+      },
+    });
+
+    const tokens = this.signTokens(user.id, user.email, user.organizationId, user.role);
+    return {
+      user: this.sanitizeUser(user),
+      organization: {
+        id: user.organization.id,
+        name: user.organization.name,
+        slug: user.organization.slug,
+      },
+      ...tokens,
+    };
   }
 
   hashToken(rawToken: string): string {

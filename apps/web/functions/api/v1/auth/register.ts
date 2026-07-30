@@ -65,10 +65,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       );
     }
 
+    const now = new Date().toISOString();
+
     const { error: orgErr } = await supabase.from('organizations').insert({
       id: orgId,
       name: organizationName,
       slug,
+      created_at: now,
+      updated_at: now,
     });
     if (orgErr) {
       return json({ statusCode: 500, message: orgErr.message }, 500);
@@ -82,6 +86,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       organization_id: orgId,
       role: 'owner',
       is_active: true,
+      created_at: now,
+      updated_at: now,
     });
     if (userErr) {
       await supabase.from('organizations').delete().eq('id', orgId);
@@ -94,9 +100,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       user_id: userId,
       action: 'auth.register',
       resource: 'organization',
+      created_at: now,
     });
 
-    const now = new Date().toISOString();
     const tokens = await signAccessToken(context.env, {
       sub: userId,
       email,

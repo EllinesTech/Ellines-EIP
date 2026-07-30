@@ -103,3 +103,37 @@ export function register(payload: {
 export function fetchMe() {
   return request<{ user: AuthUser; organization: AuthOrganization }>('/api/v1/auth/me');
 }
+
+export function forgotPassword(email: string) {
+  return request<{ message: string; resetToken?: string; expiresIn?: string }>(
+    '/api/v1/auth/forgot-password',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    },
+  );
+}
+
+export function resetPassword(token: string, newPassword: string) {
+  return request<{ message: string }>('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
+export function ssoRequest(email: string, provider?: string) {
+  return request<{ message: string; ssoToken?: string; expiresIn?: string }>(
+    '/api/v1/auth/sso/request',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email, provider }),
+    },
+  );
+}
+
+export function ssoVerify(token: string) {
+  return request<AuthSession>('/api/v1/auth/sso/verify', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}

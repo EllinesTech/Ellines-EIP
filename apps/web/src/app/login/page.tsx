@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, setSession } from '@/lib/api';
+import { login, setSession, ssoRequest, ssoVerify } from '@/lib/api';
 import styles from './login.module.css';
 import { useAutofitScale } from './use-autofit-scale';
 
@@ -16,11 +16,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [ssoEmail, setSsoEmail] = useState('');
+  const [ssoProvider, setSsoProvider] = useState('email');
+  const [ssoToken, setSsoToken] = useState('');
+  const [ssoMessage, setSsoMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const brandFit = useAutofitScale([]);
-  const formFit = useAutofitScale([tab, error, showPassword]);
+  const formFit = useAutofitScale([tab, error, showPassword, ssoToken, ssoMessage, ssoProvider]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -42,8 +46,58 @@ export default function LoginPage() {
     }
   }
 
-  function onSocial(provider: string) {
-    setError(`${provider} sign-in will be available in a later release. Use account login for now.`);
+  async function completeSso(token: string) {
+    const session = await ssoVerify(token);
+    setSession(session);
+    if (remember) {
+      localStorage.setItem('eip_remember', '1');
+    } else {
+      localStorage.removeItem('eip_remember');
+    }
+    router.replace('/app');
+  }
+
+  async function onSsoRequest(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSsoMessage('');
+    setSsoToken('');
+    setLoading(true);
+    try {
+      const result = await ssoRequest(ssoEmail, ssoProvider);
+      setSsoMessage(result.message);
+      if (result.ssoToken) {
+        setSsoToken(result.ssoToken);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'SSO request failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onSsoContinue() {
+    if (!ssoToken) return;
+    setError('');
+    setLoading(true);
+    try {
+      await completeSso(ssoToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'SSO sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function startSocial(provider: 'google' | 'microsoft') {
+    setTab('sso');
+    setError('');
+    setSsoMessage('');
+    setSsoToken('');
+    setSsoProvider(provider);
+    if (email && !ssoEmail) {
+      setSsoEmail(email);
+    }
   }
 
   return (
@@ -102,6 +156,9 @@ export default function LoginPage() {
               onClick={() => {
                 setTab('account');
                 setError('');
+                setSsoMessage('');
+                setSsoToken('');
+                setSsoProvider('email');
               }}
             >
               Account Login
@@ -114,6 +171,9 @@ export default function LoginPage() {
               onClick={() => {
                 setTab('sso');
                 setError('');
+                setSsoMessage('');
+                setSsoToken('');
+                setSsoProvider('email');
               }}
             >
               SSO Login
@@ -121,6 +181,7 @@ export default function LoginPage() {
           </div>
 
           {error ? <div className={styles.error}>{error}</div> : null}
+          {ssoMessage && tab === 'sso' ? <div className={styles.success}>{ssoMessage}</div> : null}
 
           {tab === 'account' ? (
             <form onSubmit={onSubmit}>
@@ -196,10 +257,7 @@ export default function LoginPage() {
                   />
                   <span>Keep me logged in</span>
                 </label>
-                <Link href="/login/#forgot" className={styles.forgot} onClick={(e) => {
-                  e.preventDefault();
-                  setError('Password reset will be available soon. Contact your organization admin.');
-                }}>
+                <Link href="/forgot-password" className={styles.forgot}>
                   Forgot password?
                 </Link>
               </div>
@@ -210,15 +268,75 @@ export default function LoginPage() {
             </form>
           ) : (
             <div className={styles.ssoBox}>
-              <p>Use your organization identity provider to continue.</p>
-              <button type="button" className={styles.socialBtn} onClick={() => onSocial('Microsoft')}>
-                <MicrosoftIcon />
-                Continue with Microsoft
-              </button>
-              <button type="button" className={styles.socialBtn} onClick={() => onSocial('Google')}>
-                <GoogleIcon />
-                Continue with Google
-              </button>
+              <p>
+                {ssoProvider === 'google'
+                  ? 'Continue with Google using the work email on your EIP account.'
+                  : ssoProvider === 'microsoft'
+                    ? 'Continue with Microsoft using the work email on your EIP account.'
+                    : 'Use your organization work email for passwordless SSO.'}
+              </p>
+              {!ssoToken ? (
+                <form onSubmit={onSsoRequest}>
+                  <div className={styles.field}>
+                    <label htmlFor="ssoEmail">Work email</label>
+                    <div className={styles.inputWrap}>
+                      <input
+                        id="ssoEmail"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        placeholder="you@company.com"
+                        value={ssoEmail}
+                        onChange={(e) => setSsoEmail(e.target.value)}
+                        style={{ paddingLeft: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+                  <button className={styles.submit} type="submit" disabled={loading}>
+                    {loading
+                      ? 'Requesting…'
+                      : ssoProvider === 'google'
+                        ? 'Continue with Google'
+                        : ssoProvider === 'microsoft'
+                          ? 'Continue with Microsoft'
+                          : 'Continue with SSO'}
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.submit}
+                  disabled={loading}
+                  onClick={onSsoContinue}
+                >
+                  {loading ? 'Signing in…' : 'Complete SSO sign-in →'}
+                </button>
+              )}
+              {ssoProvider !== 'email' && !ssoToken ? (
+                <button
+                  type="button"
+                  className={styles.socialBtn}
+                  onClick={() => {
+                    setSsoProvider('email');
+                    setSsoMessage('');
+                    setError('');
+                  }}
+                >
+                  Use work email SSO instead
+                </button>
+              ) : null}
+              {ssoProvider === 'email' && !ssoToken ? (
+                <>
+                  <button type="button" className={styles.socialBtn} onClick={() => startSocial('microsoft')}>
+                    <MicrosoftIcon />
+                    Continue with Microsoft
+                  </button>
+                  <button type="button" className={styles.socialBtn} onClick={() => startSocial('google')}>
+                    <GoogleIcon />
+                    Continue with Google
+                  </button>
+                </>
+              ) : null}
             </div>
           )}
 
@@ -228,11 +346,11 @@ export default function LoginPage() {
                 <span>or continue with</span>
               </div>
               <div className={styles.socialRow}>
-                <button type="button" className={styles.socialBtn} onClick={() => onSocial('Microsoft')}>
+                <button type="button" className={styles.socialBtn} onClick={() => startSocial('microsoft')}>
                   <MicrosoftIcon />
                   Microsoft
                 </button>
-                <button type="button" className={styles.socialBtn} onClick={() => onSocial('Google')}>
+                <button type="button" className={styles.socialBtn} onClick={() => startSocial('google')}>
                   <GoogleIcon />
                   Google
                 </button>

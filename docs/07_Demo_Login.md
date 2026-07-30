@@ -12,6 +12,13 @@ Use this account to open the live Command Center.
 **Auth API (live):** same-origin Cloudflare Pages Functions at `/api/v1/*` on eip.ellines.co.ke  
 **Health:** https://eip.ellines.co.ke/api/v1/health  
 
+| Flow | URL / how |
+|------|-----------|
+| Register | https://eip.ellines.co.ke/register |
+| Login | email + password on `/login` |
+| Forgot password | `/forgot-password` → one-time reset link (shown in-app until email notifications ship) |
+| SSO | `/login` → SSO tab → work email (Google/Microsoft use the same work-email verify until IdP OAuth is configured) |
+
 Full Nest Identity on Fly remains available for later microservice hosting — see [08_Live_Identity_Setup.md](./08_Live_Identity_Setup.md).
 
 ## Seed / reset the demo user
