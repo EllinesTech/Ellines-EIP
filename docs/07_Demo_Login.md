@@ -1,6 +1,6 @@
 # Demo login — Ellines EIP
 
-Use this account to open the live Command Center after Identity is deployed.
+Use this account to open the live Command Center.
 
 | Field | Value |
 |-------|-------|
@@ -9,31 +9,34 @@ Use this account to open the live Command Center after Identity is deployed.
 | **Password** | `EllinesDemo2026!` |
 | **Organization** | Ellines Demo Org |
 
-Identity API (production): `https://ellines-eip-identity.fly.dev`  
-Health: https://ellines-eip-identity.fly.dev/api/v1/health
+**Auth API (live):** same-origin Cloudflare Pages Functions at `/api/v1/*` on eip.ellines.co.ke  
+**Health:** https://eip.ellines.co.ke/api/v1/health  
+
+Full Nest Identity on Fly remains available for later microservice hosting — see [08_Live_Identity_Setup.md](./08_Live_Identity_Setup.md).
 
 ## Seed / reset the demo user
 
-Against the same database Identity uses (Supabase in production, local Postgres in Cloud/dev):
+Against the Supabase (or local) database used by production auth:
 
 ```bash
-# Ensure schema exists
 npm run db:push
-
-# Upsert demo org + owner
 npm run seed:demo
 ```
 
 Override defaults with env if needed: `DEMO_EMAIL`, `DEMO_PASSWORD`, `DEMO_ORG_NAME`, `DEMO_ORG_SLUG`, `DEMO_FULL_NAME`.
 
-## Wire-up checklist (one-time)
+## Pages secrets (one-time)
 
-1. Create Fly app and set secrets (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`).
-2. `npm run deploy:identity` (or push identity changes to `main`).
-3. Set GitHub Actions secret `NEXT_PUBLIC_API_URL` = `https://ellines-eip-identity.fly.dev`
-4. Push/redeploy web so the static build embeds that API URL.
-5. Run `npm run seed:demo` with production DB URLs in `.env`.
+Cloudflare Pages project `ellines-eip` needs:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `JWT_SECRET`
+
+```powershell
+powershell -File scripts/set-pages-auth-secrets.ps1
+```
 
 ## Security
 
-This is a **shared pilot** account. Change `DEMO_PASSWORD` and re-seed before any external launch. Do not reuse this password for personal accounts.
+This is a **shared pilot** account. Change `DEMO_PASSWORD` and re-seed before any external launch.

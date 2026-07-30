@@ -15,7 +15,7 @@
     "build": "npm run build --workspaces --if-present",
     "build:shared": "npm run build -w @ellines-eip/shared",
     "build:web": "npm run build:shared && npm run build -w @ellines-eip/web",
-    "deploy:pages": "npm run build:web && npx wrangler pages deploy apps/web/out --project-name=ellines-eip --commit-dirty=true --branch=main",
+    "deploy:pages": "npm run build:web && npm run deploy:pages -w @ellines-eip/web",
     "db:push": "npm run prisma:push -w @ellines-eip/identity",
     "db:generate": "npm run prisma:generate -w @ellines-eip/identity",
     "db:studio": "npm run prisma:studio -w @ellines-eip/identity",

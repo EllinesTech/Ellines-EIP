@@ -17,7 +17,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **3 — Executive Command Center** | ~25% | Shell + placeholder KPIs; no live data |
 | **4 — Ellinea AI** | ~5% | Brand + placeholder page only |
 | **5 — Workflow & Automation** | 0% | Not started |
-| **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke); Identity → Fly `ellines-eip-identity` |
+| **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (UI + same-origin `/api/v1` auth); Nest Identity on Fly optional |
 
 **Critical path remaining:** finish Identity/Admin → Integration Hub → live Dashboard → Ellinea AI → Workflows.
 

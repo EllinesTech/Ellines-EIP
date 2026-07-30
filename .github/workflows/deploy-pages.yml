@@ -48,8 +48,9 @@ jobs:
 
       - name: Build web
         env:
-          # Prefer secret; apps/web falls back to Fly URL when unset/empty.
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://ellines-eip-identity.fly.dev' }}
+          # Empty = same-origin Pages Functions on eip.ellines.co.ke.
+          # Set secret to override (e.g. Fly Identity URL).
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: npm run build -w @ellines-eip/web
 
       - name: Deploy to Cloudflare Pages
@@ -60,3 +61,6 @@ jobs:
           wranglerVersion: "4.114.0"
           workingDirectory: apps/web
           command: pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

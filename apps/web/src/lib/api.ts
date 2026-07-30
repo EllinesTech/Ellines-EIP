@@ -1,8 +1,13 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === 'production'
-    ? 'https://ellines-eip-identity.fly.dev'
-    : 'http://localhost:3001');
+const API_URL = (() => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  // Production static site talks to same-origin Cloudflare Pages Functions.
+  if (process.env.NODE_ENV === 'production') {
+    return '';
+  }
+  return 'http://localhost:3001';
+})();
 
 const AUTH_KEY = 'eip_auth';
 
