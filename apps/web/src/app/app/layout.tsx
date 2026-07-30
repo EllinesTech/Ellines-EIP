@@ -233,10 +233,6 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
           </div>
-          <div className={styles.powered}>
-            <span>Powered by</span>
-            <img src="/brand/ellinea-mark.png" alt="Ellinea AI" className={styles.ellineaFoot} />
-          </div>
         </div>
       </aside>
 
