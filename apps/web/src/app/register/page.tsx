@@ -36,6 +36,7 @@ export default function RegisterPage() {
 
   return (
     <div className={styles.shell}>
+      <div className={styles.shellInner}>
       <section className={styles.brandPanel} ref={brandFit.containerRef}>
         <div
           className={styles.brandStack}
@@ -133,6 +134,7 @@ export default function RegisterPage() {
           </p>
         </div>
       </section>
+      </div>
     </div>
   );
 }

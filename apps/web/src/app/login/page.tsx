@@ -48,6 +48,7 @@ export default function LoginPage() {
 
   return (
     <div className={styles.shell}>
+      <div className={styles.shellInner}>
       <section
         className={styles.brandPanel}
         ref={brandFit.containerRef}
@@ -254,6 +255,7 @@ export default function LoginPage() {
           </p>
         </div>
       </section>
+      </div>
     </div>
   );
 }

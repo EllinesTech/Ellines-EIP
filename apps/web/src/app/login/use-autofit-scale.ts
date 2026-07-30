@@ -9,8 +9,8 @@ import {
 } from 'react';
 
 /**
- * Autofit: shrink content to the container so auth screens never scroll.
- * Prefers CSS `zoom` (affects layout). Falls back to scale + negative margins.
+ * Autofit: shrink only when needed so content fits the panel.
+ * Keeps a readable floor so spacing stays reasonable.
  */
 export function useAutofitScale(deps: DependencyList = []) {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -38,20 +38,28 @@ export function useAutofitScale(deps: DependencyList = []) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         reset();
-        setStyle({});
 
-        const pad = 8;
+        const pad = 12;
         const availH = Math.max(0, container.clientHeight - pad);
         const availW = Math.max(0, container.clientWidth - pad);
-        if (availH < 40 || availW < 40) return;
+        if (availH < 48 || availW < 48) {
+          setStyle({});
+          return;
+        }
 
         const needH = content.scrollHeight;
         const needW = content.scrollWidth;
-        if (needH < 1 || needW < 1) return;
+        if (needH < 1 || needW < 1) {
+          setStyle({});
+          return;
+        }
 
-        const next = Math.min(1, availH / needH, availW / needW);
-        const scale = Math.max(0.48, Number((next * 0.97).toFixed(4)));
-        if (scale >= 0.995) {
+        // Only shrink when overflowing; never enlarge.
+        const raw = Math.min(1, availH / needH, availW / needW);
+        // Soften slightly, keep readable (avoid crushed look).
+        const scale = Math.max(0.72, Number((raw * 0.99).toFixed(4)));
+
+        if (scale >= 0.992) {
           setStyle({});
           return;
         }
@@ -61,7 +69,7 @@ export function useAutofitScale(deps: DependencyList = []) {
         } else {
           setStyle({
             transform: `scale(${scale})`,
-            transformOrigin: 'top center',
+            transformOrigin: 'center top',
             marginBottom: `${Math.round(needH * (scale - 1))}px`,
             width: '100%',
           });
