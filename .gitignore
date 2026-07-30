@@ -34,6 +34,8 @@ desktop.ini
 # Build artifacts
 *.tsbuildinfo
 coverage/
+.wrangler/
+apps/web/.wrangler/
 
 # Docker volumes
 infra/docker/data/
