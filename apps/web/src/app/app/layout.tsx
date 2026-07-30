@@ -223,8 +223,19 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <div className={styles.profile}>
-            <div className={styles.avatar}>{initials(session.user.fullName)}</div>
+          <Link
+            href="/app/settings"
+            className={
+              pathname.startsWith('/app/settings')
+                ? `${styles.profile} ${styles.profileActive}`
+                : styles.profile
+            }
+            title="Profile & settings"
+          >
+            <div className={styles.avatar}>
+              {initials(session.user.fullName)}
+              <span className={styles.avatarStatus} aria-hidden />
+            </div>
             <div className={styles.profileMeta}>
               <div className={styles.profileName}>{session.user.fullName}</div>
               <div className={styles.profileRole}>
@@ -232,7 +243,12 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                 {platformAdmin ? ' · platform' : ''}
               </div>
             </div>
-          </div>
+            <span className={styles.profileChevron} aria-hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </Link>
         </div>
       </aside>
 
@@ -272,9 +288,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
               </svg>
               <span className={styles.badge} />
             </button>
-            <div className={styles.topAvatar} title={session.user.fullName}>
+            <Link
+              href="/app/settings"
+              className={styles.topAvatar}
+              title="Profile & settings"
+              aria-label="Profile and settings"
+            >
               {initials(session.user.fullName)}
-            </div>
+            </Link>
             <button type="button" className={styles.signOut} onClick={logout}>
               Sign out
             </button>
