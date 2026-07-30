@@ -1,12 +1,15 @@
 import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { ORG_ADMIN_ROLES } from '@ellines-eip/shared';
 import { OrgsService } from './orgs.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 
 @Controller('orgs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class OrgsController {
   constructor(private readonly orgs: OrgsService) {}
 
@@ -21,6 +24,7 @@ export class OrgsController {
   }
 
   @Post('me/users')
+  @Roles(...ORG_ADMIN_ROLES)
   inviteUser(
     @Request() req: { user: { organizationId: string; role: string } },
     @Body() dto: InviteUserDto,
@@ -34,6 +38,7 @@ export class OrgsController {
   }
 
   @Post('me/branches')
+  @Roles(...ORG_ADMIN_ROLES)
   createBranch(
     @Request() req: { user: { organizationId: string } },
     @Body() dto: CreateBranchDto,
@@ -47,6 +52,7 @@ export class OrgsController {
   }
 
   @Post('me/departments')
+  @Roles(...ORG_ADMIN_ROLES)
   createDepartment(
     @Request() req: { user: { organizationId: string } },
     @Body() dto: CreateDepartmentDto,

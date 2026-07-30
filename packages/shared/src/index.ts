@@ -57,6 +57,9 @@ export const EIP_ROLES: UserRole[] = [
   'viewer',
 ];
 
+/** Roles that can mutate org membership and structure. */
+export const ORG_ADMIN_ROLES: UserRole[] = ['owner', 'admin'];
+
 export const SERVICE_PORTS = {
   apiGateway: 3000,
   identity: 3001,
