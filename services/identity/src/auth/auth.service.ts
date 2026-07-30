@@ -5,8 +5,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
+import { isPlatformAdminEmail, parsePlatformAdminEmails } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -23,6 +25,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -39,7 +42,7 @@ export class AuthService {
       throw new ConflictException('Organization name already taken — try a different name');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = await bcrypt.hash(dto.password, 8);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
@@ -130,6 +133,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    const allowlist = parsePlatformAdminEmails(
+      this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
+    );
     return {
       user: this.sanitizeUser(user),
       organization: {
@@ -137,6 +143,7 @@ export class AuthService {
         name: user.organization.name,
         slug: user.organization.slug,
       },
+      isPlatformAdmin: isPlatformAdminEmail(user.email, allowlist),
     };
   }
 
@@ -201,7 +208,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    const passwordHash = await bcrypt.hash(dto.newPassword, 8);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({

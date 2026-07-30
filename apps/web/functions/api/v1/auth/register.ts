@@ -1,4 +1,4 @@
-import { getAdminClient, json, options, signAccessToken, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, signAccessToken, BCRYPT_ROUNDS, type Env } from '../../../shared/auth';
 
 function slugify(name: string): string {
   return name
@@ -40,7 +40,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const supabase = getAdminClient(context.env);
     const bcrypt = await import('bcryptjs');
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const orgId = crypto.randomUUID();
     const userId = crypto.randomUUID();
 

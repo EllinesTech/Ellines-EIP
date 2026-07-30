@@ -22,7 +22,7 @@ const DEMO_NAME = process.env.DEMO_FULL_NAME || 'Demo Executive';
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 8);
 
   const org = await prisma.organization.upsert({
     where: { slug: DEMO_SLUG },

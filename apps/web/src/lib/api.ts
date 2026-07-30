@@ -31,6 +31,32 @@ export interface AuthSession {
   expiresIn: string;
   user: AuthUser;
   organization: AuthOrganization;
+  isPlatformAdmin?: boolean;
+}
+
+export interface OrgMember {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PlatformOrg {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  userCount: number;
+  status: string;
+}
+
+export interface FeatureFlag {
+  key: string;
+  label: string;
+  enabled: boolean;
+  note: string;
 }
 
 export function getSession(): AuthSession | null {
@@ -101,7 +127,26 @@ export function register(payload: {
 }
 
 export function fetchMe() {
-  return request<{ user: AuthUser; organization: AuthOrganization }>('/api/v1/auth/me');
+  return request<{
+    user: AuthUser;
+    organization: AuthOrganization;
+    isPlatformAdmin?: boolean;
+  }>('/api/v1/auth/me');
+}
+
+/** Refresh session flags (e.g. isPlatformAdmin) from /auth/me without re-login. */
+export async function refreshSessionFlags(): Promise<AuthSession | null> {
+  const current = getSession();
+  if (!current) return null;
+  const me = await fetchMe();
+  const next: AuthSession = {
+    ...current,
+    user: { ...current.user, ...me.user },
+    organization: me.organization,
+    isPlatformAdmin: Boolean(me.isPlatformAdmin),
+  };
+  setSession(next);
+  return next;
 }
 
 export function forgotPassword(email: string) {
@@ -136,4 +181,38 @@ export function ssoVerify(token: string) {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
+}
+
+export function listOrgUsers() {
+  return request<OrgMember[]>('/api/v1/orgs/me/users');
+}
+
+export function inviteOrgUser(payload: {
+  email: string;
+  fullName: string;
+  role?: string;
+  temporaryPassword?: string;
+}) {
+  return request<{ user: { id: string; email: string; fullName: string; role: string }; temporaryPassword: string }>(
+    '/api/v1/orgs/me/users',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function updateOrgUser(userId: string, payload: { role?: string; isActive?: boolean }) {
+  return request<OrgMember>(`/api/v1/orgs/me/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listPlatformOrgs() {
+  return request<PlatformOrg[]>('/api/v1/platform/orgs');
+}
+
+export function listPlatformFlags() {
+  return request<FeatureFlag[]>('/api/v1/platform/flags');
 }

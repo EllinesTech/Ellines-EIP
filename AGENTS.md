@@ -19,6 +19,7 @@ EIP sits **above** existing systems (ERP, CRM, etc.). It connects and observes; 
 | `docs/05_Build_Queue.md` | **Ordered worklist + current status** — pick from here |
 | `docs/04_Enterprise_Lexicon.md` | Terminology |
 | `docs/06_Automation_Prompt.md` | Paste into Cursor Automations |
+| `docs/09_Access_Layers.md` | Work Console vs Org IT vs Platform Super Admin |
 | `README.md` | Setup, hosting, scripts |
 
 **GitHub `main` is the single product codebase.** Local machines and Cloud Agents stay in sync via Git. Humans: `git pull origin main` after agent landings. Live web updates when `main` deploys to Cloudflare Pages.
@@ -27,7 +28,7 @@ EIP sits **above** existing systems (ERP, CRM, etc.). It connects and observes; 
 
 - **Live web:** Cloudflare Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (static UI + same-origin `/api/v1` auth Functions)
 - **Identity (Nest / Fly):** optional full microservice — see `docs/08_Live_Identity_Setup.md`
-- **Working:** Identity schema + auth (Pages Functions + Nest), Next.js app (auth, shell, Command Center placeholders)
+- **Working:** Identity schema + auth (Pages Functions + Nest), access layers (Work Console / IT Admin / Platform), role-adaptive Command Center
 - **Not built yet:** API gateway, integration-hub, ellinea-ai, workflow, notification; real connectors; live KPIs; Ellinea chat
 
 Full checklist: `docs/05_Build_Queue.md`.

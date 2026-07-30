@@ -1,10 +1,29 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+export type UserRole = 'owner' | 'admin' | 'executive' | 'manager' | 'member' | 'viewer';
+
+/**
+ * bcrypt cost for Pages Functions. Cost 12 exceeds Cloudflare Worker CPU
+ * (error 1102). Cost 8 is still strong enough for MVP and fits Workers.
+ */
+export const BCRYPT_ROUNDS = 8;
+
+export const EIP_ROLES: UserRole[] = [
+  'owner',
+  'admin',
+  'executive',
+  'manager',
+  'member',
+  'viewer',
+];
+
 export interface Env {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN?: string;
+  /** Comma-separated Ellines operator emails (platform Super Admin). */
+  PLATFORM_ADMIN_EMAILS?: string;
 }
 
 export function getAdminClient(env: Env): SupabaseClient {
@@ -25,7 +44,7 @@ export function json(data: unknown, status = 200): Response {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': '*',
       'access-control-allow-headers': 'Content-Type, Authorization',
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PATCH, OPTIONS',
     },
   });
 }
@@ -79,6 +98,55 @@ export async function verifyAccessToken(
   return { sub, email, organizationId, role };
 }
 
+export async function requireAuth(
+  env: Env,
+  request: Request,
+): Promise<{ sub: string; email: string; organizationId: string; role: string } | Response> {
+  const token = bearerToken(request);
+  if (!token) {
+    return json({ statusCode: 401, message: 'Unauthorized' }, 401);
+  }
+  try {
+    return await verifyAccessToken(env, token);
+  } catch {
+    return json({ statusCode: 401, message: 'Unauthorized' }, 401);
+  }
+}
+
+export function isOrgAdminRole(role: string): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
+export function requireOrgAdmin(role: string): Response | null {
+  if (!isOrgAdminRole(role)) {
+    return json(
+      { statusCode: 403, message: 'Only owners and admins can perform this action' },
+      403,
+    );
+  }
+  return null;
+}
+
+export function assertCanAssignRole(actorRole: string, nextRole: UserRole): string | null {
+  if (nextRole === 'owner' && actorRole !== 'owner') {
+    return 'Only owners can assign the owner role';
+  }
+  return null;
+}
+
+export function parsePlatformAdminEmails(raw?: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function platformAdminFromEnv(env: Env, email: string): boolean {
+  const allowlist = parsePlatformAdminEmails(env.PLATFORM_ADMIN_EMAILS);
+  return allowlist.includes(email.trim().toLowerCase());
+}
+
 export async function hashToken(rawToken: string): Promise<string> {
   const data = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -91,7 +159,6 @@ export function randomTokenHex(bytes = 32): string {
   return [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Short-lived passwordless SSO challenge (work email). */
 export async function signSsoChallenge(
   env: Env,
   payload: { sub: string; email: string; organizationId: string; role: string },

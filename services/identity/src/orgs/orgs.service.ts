@@ -1,8 +1,15 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import type { UserRole } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -46,6 +53,9 @@ export class OrgsService {
       throw new ForbiddenException('Only owners and admins can invite users');
     }
 
+    const nextRole = (dto.role || 'member') as UserRole;
+    this.assertCanAssignRole(actorRole, nextRole);
+
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -54,7 +64,7 @@ export class OrgsService {
     }
 
     const tempPassword = dto.temporaryPassword || `Temp-${Math.random().toString(36).slice(2, 10)}!`;
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    const passwordHash = await bcrypt.hash(tempPassword, 8);
 
     const user = await this.prisma.user.create({
       data: {
@@ -62,7 +72,7 @@ export class OrgsService {
         fullName: dto.fullName,
         passwordHash,
         organizationId,
-        role: dto.role || 'member',
+        role: nextRole,
       },
     });
 
@@ -85,6 +95,92 @@ export class OrgsService {
       },
       temporaryPassword: tempPassword,
     };
+  }
+
+  async updateUser(
+    organizationId: string,
+    actor: { id: string; role: string },
+    userId: string,
+    dto: UpdateUserDto,
+  ) {
+    if (!['owner', 'admin'].includes(actor.role)) {
+      throw new ForbiddenException('Only owners and admins can update users');
+    }
+    if (dto.role === undefined && dto.isActive === undefined) {
+      throw new BadRequestException('Provide role and/or isActive');
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+    if (!target) throw new NotFoundException('User not found');
+
+    if (dto.role !== undefined) {
+      this.assertCanAssignRole(actor.role, dto.role as UserRole);
+      if (target.role === 'owner' && dto.role !== 'owner') {
+        await this.assertNotLastOwner(organizationId, target.id);
+      }
+    }
+
+    if (dto.isActive === false) {
+      if (target.id === actor.id) {
+        throw new ForbiddenException('You cannot deactivate your own account');
+      }
+      if (target.role === 'owner') {
+        await this.assertNotLastOwner(organizationId, target.id);
+      }
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: target.id },
+      data: {
+        ...(dto.role !== undefined ? { role: dto.role } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: actor.id,
+        action: 'org.update_user',
+        resource: 'user',
+        metadata: {
+          targetUserId: user.id,
+          role: user.role,
+          isActive: user.isActive,
+        },
+      },
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  private assertCanAssignRole(actorRole: string, nextRole: UserRole) {
+    if (nextRole === 'owner' && actorRole !== 'owner') {
+      throw new ForbiddenException('Only owners can assign the owner role');
+    }
+  }
+
+  private async assertNotLastOwner(organizationId: string, excludeUserId: string) {
+    const owners = await this.prisma.user.count({
+      where: {
+        organizationId,
+        role: 'owner',
+        isActive: true,
+        id: { not: excludeUserId },
+      },
+    });
+    if (owners < 1) {
+      throw new ForbiddenException('Cannot remove or demote the last active owner');
+    }
   }
 
   async listBranches(organizationId: string) {

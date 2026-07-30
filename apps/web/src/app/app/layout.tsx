@@ -3,13 +3,29 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { AuthSession, clearSession, getSession } from '@/lib/api';
+import { isOrgAdminRole } from '@ellines-eip/shared';
+import {
+  AuthSession,
+  clearSession,
+  getSession,
+  refreshSessionFlags,
+} from '@/lib/api';
 import styles from './shell.module.css';
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  short: string;
+  adminOnly?: boolean;
+  platformOnly?: boolean;
+};
+
+const NAV: NavItem[] = [
   { href: '/app', label: 'Command Center', short: 'Command' },
   { href: '/app/ellinea', label: 'Ask Ellinea', short: 'Ellinea' },
-  { href: '/app/connectors', label: 'Connectors', short: 'Connect' },
+  { href: '/app/admin', label: 'IT Admin', short: 'Admin', adminOnly: true },
+  { href: '/app/connectors', label: 'Connectors', short: 'Connect', adminOnly: true },
+  { href: '/app/platform', label: 'Platform', short: 'Platform', platformOnly: true },
   { href: '/app/settings', label: 'Settings', short: 'Settings' },
 ];
 
@@ -27,6 +43,13 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     }
     setSessionState(s);
     setReady(true);
+    refreshSessionFlags()
+      .then((next) => {
+        if (next) setSessionState(next);
+      })
+      .catch(() => {
+        /* keep local session if /me is briefly unavailable */
+      });
   }, [router]);
 
   function logout() {
@@ -45,6 +68,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const orgAdmin = isOrgAdminRole(session.user.role);
+  const platformAdmin = Boolean(session.isPlatformAdmin);
+  const visibleNav = NAV.filter((item) => {
+    if (item.adminOnly && !orgAdmin) return false;
+    if (item.platformOnly && !platformAdmin) return false;
+    return true;
+  });
+
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
@@ -59,8 +90,11 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className={styles.nav} aria-label="Workspace">
-          {NAV.map((item) => {
-            const active = pathname === item.href;
+          {visibleNav.map((item) => {
+            const active =
+              item.href === '/app'
+                ? pathname === '/app' || pathname === '/app/'
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -86,7 +120,10 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <header className={styles.topbar}>
           <div className={styles.orgBlock}>
             <div className={styles.orgName}>{session.organization.name}</div>
-            <div className={styles.roleLabel}>{session.user.role}</div>
+            <div className={styles.roleLabel}>
+              {session.user.role}
+              {platformAdmin ? ' · platform' : ''}
+            </div>
           </div>
           <div className={styles.topRight}>
             <span className={styles.userName}>{session.user.fullName}</span>

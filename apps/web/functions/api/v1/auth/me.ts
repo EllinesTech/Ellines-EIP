@@ -3,6 +3,7 @@ import {
   getAdminClient,
   json,
   options,
+  platformAdminFromEnv,
   verifyAccessToken,
   type Env,
 } from '../../../shared/auth';
@@ -65,6 +66,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         name: org.name,
         slug: org.slug,
       },
+      isPlatformAdmin: platformAdminFromEnv(context.env, user.email as string),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

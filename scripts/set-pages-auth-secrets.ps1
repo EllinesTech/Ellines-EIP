@@ -39,4 +39,8 @@ Write-Host 'Setting Pages secrets for ellines-eip (values hidden)...'
 $supabaseUrl | npx --yes wrangler@4.114.0 pages secret put SUPABASE_URL --project-name=ellines-eip
 $serviceKey | npx --yes wrangler@4.114.0 pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name=ellines-eip
 $jwt | npx --yes wrangler@4.114.0 pages secret put JWT_SECRET --project-name=ellines-eip
+$platformAdmins = Get-DotEnvValue (Join-Path $root '.env') 'PLATFORM_ADMIN_EMAILS'
+if ($platformAdmins) {
+  $platformAdmins | npx --yes wrangler@4.114.0 pages secret put PLATFORM_ADMIN_EMAILS --project-name=ellines-eip
+}
 Write-Host 'Secrets updated.'

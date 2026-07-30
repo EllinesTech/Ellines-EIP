@@ -4,6 +4,7 @@ import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { OrgsModule } from './orgs/orgs.module';
+import { PlatformModule } from './platform/platform.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -20,6 +21,7 @@ import { HealthController } from './health.controller';
     PrismaModule,
     AuthModule,
     OrgsModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
 })

@@ -1,4 +1,4 @@
-import { getAdminClient, hashToken, json, options, type Env } from '../../../shared/auth';
+import { getAdminClient, hashToken, json, options, BCRYPT_ROUNDS, type Env } from '../../../shared/auth';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -45,7 +45,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const bcrypt = await import('bcryptjs');
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     const now = new Date().toISOString();
     const orgId = (record.organization_id as string) || user.organization_id;
 

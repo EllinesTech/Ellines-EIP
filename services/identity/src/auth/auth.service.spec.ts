@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,7 +23,10 @@ describe('AuthService password reset', () => {
   } as unknown as PrismaService;
 
   const jwt = { sign: jest.fn().mockReturnValue('token') } as unknown as JwtService;
-  const auth = new AuthService(prisma, jwt);
+  const config = {
+    get: jest.fn().mockReturnValue(''),
+  } as unknown as ConfigService;
+  const auth = new AuthService(prisma, jwt, config);
 
   beforeEach(() => {
     jest.clearAllMocks();
