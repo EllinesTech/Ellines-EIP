@@ -6,6 +6,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
+    "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "dotenv -e ../../.env --override -- prisma migrate dev",
     "prisma:push": "dotenv -e ../../.env --override -- prisma db push",
@@ -35,11 +36,34 @@
     "@nestjs/schematics": "^11.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.10",
     "@types/passport-jwt": "^4.0.1",
     "dotenv-cli": "^8.0.0",
+    "jest": "^29.7.0",
     "prisma": "^6.5.0",
+    "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@ellines-eip/shared$": "<rootDir>/../../../packages/shared/src/index.ts"
+    }
   }
 }
