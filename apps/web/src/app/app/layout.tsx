@@ -145,7 +145,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     return (
       <div className={styles.loading} suppressHydrationWarning>
         <div className={styles.loadingInner}>
-          <img src="/brand/logo-mark.png" alt="" className={styles.loadingMark} />
+          <img src="/brand/logo-hex.png" alt="" className={styles.loadingMark} />
           <p>Loading Ellines EIP…</p>
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     <div className={`${styles.shell} ${collapsed ? styles.shellCollapsed : ''}`}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          <img src="/brand/logo-mark.png" alt="" className={styles.brandIcon} />
+          <img src="/brand/logo-hex.png" alt="" className={styles.brandIcon} />
           <div className={styles.brandText}>
             <div className={styles.brandName}>
               Ellines <span>EIP</span>

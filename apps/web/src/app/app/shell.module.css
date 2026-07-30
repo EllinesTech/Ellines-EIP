@@ -55,8 +55,9 @@
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  object-fit: cover;
-  object-position: top center;
+  object-fit: contain;
+  object-position: center;
+  padding: 4px;
   border-radius: 11px;
   background: #0b1020;
   box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.35), 0 0 18px rgba(59, 130, 246, 0.2);
@@ -539,6 +540,7 @@
   width: 56px;
   height: 56px;
   object-fit: contain;
+  object-position: center;
   animation: pulseMark 1.6s ease-in-out infinite;
 }
 
