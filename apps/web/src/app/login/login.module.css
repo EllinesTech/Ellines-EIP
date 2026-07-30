@@ -1,14 +1,18 @@
+/* Login: fit one viewport — no scroll on typical laptop/phone heights */
+
 .shell {
-  min-height: 100svh;
-  min-height: 100dvh;
+  height: 100svh;
+  height: 100dvh;
+  max-height: 100svh;
+  max-height: 100dvh;
   width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: 1fr 1fr;
   background: #05060f;
   color: #eef3fb;
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .brandPanel {
@@ -17,12 +21,13 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: clamp(2rem, 6vw, 4rem);
+  padding: clamp(0.75rem, 2.5vh, 1.75rem) clamp(1rem, 3vw, 2.5rem);
   background:
     radial-gradient(ellipse 70% 50% at 20% 18%, rgba(168, 85, 247, 0.3), transparent 55%),
     radial-gradient(ellipse 55% 45% at 70% 85%, rgba(37, 99, 235, 0.18), transparent 55%),
     #05060f;
   overflow: hidden;
+  min-height: 0;
 }
 
 .brandPanel::after {
@@ -43,39 +48,40 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  max-width: 28rem;
+  max-width: 26rem;
   gap: 0;
+  min-height: 0;
 }
 
 .hex {
-  width: min(26vw, 108px);
+  width: clamp(52px, 8vh, 88px);
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 0 28px rgba(168, 85, 247, 0.5));
+  filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.45));
 }
 
 .wordmark {
-  margin-top: 0.05rem;
+  margin-top: 0.15rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.05rem;
+  gap: 0;
   line-height: 1;
 }
 
 .ellines {
-  font-size: clamp(1.5rem, 3.2vw, 1.9rem);
+  font-size: clamp(1.05rem, 2.2vh, 1.55rem);
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   line-height: 1;
   color: #fff;
 }
 
 .eip {
   margin-top: 0;
-  font-size: clamp(2rem, 4.8vw, 2.7rem);
+  font-size: clamp(1.45rem, 3.2vh, 2.2rem);
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   line-height: 1;
   background: linear-gradient(135deg, #c084fc 0%, #a855f7 40%, #3b82f6 100%);
   -webkit-background-clip: text;
@@ -84,36 +90,36 @@
 }
 
 .platform {
-  margin: 0.4rem 0 0;
-  font-size: 0.74rem;
+  margin: 0.28rem 0 0;
+  font-size: clamp(0.58rem, 1.3vh, 0.7rem);
   font-weight: 600;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(238, 243, 251, 0.8);
 }
 
 .slogan {
-  margin: 0.45rem 0 0;
-  max-width: 22rem;
-  font-size: 1.08rem;
+  margin: 0.3rem 0 0;
+  max-width: 20rem;
+  font-size: clamp(0.82rem, 1.8vh, 1rem);
   font-style: italic;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.3;
   color: #c4b0e0;
 }
 
 .poweredBlock {
-  margin-top: 1.65rem;
+  margin-top: clamp(0.55rem, 2vh, 1.1rem);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.4rem;
   width: 100%;
 }
 
 .poweredLine {
   display: block;
-  width: min(100%, 220px);
+  width: min(100%, 180px);
   height: 1px;
   background: linear-gradient(90deg, transparent, #a855f7, #3b82f6, transparent);
 }
@@ -122,13 +128,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.3rem;
 }
 
 .poweredLabel {
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #8b95a8;
 }
@@ -137,21 +143,21 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .ellineaIcon {
-  width: 58px;
-  height: 58px;
+  width: clamp(36px, 5.5vh, 48px);
+  height: clamp(36px, 5.5vh, 48px);
   object-fit: contain;
   filter:
     brightness(1.25)
     contrast(1.1)
-    drop-shadow(0 0 12px rgba(168, 85, 247, 0.4));
+    drop-shadow(0 0 10px rgba(168, 85, 247, 0.35));
 }
 
 .ellineaName {
-  font-size: 1rem;
+  font-size: clamp(0.82rem, 1.6vh, 0.95rem);
   font-weight: 700;
   letter-spacing: -0.01em;
   background: linear-gradient(90deg, #ddd6fe, #93c5fd);
@@ -161,43 +167,50 @@
 }
 
 .ellineaTag {
-  font-size: 0.6rem;
+  font-size: 0.52rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #9aa3b8;
 }
 
 .formPanel {
-  display: grid;
-  place-items: center;
-  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(0.6rem, 2vh, 1.25rem) clamp(0.85rem, 2.5vw, 1.5rem);
   background: rgba(12, 16, 28, 0.95);
   border-left: 1px solid rgba(232, 237, 245, 0.08);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .card {
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
+  min-height: 0;
 }
 
 .card h1 {
-  margin: 0 0 0.3rem;
-  font-size: 1.65rem;
+  margin: 0 0 0.12rem;
+  font-size: clamp(1.2rem, 2.6vh, 1.45rem);
   letter-spacing: -0.02em;
   color: #fff;
+  line-height: 1.15;
 }
 
 .subtitle {
-  margin: 0 0 1.15rem;
+  margin: 0 0 clamp(0.45rem, 1.4vh, 0.75rem);
   color: #8b95a8;
-  font-size: 0.95rem;
+  font-size: clamp(0.78rem, 1.5vh, 0.88rem);
+  line-height: 1.3;
 }
 
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1.25rem;
+  gap: 0.15rem;
+  margin-bottom: clamp(0.45rem, 1.3vh, 0.75rem);
   border-bottom: 1px solid rgba(232, 237, 245, 0.1);
 }
 
@@ -207,9 +220,9 @@
   background: transparent;
   color: #8b95a8;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 0.65rem 0.85rem;
+  padding: 0.4rem 0.65rem;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -224,21 +237,22 @@
   background: rgba(185, 28, 28, 0.15);
   color: #fca5a5;
   border: 1px solid rgba(248, 113, 113, 0.35);
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
+  gap: 0.22rem;
+  margin-bottom: clamp(0.4rem, 1.1vh, 0.65rem);
 }
 
 .field label {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #b8c0d0;
 }
@@ -251,20 +265,25 @@
 
 .inputIcon {
   position: absolute;
-  left: 0.85rem;
+  left: 0.7rem;
   color: #8b95a8;
   display: grid;
   place-items: center;
   pointer-events: none;
 }
 
+.inputIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
 .inputWrap input {
   width: 100%;
   border: 1px solid rgba(232, 237, 245, 0.14);
-  border-radius: 10px;
-  padding: 0.8rem 2.6rem 0.8rem 2.55rem;
+  border-radius: 8px;
+  padding: clamp(0.45rem, 1.2vh, 0.65rem) 2.3rem clamp(0.45rem, 1.2vh, 0.65rem) 2.2rem;
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   background: #070b14;
   color: #fff;
   outline: none;
@@ -273,18 +292,18 @@
 
 .inputWrap input:focus {
   border-color: rgba(168, 85, 247, 0.65);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.16);
 }
 
 .eyeBtn {
   position: absolute;
-  right: 0.45rem;
+  right: 0.3rem;
   border: none;
   background: transparent;
   color: #8b95a8;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 8px;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -299,28 +318,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin: 0.15rem 0 1.1rem;
+  gap: 0.5rem;
+  margin: 0 0 clamp(0.45rem, 1.2vh, 0.7rem);
 }
 
 .check {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.85rem;
+  gap: 0.35rem;
+  font-size: 0.75rem;
   color: #b8c0d0;
   cursor: pointer;
   user-select: none;
 }
 
 .check input {
-  width: 1rem;
-  height: 1rem;
+  width: 0.9rem;
+  height: 0.9rem;
   accent-color: #a855f7;
 }
 
 .forgot {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #60a5fa;
 }
@@ -332,15 +351,15 @@
 .submit {
   width: 100%;
   border: none;
-  border-radius: 10px;
-  padding: 0.9rem 1.25rem;
+  border-radius: 8px;
+  padding: clamp(0.5rem, 1.3vh, 0.7rem) 1rem;
   font: inherit;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   color: #fff;
   cursor: pointer;
   background: linear-gradient(90deg, #9333ea 0%, #6f2d8d 45%, #2563eb 100%);
-  box-shadow: 0 12px 28px rgba(111, 45, 141, 0.35);
+  box-shadow: 0 8px 20px rgba(111, 45, 141, 0.3);
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -358,10 +377,10 @@
 .divider {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin: 1.25rem 0 0.9rem;
+  gap: 0.55rem;
+  margin: clamp(0.5rem, 1.4vh, 0.8rem) 0 clamp(0.4rem, 1vh, 0.6rem);
   color: #8b95a8;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .divider::before,
@@ -375,22 +394,22 @@
 .socialRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
+  gap: 0.45rem;
 }
 
 .socialBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
   border: 1px solid rgba(232, 237, 245, 0.14);
-  border-radius: 10px;
-  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  padding: clamp(0.4rem, 1.1vh, 0.55rem) 0.65rem;
   background: rgba(7, 11, 20, 0.8);
   color: #eef3fb;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -404,31 +423,31 @@
 .ssoBox {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.45rem;
 }
 
 .ssoBox p {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.2rem;
   color: #8b95a8;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .trust {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  margin: 1.25rem 0 0;
+  gap: 0.3rem;
+  margin: clamp(0.5rem, 1.3vh, 0.75rem) 0 0;
   color: #8b95a8;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .footer {
-  margin: 1rem 0 0;
+  margin: clamp(0.4rem, 1.1vh, 0.65rem) 0 0;
   text-align: center;
   color: #8b95a8;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .footer a {
@@ -437,9 +456,9 @@
 }
 
 .back {
-  margin: 0.75rem 0 0;
+  margin: 0.35rem 0 0;
   text-align: center;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
 }
 
 .back a {
@@ -450,33 +469,133 @@
   color: #eef3fb;
 }
 
+/* Short laptop / landscape */
+@media (max-height: 760px) {
+  .poweredBlock {
+    margin-top: 0.4rem;
+    gap: 0.28rem;
+  }
+
+  .poweredLine {
+    width: min(100%, 140px);
+  }
+
+  .ellineaTag {
+    display: none;
+  }
+
+  .trust {
+    display: none;
+  }
+}
+
+@media (max-height: 640px) {
+  .poweredBlock {
+    display: none;
+  }
+
+  .slogan {
+    display: none;
+  }
+
+  .platform {
+    margin-top: 0.2rem;
+  }
+
+  .back {
+    display: none;
+  }
+}
+
+/* Phone / narrow */
 @media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .brandPanel {
-    min-height: auto;
-    padding: 2rem 1.25rem 1.5rem;
+    padding: 0.55rem 1rem 0.45rem;
+    min-height: 0;
+  }
+
+  .brandPanel::after {
+    display: none;
   }
 
   .hex {
-    width: 84px;
+    width: 40px;
   }
 
-  .ellineaIcon {
-    width: 50px;
-    height: 50px;
+  .ellines {
+    font-size: 0.85rem;
+    letter-spacing: 0.14em;
+  }
+
+  .eip {
+    font-size: 1.15rem;
+  }
+
+  .platform {
+    font-size: 0.55rem;
+    margin-top: 0.15rem;
+  }
+
+  .slogan,
+  .poweredBlock {
+    display: none;
   }
 
   .formPanel {
     border-left: none;
     border-top: 1px solid rgba(232, 237, 245, 0.08);
-    align-items: start;
+    justify-content: flex-start;
+    padding: 0.65rem 1rem 0.75rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .card {
+    max-width: 100%;
   }
 
   .socialRow {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Very short phones */
+@media (max-width: 860px) and (max-height: 700px) {
+  .brandPanel {
+    padding: 0.4rem 0.85rem;
+  }
+
+  .hex {
+    width: 32px;
+  }
+
+  .wordmark {
+    flex-direction: row;
+    gap: 0.35rem;
+    align-items: baseline;
+  }
+
+  .ellines,
+  .eip {
+    font-size: 0.95rem;
+  }
+
+  .platform {
+    display: none;
+  }
+
+  .formPanel {
+    padding-top: 0.45rem;
+  }
+
+  .trust,
+  .back {
+    display: none;
   }
 }
 
