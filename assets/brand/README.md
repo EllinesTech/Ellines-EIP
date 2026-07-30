@@ -9,37 +9,39 @@
 
 | Name | Hex | Usage |
 |------|-----|-------|
-| Primary Purple | `#6F2D8D` | Logo, primary actions, AI highlights |
-| Deep Purple | `#4A148C` | Gradients, dark accents |
-| Vibrant Blue | `#2563EB` | Links, data viz, secondary actions |
-| Dark Navy | `#0F172A` | Headings, body text |
+| Primary Purple | `#6F2D8D` / `#A855F7` | Logo gradient, CTAs, AI accents |
+| Vibrant Blue | `#2563EB` / `#3B82F6` | Logo gradient, links, data |
+| Dark Navy | `#121826` | App sidebar / chrome |
+| Ink | `#05060F` | Splash / auth backgrounds |
+| Soft surface | `#E8EDF5` | Dashboard work area |
 | Medium Grey | `#6B7280` | Secondary text |
-| Off White | `#F5F7FA` | Backgrounds |
 
 ## Typography
 
 - **Font:** Exo 2
 - **Weights:** Regular (400), SemiBold (600), Bold (700)
-- **Usage:** All UI, marketing, and documentation
 
-## Logo Files
+## Logo Files (Hex-E)
+
+Source folders: `Ellines EIP Logo/`, `Ellinea AI Logo/`  
+Served from: `apps/web/public/brand/`
 
 | File | Description |
 |------|-------------|
-| `logo/ellines-eip-logo-full.png` | Full logo with tagline (primary) |
-| `logo/ellines-eip-icon-transparent.png` | Icon only, transparent background |
-| `logo/ellines-eip-logo-alt.png` | Alternative full logo layout |
-| `eip-brand-guide-poster.png` | Complete brand guide poster |
+| `logo/logo-mark.png` | Hex-E mark + ELLINES EIP lockup (primary) |
+| `logo/logo-lockup.png` | Alternate lockup |
+| `logo/logo-full.png` | Full brand lockup |
+| `logo/ellinea-mark.png` | Ellinea AI mark (no bg) |
+| `logo/ellinea-lockup.png` | Ellinea AI full lockup |
 
 ## Usage Rules
 
-- White background is the default presentation
-- Do not redesign the symbol — only spacing, layout, and sizing may be adjusted
-- "Powered by Ellinea AI" appears below the platform name
-- Minimum clear space: height of the "E" in EIP on all sides
+- Product UI uses **Hex-E** (Ellines EIP), not the retired orbital mark
+- Splash → Get started → Login; slogan appears on splash and auth
+- "Powered by Ellinea AI" uses the Ellinea mark
+- Prefer dark chrome + lighter dashboard work surface
 
 ## Export Needed (future)
 
-- [ ] SVG versions (icon + full logo)
-- [ ] Favicon / app icon (512×512)
-- [ ] Monochrome dark and reverse white variants
+- [ ] Flat Hex-E SVG / favicon (16–32px)
+- [ ] Monochrome / reverse variants

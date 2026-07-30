@@ -24,6 +24,8 @@ Ellines EIP is an AI-native enterprise intelligence platform that sits **above**
 | [MVP Scope v1.0](./docs/02_MVP_Scope_v1.0.md) | Feature list and build order |
 | [Master Blueprint](./docs/03_Master_Blueprint.md) | Product vision and architecture |
 | [Enterprise Lexicon](./docs/04_Enterprise_Lexicon.md) | Official terminology |
+| [Build Queue](./docs/05_Build_Queue.md) | Live status + ordered agent worklist |
+| [AGENTS.md](./AGENTS.md) | Instructions for Cursor Cloud Agents |
 
 ## Repository Structure
 

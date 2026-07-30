@@ -1,84 +1,123 @@
 .shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 248px 1fr;
   min-height: 100vh;
-  background: var(--eip-light);
+  background: #dce3ef;
+  font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  background: white;
-  border-right: 1px solid var(--eip-border);
-  padding: 1.25rem 1rem;
+  background: #121826;
+  color: #eef3fb;
+  padding: 1.15rem 0.85rem 1rem;
+  border-right: 1px solid rgba(168, 85, 247, 0.12);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.5rem 1.25rem;
-  border-bottom: 1px solid var(--eip-border);
-  margin-bottom: 1rem;
+  gap: 0.65rem;
+  padding: 0.25rem 0.4rem 1.1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.9rem;
 }
 
 .brandIcon {
   width: 42px;
   height: 42px;
-  object-fit: contain;
-  mix-blend-mode: lighten;
-  background: #0b1020;
+  object-fit: cover;
+  object-position: top center;
   border-radius: 10px;
+  background: #0b1020;
 }
 
 .brandName {
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--eip-navy);
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.brandName span {
+  background: linear-gradient(135deg, #a855f7, #3b82f6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .brandSub {
-  font-size: 0.75rem;
-  color: var(--eip-grey);
+  font-size: 0.68rem;
+  color: #8b98ad;
+  margin-top: 0.1rem;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.18rem;
   flex: 1;
 }
 
 .navLink {
-  padding: 0.7rem 0.85rem;
-  border-radius: 10px;
-  color: var(--eip-grey);
+  padding: 0.7rem 0.8rem;
+  border-radius: 8px;
+  color: #8b98ad;
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .navLink:hover {
-  background: var(--eip-light);
-  color: var(--eip-navy);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
 }
 
 .navActive {
-  background: linear-gradient(135deg, rgba(111, 45, 141, 0.12), rgba(37, 99, 235, 0.1));
-  color: var(--eip-primary);
+  background: rgba(111, 45, 141, 0.28);
+  color: #fff;
+  box-shadow: inset 2px 0 0 #a855f7;
+}
+
+.navShort {
+  display: none;
 }
 
 .sidebarFooter {
-  padding: 1rem 0.5rem 0.25rem;
-  font-size: 0.75rem;
+  padding: 0.85rem 0.4rem 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.powered {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  color: var(--eip-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa3b8;
+}
+
+.ellineaFoot {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
 }
 
 .main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(168, 85, 247, 0.06), transparent 50%),
+    #e8edf5;
 }
 
 .topbar {
@@ -86,45 +125,86 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.5rem;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--eip-border);
+  padding: 0.95rem 1.6rem;
+  background: rgba(232, 237, 245, 0.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #d0d8e6;
 }
 
 .orgName {
   font-weight: 700;
-  color: var(--eip-navy);
+  color: #0f172a;
+  letter-spacing: -0.015em;
 }
 
 .roleLabel {
-  font-size: 0.8rem;
-  color: var(--eip-grey);
+  font-size: 0.78rem;
+  color: #6b7280;
   text-transform: capitalize;
+  margin-top: 0.1rem;
 }
 
 .topRight {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .userName {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--eip-navy);
+  color: #0f172a;
+}
+
+.signOut {
+  border: 1px solid #d5dce8;
+  background: #fff;
+  color: #6b7280;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.signOut:hover {
+  color: #0f172a;
+  background: #f8fafc;
 }
 
 .content {
-  padding: 1.5rem;
-  animation: rise 0.45s ease both;
+  padding: 1.6rem;
+  animation: rise 0.4s ease both;
 }
 
 .loading {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  color: var(--eip-grey);
+  background: #121826;
+  color: #8b98ad;
+}
+
+.loadingInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loadingMark {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  animation: pulseMark 1.6s ease-in-out infinite;
+}
+
+.loadingInner p {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 @keyframes rise {
@@ -138,6 +218,16 @@
   }
 }
 
+@keyframes pulseMark {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
@@ -145,11 +235,45 @@
 
   .sidebar {
     border-right: none;
-    border-bottom: 1px solid var(--eip-border);
+    border-bottom: 1px solid rgba(168, 85, 247, 0.12);
+    padding-bottom: 0.85rem;
   }
 
   .nav {
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .navLink {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  .navActive {
+    box-shadow: none;
+  }
+
+  .navLabel {
+    display: none;
+  }
+
+  .navShort {
+    display: inline;
+  }
+
+  .sidebarFooter {
+    display: none;
+  }
+
+  .content {
+    padding: 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .loadingMark {
+    animation: none;
   }
 }

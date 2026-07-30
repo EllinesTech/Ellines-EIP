@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "dotenv -e ../../.env --override -- nest start --watch",
-    "start": "dotenv -e ../../.env --override -- node dist/main.js",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "dotenv -e ../../.env --override -- prisma migrate dev",
     "prisma:push": "dotenv -e ../../.env --override -- prisma db push",

@@ -7,10 +7,10 @@ import { AuthSession, clearSession, getSession } from '@/lib/api';
 import styles from './shell.module.css';
 
 const NAV = [
-  { href: '/app', label: 'Command Center' },
-  { href: '/app/ellinea', label: 'Ask Ellinea' },
-  { href: '/app/connectors', label: 'Connectors' },
-  { href: '/app/settings', label: 'Settings' },
+  { href: '/app', label: 'Command Center', short: 'Command' },
+  { href: '/app/ellinea', label: 'Ask Ellinea', short: 'Ellinea' },
+  { href: '/app/connectors', label: 'Connectors', short: 'Connect' },
+  { href: '/app/settings', label: 'Settings', short: 'Settings' },
 ];
 
 export default function AppShellLayout({ children }: { children: ReactNode }) {
@@ -36,8 +36,11 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
 
   if (!ready || !session) {
     return (
-      <div className={styles.loading}>
-        <p>Loading Ellines EIP…</p>
+      <div className={styles.loading} suppressHydrationWarning>
+        <div className={styles.loadingInner}>
+          <img src="/brand/logo-mark.png" alt="" className={styles.loadingMark} />
+          <p>Loading Ellines EIP…</p>
+        </div>
       </div>
     );
   }
@@ -48,11 +51,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <div className={styles.brand}>
           <img src="/brand/logo-mark.png" alt="" className={styles.brandIcon} />
           <div>
-            <div className={styles.brandName}>Ellines EIP</div>
+            <div className={styles.brandName}>
+              Ellines <span>EIP</span>
+            </div>
             <div className={styles.brandSub}>Intelligence Platform</div>
           </div>
         </div>
-        <nav className={styles.nav}>
+
+        <nav className={styles.nav} aria-label="Workspace">
           {NAV.map((item) => {
             const active = pathname === item.href;
             return (
@@ -61,23 +67,30 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                 href={item.href}
                 className={active ? `${styles.navLink} ${styles.navActive}` : styles.navLink}
               >
-                {item.label}
+                <span className={styles.navLabel}>{item.label}</span>
+                <span className={styles.navShort}>{item.short}</span>
               </Link>
             );
           })}
         </nav>
-        <div className={styles.sidebarFooter}>Powered by Ellinea AI</div>
+
+        <div className={styles.sidebarFooter}>
+          <div className={styles.powered}>
+            <span>Powered by</span>
+            <img src="/brand/ellinea-mark.png" alt="Ellinea AI" className={styles.ellineaFoot} />
+          </div>
+        </div>
       </aside>
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <div>
+          <div className={styles.orgBlock}>
             <div className={styles.orgName}>{session.organization.name}</div>
             <div className={styles.roleLabel}>{session.user.role}</div>
           </div>
           <div className={styles.topRight}>
             <span className={styles.userName}>{session.user.fullName}</span>
-            <button type="button" className="btn btn-ghost" onClick={logout}>
+            <button type="button" className={styles.signOut} onClick={logout}>
               Sign out
             </button>
           </div>

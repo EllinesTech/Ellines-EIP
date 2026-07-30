@@ -1,0 +1,6 @@
+{
+  "name": "ellines-eip",
+  "install": "npm ci",
+  "start": "echo 'Use: npm run build:shared && npm run build -w @ellines-eip/web (web). Identity needs DATABASE_URL secrets.'",
+  "terminals": []
+}

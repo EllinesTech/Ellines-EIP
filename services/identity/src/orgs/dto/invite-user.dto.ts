@@ -1,5 +1,7 @@
 import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsIn } from 'class-validator';
-import { EIP_ROLES, UserRole } from '@ellines-eip/shared';
+
+const EIP_ROLES = ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'] as const;
+type UserRole = (typeof EIP_ROLES)[number];
 
 export class InviteUserDto {
   @IsEmail()
@@ -11,7 +13,7 @@ export class InviteUserDto {
   fullName!: string;
 
   @IsOptional()
-  @IsIn(EIP_ROLES)
+  @IsIn([...EIP_ROLES])
   role?: UserRole;
 
   @IsOptional()
