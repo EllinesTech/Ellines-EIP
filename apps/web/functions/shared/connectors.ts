@@ -35,6 +35,10 @@ export type InstallConfig = {
   sftpPassword?: string;
   sftpPrivateKey?: string;
   sftpRemotePath?: string;
+  /** 0 = manual only; otherwise minutes between automatic syncs. */
+  syncIntervalMinutes?: number;
+  /** ISO timestamp when the next automatic sync is due. */
+  nextSyncAt?: string;
 };
 
 const SECRET_KEYS = [
@@ -347,6 +351,36 @@ export async function syncOpenApiRoutes(options: {
         ? best.briefHighlight
         : `${name}: synced ${okCount} API capability route(s).`,
     timeline: timeline.length ? timeline : best.timeline,
+  };
+}
+
+export function computeNextSyncAt(
+  intervalMinutes: number | undefined,
+  from = new Date(),
+): string | null {
+  const mins = Math.max(0, Math.round(Number(intervalMinutes) || 0));
+  if (!mins) return null;
+  return new Date(from.getTime() + mins * 60_000).toISOString();
+}
+
+export function isSyncDue(config: InstallConfig, now = new Date()): boolean {
+  const mins = Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0));
+  if (!mins) return false;
+  if (!config.nextSyncAt) return true;
+  const due = Date.parse(config.nextSyncAt);
+  if (!Number.isFinite(due)) return true;
+  return due <= now.getTime();
+}
+
+export function withScheduleAfterSync(config: InstallConfig, from = new Date()): InstallConfig {
+  const mins = Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0));
+  if (!mins) {
+    return { ...config, nextSyncAt: undefined };
+  }
+  return {
+    ...config,
+    syncIntervalMinutes: mins,
+    nextSyncAt: computeNextSyncAt(mins, from) || undefined,
   };
 }
 

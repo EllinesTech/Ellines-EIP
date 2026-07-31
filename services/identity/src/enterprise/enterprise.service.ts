@@ -366,12 +366,22 @@ export class EnterpriseService {
       { ...summary, connectorId: row.catalogId, connectorName: row.displayName },
       row.catalogId,
     );
+    const nextAt = (() => {
+      const mins = Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0));
+      if (!mins) return undefined;
+      return new Date(Date.now() + mins * 60_000).toISOString();
+    })();
     await this.prisma.connectorInstallation.update({
       where: { id },
       data: {
         status: 'synced',
         lastSyncedAt: new Date(),
         lastMessage: `Synced — health ${persisted.healthScore}`,
+        config: {
+          ...config,
+          syncIntervalMinutes: Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0)),
+          nextSyncAt: nextAt,
+        } as object,
       },
     });
     return persisted;

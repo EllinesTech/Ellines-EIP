@@ -82,6 +82,8 @@ export type ConnectorInstallConfig = {
   sftpPassword?: string;
   sftpPrivateKey?: string;
   sftpRemotePath?: string;
+  syncIntervalMinutes?: number;
+  nextSyncAt?: string;
 };
 
 export function buildAuthHeaders(config: ConnectorInstallConfig): Record<string, string> {

@@ -15,6 +15,7 @@ import {
   parseOpenApiDocument,
   syncOpenApiRoutes,
   toTimelineStorage,
+  withScheduleAfterSync,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 
@@ -234,12 +235,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const now = new Date().toISOString();
+    const nextConfig = withScheduleAfterSync(config, new Date(now));
     await supabase
       .from('connector_installations')
       .update({
         status: 'synced',
         last_synced_at: now,
         last_message: `Synced — health ${summary.healthScore}`,
+        config: nextConfig,
         updated_at: now,
       })
       .eq('id', id);

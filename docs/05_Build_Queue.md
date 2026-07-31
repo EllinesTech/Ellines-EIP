@@ -13,13 +13,13 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
-| **2 — Integration Hub** | ~95% | MVP connectors done; **UEM normalize + Command Center object counts shipped**. Next: Sync Scheduler |
-| **3 — Executive Command Center** | ~60% | Work Console KPIs + UEM strip from connector sync; Timeline / Search / Notifications still open |
+| **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
+| **3 — Executive Command Center** | ~60% | KPIs + UEM strip live; **next: Enterprise Timeline** |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
 
-**Critical path remaining:** **2.7 Sync Scheduler** → Ellinea AI deepen → Timeline / Search / Notifications → Workflows / write under Owner policy.
+**Critical path remaining:** **3.4 Enterprise Timeline** → Search / Notifications → Ellinea AI deepen → Workflows / write under Owner policy.
 
 **MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
 
@@ -54,7 +54,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 2.5 | Email Connector | `done` | IMAP via Identity (`imapflow`); Pages saves config |
 | 2.5a | SFTP / folder drop | `done` | Pull CSV via Identity (`ssh2-sftp-client`); Pages saves config |
 | 2.6 | Universal Enterprise Model | `done` | Shared UEM types + normalize; timeline stores events+model; Command Center shows counts/objects |
-| 2.7 | Sync Scheduler | `next` | Manual Sync now for MVP — add interval jobs next |
+| 2.7 | Sync Scheduler | `done` | Per-install interval + nextSyncAt; run-due on Connectors load; cron hook registered |
 | 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |
 | 2.x | Webhooks / events | `todo` | Planned — System B pushes to EIP |
 | 2.x | SQL Server / MySQL | `todo` | Same pattern as Postgres when HIS needs it |
@@ -68,7 +68,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.1 | Executive Dashboard shell | `done` | Role-adaptive Work Console |
 | 3.2 | KPI Widgets (live) | `done` | From `/api/v1/enterprise/summary` after connector sync |
 | 3.3 | Enterprise Health Score | `done` | Snapshot `healthScore` |
-| 3.4 | Enterprise Timeline | `todo` | |
+| 3.4 | Enterprise Timeline | `next` | Feed exists in snapshot — surface a dedicated timeline view |
 | 3.5 | Enterprise Search | `todo` | |
 | 3.6 | Notification Center | `todo` | `services/notification` missing |
 
@@ -92,14 +92,13 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ## Recently landed on main (through 2026-07-31)
 
+- Sync scheduler: per-install intervals, run-due on Connectors load, Pages cron hook
+- Universal Enterprise Model normalize + Command Center object counts
+- Pages Functions import verify gate; Work Console density + settings typography
 - System Settings, profile shell, org datetime prefs (Pages)
-- Pages Functions import-path fix for connector installations (deploy runtime)
-- Owner vs IT hardening; Email IMAP + SFTP connectors; Pages deploy docs
-- Connector install wizard + OpenAPI + Postgres + platform packs
+- Owner vs IT hardening; Email IMAP + SFTP; connector wizard + packs
 - REST API + CSV/file connectors; live sync into enterprise snapshot
-- Access layers: Work Console / Org IT / Platform Super Admin ([09_Access_Layers.md](./09_Access_Layers.md))
-- Auth UX (1.2b) + Identity hardening (1.2a); brand + splash/login refresh
-- Identity Fly Dockerfile + deploy workflow + demo seed / login docs
+- Access layers + Auth UX + Identity hardening; brand refresh; Fly Identity deploy
 
 ---
 

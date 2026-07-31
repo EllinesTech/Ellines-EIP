@@ -13,6 +13,7 @@ import {
   syncInstallation,
   testInstallation,
   updateInstallation,
+  runDueConnectorSyncs,
   type ConnectorInstallConfigDto,
   type ConnectorInstallationDto,
   type ConnectorPackDto,
@@ -123,6 +124,7 @@ export default function ConnectorsPage() {
   const [parsed, setParsed] = useState<OpenApiParseResult | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [testOk, setTestOk] = useState<boolean | null>(null);
+  const [syncIntervalMinutes, setSyncIntervalMinutes] = useState(0);
 
   useEffect(() => {
     const s = getSession();
@@ -143,6 +145,19 @@ export default function ConnectorsPage() {
       const [inst, p] = await Promise.all([listInstallations(), listPublishedPacks()]);
       setInstallations(inst);
       setPacks(p);
+      try {
+        const due = await runDueConnectorSyncs();
+        if (due.ran > 0) {
+          const okCount = due.results.filter((r) => r.ok).length;
+          setNotice(
+            `Scheduler ran ${due.ran} due sync${due.ran === 1 ? '' : 's'} (${okCount} ok).`,
+          );
+          const refreshed = await listInstallations();
+          setInstallations(refreshed);
+        }
+      } catch {
+        /* opportunistic scheduler — ignore if briefly unavailable */
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load connectors');
     }
@@ -173,6 +188,7 @@ export default function ConnectorsPage() {
     setParsed(null);
     setSelectedPaths([]);
     setTestOk(null);
+    setSyncIntervalMinutes(0);
   }
 
   function openWizard() {
@@ -229,6 +245,7 @@ export default function ConnectorsPage() {
         .filter((e) => selectedPaths.includes(`${e.method} ${e.path}`))
         .map((e) => ({ method: e.method, path: e.path, capability: e.capability }));
     }
+    config.syncIntervalMinutes = syncIntervalMinutes;
     return config;
   }
 
@@ -352,6 +369,7 @@ export default function ConnectorsPage() {
     if (c.selectedRoutes?.length) {
       setSelectedPaths(c.selectedRoutes.map((r) => `${r.method} ${r.path}`));
     }
+    setSyncIntervalMinutes(Number(c.syncIntervalMinutes) || 0);
     setStep(2);
     setWizardOpen(true);
   }
@@ -386,8 +404,7 @@ export default function ConnectorsPage() {
           <h1>Connectors</h1>
           <p className={styles.lede}>
             Connect System B (HIS, ERP, CRM…) so Owner, IT, and employees can see and act on what that
-            system can do — without waiting for the vendor to build an EIP plugin. Install via OpenAPI,
-            API, database, CSV, email, or SFTP. Config is saved per organization.
+            system can do. Set sync schedules per install; due syncs run when IT opens this page.
           </p>
         </div>
         <button type="button" className={adminStyles.primary} onClick={openWizard} disabled={busy}>
@@ -766,9 +783,24 @@ export default function ConnectorsPage() {
           {step === 4 ? (
             <div>
               <p className={styles.lede}>
-                Save credentials on the server, test the connection, then sync into the enterprise
-                snapshot Ellinea reads.
+                Save credentials on the server, choose a sync schedule, test the connection, then sync
+                into the enterprise snapshot Ellinea reads.
               </p>
+              <div className={adminStyles.form} style={{ marginBottom: '0.85rem' }}>
+                <label>
+                  Sync schedule
+                  <select
+                    value={String(syncIntervalMinutes)}
+                    onChange={(e) => setSyncIntervalMinutes(Number(e.target.value) || 0)}
+                  >
+                    <option value="0">Manual only</option>
+                    <option value="15">Every 15 minutes</option>
+                    <option value="60">Every hour</option>
+                    <option value="360">Every 6 hours</option>
+                    <option value="1440">Daily</option>
+                  </select>
+                </label>
+              </div>
               {testOk === true ? (
                 <p className={adminStyles.notice}>Last test succeeded.</p>
               ) : null}
@@ -818,6 +850,7 @@ export default function ConnectorsPage() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Schedule</th>
                 <th>Last sync</th>
                 <th />
               </tr>
@@ -835,6 +868,46 @@ export default function ConnectorsPage() {
                   </td>
                   <td>{c.catalogId}</td>
                   <td>{c.status}</td>
+                  <td>
+                    <select
+                      value={String(c.config?.syncIntervalMinutes || 0)}
+                      disabled={busy}
+                      aria-label={`Schedule for ${c.displayName}`}
+                      onChange={(e) => {
+                        const mins = Number(e.target.value) || 0;
+                        void (async () => {
+                          setBusy(true);
+                          setError('');
+                          try {
+                            await updateInstallation(c.id, {
+                              config: { syncIntervalMinutes: mins },
+                            });
+                            setNotice(
+                              mins
+                                ? `Schedule set to every ${mins} minutes for ${c.displayName}.`
+                                : `Manual sync only for ${c.displayName}.`,
+                            );
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Schedule update failed');
+                          } finally {
+                            setBusy(false);
+                          }
+                        })();
+                      }}
+                    >
+                      <option value="0">Manual</option>
+                      <option value="15">15 min</option>
+                      <option value="60">1 hour</option>
+                      <option value="360">6 hours</option>
+                      <option value="1440">Daily</option>
+                    </select>
+                    {c.config?.nextSyncAt ? (
+                      <div style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 4 }}>
+                        Next {new Date(String(c.config.nextSyncAt)).toLocaleString()}
+                      </div>
+                    ) : null}
+                  </td>
                   <td>{c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString() : '—'}</td>
                   <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button

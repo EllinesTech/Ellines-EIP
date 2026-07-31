@@ -378,6 +378,8 @@ export interface ConnectorInstallConfigDto {
   sftpPassword?: string;
   sftpPrivateKey?: string;
   sftpRemotePath?: string;
+  syncIntervalMinutes?: number;
+  nextSyncAt?: string;
 }
 
 export interface ConnectorInstallationDto {
@@ -481,6 +483,17 @@ export function testInstallation(id: string) {
 
 export function syncInstallation(id: string) {
   return request<EnterpriseSummaryDto>(`/api/v1/connectors/installations/${id}/sync`, {
+    method: 'POST',
+  });
+}
+
+export function runDueConnectorSyncs() {
+  return request<{
+    checked: number;
+    due: number;
+    ran: number;
+    results: { id: string; name: string; ok: boolean; message: string }[];
+  }>('/api/v1/connectors/run-due', {
     method: 'POST',
   });
 }

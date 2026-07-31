@@ -2,3 +2,8 @@ name = "ellines-eip"
 compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "out"
+
+# Automatic connector sync poll (org-scoped run-due still needs an admin session;
+# this cron keeps the Worker warm and is ready for platform-wide scheduler expansion).
+[triggers]
+crons = ["*/15 * * * *"]
