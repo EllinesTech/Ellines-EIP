@@ -14,6 +14,7 @@ import {
   testInstallation,
   updateInstallation,
   runDueConnectorSyncs,
+  ingestEnterpriseSnapshot,
   type ConnectorInstallConfigDto,
   type ConnectorInstallationDto,
   type ConnectorPackDto,
@@ -125,6 +126,9 @@ export default function ConnectorsPage() {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [syncIntervalMinutes, setSyncIntervalMinutes] = useState(0);
+  const [byoJson, setByoJson] = useState(
+    '{\n  "connectorName": "External System B",\n  "healthScore": 78,\n  "connectedSystems": 1,\n  "openAlerts": 2,\n  "openDecisions": 1,\n  "briefHighlight": "Pushed from an external UEM feed.",\n  "timeline": [{ "title": "External ingest", "detail": "BYO snapshot" }]\n}',
+  );
 
   useEffect(() => {
     const s = getSession();
@@ -414,6 +418,49 @@ export default function ConnectorsPage() {
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
+
+      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
+        <div className={styles.panelLabel}>Bring-your-own System B</div>
+        <p className={styles.lede}>
+          Paste any UEM / metrics JSON and ingest it as this org’s enterprise snapshot (no vendor
+          connector required). API: <code>POST /api/v1/enterprise/ingest</code>.
+        </p>
+        <label className={adminStyles.form} style={{ display: 'block' }}>
+          <span className={styles.panelLabel}>JSON payload</span>
+          <textarea
+            value={byoJson}
+            onChange={(e) => setByoJson(e.target.value)}
+            rows={8}
+            style={{ width: '100%', fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem' }}
+          />
+        </label>
+        <button
+          type="button"
+          className={adminStyles.primary}
+          disabled={busy}
+          style={{ marginTop: '0.5rem' }}
+          onClick={() => {
+            setBusy(true);
+            setError('');
+            try {
+              const parsedJson = JSON.parse(byoJson) as Record<string, unknown>;
+              void ingestEnterpriseSnapshot(parsedJson)
+                .then((res) => {
+                  setNotice(res.message || `Ingested · health ${res.healthScore}`);
+                })
+                .catch((err) => {
+                  setError(err instanceof Error ? err.message : 'Ingest failed');
+                })
+                .finally(() => setBusy(false));
+            } catch {
+              setBusy(false);
+              setError('BYO JSON is invalid');
+            }
+          }}
+        >
+          Ingest external snapshot
+        </button>
+      </section>
 
       {packs.length > 0 ? (
         <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>

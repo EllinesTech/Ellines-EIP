@@ -587,6 +587,15 @@ export function fetchEnterpriseSummary() {
   return request<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
 }
 
+/** Owner/IT: push any System B JSON (UEM / metrics) into the org snapshot. */
+export function ingestEnterpriseSnapshot(payload: Record<string, unknown>) {
+  return request<EnterpriseSummaryDto & { message?: string }>('/api/v1/enterprise/ingest', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+
 export function listConnectors() {
   return request<ConnectorStatusDto[]>('/api/v1/connectors');
 }

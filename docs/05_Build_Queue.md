@@ -121,7 +121,8 @@ while queue has next/in_progress and not blocked:
 | 6.1 | Extract `services/ellinea-ai` | `done` | `@ellines-eip/ellinea-ai` + Nest stub |
 | 6.2 | Ellinea API contract | `done` | docs/11 + Nest ask/brief/recommend/memory/feedback |
 | 6.3 | `@ellines/ellinea-sdk` | `done` | `@ellines-eip/ellinea-sdk` createEllineaClient |
-| 6.4 | Bring-your-own connectors | `next` | UEM snapshots from any System B |
+| 6.4 | Bring-your-own connectors | `done` | `POST /api/v1/enterprise/ingest` + Connectors UI |
+| 6.5 | Tenant learning isolation | `next` | Per-org Memory/DNA/feedback boundaries |
 
 ---
 
@@ -170,7 +171,8 @@ Blueprint: *â€œContinuously learn from enterprise knowledge through Ellinea AI.â
 | 6.1 | Extract `services/ellinea-ai` | `done` | Package + Nest stub on :3002 |
 | 6.2 | Ellinea API contract | `done` | [11_Ellinea_API_Contract.md](./11_Ellinea_API_Contract.md) |
 | 6.3 | `@ellines/ellinea-sdk` | `done` | `createEllineaClient` in packages/ellinea-sdk |
-| 6.4 | Bring-your-own connectors | `next` | UEM snapshots from any System B |
+| 6.4 | Bring-your-own connectors | `done` | External UEM ingest endpoint + Connectors paste UI |
+| 6.5 | Tenant learning isolation | `next` | Per-org Memory/DNA/feedback boundaries |
 | 6.3 | `@ellines/ellinea-sdk` | `todo` | |
 | 6.4 | Bring-your-own connectors | `todo` | UEM snapshots from any System B |
 | 6.5 | Tenant learning isolation | `todo` | |
