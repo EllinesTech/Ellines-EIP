@@ -136,3 +136,163 @@
     min-width: 560px;
   }
 }
+
+.wizard {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.wizardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.78rem;
+  color: #8b95a8;
+}
+
+.stepActive {
+  color: #c4b5fd;
+  font-weight: 700;
+}
+
+.step {
+  opacity: 0.75;
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.typeCard,
+.typeCardActive {
+  text-align: left;
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.typeCardActive {
+  background: rgba(111, 45, 141, 0.18);
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.typeTag {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.typeCard strong,
+.typeCardActive strong {
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+}
+
+.typeCard p,
+.typeCardActive p {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #8b95a8;
+  line-height: 1.4;
+}
+
+.wizardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.form textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #f4f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  background: #0b0e14;
+  resize: vertical;
+  width: 100%;
+}
+
+.capList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 280px;
+  overflow: auto;
+  margin-top: 0.75rem;
+}
+
+.capRow,
+.capDisabled {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+
+.capDisabled {
+  opacity: 0.45;
+}
+
+.capMethod {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #93c5fd;
+}
+
+.packGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.packCard {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.packCard strong {
+  color: #fff;
+}
+
+.packCard p {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: #8b95a8;
+  line-height: 1.4;
+}

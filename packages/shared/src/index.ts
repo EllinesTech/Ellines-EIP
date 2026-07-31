@@ -142,3 +142,34 @@ export interface ConnectorStatus {
   lastSyncedAt: string | null;
   message?: string;
 }
+
+/** Saved per-org connector install (wizard). Secrets redacted on list/get. */
+export interface ConnectorInstallation {
+  id: string;
+  organizationId: string;
+  catalogId: string;
+  displayName: string;
+  status: 'draft' | 'tested' | 'synced' | 'error';
+  lastTestAt: string | null;
+  lastSyncedAt: string | null;
+  lastMessage?: string | null;
+  packId?: string | null;
+  /** Non-secret config echo; secret fields appear as `***` when set. */
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Platform-published pack — Org IT installs with credentials only. */
+export interface ConnectorPack {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  catalogId: string;
+  templateConfig: Record<string, unknown>;
+  published: boolean;
+  createdByEmail?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

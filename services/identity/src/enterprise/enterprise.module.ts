@@ -5,5 +5,6 @@ import { EnterpriseService } from './enterprise.service';
 @Module({
   controllers: [EnterpriseController],
   providers: [EnterpriseService],
+  exports: [EnterpriseService],
 })
 export class EnterpriseModule {}

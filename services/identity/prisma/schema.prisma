@@ -24,12 +24,13 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users               User[]
-  branches            Branch[]
-  departments         Department[]
-  auditLogs           AuditLog[]
-  passwordResetTokens PasswordResetToken[]
-  enterpriseSnapshot  EnterpriseSnapshot?
+  users                  User[]
+  branches               Branch[]
+  departments            Department[]
+  auditLogs              AuditLog[]
+  passwordResetTokens    PasswordResetToken[]
+  enterpriseSnapshot     EnterpriseSnapshot?
+  connectorInstallations ConnectorInstallation[]
 
   @@map("organizations")
 }
@@ -135,4 +136,44 @@ model EnterpriseSnapshot {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("enterprise_snapshots")
+}
+
+/** Per-org connector wizard install — config persists server-side (not localStorage). */
+model ConnectorInstallation {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  catalogId      String    @map("catalog_id")
+  displayName    String    @map("display_name")
+  config         Json
+  status         String    @default("draft")
+  lastTestAt     DateTime? @map("last_test_at")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  lastMessage    String?   @map("last_message")
+  packId         String?   @map("pack_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pack         ConnectorPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("connector_installations")
+}
+
+/** Platform Super Admin publishes packs; Org IT installs with credentials only. */
+model ConnectorPack {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  description      String   @default("")
+  catalogId        String   @map("catalog_id")
+  templateConfig   Json     @map("template_config")
+  published        Boolean  @default(true)
+  createdByEmail   String?  @map("created_by_email")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  installations ConnectorInstallation[]
+
+  @@map("connector_packs")
 }

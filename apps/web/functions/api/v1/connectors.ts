@@ -27,39 +27,35 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     : null;
   const activeId = (snap?.connector_id as string | undefined) || null;
 
+  const item = (
+    id: string,
+    name: string,
+    type: string,
+    idleMsg: string,
+  ) => ({
+    id,
+    name,
+    type,
+    status: activeId === id ? 'synced' : 'idle',
+    lastSyncedAt: activeId === id ? lastAt : null,
+    message: activeId === id ? 'Last sync OK' : idleMsg,
+  });
+
   return json([
-    {
-      id: 'demo-json',
-      name: 'Demo JSON Systems',
-      type: 'file',
-      status: activeId === 'demo-json' ? 'synced' : 'idle',
-      lastSyncedAt: activeId === 'demo-json' ? lastAt : null,
-      message:
-        activeId === 'demo-json'
-          ? 'Last sync OK'
-          : 'Built-in seed — Sync now for live KPIs',
-    },
-    {
-      id: 'rest-api',
-      name: 'REST API Systems',
-      type: 'api',
-      status: activeId === 'rest-api' ? 'synced' : 'idle',
-      lastSyncedAt: activeId === 'rest-api' ? lastAt : null,
-      message:
-        activeId === 'rest-api'
-          ? 'Last sync OK'
-          : 'JSON HTTPS URL when the system exposes an API',
-    },
-    {
-      id: 'csv-file',
-      name: 'CSV / File Import',
-      type: 'file',
-      status: activeId === 'csv-file' ? 'synced' : 'idle',
-      lastSyncedAt: activeId === 'csv-file' ? lastAt : null,
-      message:
-        activeId === 'csv-file'
-          ? 'Last sync OK'
-          : 'No API needed — paste a CSV export from the business system',
-    },
+    item('demo-json', 'Demo JSON Systems', 'file', 'Built-in seed — Sync now for live KPIs'),
+    item('rest-api', 'REST API Systems', 'api', 'JSON HTTPS URL when the system exposes an API'),
+    item('openapi', 'OpenAPI / Swagger', 'api', 'Upload OpenAPI — pick capabilities to sync'),
+    item(
+      'csv-file',
+      'CSV / File Import',
+      'file',
+      'No API needed — paste a CSV export from the business system',
+    ),
+    item(
+      'postgres',
+      'PostgreSQL (read-only)',
+      'database',
+      'Reporting DB / replica when vendors will not ship an API',
+    ),
   ]);
 };

@@ -13,13 +13,13 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~90% | Access layers landed; Gateway deferred while Integration Hub unlocks live KPIs |
-| **2 — Integration Hub** | ~50% | Demo JSON + REST + CSV/file; catalog shows DB/email/SFTP next |
+| **2 — Integration Hub** | ~70% | Install wizard + persisted configs; OpenAPI; Postgres (Identity); packs stub |
 | **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (UI + same-origin `/api/v1` auth); Nest Identity on Fly optional |
 
-**Critical path remaining:** finish Identity/Admin → Integration Hub → live Dashboard → Ellinea AI → Workflows.
+**Critical path remaining:** Email/SFTP connectors + UEM deepen → Ellinea AI → Workflows.
 
 ---
 
@@ -41,11 +41,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 2.1 | Connector Framework + SDK | `done` | SDK + Demo JSON connector; snapshot via Pages/Nest; Connectors Sync UI |
+| 2.1 | Connector Framework + SDK | `done` | SDK + Demo JSON; OpenAPI parse; Postgres helpers; capability catalog |
 | 2.2 | REST API Connector | `done` | SDK `createRestApiConnector` + Connectors UI endpoint + sample JSON sync |
-| 2.3 | PostgreSQL Connector | `next` | Preferred when vendors will not expose an API |
+| 2.2a | Install wizard + per-org config | `done` | Type → credentials → map → test/sync; `connector_installations` (not localStorage) |
+| 2.2b | OpenAPI / Swagger ingest | `done` | Upload JSON → list capabilities → select GET routes → sync |
+| 2.3 | PostgreSQL Connector | `done` | Read-only SELECT via Identity (`pg`); Pages saves config (TCP sync needs Nest) |
+| 2.3a | Platform connector packs | `done` | Super Admin publish pack; Org IT install with credentials only |
 | 2.4 | CSV/File Connector | `done` | Paste/import CSV — no API path; catalog shows DB/email/SFTP as coming |
-| 2.5 | Email Connector | `todo` | P1 |
+| 2.5 | Email Connector | `next` | P1 |
 | 2.6 | Universal Enterprise Model | `todo` | Snapshot fields are a thin start |
 | 2.7 | Sync Scheduler | `todo` | Manual Sync now for MVP |
 | 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |

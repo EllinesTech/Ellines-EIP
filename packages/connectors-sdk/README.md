@@ -7,17 +7,20 @@ SDK for Ellines EIP connector plugins. **API is only one path** — file, databa
 - `createDemoJsonConnector` — demo seed
 - `createRestApiConnector` — HTTPS JSON URL
 - `createCsvFileConnector` / `parseCsvToEnterprisePayload` — CSV/file export (no API)
+- `parseOpenApiDocument` / `syncOpenApiRoutes` — OpenAPI → capabilities → sync
+- `createPostgresConnector` / `assertReadOnlySql` / `rowsToEnterprisePayload` — read-only SQL
+- `buildAuthHeaders` — API key / Bearer / Basic
 - `normalizeEnterprisePayload` — map varied JSON into the Universal Enterprise Model
 - `CONNECTOR_CATALOG` — product catalog (live + planned)
 
 ## Philosophy
 
-If a vendor will not give an API, EIP still connects via:
+IT installs a connection without the vendor writing an EIP plugin:
 
-1. CSV / Excel / file export  
-2. Read-only database (Postgres / SQL Server — roadmap)  
-3. Email / IMAP reports  
-4. SFTP folder drops  
-5. Webhooks when the system can push  
+1. OpenAPI / Swagger upload (capabilities listed automatically)
+2. REST URL + auth
+3. CSV / Excel / file export
+4. Read-only PostgreSQL (reporting replica)
+5. Email / IMAP, SFTP, webhooks (roadmap)
 
-Ellinea never talks to each system’s proprietary UI — it reads the normalized enterprise snapshot after sync.
+Ellinea reads the normalized enterprise snapshot after sync — never each system’s proprietary UI.

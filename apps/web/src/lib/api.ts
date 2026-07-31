@@ -240,6 +240,67 @@ export interface ConnectorStatusDto {
   message?: string;
 }
 
+export interface ConnectorInstallConfigDto {
+  endpoint?: string;
+  headers?: Record<string, string>;
+  authType?: 'none' | 'apiKey' | 'bearer' | 'basic';
+  apiKey?: string;
+  apiKeyHeader?: string;
+  bearerToken?: string;
+  basicUser?: string;
+  basicPass?: string;
+  csvText?: string;
+  openApiDocument?: unknown;
+  openApiBaseUrl?: string;
+  selectedRoutes?: { method: string; path: string; capability?: string }[];
+  connectionString?: string;
+  sql?: string;
+  systemName?: string;
+  fieldMap?: Record<string, string>;
+}
+
+export interface ConnectorInstallationDto {
+  id: string;
+  organizationId: string;
+  catalogId: string;
+  displayName: string;
+  status: string;
+  lastTestAt: string | null;
+  lastSyncedAt: string | null;
+  lastMessage?: string | null;
+  packId?: string | null;
+  config: ConnectorInstallConfigDto;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectorPackDto {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  catalogId: string;
+  templateConfig: ConnectorInstallConfigDto;
+  published: boolean;
+  createdByEmail?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpenApiParseResult {
+  title: string;
+  version: string;
+  baseUrl: string;
+  endpoints: {
+    method: string;
+    path: string;
+    operationId: string;
+    summary: string;
+    capability: string;
+    selectable: boolean;
+  }[];
+}
+
 export function fetchEnterpriseSummary() {
   return request<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
 }
@@ -250,10 +311,85 @@ export function listConnectors() {
 
 export function syncConnector(
   connectorId: string,
-  options?: { endpoint?: string; headers?: Record<string, string>; csvText?: string },
+  options?: ConnectorInstallConfigDto,
 ) {
   return request<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
     method: 'POST',
     body: options ? JSON.stringify(options) : undefined,
+  });
+}
+
+export function listInstallations() {
+  return request<ConnectorInstallationDto[]>('/api/v1/connectors/installations');
+}
+
+export function createInstallation(body: {
+  catalogId: string;
+  displayName: string;
+  config?: ConnectorInstallConfigDto;
+  packId?: string;
+}) {
+  return request<ConnectorInstallationDto>('/api/v1/connectors/installations', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateInstallation(
+  id: string,
+  body: { displayName?: string; config?: ConnectorInstallConfigDto },
+) {
+  return request<ConnectorInstallationDto>(`/api/v1/connectors/installations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteInstallation(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/connectors/installations/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export function testInstallation(id: string) {
+  return request<{ ok: boolean; message?: string; installation: ConnectorInstallationDto }>(
+    `/api/v1/connectors/installations/${id}/test`,
+    { method: 'POST' },
+  );
+}
+
+export function syncInstallation(id: string) {
+  return request<EnterpriseSummaryDto>(`/api/v1/connectors/installations/${id}/sync`, {
+    method: 'POST',
+  });
+}
+
+export function parseOpenApi(document: unknown) {
+  return request<OpenApiParseResult>('/api/v1/connectors/openapi/parse', {
+    method: 'POST',
+    body: JSON.stringify({ document }),
+  });
+}
+
+export function listPublishedPacks() {
+  return request<ConnectorPackDto[]>('/api/v1/connectors/packs');
+}
+
+export function listPlatformConnectorPacks() {
+  return request<ConnectorPackDto[]>('/api/v1/platform/connector-packs');
+}
+
+export function createPlatformConnectorPack(body: {
+  slug: string;
+  name: string;
+  description?: string;
+  catalogId: string;
+  templateConfig?: ConnectorInstallConfigDto;
+  fromInstallationId?: string;
+  published?: boolean;
+}) {
+  return request<ConnectorPackDto>('/api/v1/platform/connector-packs', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }

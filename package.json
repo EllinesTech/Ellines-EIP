@@ -9,7 +9,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n identity,web -c magenta,cyan \"npm run dev:identity\" \"npm run dev:web\"",
+    "predev": "npm run build:shared",
+    "dev": "concurrently -n shared,sdk,identity,web -c gray,yellow,magenta,cyan \"npm run dev -w @ellines-eip/shared\" \"npm run dev -w @ellines-eip/connectors-sdk\" \"npm run dev:identity\" \"npm run dev:web\"",
     "dev:identity": "npm run dev -w @ellines-eip/identity",
     "dev:web": "npm run dev -w @ellines-eip/web",
     "build": "npm run build --workspaces --if-present",

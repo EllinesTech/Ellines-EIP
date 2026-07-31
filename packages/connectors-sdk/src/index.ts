@@ -1,6 +1,69 @@
 import type { EnterpriseSummary } from '@ellines-eip/shared';
 
+export {
+  parseOpenApiDocument,
+  syncOpenApiRoutes,
+  type OpenApiEndpoint,
+  type ParsedOpenApi,
+  type SelectedOpenApiRoute,
+} from './openapi';
+export {
+  assertReadOnlySql,
+  createPostgresConnector,
+  rowsToEnterprisePayload,
+  type PostgresConnectorOptions,
+  type PostgresQueryFn,
+} from './postgres';
+
 export type ConnectorType = 'api' | 'database' | 'file' | 'email' | 'event';
+
+/** Typed capability exposed by any connector (API, DB, file, …). */
+export type ConnectorCapability = {
+  id: string;
+  name: string;
+  kind: 'read' | 'write' | 'sync';
+  description?: string;
+  inputs?: string[];
+  outputs?: string[];
+};
+
+/** Persisted install config shape (secrets stored server-side per org). */
+export type ConnectorInstallConfig = {
+  endpoint?: string;
+  headers?: Record<string, string>;
+  authType?: 'none' | 'apiKey' | 'bearer' | 'basic';
+  apiKey?: string;
+  apiKeyHeader?: string;
+  bearerToken?: string;
+  basicUser?: string;
+  basicPass?: string;
+  csvText?: string;
+  openApiDocument?: unknown;
+  openApiBaseUrl?: string;
+  selectedRoutes?: { method: string; path: string; capability?: string }[];
+  connectionString?: string;
+  sql?: string;
+  fieldMap?: Record<string, string>;
+  systemName?: string;
+};
+
+export function buildAuthHeaders(config: ConnectorInstallConfig): Record<string, string> {
+  const headers: Record<string, string> = { ...(config.headers || {}) };
+  const auth = config.authType || 'none';
+  if (auth === 'apiKey' && config.apiKey) {
+    headers[config.apiKeyHeader || 'X-API-Key'] = config.apiKey;
+  } else if (auth === 'bearer' && config.bearerToken) {
+    headers.Authorization = `Bearer ${config.bearerToken}`;
+  } else if (auth === 'basic' && config.basicUser) {
+    const raw = `${config.basicUser}:${config.basicPass || ''}`;
+    const token =
+      typeof Buffer !== 'undefined'
+        ? Buffer.from(raw).toString('base64')
+        : btoa(raw);
+    headers.Authorization = `Basic ${token}`;
+  }
+  return headers;
+}
 
 export interface ConnectorConfig {
   [key: string]: unknown;
@@ -345,10 +408,17 @@ export const CONNECTOR_CATALOG = [
     blurb: 'Built-in sample feed for demos and smoke tests.',
   },
   {
+    id: 'openapi',
+    name: 'OpenAPI / Swagger',
+    type: 'api' as ConnectorType,
+    status: 'available' as const,
+    blurb: 'Upload the vendor OpenAPI file — EIP lists capabilities and syncs selected GETs.',
+  },
+  {
     id: 'postgres',
     name: 'PostgreSQL (read-only)',
     type: 'database' as ConnectorType,
-    status: 'coming' as const,
+    status: 'available' as const,
     blurb: 'Connect straight to the system database when vendors will not ship an API.',
   },
   {

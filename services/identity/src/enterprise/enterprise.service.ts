@@ -5,12 +5,24 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
+  assertReadOnlySql,
+  buildAuthHeaders,
   createCsvFileConnector,
   createDemoJsonConnector,
+  createPostgresConnector,
   createRestApiConnector,
   normalizeEnterprisePayload,
+  parseOpenApiDocument,
+  syncOpenApiRoutes,
+  type ConnectorInstallConfig,
 } from '@ellines-eip/connectors-sdk';
-import type { ConnectorStatus, EnterpriseSummary } from '@ellines-eip/shared';
+import type {
+  ConnectorInstallation,
+  ConnectorPack,
+  ConnectorStatus,
+  EnterpriseSummary,
+} from '@ellines-eip/shared';
+import { Client } from 'pg';
 import { PrismaService } from '../prisma/prisma.service';
 import demoSeed from './demo-enterprise.json';
 import restSample from './rest-enterprise-sample.json';
@@ -22,6 +34,42 @@ openAlerts,1
 openDecisions,3
 briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
 `;
+
+const SECRET_KEYS = ['apiKey', 'bearerToken', 'basicPass', 'connectionString'] as const;
+
+function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...config };
+  for (const key of SECRET_KEYS) {
+    if (typeof out[key] === 'string' && (out[key] as string).length > 0) {
+      out[key] = '***';
+    }
+  }
+  if (out.openApiDocument !== undefined) {
+    out.openApiDocument = { _present: true };
+  }
+  return out;
+}
+
+function asInstallConfig(raw: unknown): ConnectorInstallConfig {
+  return (raw && typeof raw === 'object' ? raw : {}) as ConnectorInstallConfig;
+}
+
+function mergeConfig(
+  existing: ConnectorInstallConfig,
+  patch: ConnectorInstallConfig,
+): ConnectorInstallConfig {
+  const next: ConnectorInstallConfig = { ...existing, ...patch };
+  for (const key of SECRET_KEYS) {
+    const v = patch[key];
+    if (v === '***' || v === '' || v === undefined) {
+      next[key] = existing[key];
+    }
+  }
+  if (patch.openApiDocument && (patch.openApiDocument as { _present?: boolean })._present) {
+    next.openApiDocument = existing.openApiDocument;
+  }
+  return next;
+}
 
 @Injectable()
 export class EnterpriseService {
@@ -91,6 +139,17 @@ export class EnterpriseService {
             : 'JSON HTTPS URL when the system exposes an API',
       },
       {
+        id: 'openapi',
+        name: 'OpenAPI / Swagger',
+        type: 'api',
+        status: activeId === 'openapi' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'openapi' ? lastAt : null,
+        message:
+          activeId === 'openapi'
+            ? 'Last sync OK'
+            : 'Upload OpenAPI — pick capabilities to sync',
+      },
+      {
         id: 'csv-file',
         name: 'CSV / File Import',
         type: 'file',
@@ -101,14 +160,178 @@ export class EnterpriseService {
             ? 'Last sync OK'
             : 'No API needed — paste a CSV export from the business system',
       },
+      {
+        id: 'postgres',
+        name: 'PostgreSQL (read-only)',
+        type: 'database',
+        status: activeId === 'postgres' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'postgres' ? lastAt : null,
+        message:
+          activeId === 'postgres'
+            ? 'Last sync OK'
+            : 'Reporting DB / replica when vendors will not ship an API',
+      },
     ];
+  }
+
+  async listInstallations(organizationId: string): Promise<ConnectorInstallation[]> {
+    const rows = await this.prisma.connectorInstallation.findMany({
+      where: { organizationId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return rows.map((r) => this.toInstallationDto(r));
+  }
+
+  async createInstallation(
+    organizationId: string,
+    actorUserId: string,
+    body: {
+      catalogId: string;
+      displayName: string;
+      config?: ConnectorInstallConfig;
+      packId?: string;
+    },
+  ): Promise<ConnectorInstallation> {
+    const catalogId = body.catalogId?.trim();
+    if (!catalogId) throw new BadRequestException('catalogId is required');
+    const allowed = ['rest-api', 'openapi', 'csv-file', 'postgres', 'demo-json'];
+    if (!allowed.includes(catalogId)) {
+      throw new BadRequestException(`Unsupported catalogId: ${catalogId}`);
+    }
+
+    let config = body.config || {};
+    let displayName = (body.displayName || '').trim() || catalogId;
+    let packId: string | null = body.packId || null;
+
+    if (packId) {
+      const pack = await this.prisma.connectorPack.findFirst({
+        where: { id: packId, published: true },
+      });
+      if (!pack) throw new NotFoundException('Connector pack not found');
+      config = {
+        ...(pack.templateConfig as ConnectorInstallConfig),
+        ...config,
+      };
+      displayName = displayName || pack.name;
+    }
+
+    const row = await this.prisma.connectorInstallation.create({
+      data: {
+        organizationId,
+        catalogId,
+        displayName,
+        config: config as object,
+        status: 'draft',
+        packId,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: actorUserId,
+        action: 'connector.install.create',
+        resource: 'connector_installation',
+        metadata: { id: row.id, catalogId },
+      },
+    });
+    return this.toInstallationDto(row);
+  }
+
+  async updateInstallation(
+    organizationId: string,
+    id: string,
+    patch: { displayName?: string; config?: ConnectorInstallConfig },
+  ): Promise<ConnectorInstallation> {
+    const row = await this.prisma.connectorInstallation.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) throw new NotFoundException('Installation not found');
+    const existing = asInstallConfig(row.config);
+    const config = patch.config ? mergeConfig(existing, patch.config) : existing;
+    const updated = await this.prisma.connectorInstallation.update({
+      where: { id },
+      data: {
+        displayName: patch.displayName?.trim() || row.displayName,
+        config: config as object,
+      },
+    });
+    return this.toInstallationDto(updated);
+  }
+
+  async deleteInstallation(organizationId: string, id: string) {
+    const row = await this.prisma.connectorInstallation.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) throw new NotFoundException('Installation not found');
+    await this.prisma.connectorInstallation.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  parseOpenApi(document: unknown) {
+    try {
+      return parseOpenApiDocument(document);
+    } catch (err) {
+      throw new BadRequestException(err instanceof Error ? err.message : 'Invalid OpenAPI');
+    }
+  }
+
+  async testInstallation(organizationId: string, id: string) {
+    const row = await this.prisma.connectorInstallation.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) throw new NotFoundException('Installation not found');
+    const config = asInstallConfig(row.config);
+
+    try {
+      const ok = await this.runTest(row.catalogId, config);
+      const updated = await this.prisma.connectorInstallation.update({
+        where: { id },
+        data: {
+          status: ok ? 'tested' : 'error',
+          lastTestAt: new Date(),
+          lastMessage: ok ? 'Connection test OK' : 'Connection test failed',
+        },
+      });
+      return { ok, installation: this.toInstallationDto(updated) };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection test failed';
+      const updated = await this.prisma.connectorInstallation.update({
+        where: { id },
+        data: { status: 'error', lastTestAt: new Date(), lastMessage: message },
+      });
+      return { ok: false, message, installation: this.toInstallationDto(updated) };
+    }
+  }
+
+  async syncInstallation(organizationId: string, actorUserId: string, id: string) {
+    const row = await this.prisma.connectorInstallation.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) throw new NotFoundException('Installation not found');
+    const config = asInstallConfig(row.config);
+    const summary = await this.runSync(row.catalogId, config, row.displayName);
+    const persisted = await this.persistSync(
+      organizationId,
+      actorUserId,
+      { ...summary, connectorId: row.catalogId, connectorName: row.displayName },
+      row.catalogId,
+    );
+    await this.prisma.connectorInstallation.update({
+      where: { id },
+      data: {
+        status: 'synced',
+        lastSyncedAt: new Date(),
+        lastMessage: `Synced — health ${persisted.healthScore}`,
+      },
+    });
+    return persisted;
   }
 
   async syncConnector(
     organizationId: string,
     actorUserId: string,
     connectorId: string,
-    options?: { endpoint?: string; headers?: Record<string, string>; csvText?: string },
+    options?: ConnectorInstallConfig,
   ) {
     if (connectorId === 'demo-json') {
       const connector = createDemoJsonConnector(demoSeed);
@@ -119,28 +342,131 @@ export class EnterpriseService {
       return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
     }
 
-    if (connectorId === 'rest-api') {
-      const endpoint = (options?.endpoint || '').trim();
+    const config = options || {};
+    const summary = await this.runSync(connectorId, config, undefined);
+    return this.persistSync(organizationId, actorUserId, summary, connectorId);
+  }
+
+  async listPacks(publishedOnly = false): Promise<ConnectorPack[]> {
+    const rows = await this.prisma.connectorPack.findMany({
+      where: publishedOnly ? { published: true } : undefined,
+      orderBy: { updatedAt: 'desc' },
+    });
+    return rows.map((r) => this.toPackDto(r));
+  }
+
+  async createPack(
+    actorEmail: string,
+    body: {
+      slug: string;
+      name: string;
+      description?: string;
+      catalogId: string;
+      templateConfig?: ConnectorInstallConfig;
+      fromInstallationId?: string;
+      organizationId?: string;
+      published?: boolean;
+    },
+  ): Promise<ConnectorPack> {
+    const slug = body.slug?.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+    if (!slug) throw new BadRequestException('slug is required');
+    if (!body.name?.trim()) throw new BadRequestException('name is required');
+
+    let catalogId = body.catalogId;
+    let templateConfig: ConnectorInstallConfig = body.templateConfig || {};
+
+    if (body.fromInstallationId && body.organizationId) {
+      const inst = await this.prisma.connectorInstallation.findFirst({
+        where: { id: body.fromInstallationId, organizationId: body.organizationId },
+      });
+      if (!inst) throw new NotFoundException('Installation not found');
+      catalogId = inst.catalogId;
+      const cfg = asInstallConfig(inst.config);
+      templateConfig = redactConfig({ ...cfg }) as ConnectorInstallConfig;
+      for (const key of SECRET_KEYS) delete templateConfig[key];
+      delete templateConfig.openApiDocument;
+    }
+
+    if (!catalogId) throw new BadRequestException('catalogId is required');
+
+    try {
+      const row = await this.prisma.connectorPack.create({
+        data: {
+          slug,
+          name: body.name.trim(),
+          description: body.description?.trim() || '',
+          catalogId,
+          templateConfig: templateConfig as object,
+          published: body.published !== false,
+          createdByEmail: actorEmail,
+        },
+      });
+      return this.toPackDto(row);
+    } catch {
+      throw new BadRequestException('Pack slug already exists');
+    }
+  }
+
+  private async runTest(catalogId: string, config: ConnectorInstallConfig): Promise<boolean> {
+    if (catalogId === 'demo-json') return true;
+    if (catalogId === 'csv-file') {
+      return Boolean((config.csvText || CSV_SAMPLE).trim());
+    }
+    if (catalogId === 'rest-api') {
+      const endpoint = (config.endpoint || '').trim();
+      if (!endpoint || endpoint.includes('rest-sample') || endpoint === 'sample') return true;
+      const connector = createRestApiConnector({
+        endpoint,
+        headers: buildAuthHeaders(config),
+      });
+      return connector.testConnection();
+    }
+    if (catalogId === 'openapi') {
+      if (!config.openApiDocument) throw new BadRequestException('OpenAPI document required');
+      parseOpenApiDocument(config.openApiDocument);
+      const base = (config.openApiBaseUrl || '').trim();
+      if (!base) return true;
+      const res = await fetch(base, { method: 'GET', headers: buildAuthHeaders(config) });
+      return res.ok || res.status === 404 || res.status === 401 || res.status === 403;
+    }
+    if (catalogId === 'postgres') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
+      }
+      assertReadOnlySql(config.sql || 'SELECT 1');
+      await this.pgQuery(config.connectionString, 'SELECT 1 AS ok');
+      return true;
+    }
+    throw new NotFoundException('Unknown connector');
+  }
+
+  private async runSync(
+    catalogId: string,
+    config: ConnectorInstallConfig,
+    displayName?: string,
+  ) {
+    if (catalogId === 'demo-json') {
+      const connector = createDemoJsonConnector(demoSeed);
+      const result = await connector.sync();
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'Sync failed');
+      return result.summary;
+    }
+
+    if (catalogId === 'rest-api') {
+      const endpoint = (config.endpoint || '').trim();
       const useSample =
         !endpoint ||
         endpoint.includes('/api/v1/connectors/rest-sample') ||
         endpoint === 'sample';
-
       if (useSample) {
         const payload = normalizeEnterprisePayload(restSample);
-        return this.persistSync(
-          organizationId,
-          actorUserId,
-          {
-            connectorId: 'rest-api',
-            connectorName: 'REST API Systems',
-            ...payload,
-            syncedAt: new Date().toISOString(),
-          },
-          connectorId,
-        );
+        return {
+          connectorId: 'rest-api',
+          connectorName: displayName || 'REST API Systems',
+          ...payload,
+          syncedAt: new Date().toISOString(),
+        };
       }
-
       let parsed: URL;
       try {
         parsed = new URL(endpoint);
@@ -150,30 +476,162 @@ export class EnterpriseService {
       if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
         throw new BadRequestException('REST endpoint must be http(s)');
       }
-
       const connector = createRestApiConnector({
         endpoint: parsed.toString(),
-        headers: options?.headers,
+        headers: buildAuthHeaders(config),
+        connectorName: displayName || config.systemName || 'REST API Systems',
       });
       const result = await connector.sync();
-      if (!result.ok) {
-        throw new ServiceUnavailableException(result.message || 'REST sync failed');
-      }
-      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'REST sync failed');
+      return result.summary;
     }
 
-    if (connectorId === 'csv-file') {
+    if (catalogId === 'openapi') {
+      if (!config.openApiDocument && !config.openApiBaseUrl) {
+        throw new BadRequestException('OpenAPI document or base URL required');
+      }
+      let baseUrl = (config.openApiBaseUrl || '').trim();
+      let systemName = displayName || config.systemName || 'OpenAPI System';
+      if (config.openApiDocument) {
+        const parsed = parseOpenApiDocument(config.openApiDocument);
+        if (!baseUrl) baseUrl = parsed.baseUrl;
+        systemName = displayName || config.systemName || parsed.title;
+      }
+      const routes = config.selectedRoutes?.length
+        ? config.selectedRoutes
+        : config.openApiDocument
+          ? parseOpenApiDocument(config.openApiDocument)
+              .endpoints.filter((e) => e.selectable)
+              .slice(0, 5)
+              .map((e) => ({ method: e.method, path: e.path, capability: e.capability }))
+          : [];
+      const result = await syncOpenApiRoutes({
+        baseUrl,
+        routes,
+        headers: buildAuthHeaders(config),
+        systemName,
+        normalize: normalizeEnterprisePayload,
+      });
+      if (!result.ok) throw new ServiceUnavailableException(result.message);
+      return {
+        connectorId: 'openapi',
+        connectorName: systemName,
+        ...result.payload,
+        syncedAt: new Date().toISOString(),
+      };
+    }
+
+    if (catalogId === 'csv-file') {
       const connector = createCsvFileConnector({
-        csvText: (options?.csvText && options.csvText.trim()) || CSV_SAMPLE,
+        csvText: (config.csvText && config.csvText.trim()) || CSV_SAMPLE,
+        connectorName: displayName || 'CSV / File Import',
       });
       const result = await connector.sync();
-      if (!result.ok) {
-        throw new BadRequestException(result.message || 'CSV sync failed');
+      if (!result.ok) throw new BadRequestException(result.message || 'CSV sync failed');
+      return result.summary;
+    }
+
+    if (catalogId === 'postgres') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
       }
-      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
+      const sql = config.sql?.trim() || 'SELECT 1 AS healthScore, 1 AS connectedSystems';
+      const connector = createPostgresConnector({
+        sql,
+        connectorName: displayName || config.systemName || 'PostgreSQL (read-only)',
+        runQuery: (q) => this.pgQuery(config.connectionString!, q),
+      });
+      const result = await connector.sync();
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'Postgres sync failed');
+      return result.summary;
     }
 
     throw new NotFoundException('Unknown connector');
+  }
+
+  private async pgQuery(
+    connectionString: string,
+    sql: string,
+  ): Promise<Record<string, unknown>[]> {
+    const client = new Client({
+      connectionString,
+      connectionTimeoutMillis: 8000,
+    });
+    await client.connect();
+    try {
+      await client.query('BEGIN READ ONLY');
+      await client.query('SET LOCAL statement_timeout = 8000');
+      const res = await client.query(sql);
+      await client.query('COMMIT');
+      return res.rows as Record<string, unknown>[];
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      throw err;
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  private toInstallationDto(row: {
+    id: string;
+    organizationId: string;
+    catalogId: string;
+    displayName: string;
+    config: unknown;
+    status: string;
+    lastTestAt: Date | null;
+    lastSyncedAt: Date | null;
+    lastMessage: string | null;
+    packId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): ConnectorInstallation {
+    return {
+      id: row.id,
+      organizationId: row.organizationId,
+      catalogId: row.catalogId,
+      displayName: row.displayName,
+      status: row.status as ConnectorInstallation['status'],
+      lastTestAt: row.lastTestAt?.toISOString() ?? null,
+      lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+      lastMessage: row.lastMessage,
+      packId: row.packId,
+      config: redactConfig(asInstallConfig(row.config) as Record<string, unknown>),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private toPackDto(row: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    catalogId: string;
+    templateConfig: unknown;
+    published: boolean;
+    createdByEmail: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): ConnectorPack {
+    return {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      catalogId: row.catalogId,
+      templateConfig: redactConfig(
+        (row.templateConfig || {}) as Record<string, unknown>,
+      ),
+      published: row.published,
+      createdByEmail: row.createdByEmail,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   private async persistSync(

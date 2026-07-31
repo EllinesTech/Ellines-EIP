@@ -4,15 +4,22 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isOrgAdminRole } from '@ellines-eip/shared';
 import {
+  createInstallation,
+  deleteInstallation,
   getSession,
-  listConnectors,
-  syncConnector,
-  type ConnectorStatusDto,
+  listInstallations,
+  listPublishedPacks,
+  parseOpenApi,
+  syncInstallation,
+  testInstallation,
+  updateInstallation,
+  type ConnectorInstallConfigDto,
+  type ConnectorInstallationDto,
+  type ConnectorPackDto,
+  type OpenApiParseResult,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
-
-const DEFAULT_REST_ENDPOINT = '/api/v1/connectors/rest-sample';
 
 const DEFAULT_CSV = `metric,value
 healthScore,81
@@ -22,74 +29,78 @@ openDecisions,3
 briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
 `;
 
-const CATALOG = [
+const DEFAULT_SQL = `SELECT
+  72 AS "healthScore",
+  1 AS "connectedSystems",
+  2 AS "openAlerts",
+  1 AS "openDecisions",
+  'Read-only SQL from reporting replica — no vendor API.' AS "briefHighlight"`;
+
+type WizardStep = 1 | 2 | 3 | 4;
+
+const TYPES = [
   {
-    id: 'csv-file',
-    title: 'CSV / File export',
-    tag: 'No API needed',
-    blurb: 'Import nightly CSV/Excel dumps the business already produces.',
-    state: 'live',
+    id: 'openapi',
+    title: 'OpenAPI / Swagger',
+    tag: 'Best when docs exist',
+    blurb: 'Upload the vendor OpenAPI file. EIP lists capabilities — no vendor developer.',
   },
   {
     id: 'rest-api',
     title: 'REST / HTTP API',
     tag: 'When API exists',
-    blurb: 'Pull JSON from any HTTPS endpoint IT can reach.',
-    state: 'live',
+    blurb: 'Point at any JSON HTTPS URL IT can reach.',
+  },
+  {
+    id: 'postgres',
+    title: 'PostgreSQL (read-only)',
+    tag: 'No API needed',
+    blurb: 'Connect to a reporting DB / replica when the vendor will not ship an API.',
+  },
+  {
+    id: 'csv-file',
+    title: 'CSV / File export',
+    tag: 'No API needed',
+    blurb: 'Paste a nightly CSV/Excel dump the business already produces.',
   },
   {
     id: 'demo-json',
     title: 'Demo JSON seed',
     tag: 'Demo',
-    blurb: 'Built-in sample for smoke tests and demos.',
-    state: 'live',
-  },
-  {
-    id: 'postgres',
-    title: 'PostgreSQL (read-only)',
-    tag: 'Coming next',
-    blurb: 'Connect to the system database when vendors will not ship an API.',
-    state: 'soon',
-  },
-  {
-    id: 'email-imap',
-    title: 'Email (IMAP)',
-    tag: 'Planned',
-    blurb: 'Ingest mailed reports and alerts from legacy systems.',
-    state: 'soon',
-  },
-  {
-    id: 'sftp',
-    title: 'SFTP / folder drop',
-    tag: 'Planned',
-    blurb: 'Watch SFTP/inbox folders — common in healthcare and supply chain.',
-    state: 'soon',
-  },
-  {
-    id: 'sqlserver',
-    title: 'SQL Server / MySQL',
-    tag: 'Planned',
-    blurb: 'Read-only DB sync for on-prem ERP and HIS backends.',
-    state: 'soon',
-  },
-  {
-    id: 'webhook',
-    title: 'Webhooks / events',
-    tag: 'Planned',
-    blurb: 'Receive pushes when a system can call EIP.',
-    state: 'soon',
+    blurb: 'Built-in sample for smoke tests.',
   },
 ] as const;
 
 export default function ConnectorsPage() {
   const router = useRouter();
   const [ok, setOk] = useState(false);
-  const [items, setItems] = useState<ConnectorStatusDto[]>([]);
+  const [installations, setInstallations] = useState<ConnectorInstallationDto[]>([]);
+  const [packs, setPacks] = useState<ConnectorPackDto[]>([]);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [restEndpoint, setRestEndpoint] = useState(DEFAULT_REST_ENDPOINT);
+  const [busy, setBusy] = useState(false);
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [step, setStep] = useState<WizardStep>(1);
+  const [catalogId, setCatalogId] = useState<string>('openapi');
+  const [displayName, setDisplayName] = useState('');
+  const [packId, setPackId] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [endpoint, setEndpoint] = useState('/api/v1/connectors/rest-sample');
+  const [authType, setAuthType] = useState<ConnectorInstallConfigDto['authType']>('none');
+  const [apiKey, setApiKey] = useState('');
+  const [bearerToken, setBearerToken] = useState('');
+  const [basicUser, setBasicUser] = useState('');
+  const [basicPass, setBasicPass] = useState('');
   const [csvText, setCsvText] = useState(DEFAULT_CSV);
+  const [connectionString, setConnectionString] = useState('');
+  const [sql, setSql] = useState(DEFAULT_SQL);
+  const [openApiText, setOpenApiText] = useState('');
+  const [openApiBaseUrl, setOpenApiBaseUrl] = useState('');
+  const [parsed, setParsed] = useState<OpenApiParseResult | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [testOk, setTestOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -102,16 +113,14 @@ export default function ConnectorsPage() {
       return;
     }
     setOk(true);
-    const savedUrl = localStorage.getItem('eip_rest_endpoint');
-    if (savedUrl) setRestEndpoint(savedUrl);
-    const savedCsv = localStorage.getItem('eip_csv_text');
-    if (savedCsv) setCsvText(savedCsv);
   }, [router]);
 
   async function load() {
     setError('');
     try {
-      setItems(await listConnectors());
+      const [inst, p] = await Promise.all([listInstallations(), listPublishedPacks()]);
+      setInstallations(inst);
+      setPacks(p);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load connectors');
     }
@@ -122,30 +131,206 @@ export default function ConnectorsPage() {
     void load();
   }, [ok]);
 
-  async function onSync(id: string) {
+  function resetWizard() {
+    setStep(1);
+    setCatalogId('openapi');
+    setDisplayName('');
+    setPackId('');
+    setEditingId(null);
+    setEndpoint('/api/v1/connectors/rest-sample');
+    setAuthType('none');
+    setApiKey('');
+    setBearerToken('');
+    setBasicUser('');
+    setBasicPass('');
+    setCsvText(DEFAULT_CSV);
+    setConnectionString('');
+    setSql(DEFAULT_SQL);
+    setOpenApiText('');
+    setOpenApiBaseUrl('');
+    setParsed(null);
+    setSelectedPaths([]);
+    setTestOk(null);
+  }
+
+  function openWizard() {
+    resetWizard();
+    setWizardOpen(true);
+  }
+
+  function buildConfig(): ConnectorInstallConfigDto {
+    const config: ConnectorInstallConfigDto = {
+      authType,
+      systemName: displayName || undefined,
+    };
+    if (authType === 'apiKey' && apiKey && apiKey !== '***') config.apiKey = apiKey;
+    if (authType === 'bearer' && bearerToken && bearerToken !== '***') {
+      config.bearerToken = bearerToken;
+    }
+    if (authType === 'basic') {
+      if (basicUser) config.basicUser = basicUser;
+      if (basicPass && basicPass !== '***') config.basicPass = basicPass;
+    }
+    if (catalogId === 'rest-api') config.endpoint = endpoint.trim();
+    if (catalogId === 'csv-file') config.csvText = csvText;
+    if (catalogId === 'postgres') {
+      if (connectionString && connectionString !== '***') {
+        config.connectionString = connectionString;
+      }
+      config.sql = sql;
+    }
+    if (catalogId === 'openapi') {
+      if (openApiText.trim()) {
+        try {
+          config.openApiDocument = JSON.parse(openApiText);
+        } catch {
+          /* kept as text parse failure handled later */
+        }
+      }
+      config.openApiBaseUrl = openApiBaseUrl.trim() || parsed?.baseUrl || '';
+      config.selectedRoutes = (parsed?.endpoints || [])
+        .filter((e) => selectedPaths.includes(`${e.method} ${e.path}`))
+        .map((e) => ({ method: e.method, path: e.path, capability: e.capability }));
+    }
+    return config;
+  }
+
+  async function onParseOpenApi() {
+    setBusy(true);
+    setError('');
+    try {
+      const doc = JSON.parse(openApiText);
+      const result = await parseOpenApi(doc);
+      setParsed(result);
+      if (!openApiBaseUrl && result.baseUrl) setOpenApiBaseUrl(result.baseUrl);
+      if (!displayName) setDisplayName(result.title);
+      const defaults = result.endpoints
+        .filter((e) => e.selectable)
+        .slice(0, 5)
+        .map((e) => `${e.method} ${e.path}`);
+      setSelectedPaths(defaults);
+      setNotice(`Parsed ${result.endpoints.length} operations from ${result.title}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'OpenAPI parse failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDraft(): Promise<string> {
+    const config = buildConfig();
+    if (catalogId === 'openapi' && openApiText.trim() && !config.openApiDocument) {
+      throw new Error('OpenAPI JSON is invalid');
+    }
+    const name =
+      displayName.trim() ||
+      TYPES.find((t) => t.id === catalogId)?.title ||
+      catalogId;
+
+    if (editingId) {
+      await updateInstallation(editingId, { displayName: name, config });
+      return editingId;
+    }
+
+    const created = await createInstallation({
+      catalogId,
+      displayName: name,
+      config,
+      packId: packId || undefined,
+    });
+    setEditingId(created.id);
+    return created.id;
+  }
+
+  async function onTest() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    setTestOk(null);
+    try {
+      const id = await saveDraft();
+      const result = await testInstallation(id);
+      setTestOk(result.ok);
+      setNotice(result.message || (result.ok ? 'Connection test OK' : 'Test failed'));
+      if (result.ok) setStep(4);
+      await load();
+    } catch (err) {
+      setTestOk(false);
+      setError(err instanceof Error ? err.message : 'Test failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSyncInstall(id?: string) {
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      let options: { endpoint?: string; csvText?: string } | undefined;
-      if (id === 'rest-api') {
-        options = { endpoint: restEndpoint.trim() || DEFAULT_REST_ENDPOINT };
-        localStorage.setItem('eip_rest_endpoint', options.endpoint!);
-      }
-      if (id === 'csv-file') {
-        options = { csvText: csvText.trim() || DEFAULT_CSV };
-        localStorage.setItem('eip_csv_text', options.csvText!);
-      }
-      const summary = await syncConnector(id, options);
+      const installId = id || (await saveDraft());
+      const summary = await syncInstallation(installId);
       setNotice(
         `Synced ${summary.connectorName}: health ${summary.healthScore}, ${summary.connectedSystems} systems.`,
       );
+      setWizardOpen(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onDelete(id: string) {
+    if (!confirm('Remove this connector installation?')) return;
+    setBusy(true);
+    try {
+      await deleteInstallation(id);
+      setNotice('Installation removed.');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editInstallation(inst: ConnectorInstallationDto) {
+    resetWizard();
+    setEditingId(inst.id);
+    setCatalogId(inst.catalogId);
+    setDisplayName(inst.displayName);
+    setPackId(inst.packId || '');
+    const c = inst.config || {};
+    if (c.endpoint) setEndpoint(String(c.endpoint));
+    if (c.authType) setAuthType(c.authType);
+    if (c.apiKey) setApiKey(String(c.apiKey));
+    if (c.bearerToken) setBearerToken(String(c.bearerToken));
+    if (c.basicUser) setBasicUser(String(c.basicUser));
+    if (c.basicPass) setBasicPass(String(c.basicPass));
+    if (c.csvText) setCsvText(String(c.csvText));
+    if (c.connectionString) setConnectionString(String(c.connectionString));
+    if (c.sql) setSql(String(c.sql));
+    if (c.openApiBaseUrl) setOpenApiBaseUrl(String(c.openApiBaseUrl));
+    if (c.selectedRoutes?.length) {
+      setSelectedPaths(c.selectedRoutes.map((r) => `${r.method} ${r.path}`));
+    }
+    setStep(2);
+    setWizardOpen(true);
+  }
+
+  async function installFromPack(pack: ConnectorPackDto) {
+    resetWizard();
+    setCatalogId(pack.catalogId);
+    setDisplayName(pack.name);
+    setPackId(pack.id);
+    const c = pack.templateConfig || {};
+    if (c.endpoint) setEndpoint(String(c.endpoint));
+    if (c.sql) setSql(String(c.sql));
+    if (c.openApiBaseUrl) setOpenApiBaseUrl(String(c.openApiBaseUrl));
+    setStep(2);
+    setWizardOpen(true);
+    setNotice(`Installing pack “${pack.name}” — enter credentials, then Test & Sync.`);
   }
 
   if (!ok) {
@@ -163,127 +348,407 @@ export default function ConnectorsPage() {
           <p className={styles.eyebrow}>Integration Hub · IT Admin</p>
           <h1>Connectors</h1>
           <p className={styles.lede}>
-            Ellines does not need a vendor developer to hand you an API. Connect how the business already
-            moves data — files, databases, email, or APIs when they exist. Ellinea only reads the normalized
-            snapshot.
+            Install a connection without the vendor writing an EIP plugin. Upload OpenAPI, point at a
+            database, or drop a CSV — config is saved per organization.
           </p>
         </div>
+        <button type="button" className={adminStyles.primary} onClick={openWizard} disabled={busy}>
+          Install connector
+        </button>
       </header>
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
 
-      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
-        <div className={styles.panelLabel}>How EIP connects (many paths)</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '0.75rem',
-            marginTop: '0.75rem',
-          }}
-        >
-          {CATALOG.map((c) => (
-            <article
-              key={c.id}
-              style={{
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 12,
-                padding: '0.85rem 0.9rem',
-                background: c.state === 'live' ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
-              }}
-            >
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#a78bfa' }}>
-                {c.tag}
+      {packs.length > 0 ? (
+        <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
+          <div className={styles.panelLabel}>Platform packs (credentials only)</div>
+          <div className={adminStyles.packGrid}>
+            {packs.map((p) => (
+              <article key={p.id} className={adminStyles.packCard}>
+                <strong>{p.name}</strong>
+                <p>{p.description || p.catalogId}</p>
+                <button
+                  type="button"
+                  className={adminStyles.ghost}
+                  disabled={busy}
+                  onClick={() => void installFromPack(p)}
+                >
+                  Install pack
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {wizardOpen ? (
+        <section className={adminStyles.wizard}>
+          <div className={adminStyles.wizardHead}>
+            <div className={styles.panelLabel}>
+              Install wizard · Step {step} of 4
+              {editingId ? ' · editing' : ''}
+            </div>
+            <button type="button" className={adminStyles.ghost} onClick={() => setWizardOpen(false)}>
+              Close
+            </button>
+          </div>
+
+          <div className={adminStyles.steps}>
+            {(['Type', 'Credentials', 'Map / capabilities', 'Test & sync'] as const).map((label, i) => (
+              <span
+                key={label}
+                className={step === i + 1 ? adminStyles.stepActive : adminStyles.step}
+              >
+                {i + 1}. {label}
+              </span>
+            ))}
+          </div>
+
+          {step === 1 ? (
+            <div className={adminStyles.typeGrid}>
+              {TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={
+                    catalogId === t.id ? adminStyles.typeCardActive : adminStyles.typeCard
+                  }
+                  onClick={() => {
+                    setCatalogId(t.id);
+                    if (!displayName) setDisplayName(t.title);
+                  }}
+                >
+                  <span className={adminStyles.typeTag}>{t.tag}</span>
+                  <strong>{t.title}</strong>
+                  <p>{t.blurb}</p>
+                </button>
+              ))}
+              <div className={adminStyles.form} style={{ gridColumn: '1 / -1' }}>
+                <label>
+                  Display name
+                  <input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Hospidia production"
+                  />
+                </label>
               </div>
-              <strong style={{ display: 'block', marginTop: 6, color: '#fff' }}>{c.title}</strong>
-              <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#8b95a8', lineHeight: 1.4 }}>
-                {c.blurb}
+              <button
+                type="button"
+                className={adminStyles.primary}
+                onClick={() => setStep(2)}
+              >
+                Continue
+              </button>
+            </div>
+          ) : null}
+
+          {step === 2 ? (
+            <div>
+              <div className={adminStyles.form}>
+                {(catalogId === 'rest-api' || catalogId === 'openapi') && (
+                  <>
+                    <label>
+                      Auth
+                      <select
+                        value={authType}
+                        onChange={(e) =>
+                          setAuthType(e.target.value as ConnectorInstallConfigDto['authType'])
+                        }
+                      >
+                        <option value="none">None</option>
+                        <option value="apiKey">API key</option>
+                        <option value="bearer">Bearer token</option>
+                        <option value="basic">Basic</option>
+                      </select>
+                    </label>
+                    {authType === 'apiKey' ? (
+                      <label>
+                        API key
+                        <input
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder="Paste key"
+                        />
+                      </label>
+                    ) : null}
+                    {authType === 'bearer' ? (
+                      <label>
+                        Bearer token
+                        <input
+                          value={bearerToken}
+                          onChange={(e) => setBearerToken(e.target.value)}
+                        />
+                      </label>
+                    ) : null}
+                    {authType === 'basic' ? (
+                      <>
+                        <label>
+                          Username
+                          <input value={basicUser} onChange={(e) => setBasicUser(e.target.value)} />
+                        </label>
+                        <label>
+                          Password
+                          <input
+                            type="password"
+                            value={basicPass}
+                            onChange={(e) => setBasicPass(e.target.value)}
+                          />
+                        </label>
+                      </>
+                    ) : null}
+                  </>
+                )}
+
+                {catalogId === 'rest-api' ? (
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    Endpoint URL
+                    <input
+                      value={endpoint}
+                      onChange={(e) => setEndpoint(e.target.value)}
+                      placeholder="https://vendor.example/api/enterprise"
+                    />
+                  </label>
+                ) : null}
+
+                {catalogId === 'openapi' ? (
+                  <>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      OpenAPI / Swagger JSON
+                      <textarea
+                        value={openApiText}
+                        onChange={(e) => setOpenApiText(e.target.value)}
+                        rows={8}
+                        placeholder='Paste openapi.json here'
+                      />
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Base URL (override)
+                      <input
+                        value={openApiBaseUrl}
+                        onChange={(e) => setOpenApiBaseUrl(e.target.value)}
+                        placeholder="https://vendor.example/api"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      disabled={busy || !openApiText.trim()}
+                      onClick={() => void onParseOpenApi()}
+                    >
+                      Parse capabilities
+                    </button>
+                  </>
+                ) : null}
+
+                {catalogId === 'csv-file' ? (
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    CSV content
+                    <textarea
+                      value={csvText}
+                      onChange={(e) => setCsvText(e.target.value)}
+                      rows={8}
+                    />
+                  </label>
+                ) : null}
+
+                {catalogId === 'postgres' ? (
+                  <>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Connection string (read-only role)
+                      <input
+                        value={connectionString}
+                        onChange={(e) => setConnectionString(e.target.value)}
+                        placeholder="postgresql://reader:…@host:5432/dbname"
+                      />
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      SELECT query (metrics row or metric/value pairs)
+                      <textarea value={sql} onChange={(e) => setSql(e.target.value)} rows={6} />
+                    </label>
+                    <p className={styles.lede}>
+                      Postgres sync runs on the Identity API (TCP). On Pages-only deploys, save config
+                      here and sync via Nest Identity.
+                    </p>
+                  </>
+                ) : null}
+
+                {catalogId === 'demo-json' ? (
+                  <p className={styles.lede}>No credentials — built-in demo seed.</p>
+                ) : null}
+              </div>
+              <div className={adminStyles.wizardActions}>
+                <button type="button" className={adminStyles.ghost} onClick={() => setStep(1)}>
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className={adminStyles.primary}
+                  onClick={() => setStep(catalogId === 'openapi' ? 3 : 4)}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === 3 && catalogId === 'openapi' ? (
+            <div>
+              {!parsed ? (
+                <p className={styles.lede}>
+                  Parse the OpenAPI document in step 2 to list capabilities.
+                </p>
+              ) : (
+                <>
+                  <p className={styles.lede}>
+                    Select GET routes to sync ({parsed.title} v{parsed.version}). Writes stay off until
+                    policy lands.
+                  </p>
+                  <div className={adminStyles.capList}>
+                    {parsed.endpoints.map((e) => {
+                      const key = `${e.method} ${e.path}`;
+                      const disabled = !e.selectable;
+                      const checked = selectedPaths.includes(key);
+                      return (
+                        <label
+                          key={key}
+                          className={disabled ? adminStyles.capDisabled : adminStyles.capRow}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={disabled}
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedPaths((prev) =>
+                                checked ? prev.filter((x) => x !== key) : [...prev, key],
+                              );
+                            }}
+                          />
+                          <span className={adminStyles.capMethod}>{e.method}</span>
+                          <span>{e.capability}</span>
+                          <code>{e.path}</code>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              <div className={adminStyles.wizardActions}>
+                <button type="button" className={adminStyles.ghost} onClick={() => setStep(2)}>
+                  Back
+                </button>
+                <button type="button" className={adminStyles.primary} onClick={() => setStep(4)}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === 4 ? (
+            <div>
+              <p className={styles.lede}>
+                Save credentials on the server, test the connection, then sync into the enterprise
+                snapshot Ellinea reads.
               </p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
-        <div className={styles.panelLabel}>CSV / File (no API)</div>
-        <p style={{ marginBottom: '0.75rem' }}>
-          If the system only exports files, paste the CSV here and Sync. This is the standard path when
-          developers will not provide an API.
-        </p>
-        <textarea
-          value={csvText}
-          onChange={(e) => setCsvText(e.target.value)}
-          rows={7}
-          aria-label="CSV content"
-          style={{
-            width: '100%',
-            maxWidth: 720,
-            font: 'inherit',
-            fontSize: '0.85rem',
-            padding: '0.75rem 0.85rem',
-            borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: '#0b0e14',
-            color: '#f4f7fb',
-            resize: 'vertical',
-          }}
-        />
-      </section>
-
-      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
-        <div className={styles.panelLabel}>REST API endpoint (optional)</div>
-        <p style={{ marginBottom: '0.75rem' }}>
-          Use only when the system exposes JSON over HTTPS. Otherwise use CSV / File or wait for Database /
-          Email connectors.
-        </p>
-        <input
-          value={restEndpoint}
-          onChange={(e) => setRestEndpoint(e.target.value)}
-          placeholder={DEFAULT_REST_ENDPOINT}
-          style={{ width: '100%', maxWidth: 640 }}
-          aria-label="REST connector endpoint"
-        />
-      </section>
+              {testOk === true ? (
+                <p className={adminStyles.notice}>Last test succeeded.</p>
+              ) : null}
+              {testOk === false ? (
+                <p className={adminStyles.error}>Last test failed — fix credentials and retry.</p>
+              ) : null}
+              <div className={adminStyles.wizardActions}>
+                <button
+                  type="button"
+                  className={adminStyles.ghost}
+                  onClick={() => setStep(catalogId === 'openapi' ? 3 : 2)}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className={adminStyles.ghost}
+                  disabled={busy}
+                  onClick={() => void onTest()}
+                >
+                  {busy ? 'Working…' : 'Test connection'}
+                </button>
+                <button
+                  type="button"
+                  className={adminStyles.primary}
+                  disabled={busy}
+                  onClick={() => void onSyncInstall()}
+                >
+                  {busy ? 'Syncing…' : 'Sync now'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className={adminStyles.tableWrap}>
-        <div className={styles.panelLabel}>Ready to sync now</div>
-        <table className={adminStyles.table}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Last sync</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <div>{c.name}</div>
-                  {c.message ? (
-                    <div style={{ fontSize: '0.78rem', color: '#8b95a8', marginTop: 2 }}>{c.message}</div>
-                  ) : null}
-                </td>
-                <td>{c.type}</td>
-                <td>{c.status}</td>
-                <td>{c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString() : '—'}</td>
-                <td>
-                  <button
-                    type="button"
-                    className={adminStyles.primary}
-                    disabled={busy}
-                    onClick={() => void onSync(c.id)}
-                  >
-                    {busy ? 'Syncing…' : 'Sync now'}
-                  </button>
-                </td>
+        <div className={styles.panelLabel}>Installed connections</div>
+        {installations.length === 0 ? (
+          <p className={styles.lede}>
+            No saved installations yet. Use Install connector — nothing is kept in the browser.
+          </p>
+        ) : (
+          <table className={adminStyles.table}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Last sync</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {installations.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <div>{c.displayName}</div>
+                    {c.lastMessage ? (
+                      <div style={{ fontSize: '0.78rem', color: '#8b95a8', marginTop: 2 }}>
+                        {c.lastMessage}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td>{c.catalogId}</td>
+                  <td>{c.status}</td>
+                  <td>{c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString() : '—'}</td>
+                  <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      disabled={busy}
+                      onClick={() => editInstallation(c)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.primary}
+                      disabled={busy}
+                      onClick={() => void onSyncInstall(c.id)}
+                    >
+                      Sync
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      disabled={busy}
+                      onClick={() => void onDelete(c.id)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );

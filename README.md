@@ -79,7 +79,7 @@ Infrastructure       →  infra/docker, infra/k8s
 # Install dependencies
 npm install
 
-# Start Identity + Web together
+# Start Identity + Web together (also builds/watches shared packages)
 npm run dev
 ```
 
@@ -87,12 +87,15 @@ npm run dev
 - **Identity API:** http://localhost:3001/api/v1/health  
 
 ```bash
-# Or run separately
+# Or run separately (run `npm run build:shared` once first)
+npm run build:shared
 npm run dev:identity
 npm run dev:web
 ```
 
 Copy `.env.example` to `.env` and set your Supabase pooler URLs before running Identity.
+
+Local tip: `next build` (Pages) and `next dev` use separate caches (`.next` vs `.next-dev`), so you can build for deploy without breaking the running local app. Prefer `npm run build:web` over setting `NODE_ENV=production` in your shell.
 
 ## MVP v1.0 Build Order
 
