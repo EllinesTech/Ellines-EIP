@@ -5,6 +5,7 @@ import {
   requireAuth,
   type Env,
 } from '../../../shared/auth';
+import { mailProviderLabel, resolveMailConfig, sendOutboundEmail } from '../../../shared/mail';
 
 type Channel = 'email' | 'push' | 'in_app';
 
@@ -13,7 +14,11 @@ type DeliverBody = {
   subject?: string;
   body?: string;
   eventType?: string;
+  /** Optional recipient; defaults to the authenticated user email. */
+  to?: string;
 };
+
+type OutboxStatus = 'queued' | 'simulated' | 'skipped' | 'delivered' | 'failed';
 
 type OutboxItem = {
   id: string;
@@ -21,8 +26,11 @@ type OutboxItem = {
   subject: string;
   body: string;
   eventType: string;
-  status: 'queued' | 'simulated' | 'skipped';
+  status: OutboxStatus;
   at: string;
+  to?: string;
+  provider?: 'resend' | 'smtp' | 'none';
+  detail?: string;
 };
 
 function normalizeOutbox(raw: unknown): OutboxItem[] {
@@ -69,6 +77,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const text = typeof body.body === 'string' ? body.body.trim().slice(0, 2000) : '';
   const eventType =
     typeof body.eventType === 'string' ? body.eventType.trim().slice(0, 80) : 'manual';
+  const toRaw = typeof body.to === 'string' ? body.to.trim().slice(0, 200) : '';
+  const to = toRaw || auth.email;
 
   if (!subject || !text) {
     return json({ statusCode: 400, message: 'subject and body are required' }, 400);
@@ -94,12 +104,54 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ? (policyRaw as Record<string, unknown>)
       : {};
 
-  let status: OutboxItem['status'] = 'simulated';
+  let status: OutboxStatus = 'simulated';
+  let provider: OutboxItem['provider'] = mailProviderLabel(context.env);
+  let detail =
+    'Queued and simulated (SMTP/Resend not configured). Outbox + audit updated.';
+  let auditAction = 'notify.simulated';
+
   if (channel === 'email' && policy.emailAlerts !== true && policy.emailDigest !== true) {
     status = 'skipped';
-  }
-  if (channel === 'push' && policy.pushEnabled !== true) {
+    detail = 'Skipped — enable the channel in Delivery policy.';
+    auditAction = 'notify.skipped';
+    provider = 'none';
+  } else if (channel === 'push' && policy.pushEnabled !== true) {
     status = 'skipped';
+    detail = 'Skipped — enable the channel in Delivery policy.';
+    auditAction = 'notify.skipped';
+    provider = 'none';
+  } else if (channel === 'email') {
+    const mailConfig = resolveMailConfig(context.env);
+    if (mailConfig) {
+      const result = await sendOutboundEmail(context.env, { to, subject, text });
+      provider = result.provider;
+      if (result.ok) {
+        status = 'delivered';
+        detail = `Delivered via ${result.provider}${result.id ? ` (${result.id})` : ''} to ${to}.`;
+        auditAction = 'notify.delivered';
+      } else {
+        status = 'failed';
+        detail = result.error;
+        auditAction = 'notify.failed';
+      }
+    } else {
+      status = 'simulated';
+      provider = 'none';
+      detail =
+        'Simulated — set RESEND_API_KEY or SMTP_* / ELLINEA_SMTP_* on Pages to send real email.';
+      auditAction = 'notify.simulated';
+    }
+  } else if (channel === 'push') {
+    status = 'simulated';
+    provider = 'none';
+    detail = 'Push simulated — VAPID / Web Push provider not configured.';
+    auditAction = 'notify.simulated';
+  } else {
+    // in_app — no external provider
+    status = 'simulated';
+    provider = 'none';
+    detail = 'In-app channel recorded in outbox (no external send).';
+    auditAction = 'notify.simulated';
   }
 
   const item: OutboxItem = {
@@ -110,6 +162,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     eventType,
     status,
     at: new Date().toISOString(),
+    to,
+    provider,
+    detail,
   };
 
   const outbox = [item, ...normalizeOutbox(settings.notifyOutbox)].slice(0, 50);
@@ -124,16 +179,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   await supabase.from('audit_logs').insert({
     organization_id: auth.organizationId,
     user_id: auth.sub,
-    action: status === 'skipped' ? 'notify.skipped' : 'notify.simulated',
+    action: auditAction,
     resource: 'notification_outbox',
-    metadata: { id: item.id, channel, eventType, subject },
+    metadata: {
+      id: item.id,
+      channel,
+      eventType,
+      subject,
+      status,
+      provider,
+      to,
+      detail: detail.slice(0, 240),
+    },
   });
 
   return json({
     ...item,
-    message:
-      status === 'skipped'
-        ? 'Skipped — enable the channel in Delivery policy.'
-        : 'Queued and simulated (SMTP/push provider not configured). Outbox + audit updated.',
+    message: detail,
   });
 };

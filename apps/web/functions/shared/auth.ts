@@ -29,6 +29,22 @@ export interface Env {
   OPENAI_API_KEY?: string;
   ELLINEA_LLM_BASE_URL?: string;
   ELLINEA_LLM_MODEL?: string;
+  /** Notification outbound email (Resend preferred on Pages; SMTP_* / ELLINEA_SMTP_* optional). */
+  RESEND_API_KEY?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: string;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
+  SMTP_SECURE?: string;
+  ELLINEA_SMTP_HOST?: string;
+  ELLINEA_SMTP_PORT?: string;
+  ELLINEA_SMTP_USER?: string;
+  ELLINEA_SMTP_PASS?: string;
+  ELLINEA_SMTP_FROM?: string;
+  ELLINEA_SMTP_SECURE?: string;
+  /** Alias for RESEND_API_KEY when using Ellinea-prefixed secrets. */
+  ELLINEA_SMTP_API_KEY?: string;
 }
 
 export function getAdminClient(env: Env): SupabaseClient {

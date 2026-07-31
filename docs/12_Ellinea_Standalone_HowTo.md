@@ -86,5 +86,5 @@ All org-scoped routes bind to the JWT `organizationId`. Never accept a client-su
 ## What’s deferred
 
 - Full Nest auth on `services/ellinea-ai` (open on localhost for MVP).
-- SMTP/Web Push providers (notification outbox is simulated).
+- SMTP/Web Push providers (notification outbox sends via Resend/SMTP when Pages secrets are set; otherwise simulated).
 - Marketplace packaging of the SDK under a public npm scope.

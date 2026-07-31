@@ -106,7 +106,7 @@ export default function NotifyPolicyPage() {
     deliverNotification({
       channel: 'email',
       subject: 'EIP test delivery',
-      body: 'Simulated outbound notification from Delivery policy. SMTP provider not required for this stub.',
+      body: 'Outbound notification from Delivery policy. Sends via Resend/SMTP when secrets are set; otherwise simulated.',
       eventType: 'notify.test',
     })
       .then((item) => {
@@ -133,8 +133,8 @@ export default function NotifyPolicyPage() {
           <p className={styles.eyebrow}>Notifications</p>
           <h1>Delivery policy</h1>
           <p className={styles.lede}>
-            Org email/push preferences synced to the server. Outbound deliveries are simulated into
-            an outbox (+ audit) until SMTP/push providers are configured.
+            Org email/push preferences synced to the server. Email uses Resend or SMTP when Pages
+            secrets are set; otherwise deliveries stay simulated in the outbox (+ audit).
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -255,8 +255,8 @@ export default function NotifyPolicyPage() {
       <section className={adminStyles.tableWrap} style={{ marginTop: '0.65rem' }}>
         <div className={styles.panelLabel}>Outbox · {outbox.length}</div>
         <p className={styles.lede}>
-          Simulated deliveries respect policy channels. Real SMTP/push providers can replace the
-          simulator later without changing this UI.
+          Outbox respects policy channels. Statuses: simulated (no secrets), delivered / failed
+          (Resend or SMTP), skipped (channel off). Push stays simulated until VAPID exists.
         </p>
         {!outbox.length ? (
           <p className={styles.lede}>No outbox items yet — run a test delivery.</p>
@@ -267,6 +267,7 @@ export default function NotifyPolicyPage() {
                 <th>When</th>
                 <th>Channel</th>
                 <th>Status</th>
+                <th>Provider</th>
                 <th>Subject</th>
               </tr>
             </thead>
@@ -276,6 +277,7 @@ export default function NotifyPolicyPage() {
                   <td>{new Date(row.at).toLocaleString()}</td>
                   <td>{row.channel}</td>
                   <td>{row.status}</td>
+                  <td>{row.provider || '—'}</td>
                   <td>{row.subject}</td>
                 </tr>
               ))}

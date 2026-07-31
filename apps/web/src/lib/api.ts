@@ -420,8 +420,11 @@ export type NotifyOutboxItemDto = {
   subject: string;
   body: string;
   eventType: string;
-  status: 'queued' | 'simulated' | 'skipped';
+  status: 'queued' | 'simulated' | 'skipped' | 'delivered' | 'failed';
   at: string;
+  to?: string;
+  provider?: 'resend' | 'smtp' | 'none';
+  detail?: string;
   message?: string;
 };
 
@@ -434,6 +437,7 @@ export function deliverNotification(payload: {
   subject: string;
   body: string;
   eventType?: string;
+  to?: string;
 }) {
   return request<NotifyOutboxItemDto>('/api/v1/notifications/deliver', {
     method: 'POST',

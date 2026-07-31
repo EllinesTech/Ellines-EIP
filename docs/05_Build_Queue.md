@@ -34,18 +34,18 @@ while queue has next/in_progress and not blocked:
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
-| **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
+| **5 — Workflow & Automation** | ~60% | Approvals, rules, reports, event bus, SMTP/Resend outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | `todo` | v1.1+ simplified phone app (roadmap) |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
 
-1. **Now —** notification / SMTP worker depth (when needed), workflow polish.
-2. **Later —** email SMTP worker, **Mobile Work Companion** (v1.1).
+1. **Done (this slice) —** notification SMTP / Resend outbox delivery (secrets optional; simulated without them).
+2. **Later —** Web Push / VAPID, **Mobile Work Companion** (v1.1).
 3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** SQL + Platform suspend done → notification/SMTP depth → Mobile Companion in v1.1.
+**Critical path:** SQL + Platform suspend + SMTP outbox slice done → Mobile Companion in v1.1 (no further v1.0 `next` until queued).
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -114,7 +114,7 @@ while queue has next/in_progress and not blocked:
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
 | 5.3 | Scheduled Reports | `done` | Local schedules + preview |
 | 3.x | Other-role Overview polish | `done` | Role-specific copy, real CTAs, empty sync state |
-| 3.x | Email/push notifications | `done` | Server policy + simulated outbox (`/api/v1/notifications/deliver`) |
+| 3.x | Email/push notifications | `done` | Server policy + outbox; SMTP/Resend when secrets set |
 | 5.4 | Event Bus | `done` | Local pub/sub + log on Rules / Approvals |
 | 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
 | 4.10 | LLM / RAG | `done` | RAG retrieve + `POST /api/v1/ellinea/ask` |
@@ -166,7 +166,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.4a | Server Enterprise Memory | `done` | Persist policies/decisions per org |
 | 4.10 | LLM / RAG | `done` | Grounded provider path |
 | 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
-| 3.x | Email/push notifications | `done` | Policy + outbox simulator; SMTP worker later |
+| 3.x | Email/push notifications | `done` | Policy + outbox; real send when RESEND/SMTP secrets present |
 
 ---
 
@@ -203,7 +203,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 2.x | Webhooks / events | `done` | System B push endpoint + Owner/IT secret |
 | 2.x | SQL Server / MySQL | `done` | Read-only connectors; TCP on Identity |
 | 1.5b | Platform suspend / disable org | `done` | `settings.platformStatus`; login + sync blocked; Platform UI |
-| 3.x | Notification SMTP worker | `next` | Real email delivery beyond outbox simulator |
+| 3.x | Notification SMTP worker | `done` | Pages deliver: Resend/SMTP when secrets set; else `simulated`. Needs human Pages secrets to go live. |
+| 3.x | Web Push / VAPID | `next` | Browser push beyond simulated channel |
 
 ---
 
@@ -225,6 +226,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Notification SMTP / Resend slice:** `POST /api/v1/notifications/deliver` attempts real email when `RESEND_API_KEY` or `SMTP_*` / `ELLINEA_SMTP_*` are on Pages; otherwise keeps `simulated` (CI-safe). Human must set Pages secrets for live mail.
 - **Platform suspend/disable org:** Super Admin Suspend/Resume on `/app/platform`; blocks login + connector sync
 - **SQL Server / MySQL connectors:** read-only catalog + Identity TCP drivers (`mssql`, `mysql2`); Pages soft-test / 501 sync like Postgres
 - **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab at `/app/ellinea-console` (side nav above Settings). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
