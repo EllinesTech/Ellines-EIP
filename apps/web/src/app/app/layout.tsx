@@ -46,6 +46,15 @@ function IconOverview() {
   );
 }
 
+function IconEllinea() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" />
+      <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" />
+    </svg>
+  );
+}
+
 function IconConnectors() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -151,6 +160,7 @@ const NAV: NavItem[] = [
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
+  { href: '/app/ellinea', label: 'Ellinea Console', icon: <IconEllinea />, adminOnly: true },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
 ];
 
@@ -287,9 +297,11 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   );
   const pageTitle =
     pathname.startsWith('/app/ellinea-console')
-      ? 'Ellinea console'
+      ? 'Ellinea Console'
       : pathname.startsWith('/app/ellinea')
-      ? 'Ask Ellinea'
+      ? orgAdmin
+        ? 'Ellinea Console'
+        : 'Ask Ellinea'
       : pathname.startsWith('/app/connectors')
         ? 'Connectors'
         : pathname.startsWith('/app/admin')
