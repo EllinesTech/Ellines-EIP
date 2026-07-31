@@ -11,6 +11,7 @@ import {
   type BusinessRule,
 } from '@/lib/business-rules';
 import { getSession } from '@/lib/api';
+import { publishEnterpriseEvent, readEnterpriseEvents } from '@/lib/event-bus';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 
@@ -43,6 +44,7 @@ export default function RulesPage() {
     if (!orgId) return;
     setRules(next);
     writeBusinessRules(orgId, next);
+    publishEnterpriseEvent('rules.updated', { count: next.length });
   }
 
   function onAdd(e: FormEvent) {
@@ -84,7 +86,7 @@ export default function RulesPage() {
           <p className={styles.eyebrow}>Workflow</p>
           <h1>Business rules</h1>
           <p className={styles.lede}>
-            If/then rules on enterprise snapshot metrics. Local for now — event bus later.
+            If/then rules on enterprise snapshot metrics. Changes publish to the local event bus.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -180,6 +182,25 @@ export default function RulesPage() {
             </tbody>
           </table>
         )}
+      </section>
+
+      <section className={adminStyles.tableWrap} style={{ marginTop: '0.65rem' }}>
+        <div className={styles.panelLabel}>
+          Event bus · recent · {readEnterpriseEvents().length}
+        </div>
+        <p className={styles.lede}>
+          Local pub/sub stub — approvals and rule changes publish here until a real bus exists.
+        </p>
+        <ul className={adminStyles.structList}>
+          {readEnterpriseEvents()
+            .slice(0, 8)
+            .map((e) => (
+              <li key={e.id}>
+                <strong>{e.type}</strong>
+                <span>{new Date(e.at).toLocaleString()}</span>
+              </li>
+            ))}
+        </ul>
       </section>
     </div>
   );

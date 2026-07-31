@@ -314,6 +314,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Business Rules'
                 : pathname.startsWith('/app/reports')
                   ? 'Scheduled Reports'
+                : pathname.startsWith('/app/notify-policy')
+                  ? 'Delivery policy'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')

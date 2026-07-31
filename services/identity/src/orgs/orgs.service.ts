@@ -7,7 +7,10 @@ import {
 import {
   assertCanAssignRole,
   assertCanManageOrgUser,
+  mergeOrganizationSettings,
+  normalizeEllineaMemoryNotes,
   normalizeOrgDateTimeSettings,
+  type EllineaMemoryNoteDto,
   type OrgDateTimeSettings,
   type UserRole,
 } from '@ellines-eip/shared';
@@ -40,26 +43,59 @@ export class OrgsService {
     };
   }
 
-  async getSettings(organizationId: string): Promise<OrgDateTimeSettings> {
+  private async readSettingsRaw(organizationId: string): Promise<unknown> {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { settings: true },
     });
     if (!org) throw new NotFoundException('Organization not found');
-    return normalizeOrgDateTimeSettings(org.settings);
+    return org.settings;
+  }
+
+  async getSettings(organizationId: string): Promise<OrgDateTimeSettings> {
+    return normalizeOrgDateTimeSettings(await this.readSettingsRaw(organizationId));
   }
 
   async updateSettings(
     organizationId: string,
     patch: Partial<OrgDateTimeSettings>,
   ): Promise<OrgDateTimeSettings> {
-    const current = await this.getSettings(organizationId);
-    const next = normalizeOrgDateTimeSettings({ ...current, ...patch });
+    const existing = await this.readSettingsRaw(organizationId);
+    const nextPrefs = normalizeOrgDateTimeSettings({
+      ...normalizeOrgDateTimeSettings(existing),
+      ...patch,
+    });
+    const next = mergeOrganizationSettings(existing, {
+      ...nextPrefs,
+    });
     await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { settings: next as unknown as Prisma.InputJsonValue },
+      data: { settings: next as Prisma.InputJsonValue },
     });
-    return next;
+    return nextPrefs;
+  }
+
+  async getEllineaMemory(organizationId: string): Promise<EllineaMemoryNoteDto[]> {
+    const settings = await this.readSettingsRaw(organizationId);
+    const obj =
+      settings && typeof settings === 'object' && !Array.isArray(settings)
+        ? (settings as Record<string, unknown>)
+        : {};
+    return normalizeEllineaMemoryNotes(obj.ellineaMemory);
+  }
+
+  async putEllineaMemory(
+    organizationId: string,
+    notes: unknown,
+  ): Promise<EllineaMemoryNoteDto[]> {
+    const normalized = normalizeEllineaMemoryNotes(notes);
+    const existing = await this.readSettingsRaw(organizationId);
+    const next = mergeOrganizationSettings(existing, { ellineaMemory: normalized });
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { settings: next as Prisma.InputJsonValue },
+    });
+    return normalized;
   }
 
   async listUsers(organizationId: string) {

@@ -1,26 +1,22 @@
 import {
+  normalizeEllineaMemoryNotes,
   mergeOrganizationSettings,
-  normalizeOrgDateTimeSettings,
-  type OrgDateTimeSettings,
+  type EllineaMemoryNoteDto,
 } from '@ellines-eip/shared';
 import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
 
-type TimeFormat = OrgDateTimeSettings['timeFormat'];
-type DateStyle = OrgDateTimeSettings['dateStyle'];
-
-function normalize(raw: unknown): { timeFormat: TimeFormat; dateStyle: DateStyle } {
-  return normalizeOrgDateTimeSettings(raw);
-}
-
-function isOrgAdmin(role: string) {
-  return role === 'owner' || role === 'admin';
+function readMemoryFromSettings(settings: unknown): EllineaMemoryNoteDto[] {
+  const obj =
+    settings && typeof settings === 'object' && !Array.isArray(settings)
+      ? (settings as Record<string, unknown>)
+      : {};
+  return normalizeEllineaMemoryNotes(obj.ellineaMemory);
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -38,29 +34,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .eq('id', auth.organizationId)
       .maybeSingle();
     if (error) return json({ statusCode: 500, message: error.message }, 500);
-    return json(normalize(data?.settings));
+    return json(readMemoryFromSettings(data?.settings));
   }
 
-  if (context.request.method === 'PATCH') {
-    const canEdit =
-      isOrgAdmin(auth.role) || platformAdminFromEnv(context.env, auth.email);
-    if (!canEdit) {
-      return json(
-        {
-          statusCode: 403,
-          message:
-            'Only organization admins or platform operators can change date & time settings',
-        },
-        403,
-      );
-    }
-
-    let body: Partial<{ timeFormat: TimeFormat; dateStyle: DateStyle }> = {};
+  if (context.request.method === 'PUT') {
+    let body: unknown;
     try {
-      body = (await context.request.json()) as typeof body;
+      body = await context.request.json();
     } catch {
       return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
     }
+    const notes = normalizeEllineaMemoryNotes(
+      Array.isArray(body) ? body : (body as { notes?: unknown })?.notes,
+    );
 
     const { data: existing, error: readErr } = await supabase
       .from('organizations')
@@ -69,14 +55,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .maybeSingle();
     if (readErr) return json({ statusCode: 500, message: readErr.message }, 500);
 
-    const nextPrefs = normalize({ ...normalize(existing?.settings), ...body });
-    const nextSettings = mergeOrganizationSettings(existing?.settings, nextPrefs);
+    const nextSettings = mergeOrganizationSettings(existing?.settings, {
+      ellineaMemory: notes,
+    });
     const { error: writeErr } = await supabase
       .from('organizations')
       .update({ settings: nextSettings, updated_at: new Date().toISOString() })
       .eq('id', auth.organizationId);
     if (writeErr) return json({ statusCode: 500, message: writeErr.message }, 500);
-    return json(nextPrefs);
+
+    return json(notes);
   }
 
   return json({ message: 'Method not allowed' }, 405);

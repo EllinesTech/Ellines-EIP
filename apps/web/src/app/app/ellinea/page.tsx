@@ -18,7 +18,14 @@ import {
   type LearningSignal,
 } from '@/lib/ellinea-engine';
 import { readApprovals } from '@/lib/approvals';
-import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
+import {
+  fetchEllineaMemory,
+  fetchEnterpriseSummary,
+  getSession,
+  saveEllineaMemory,
+  type EnterpriseSummaryDto,
+} from '@/lib/api';
+import { publishEnterpriseEvent } from '@/lib/event-bus';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -81,30 +88,57 @@ export default function EllineaPage() {
     const ui = readUiPrefs();
     setPrefs(ui);
     setOrgId(session?.organization.id ?? null);
-    const mem =
+    const localMem =
       session?.organization.id && ui.ellineaUseMemory
         ? readEllineaMemory(session.organization.id)
         : [];
-    setMemory(mem);
+    setMemory(localMem);
     if (session?.organization.id && ui.ellineaUseDna) {
       setDna(
         refreshDna(
           session.organization.id,
           session.organization.name,
           session.user.role,
-          mem,
+          localMem,
         ),
       );
     }
     if (session?.organization.id) {
-      refreshSignals(session.organization.id, null, mem);
+      refreshSignals(session.organization.id, null, localMem);
+    }
+
+    const orgIdForSync = session?.organization.id;
+    if (orgIdForSync && ui.ellineaUseMemory) {
+      fetchEllineaMemory()
+        .then((serverMem) => {
+          let merged = serverMem;
+          if (!serverMem.length && localMem.length) {
+            merged = localMem;
+            void saveEllineaMemory(localMem).catch(() => undefined);
+          } else if (serverMem.length) {
+            writeEllineaMemory(orgIdForSync, serverMem);
+          }
+          setMemory(merged);
+          if (ui.ellineaUseDna) {
+            setDna(
+              refreshDna(
+                orgIdForSync,
+                session?.organization.name,
+                session?.user.role,
+                merged,
+              ),
+            );
+          }
+          refreshSignals(orgIdForSync, null, merged);
+        })
+        .catch(() => undefined);
     }
 
     fetchEnterpriseSummary()
       .then((s) => {
         setSummary(s);
         if (session?.organization.id) {
-          refreshSignals(session.organization.id, s, mem);
+          refreshSignals(session.organization.id, s, localMem);
         }
         if (s.status === 'synced') {
           setRecs(
@@ -118,7 +152,7 @@ export default function EllineaPage() {
           if (ui.ellineaAutoBrief) {
             setAnswer(
               buildEllineaAnswer('brief today', s, {
-                memory: mem,
+                memory: localMem,
                 useMemory: ui.ellineaUseMemory,
                 useRoleContext: ui.ellineaRoleContext,
                 useDna: ui.ellineaUseDna,
@@ -128,7 +162,7 @@ export default function EllineaPage() {
                         session.organization.id,
                         session.organization.name,
                         session.user.role,
-                        mem,
+                        localMem,
                       )
                     : null,
                 role: session?.user.role,
@@ -141,6 +175,22 @@ export default function EllineaPage() {
       })
       .catch(() => setSummary(null));
   }, []);
+
+  function persistMemory(next: EllineaMemoryNote[]) {
+    if (!orgId) return;
+    setMemory(next);
+    writeEllineaMemory(orgId, next);
+    void saveEllineaMemory(next)
+      .then(() => {
+        publishEnterpriseEvent('ellinea.memory.updated', { count: next.length });
+      })
+      .catch(() => undefined);
+    const session = getSession();
+    if (prefs?.ellineaUseDna !== false) {
+      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, next));
+    }
+    refreshSignals(orgId, summary, next);
+  }
 
   function ask(q: string) {
     const ui = prefs || readUiPrefs();
@@ -193,21 +243,14 @@ export default function EllineaPage() {
       },
       ...memory,
     ].slice(0, 40);
-    setMemory(next);
-    writeEllineaMemory(orgId, next);
-    const session = getSession();
-    if (prefs?.ellineaUseDna !== false) {
-      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, next));
-    }
+    persistMemory(next);
     setNoteTitle('');
     setNoteBody('');
   }
 
   function onDeleteNote(id: string) {
     if (!orgId) return;
-    const next = memory.filter((n) => n.id !== id);
-    setMemory(next);
-    writeEllineaMemory(orgId, next);
+    persistMemory(memory.filter((n) => n.id !== id));
   }
 
   const synced = summary?.status === 'synced';
@@ -379,7 +422,7 @@ export default function EllineaPage() {
         <section className={ellineaStyles.memory}>
           <div className={styles.panelLabel}>Enterprise Memory</div>
           <p className={ellineaStyles.recsHint}>
-            Local notes for this organization (this browser). Used when you ask about policy or memory.
+            Org-scoped notes synced to the server (cached locally). Used when you ask about policy or memory.
           </p>
           <form className={adminStyles.form} onSubmit={onSaveNote}>
             <label>

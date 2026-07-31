@@ -213,6 +213,46 @@ export function normalizeOrgDateTimeSettings(raw: unknown): OrgDateTimeSettings 
   return { timeFormat, dateStyle };
 }
 
+/** Org-scoped Ellinea Enterprise Memory notes (stored under organizations.settings). */
+export type EllineaMemoryNoteDto = {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+};
+
+export function normalizeEllineaMemoryNotes(raw: unknown): EllineaMemoryNoteDto[] {
+  if (!Array.isArray(raw)) return [];
+  const out: EllineaMemoryNoteDto[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const n = item as Record<string, unknown>;
+    const id = typeof n.id === 'string' ? n.id.trim() : '';
+    const title = typeof n.title === 'string' ? n.title.trim() : '';
+    const body = typeof n.body === 'string' ? n.body.trim() : '';
+    const updatedAt =
+      typeof n.updatedAt === 'string' && n.updatedAt
+        ? n.updatedAt
+        : new Date().toISOString();
+    if (!id || !title || !body) continue;
+    out.push({ id, title, body, updatedAt });
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+/** Merge patch into org settings JSON without dropping sibling keys. */
+export function mergeOrganizationSettings(
+  existing: unknown,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const base =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {};
+  return { ...base, ...patch };
+}
+
 /** Short clock / log-style date+time for shell, timelines, and audit UIs. */
 export function formatOrgDateTime(
   date: Date,

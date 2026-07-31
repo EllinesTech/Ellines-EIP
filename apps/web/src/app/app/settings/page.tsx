@@ -351,6 +351,9 @@ export default function SystemSettingsPage() {
           <Link href="/app/notifications" className={styles.primaryLink}>
             Open Notification Center →
           </Link>
+          <Link href="/app/notify-policy" className={styles.primaryLink}>
+            Email / push policy →
+          </Link>
         </div>
       </section>
 
@@ -359,7 +362,7 @@ export default function SystemSettingsPage() {
           <p className={settingsStyles.cardEyebrow}>This browser</p>
           <h2 className={settingsStyles.cardTitle}>Ellinea AI</h2>
           <p className={settingsStyles.cardHint}>
-            Daily brief, recommendations, and local Enterprise Memory on Ask Ellinea.
+            Daily brief, recommendations, and org-synced Enterprise Memory on Ask Ellinea.
           </p>
         </div>
         <div className={settingsStyles.toggleRow}>
@@ -394,7 +397,7 @@ export default function SystemSettingsPage() {
         <div className={settingsStyles.toggleRow}>
           <div className={settingsStyles.toggleCopy}>
             <strong>Enterprise Memory</strong>
-            <p>Use local policy/decision notes when answering (this browser only).</p>
+            <p>Ground answers with org-synced policy/decision notes (server + local cache).</p>
           </div>
           <Toggle
             on={uiPrefs.ellineaUseMemory}

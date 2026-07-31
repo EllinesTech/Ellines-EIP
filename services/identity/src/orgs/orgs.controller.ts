@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Body,
   Param,
   UseGuards,
@@ -44,6 +45,11 @@ export class OrgsController {
     return this.orgs.getSettings(req.user.organizationId);
   }
 
+  @Get('me/ellinea-memory')
+  getEllineaMemory(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getEllineaMemory(req.user.organizationId);
+  }
+
   @Patch('me/settings')
   updateSettings(
     @Request() req: { user: { email: string; organizationId: string; role: string } },
@@ -60,6 +66,15 @@ export class OrgsController {
       );
     }
     return this.orgs.updateSettings(req.user.organizationId, body);
+  }
+
+  @Put('me/ellinea-memory')
+  putEllineaMemory(
+    @Request() req: { user: { organizationId: string } },
+    @Body() body: unknown,
+  ) {
+    const notes = Array.isArray(body) ? body : (body as { notes?: unknown })?.notes;
+    return this.orgs.putEllineaMemory(req.user.organizationId, notes);
   }
 
   @Get('me/users')

@@ -358,6 +358,24 @@ export function updateOrgDateTimeSettings(payload: Partial<OrgDateTimeSettingsDt
   });
 }
 
+export type EllineaMemoryNoteDto = {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+};
+
+export function fetchEllineaMemory() {
+  return request<EllineaMemoryNoteDto[]>('/api/v1/orgs/me/ellinea-memory');
+}
+
+export function saveEllineaMemory(notes: EllineaMemoryNoteDto[]) {
+  return request<EllineaMemoryNoteDto[]>('/api/v1/orgs/me/ellinea-memory', {
+    method: 'PUT',
+    body: JSON.stringify(notes),
+  });
+}
+
 export function fetchPlatformOrgDateTimeSettings(orgId: string) {
   return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
 }

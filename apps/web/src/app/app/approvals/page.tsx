@@ -15,6 +15,7 @@ import {
   type ApprovalTemplateId,
 } from '@/lib/approvals';
 import { fetchEnterpriseSummary, getSession } from '@/lib/api';
+import { publishEnterpriseEvent } from '@/lib/event-bus';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -69,17 +70,31 @@ export default function ApprovalsPage() {
       source: 'manual',
     });
     persist([next, ...items]);
+    publishEnterpriseEvent('approval.created', {
+      approvalId: next.id,
+      title: next.title,
+      templateId: next.templateId,
+    });
     setTitle('');
     setDetail('');
   }
 
   function decide(id: string, status: 'approved' | 'rejected') {
     setBusy(true);
-    persist(
-      items.map((item) =>
-        item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
-      ),
+    const next = items.map((item) =>
+      item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
     );
+    persist(next);
+    const updated = next.find((i) => i.id === id);
+    if (updated) {
+      publishEnterpriseEvent(`approval.${status}`, {
+        approvalId: id,
+        title: updated.title,
+        templateId: updated.templateId,
+        step: updated.currentStepIndex,
+        overall: updated.status,
+      });
+    }
     setBusy(false);
   }
 

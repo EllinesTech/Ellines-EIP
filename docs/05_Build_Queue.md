@@ -33,8 +33,8 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~80% | Feedback + DNA shipped; signals next; standalone how-to later |
-| **5 — Workflow & Automation** | ~45% | Approvals multi-step + rules shipped; reports next |
+| **4 — Ellinea AI** | ~90% | Server Memory shipped; LLM/RAG next; standalone later |
+| **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
 ### Priority order (first → next → later)
@@ -114,8 +114,10 @@ while queue has next/in_progress and not blocked:
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
 | 5.3 | Scheduled Reports | `done` | Local schedules + preview |
 | 3.x | Other-role Overview polish | `done` | Role-specific copy, real CTAs, empty sync state |
-| 3.x | Email/push notifications | `next` | Needs `services/notification` — document path; UI prefs already exist |
-| 5.4 | Event Bus | `todo` | |
+| 3.x | Email/push notifications | `in_progress` | Delivery policy UI at `/app/notify-policy`; service later |
+| 5.4 | Event Bus | `done` | Local pub/sub + log on Rules / Approvals |
+| 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
+| 4.10 | LLM / RAG | `next` | Grounded answers after server Memory |
 
 ---
 
@@ -128,14 +130,14 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.1 | Natural Language Q&A | `done` | Template + UEM |
 | 4.2 | CEO Daily Brief | `done` | |
 | 4.3 | Explainable Recommendations | `done` | |
-| 4.4 | Enterprise Memory | `in_progress` | Local notes; server Memory later |
-| 4.4a | Server Enterprise Memory API | `todo` | Persist policies/decisions per org |
+| 4.4 | Enterprise Memory | `done` | Local cache + server sync |
+| 4.4a | Server Enterprise Memory API | `done` | Org settings `ellineaMemory` via Pages + Nest |
 | 4.5 | Context Engine | `done` | Role + org framing |
 | 4.6 | Chat Interface | `done` | |
 | 4.7 | Recommendation feedback loop | `done` | Helpful/dismiss → re-rank; settings toggle |
 | 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
-| 4.10 | LLM / RAG | `todo` | After server Memory |
+| 4.10 | LLM / RAG | `next` | After server Memory — provider + grounded answers |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
 
@@ -149,9 +151,11 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 5.1a | Multi-step approval templates | `done` | IT→Owner, Manager→Exec→Owner, single |
 | 5.2 | Business Rules Engine | `done` | `/app/rules` + Overview flag hits (local) |
 | 5.3 | Scheduled Reports | `done` | `/app/reports` local schedules + preview |
-| 5.4 | Event Bus | `todo` | Internal pub/sub |
+| 5.4 | Event Bus | `done` | Browser event bus + log |
+| 4.4a | Server Enterprise Memory | `done` | Persist policies/decisions per org |
+| 4.10 | LLM / RAG | `next` | Grounded provider path |
 | 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
-| 3.x | Email/push notifications | `next` | Service + org policy later; prefs already on Settings |
+| 3.x | Email/push notifications | `in_progress` | Policy UI done; `services/notification` later |
 
 ---
 
