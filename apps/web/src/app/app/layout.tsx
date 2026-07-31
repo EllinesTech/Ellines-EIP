@@ -161,6 +161,7 @@ const NAV: NavItem[] = [
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
+  { href: '/app/ellinea-console', label: 'Ellinea console', icon: <IconEllinea />, adminOnly: true },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
 ];
 
@@ -296,7 +297,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       : item,
   );
   const pageTitle =
-    pathname.startsWith('/app/ellinea')
+    pathname.startsWith('/app/ellinea-console')
+      ? 'Ellinea console'
+      : pathname.startsWith('/app/ellinea')
       ? 'Ask Ellinea'
       : pathname.startsWith('/app/connectors')
         ? 'Connectors'
