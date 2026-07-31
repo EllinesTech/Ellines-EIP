@@ -30,6 +30,8 @@ export type UiPrefs = {
   showApprovalsNav: boolean;
   /** Seed approval queue from open decisions after sync. */
   approvalsSeedFromDecisions: boolean;
+  /** Learn from helpful/dismiss votes on Ellinea recommendations. */
+  ellineaRecFeedback: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -51,6 +53,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   ellineaRoleContext: true,
   showApprovalsNav: true,
   approvalsSeedFromDecisions: true,
+  ellineaRecFeedback: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -76,6 +79,7 @@ export function readUiPrefs(): UiPrefs {
       ellineaRoleContext: parsed.ellineaRoleContext !== false,
       showApprovalsNav: parsed.showApprovalsNav !== false,
       approvalsSeedFromDecisions: parsed.approvalsSeedFromDecisions !== false,
+      ellineaRecFeedback: parsed.ellineaRecFeedback !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

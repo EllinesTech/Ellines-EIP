@@ -5,8 +5,9 @@ import Link from 'next/link';
 import {
   buildDailyBriefText,
   buildEllineaAnswer,
-  buildEllineaRecommendations,
+  buildRankedRecommendations,
   readEllineaMemory,
+  recordRecFeedback,
   writeEllineaMemory,
   type EllineaMemoryNote,
   type EllineaRecommendation,
@@ -50,9 +51,11 @@ export default function EllineaPage() {
         setSummary(s);
         if (s.status === 'synced') {
           setRecs(
-            buildEllineaRecommendations(s, {
+            buildRankedRecommendations(s, {
               role: session?.user.role,
               useRoleContext: ui.ellineaRoleContext,
+              organizationId: session?.organization.id,
+              useFeedback: ui.ellineaRecFeedback,
             }),
           );
           if (ui.ellineaAutoBrief) {
@@ -86,6 +89,19 @@ export default function EllineaPage() {
         role: session?.user.role,
         fullName: session?.user.fullName,
         organizationName: session?.organization.name,
+      }),
+    );
+  }
+
+  function onFeedback(recId: string, vote: 'helpful' | 'dismiss') {
+    if (!orgId || prefs?.ellineaRecFeedback === false) return;
+    recordRecFeedback(orgId, recId, vote);
+    setRecs(
+      buildRankedRecommendations(summary, {
+        role: getSession()?.user.role,
+        useRoleContext: prefs?.ellineaRoleContext !== false,
+        organizationId: orgId,
+        useFeedback: true,
       }),
     );
   }
@@ -173,7 +189,8 @@ export default function EllineaPage() {
         <section className={ellineaStyles.recs}>
           <div className={styles.panelLabel}>Recommendations</div>
           <p className={ellineaStyles.recsHint}>
-            Explainable insights with evidence and confidence — template engine (LLM later).
+            Explainable insights with evidence and confidence. Mark helpful or dismiss so Ellinea
+            learns what matters for this organization.
           </p>
           <ul className={ellineaStyles.recList}>
             {recs.map((r) => (
@@ -188,6 +205,24 @@ export default function EllineaPage() {
                     <li key={e}>{e}</li>
                   ))}
                 </ul>
+                {prefs?.ellineaRecFeedback !== false && orgId ? (
+                  <div className={ellineaStyles.feedbackRow}>
+                    <button
+                      type="button"
+                      className={styles.ghostBtn}
+                      onClick={() => onFeedback(r.id, 'helpful')}
+                    >
+                      Helpful
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      onClick={() => onFeedback(r.id, 'dismiss')}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

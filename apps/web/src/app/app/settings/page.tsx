@@ -417,6 +417,19 @@ export default function SystemSettingsPage() {
             }
           />
         </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Recommendation feedback</strong>
+            <p>Learn from Helpful / Dismiss votes to re-rank insights for this org.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaRecFeedback}
+            label="Toggle Ellinea recommendation feedback"
+            onClick={() =>
+              persistUi({ ...uiPrefs, ellineaRecFeedback: !uiPrefs.ellineaRecFeedback })
+            }
+          />
+        </div>
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open Ask Ellinea →

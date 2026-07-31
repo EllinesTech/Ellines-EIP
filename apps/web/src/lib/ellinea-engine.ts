@@ -38,6 +38,70 @@ export function writeEllineaMemory(organizationId: string, notes: EllineaMemoryN
   localStorage.setItem(memoryStorageKey(organizationId), JSON.stringify(notes.slice(0, 40)));
 }
 
+export type RecFeedbackVote = 'helpful' | 'dismiss';
+
+export type EllineaRecFeedback = Record<string, { helpful: number; dismiss: number }>;
+
+const FEEDBACK_PREFIX = 'eip_ellinea_rec_feedback_';
+
+export function feedbackStorageKey(organizationId: string) {
+  return `${FEEDBACK_PREFIX}${organizationId}`;
+}
+
+export function readRecFeedback(organizationId: string): EllineaRecFeedback {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(feedbackStorageKey(organizationId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as EllineaRecFeedback;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeRecFeedback(organizationId: string, feedback: EllineaRecFeedback) {
+  localStorage.setItem(feedbackStorageKey(organizationId), JSON.stringify(feedback));
+}
+
+export function recordRecFeedback(
+  organizationId: string,
+  recId: string,
+  vote: RecFeedbackVote,
+): EllineaRecFeedback {
+  const next = { ...readRecFeedback(organizationId) };
+  const cur = next[recId] || { helpful: 0, dismiss: 0 };
+  next[recId] = {
+    helpful: cur.helpful + (vote === 'helpful' ? 1 : 0),
+    dismiss: cur.dismiss + (vote === 'dismiss' ? 1 : 0),
+  };
+  writeRecFeedback(organizationId, next);
+  return next;
+}
+
+export function rankRecommendations(
+  items: EllineaRecommendation[],
+  feedback: EllineaRecFeedback,
+): EllineaRecommendation[] {
+  const scored = items
+    .map((r) => {
+      const f = feedback[r.id] || { helpful: 0, dismiss: 0 };
+      const boost = f.helpful * 8 - f.dismiss * 12;
+      return {
+        ...r,
+        confidence: Math.max(35, Math.min(98, r.confidence + boost)),
+        _score: r.confidence + boost - (r.priority === 'high' ? 0 : r.priority === 'medium' ? 4 : 10),
+      };
+    })
+    .filter((r) => {
+      const f = feedback[r.id];
+      return !(f && f.dismiss >= 2 && f.helpful === 0);
+    })
+    .sort((a, b) => b._score - a._score);
+
+  return scored.map(({ _score: _ignored, ...r }) => r);
+}
+
 export type EllineaContext = {
   role?: string;
   fullName?: string;
@@ -199,6 +263,18 @@ export function buildEllineaRecommendations(
       : out.filter((r) => !lens.recFilter || lens.recFilter(r.id));
 
   return (filtered.length ? filtered : out).slice(0, 5);
+}
+
+export function buildRankedRecommendations(
+  summary: EnterpriseSummaryDto | null,
+  context?: Pick<EllineaContext, 'role' | 'useRoleContext'> & {
+    organizationId?: string;
+    useFeedback?: boolean;
+  },
+): EllineaRecommendation[] {
+  const base = buildEllineaRecommendations(summary, context);
+  if (!context?.organizationId || context.useFeedback === false) return base;
+  return rankRecommendations(base, readRecFeedback(context.organizationId));
 }
 
 export function buildDailyBriefText(

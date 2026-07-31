@@ -19,7 +19,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **1 — Platform Foundation** | ~98% | Audit Center + change password shipped; org profile still todo |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | **Active** — Owner/Admin path nearly complete |
-| **4 — Ellinea AI** | ~65% | Learning + standalone planned; **how-to demo later** (Phase 6) |
+| **4 — Ellinea AI** | ~72% | Feedback loop shipping; DNA/signals next; standalone how-to later |
 | **5 — Workflow & Automation** | ~15% | Approvals stub; deep workflow after Owner/Admin dash |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
@@ -93,7 +93,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.9 | Owner/IT empty states | `done` | No-sync callout on Overview; empty members on Admin |
 | 1.4a | Audit Center UI | `done` | `/app/audit` feed |
 | 1.7 | Org profile (name) | `done` | Owner renames org in Settings |
-| 4.7 | Recommendation feedback | `next` | Owner/Admin intelligence path |
+| 4.7 | Recommendation feedback | `done` | Helpful/dismiss on Ask Ellinea |
+| 4.8 | Enterprise DNA capture | `next` | From Memory + Approvals |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
 | 3.x | Other-role Overview polish | `todo` | After Owner/Admin Ellinea learning |
 
