@@ -119,7 +119,8 @@ while queue has next/in_progress and not blocked:
 | 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
 | 4.10 | LLM / RAG | `done` | RAG retrieve + `POST /api/v1/ellinea/ask` |
 | 6.1 | Extract `services/ellinea-ai` | `done` | `@ellines-eip/ellinea-ai` + Nest stub |
-| 6.2 | Ellinea API contract | `next` | ask / brief / recommend / memory / feedback |
+| 6.2 | Ellinea API contract | `done` | docs/11 + Nest ask/brief/recommend/memory/feedback |
+| 6.3 | `@ellines/ellinea-sdk` | `next` | Client SDK for Ellinea API |
 
 ---
 
@@ -166,7 +167,8 @@ Blueprint: *â€œContinuously learn from enterprise knowledge through Ellinea AI.â
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | 6.1 | Extract `services/ellinea-ai` | `done` | Package + Nest stub on :3002 |
-| 6.2 | Ellinea API contract | `next` | ask / brief / recommend / memory / feedback |
+| 6.2 | Ellinea API contract | `done` | [11_Ellinea_API_Contract.md](./11_Ellinea_API_Contract.md) |
+| 6.3 | `@ellines/ellinea-sdk` | `next` | Thin client for ask/brief/recommend |
 | 6.3 | `@ellines/ellinea-sdk` | `todo` | |
 | 6.4 | Bring-your-own connectors | `todo` | UEM snapshots from any System B |
 | 6.5 | Tenant learning isolation | `todo` | |
