@@ -73,6 +73,7 @@ export default function EllineaPage() {
   const [signals, setSignals] = useState<LearningSignal[]>([]);
   const [answerMode, setAnswerMode] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  // Memory note form — keep these useState hooks (ReferenceError if omitted in production).
   const [noteTitle, setNoteTitle] = useState('');
   const [noteBody, setNoteBody] = useState('');
 
