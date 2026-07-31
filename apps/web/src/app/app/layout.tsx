@@ -94,6 +94,15 @@ function IconTimeline() {
   );
 }
 
+function IconNotifications() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
+      <path d="M10 19a2 2 0 004 0" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -106,6 +115,7 @@ function IconSettings() {
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
+  { href: '/app/notifications', label: 'Notifications', icon: <IconNotifications /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
@@ -252,15 +262,17 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           ? 'IT Admin'
           : pathname.startsWith('/app/platform')
             ? 'Platform'
-              : pathname.startsWith('/app/search')
-                ? 'Enterprise Search'
-                : pathname.startsWith('/app/timeline')
-                  ? 'Enterprise Timeline'
-                  : pathname.startsWith('/app/profile')
-                    ? 'Profile'
-                    : pathname.startsWith('/app/settings')
-                      ? 'System Settings'
-                      : 'EIP Dashboard — Overview';
+              : pathname.startsWith('/app/notifications')
+                ? 'Notifications'
+                : pathname.startsWith('/app/search')
+                  ? 'Enterprise Search'
+                  : pathname.startsWith('/app/timeline')
+                    ? 'Enterprise Timeline'
+                    : pathname.startsWith('/app/profile')
+                      ? 'Profile'
+                      : pathname.startsWith('/app/settings')
+                        ? 'System Settings'
+                        : 'EIP Dashboard — Overview';
 
   const profileActive = pathname.startsWith('/app/profile');
 
@@ -403,13 +415,18 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className={styles.topRight}>
-            <button type="button" className={styles.iconBtn} aria-label="Notifications" title="Notifications">
+            <Link
+              href="/app/notifications"
+              className={styles.iconBtn}
+              aria-label="Notifications"
+              title="Notifications"
+            >
               <svg viewBox="0 0 24 24" aria-hidden>
                 <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
                 <path d="M10 19a2 2 0 004 0" />
               </svg>
-              <span className={styles.badge} />
-            </button>
+              {uiPrefs.notifyBadge ? <span className={styles.badge} /> : null}
+            </Link>
             <Link
               href="/app/profile"
               className={styles.topAvatar}

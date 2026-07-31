@@ -41,6 +41,10 @@ Pages **Functions** live under `apps/web/functions/` and deploy with the `out/` 
 
 **Do not** put `[triggers] crons` in `apps/web/wrangler.toml` — that breaks `wrangler pages deploy` on free/account cron limits. Connector schedules use opportunistic `POST /api/v1/connectors/run-due` when IT opens Connectors.
 
+**Cron cleanup:** Pages Edit tokens cannot clear Worker schedules (403). If a cron was ever created, remove it in Cloudflare Dashboard → Workers & Pages → `ellines-eip` → Settings → Triggers (requires a token with Workers Scripts Edit), or leave it inert after removing crons from `wrangler.toml`.
+
+**Git integration:** `ellines-eip` must stay **Direct Upload / Wrangler only** (`Git Provider: No`). Do not connect Cloudflare Git builds for this project.
+
 ## Connect checklist (one-time)
 
 1. Confirm the GitHub remote is `https://github.com/EllinesTech/Ellines-EIP.git`.

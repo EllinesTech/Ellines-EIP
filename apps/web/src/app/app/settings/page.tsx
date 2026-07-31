@@ -260,6 +260,54 @@ export default function SystemSettingsPage() {
 
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>This browser</p>
+          <h2 className={settingsStyles.cardTitle}>Notifications</h2>
+          <p className={settingsStyles.cardHint}>
+            Control what appears in the Notification Center feed and bell badge.
+          </p>
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Bell badge</strong>
+            <p>Show the unread indicator on the top-bar notifications icon.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.notifyBadge}
+            label="Toggle notification badge"
+            onClick={() => persistUi({ ...uiPrefs, notifyBadge: !uiPrefs.notifyBadge })}
+          />
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Alert items</strong>
+            <p>Include open alerts from the latest enterprise snapshot.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.notifyAlerts}
+            label="Toggle alert notifications"
+            onClick={() => persistUi({ ...uiPrefs, notifyAlerts: !uiPrefs.notifyAlerts })}
+          />
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Sync events</strong>
+            <p>Include connector sync summaries in the feed.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.notifySyncEvents}
+            label="Toggle sync notifications"
+            onClick={() => persistUi({ ...uiPrefs, notifySyncEvents: !uiPrefs.notifySyncEvents })}
+          />
+        </div>
+        <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
+          <Link href="/app/notifications" className={styles.primaryLink}>
+            Open Notification Center →
+          </Link>
+        </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
           <p className={settingsStyles.cardEyebrow}>Organization</p>
           <h2 className={settingsStyles.cardTitle}>Clock &amp; date</h2>
           <p className={settingsStyles.cardHint}>

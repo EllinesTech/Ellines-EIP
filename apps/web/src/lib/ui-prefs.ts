@@ -10,8 +10,14 @@ export type UiPrefs = {
   showUemStrip: boolean;
   /** Soften chart sparklines on KPI cards. */
   showSparklines: boolean;
-  /** Prefer reduced motion (respects OS when true). */
+  /** Prefer reduced motion. */
   reduceMotion: boolean;
+  /** Show unread badge on the notifications bell. */
+  notifyBadge: boolean;
+  /** Include connector sync events in the notification feed. */
+  notifySyncEvents: boolean;
+  /** Include open alerts from the enterprise snapshot. */
+  notifyAlerts: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -24,6 +30,9 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   showUemStrip: true,
   showSparklines: true,
   reduceMotion: false,
+  notifyBadge: true,
+  notifySyncEvents: true,
+  notifyAlerts: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -40,6 +49,9 @@ export function readUiPrefs(): UiPrefs {
       showUemStrip: parsed.showUemStrip !== false,
       showSparklines: parsed.showSparklines !== false,
       reduceMotion: parsed.reduceMotion === true,
+      notifyBadge: parsed.notifyBadge !== false,
+      notifySyncEvents: parsed.notifySyncEvents !== false,
+      notifyAlerts: parsed.notifyAlerts !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

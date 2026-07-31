@@ -14,12 +14,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
-| **3 — Executive Command Center** | ~80% | KPIs + UEM + Timeline + **Search** shipped; next: Notifications |
-| **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
+| **3 — Executive Command Center** | ~90% | KPIs + UEM + Timeline + Search + **Notifications** shipped |
+| **4 — Ellinea AI** | ~15% | Thin brief + template Q&A — **next** deepen |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
 
-**Critical path remaining:** **3.6 Notification Center** → Ellinea AI deepen → Workflows / write under Owner policy.
+**Critical path remaining:** **Ellinea AI deepen (4.x)** → email/push notifications → Workflows / write under Owner policy.
+
+**Feature settings rule:** new user-facing surfaces must ship a System Settings control when behavior is preference-shaped (display, density, notification filters, etc.).
 
 **MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
 
@@ -70,7 +72,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.3 | Enterprise Health Score | `done` | Snapshot `healthScore` |
 | 3.4 | Enterprise Timeline | `done` | `/app/timeline` + Overview rail; uses org clock prefs + sync timestamps |
 | 3.5 | Enterprise Search | `done` | `/app/search` + topbar; queries snapshot, timeline, UEM objects, installs |
-| 3.6 | Notification Center | `next` | `services/notification` missing — start with in-app feed from snapshot alerts |
+| 3.6 | Notification Center | `done` | `/app/notifications` + bell; settings for badge/alerts/sync; snapshot-derived feed |
+| 3.x | Email/push notifications | `todo` | Needs `services/notification` + org policy |
 
 ---
 
@@ -78,7 +81,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `in_progress` | Thin Daily Brief + template Ask Ellinea from snapshot; full LLM later |
+| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `next` | Thin Daily Brief + template Ask Ellinea from snapshot; deepen LLM next |
 
 ---
 

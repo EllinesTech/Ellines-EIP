@@ -1,34 +1,35 @@
 .form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.85rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.55rem 0.75rem;
   align-items: end;
-  margin-top: 0.75rem;
+  margin-top: 0.55rem;
 }
 
 .form label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #8b95a8;
+  gap: 0.28rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #c5cddb;
 }
 
 .form input,
 .form select,
 .table select {
   font: inherit;
-  font-size: 0.92rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   color: #f4f7fb;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  min-height: 36px;
   background: #0b0e14;
 }
 
@@ -37,15 +38,17 @@
 .table select:focus {
   outline: none;
   border-color: rgba(139, 92, 246, 0.55);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
 }
 
 .primary,
 .ghost {
   font: inherit;
+  font-size: 0.8125rem;
   font-weight: 700;
-  border-radius: 10px;
-  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  min-height: 36px;
   cursor: pointer;
   border: none;
 }
@@ -53,7 +56,7 @@
 .primary {
   background: linear-gradient(135deg, #7c3aed, #3b82f6);
   color: #fff;
-  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.35);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
 }
 
 .primary:disabled,
@@ -69,21 +72,23 @@
 }
 
 .error {
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
   background: rgba(239, 68, 68, 0.12);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.35);
+  font-size: 0.8125rem;
 }
 
 .notice {
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
   background: rgba(124, 58, 237, 0.12);
   color: #ddd6fe;
   border: 1px solid rgba(167, 139, 250, 0.35);
+  font-size: 0.8125rem;
 }
 
 .notice code {
@@ -91,33 +96,33 @@
 }
 
 .tableWrap {
-  margin-top: 1.25rem;
+  margin-top: 0.85rem;
   background: #161b26;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 1rem 1.1rem 1.15rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.65rem;
-  font-size: 0.92rem;
+  margin-top: 0.45rem;
+  font-size: 0.8125rem;
 }
 
 .table th {
   text-align: left;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #8b95a8;
-  padding: 0.45rem 0.35rem;
+  padding: 0.35rem 0.3rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .table td {
-  padding: 0.65rem 0.35rem;
+  padding: 0.45rem 0.3rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   color: #f4f7fb;
   vertical-align: middle;
@@ -133,14 +138,14 @@
   }
 
   .table {
-    min-width: 560px;
+    min-width: 520px;
   }
 }
 
 .wizard {
-  margin-bottom: 1.25rem;
-  padding: 1rem 1.1rem 1.15rem;
-  border-radius: 14px;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem 0.85rem 0.9rem;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(15, 23, 42, 0.55);
 }
@@ -149,16 +154,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
 }
 
 .steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  margin-bottom: 1rem;
-  font-size: 0.78rem;
+  gap: 0.4rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.72rem;
   color: #8b95a8;
 }
 
@@ -173,15 +178,15 @@
 
 .typeGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.55rem;
 }
 
 .typeCard,
 .typeCardActive {
   text-align: left;
-  border-radius: 12px;
-  padding: 0.85rem 0.9rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.7rem;
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -196,7 +201,7 @@
 
 .typeTag {
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -206,35 +211,36 @@
 .typeCard strong,
 .typeCardActive strong {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
+  font-size: 0.84rem;
   color: #fff;
 }
 
 .typeCard p,
 .typeCardActive p {
-  margin: 0.35rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
   color: #8b95a8;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .wizardActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1rem;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .form textarea {
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   color: #f4f7fb;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
   background: #0b0e14;
   resize: vertical;
   width: 100%;
@@ -243,22 +249,22 @@
 .capList {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  max-height: 280px;
+  gap: 0.28rem;
+  max-height: 240px;
   overflow: auto;
-  margin-top: 0.75rem;
+  margin-top: 0.55rem;
 }
 
 .capRow,
 .capDisabled {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
-  gap: 0.55rem;
+  gap: 0.45rem;
   align-items: center;
-  padding: 0.45rem 0.55rem;
+  padding: 0.35rem 0.45rem;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 
 .capDisabled {
@@ -266,7 +272,7 @@
 }
 
 .capMethod {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #93c5fd;
@@ -274,25 +280,26 @@
 
 .packGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
-  margin-top: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.55rem;
 }
 
 .packCard {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 0.85rem 0.9rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.7rem;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .packCard strong {
+  font-size: 0.84rem;
   color: #fff;
 }
 
 .packCard p {
-  margin: 0.35rem 0 0.75rem;
-  font-size: 0.8rem;
+  margin: 0.25rem 0 0.55rem;
+  font-size: 0.75rem;
   color: #8b95a8;
-  line-height: 1.4;
+  line-height: 1.35;
 }
