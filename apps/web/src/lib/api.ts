@@ -304,6 +304,24 @@ export function changePassword(payload: { currentPassword: string; newPassword: 
   });
 }
 
+export type OrgProfileDto = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+};
+
+export function fetchOrgProfile() {
+  return request<OrgProfileDto>('/api/v1/orgs/me');
+}
+
+export function updateOrgProfile(payload: { name: string }) {
+  return request<OrgProfileDto>('/api/v1/orgs/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
 export type OrgDateTimeSettingsDto = {
   timeFormat: '12h' | '24h';
   dateStyle: 'short' | 'medium' | 'log';

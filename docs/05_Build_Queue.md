@@ -52,7 +52,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform` |
 | 1.5a | Owner vs IT authority | `done` | Only Owner assigns Owner & IT |
 | 1.6 | Org structure UI (branches / depts) | `done` | Pages Functions + Org Admin forms |
-| 1.7 | Org profile (name / slug display) | `next` | Owner edits org display name in Settings |
+| 1.7 | Org profile (name / slug display) | `done` | Owner renames org in System Settings; slug read-only |
 
 ---
 
@@ -92,9 +92,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.8 | Org structure in Admin | `done` | Branches + departments on `/app/admin` |
 | 3.9 | Owner/IT empty states | `done` | No-sync callout on Overview; empty members on Admin |
 | 1.4a | Audit Center UI | `done` | `/app/audit` feed |
-| 1.7 | Org profile (name) | `next` | Owner edits org display name |
+| 1.7 | Org profile (name) | `done` | Owner renames org in Settings |
+| 4.7 | Recommendation feedback | `next` | Owner/Admin intelligence path |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
-| 3.x | Other-role Overview polish | `todo` | After Owner/Admin path |
+| 3.x | Other-role Overview polish | `todo` | After Owner/Admin Ellinea learning |
 
 ---
 
@@ -111,7 +112,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.4a | Server Enterprise Memory API | `todo` | Persist policies/decisions per org |
 | 4.5 | Context Engine | `done` | Role + org framing |
 | 4.6 | Chat Interface | `done` | |
-| 4.7 | Recommendation feedback loop | `todo` | Helpful / dismiss → re-rank |
+| 4.7 | Recommendation feedback loop | `next` | Accept / dismiss / “helpful?” on insights → re-rank |
 | 4.8 | Enterprise DNA capture | `todo` | From Memory + Approvals |
 | 4.9 | Continuous learning signals | `todo` | Outcomes over time |
 | 4.10 | LLM / RAG | `todo` | After server Memory |

@@ -4,12 +4,16 @@ import Link from 'next/link';
 import {
   formatOrgDateTime,
   isOrgAdminRole,
+  isOrgOwnerRole,
 } from '@ellines-eip/shared';
 import {
   cacheOrgDateTimeSettings,
   fetchOrgDateTimeSettings,
+  fetchOrgProfile,
   getSession,
+  setSession,
   updateOrgDateTimeSettings,
+  updateOrgProfile,
   type OrgDateTimeSettingsDto,
 } from '@/lib/api';
 import {
@@ -51,8 +55,11 @@ function Toggle({
 
 export default function SystemSettingsPage() {
   const [orgAdmin, setOrgAdmin] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
+  const [orgName, setOrgName] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
 
   const [timeFormat, setTimeFormat] = useState<OrgDateTimeSettingsDto['timeFormat']>('12h');
   const [dateStyle, setDateStyle] = useState<OrgDateTimeSettingsDto['dateStyle']>('short');
@@ -68,7 +75,10 @@ export default function SystemSettingsPage() {
     const s = getSession();
     if (!s) return;
     setOrgAdmin(isOrgAdminRole(s.user.role));
+    setIsOwner(isOrgOwnerRole(s.user.role));
     setOrgId(s.organization.id);
+    setOrgName(s.organization.name);
+    setOrgSlug(s.organization.slug);
     setUiPrefs(readUiPrefs());
     fetchOrgDateTimeSettings()
       .then((prefs) => {
@@ -78,6 +88,14 @@ export default function SystemSettingsPage() {
       })
       .catch(() => {
         /* keep defaults */
+      });
+    fetchOrgProfile()
+      .then((org) => {
+        setOrgName(org.name);
+        setOrgSlug(org.slug);
+      })
+      .catch(() => {
+        /* keep session values */
       });
   }, []);
 
@@ -106,6 +124,35 @@ export default function SystemSettingsPage() {
       setNotice('Organization clock and date format saved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save clock settings');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveOrgName(e: FormEvent) {
+    e.preventDefault();
+    if (!isOwner) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const saved = await updateOrgProfile({ name: orgName });
+      setOrgName(saved.name);
+      setOrgSlug(saved.slug);
+      const session = getSession();
+      if (session) {
+        setSession({
+          ...session,
+          organization: {
+            ...session.organization,
+            name: saved.name,
+            slug: saved.slug,
+          },
+        });
+      }
+      setNotice('Organization display name saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save organization name');
     } finally {
       setBusy(false);
     }
@@ -419,6 +466,44 @@ export default function SystemSettingsPage() {
             Open Approvals →
           </Link>
         </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>Organization</p>
+          <h2 className={settingsStyles.cardTitle}>Organization profile</h2>
+          <p className={settingsStyles.cardHint}>
+            {isOwner
+              ? 'Display name shown across the Work Console. Slug stays fixed for URLs and integrations.'
+              : 'Organization name is Owner-managed. Slug is read-only.'}
+          </p>
+        </div>
+        <form onSubmit={(e) => void onSaveOrgName(e)}>
+          <div className={settingsStyles.form}>
+            <label>
+              Display name
+              <input
+                value={orgName}
+                disabled={!isOwner || busy}
+                onChange={(e) => setOrgName(e.target.value)}
+                required
+                minLength={2}
+                maxLength={120}
+              />
+            </label>
+            <label>
+              Slug
+              <input value={orgSlug} readOnly aria-label="Organization slug" />
+            </label>
+          </div>
+          {isOwner ? (
+            <div className={settingsStyles.actions}>
+              <button type="submit" className={adminStyles.primary} disabled={busy}>
+                {busy ? 'Saving…' : 'Save organization name'}
+              </button>
+            </div>
+          ) : null}
+        </form>
       </section>
 
       <section className={settingsStyles.card}>
