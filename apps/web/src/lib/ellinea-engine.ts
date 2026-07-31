@@ -95,8 +95,70 @@ export function readEnterpriseDna(organizationId: string): EnterpriseDnaSnapshot
   }
 }
 
-export function writeEnterpriseDna(snapshot: EnterpriseDnaSnapshot) {
-  localStorage.setItem(dnaStorageKey(snapshot.organizationId), JSON.stringify(snapshot));
+export type LearningSignal = {
+  id: string;
+  kind: 'approval_rate' | 'alert_pressure' | 'feedback_bias' | 'memory_depth';
+  label: string;
+  detail: string;
+  weight: number;
+};
+
+/** Lightweight outcome signals for continuous learning (local, per org). */
+export function buildLearningSignals(input: {
+  summary: EnterpriseSummaryDto | null;
+  approvals: { status: string }[];
+  feedback: EllineaRecFeedback;
+  memoryCount: number;
+}): LearningSignal[] {
+  const signals: LearningSignal[] = [];
+  const decided = input.approvals.filter((a) => a.status === 'approved' || a.status === 'rejected');
+  const approved = decided.filter((a) => a.status === 'approved').length;
+  if (decided.length) {
+    const rate = Math.round((approved / decided.length) * 100);
+    signals.push({
+      id: 'approval_rate',
+      kind: 'approval_rate',
+      label: `${rate}% approval rate`,
+      detail: `${approved} of ${decided.length} decided requests approved — shapes DNA caution.`,
+      weight: rate,
+    });
+  }
+
+  if (input.summary?.status === 'synced') {
+    const pressure = input.summary.openAlerts + input.summary.openDecisions;
+    signals.push({
+      id: 'alert_pressure',
+      kind: 'alert_pressure',
+      label: `Pressure score ${pressure}`,
+      detail: `${input.summary.openAlerts} alerts · ${input.summary.openDecisions} open decisions in latest sync.`,
+      weight: pressure,
+    });
+  }
+
+  const votes = Object.values(input.feedback);
+  if (votes.length) {
+    const helpful = votes.reduce((a, v) => a + v.helpful, 0);
+    const dismiss = votes.reduce((a, v) => a + v.dismiss, 0);
+    signals.push({
+      id: 'feedback_bias',
+      kind: 'feedback_bias',
+      label: helpful >= dismiss ? 'Insight-positive org' : 'Selective on insights',
+      detail: `Ellinea feedback: ${helpful} helpful · ${dismiss} dismiss.`,
+      weight: helpful - dismiss,
+    });
+  }
+
+  if (input.memoryCount > 0) {
+    signals.push({
+      id: 'memory_depth',
+      kind: 'memory_depth',
+      label: `${input.memoryCount} memory note(s)`,
+      detail: 'Policies and decisions in Enterprise Memory deepen DNA.',
+      weight: input.memoryCount,
+    });
+  }
+
+  return signals;
 }
 
 /** Rebuild Enterprise DNA™ from Memory, Approvals, and recommendation feedback. */

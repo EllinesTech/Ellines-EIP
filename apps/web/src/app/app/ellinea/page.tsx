@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   buildDailyBriefText,
   buildEllineaAnswer,
+  buildLearningSignals,
   buildRankedRecommendations,
   readEllineaMemory,
   readRecFeedback,
@@ -14,6 +15,7 @@ import {
   type EllineaMemoryNote,
   type EllineaRecommendation,
   type EnterpriseDnaSnapshot,
+  type LearningSignal,
 } from '@/lib/ellinea-engine';
 import { readApprovals } from '@/lib/approvals';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
@@ -55,8 +57,24 @@ export default function EllineaPage() {
   const [recs, setRecs] = useState<EllineaRecommendation[]>([]);
   const [memory, setMemory] = useState<EllineaMemoryNote[]>([]);
   const [dna, setDna] = useState<EnterpriseDnaSnapshot | null>(null);
+  const [signals, setSignals] = useState<LearningSignal[]>([]);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteBody, setNoteBody] = useState('');
+
+  function refreshSignals(
+    organizationId: string,
+    s: EnterpriseSummaryDto | null,
+    mem: EllineaMemoryNote[],
+  ) {
+    setSignals(
+      buildLearningSignals({
+        summary: s,
+        approvals: readApprovals(organizationId),
+        feedback: readRecFeedback(organizationId),
+        memoryCount: mem.length,
+      }),
+    );
+  }
 
   useEffect(() => {
     const session = getSession();
@@ -78,10 +96,16 @@ export default function EllineaPage() {
         ),
       );
     }
+    if (session?.organization.id) {
+      refreshSignals(session.organization.id, null, mem);
+    }
 
     fetchEnterpriseSummary()
       .then((s) => {
         setSummary(s);
+        if (session?.organization.id) {
+          refreshSignals(session.organization.id, s, mem);
+        }
         if (s.status === 'synced') {
           setRecs(
             buildRankedRecommendations(s, {
@@ -325,6 +349,26 @@ export default function EllineaPage() {
                   <span className={ellineaStyles.confidence}>{t.source}</span>
                 </div>
                 <p>{t.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {signals.length ? (
+        <section className={ellineaStyles.recs} style={{ marginTop: '0.65rem' }}>
+          <div className={styles.panelLabel}>Learning signals</div>
+          <p className={ellineaStyles.recsHint}>
+            Outcome patterns from approvals, alerts, feedback, and memory depth.
+          </p>
+          <ul className={ellineaStyles.recList}>
+            {signals.map((s) => (
+              <li key={s.id} className={ellineaStyles.recItem}>
+                <div className={ellineaStyles.recTop}>
+                  <strong>{s.label}</strong>
+                  <span className={ellineaStyles.confidence}>{s.kind}</span>
+                </div>
+                <p>{s.detail}</p>
               </li>
             ))}
           </ul>

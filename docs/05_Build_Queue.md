@@ -109,9 +109,10 @@ while queue has next/in_progress and not blocked:
 | 1.7 | Org profile (name) | `done` | Owner renames org in Settings |
 | 4.7 | Recommendation feedback | `done` | Helpful/dismiss on Ask Ellinea |
 | 4.8 | Enterprise DNA capture | `done` | Memory + Approvals + feedback → DNA traits |
-| 4.9 | Continuous learning signals | `next` | Outcomes over time |
+| 4.9 | Continuous learning signals | `done` | Signals strip on Ask Ellinea |
+| 5.1a | Multi-step approval templates | `next` | Owner/IT workflow deepen |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
-| 3.x | Other-role Overview polish | `todo` | After learning signals |
+| 3.x | Other-role Overview polish | `todo` | After Approvals deepen |
 
 ---
 
@@ -130,8 +131,9 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.6 | Chat Interface | `done` | |
 | 4.7 | Recommendation feedback loop | `done` | Helpful/dismiss → re-rank; settings toggle |
 | 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
-| 4.9 | Continuous learning signals | `next` | Outcomes over time (alerts/approvals cadence) |
+| 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
 | 4.10 | LLM / RAG | `todo` | After server Memory |
+| 5.1a | Multi-step approval templates | `next` | Deepen Approvals for Owner/IT |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
 
@@ -142,7 +144,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | 5.1 | Approval Workflows | `in_progress` | Local queue for Owner/IT |
-| 5.1a | Multi-step approval templates | `todo` | After Owner/Admin dash solid |
+| 5.1a | Multi-step approval templates | `next` | Request → IT review → Owner decide |
 | 5.2 | Business Rules Engine | `todo` | Deferred |
 | 5.3 | Scheduled Reports | `todo` | |
 | 5.4 | Event Bus | `todo` | |
