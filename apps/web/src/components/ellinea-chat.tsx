@@ -3,87 +3,17 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   fetchEnterpriseSummary,
+  getSession,
   type EnterpriseSummaryDto,
 } from '@/lib/api';
+import {
+  buildEllineaAnswer,
+  readEllineaMemory,
+} from '@/lib/ellinea-engine';
+import { readUiPrefs } from '@/lib/ui-prefs';
 import styles from './ellinea-chat.module.css';
 
-export function buildEllineaAnswer(
-  question: string,
-  summary: EnterpriseSummaryDto | null,
-): string {
-  const q = question.toLowerCase();
-  if (!summary || summary.status !== 'synced') {
-    return 'I do not have a live enterprise snapshot yet. Ask IT to open Connectors and sync a system, then ask again.';
-  }
-
-  const model = summary.model;
-  const counts = model?.counts;
-  const objects = model?.objects || [];
-  const branches = objects.filter((o) => o.kind === 'branch');
-  const attention = objects.filter((o) => (o.status || '').toLowerCase().includes('attention'));
-  const synced =
-    summary.syncedAt ? new Date(summary.syncedAt).toLocaleString() : 'recently';
-
-  if (q.includes('branch') || q.includes('site') || q.includes('location')) {
-    if (branches.length) {
-      const list = branches
-        .slice(0, 6)
-        .map((b) => `${b.name}${b.status ? ` (${b.status})` : ''}`)
-        .join('; ');
-      return `I see ${counts?.branches ?? branches.length} branch object(s) in the Universal Enterprise Model: ${list}. ${attention.length ? `${attention.length} need attention.` : 'None flagged for attention.'}`;
-    }
-    return `Branch count in the model is ${counts?.branches ?? 0}. Sync a richer System B feed to list named branches.`;
-  }
-
-  if (q.includes('people') || q.includes('person') || q.includes('staff') || q.includes('employee')) {
-    return `People count in the Universal Enterprise Model is ${counts?.people ?? 0}. Tasks ${counts?.tasks ?? 0}, documents ${counts?.documents ?? 0}, assets ${counts?.assets ?? 0}.`;
-  }
-
-  if (q.includes('timeline') || q.includes('what happened') || q.includes('recent')) {
-    const events = (summary.timeline || []).slice(0, 4);
-    if (!events.length) {
-      return 'No timeline events in the latest snapshot yet.';
-    }
-    return `Recent enterprise events: ${events.map((e) => e.title).join(' · ')}. Open Timeline for the full feed.`;
-  }
-
-  if (q.includes('health') || q.includes('performing') || q.includes('how are') || q.includes('business')) {
-    const uem =
-      counts
-        ? ` UEM: ${counts.branches} branches, ${counts.people} people, ${counts.tasks} tasks, ${counts.notifications} notifications.`
-        : '';
-    return `Enterprise health is ${summary.healthScore}/100 across ${summary.connectedSystems} connected systems.${uem} ${summary.briefHighlight}`;
-  }
-
-  if (q.includes('alert') || q.includes('risk') || q.includes('attention')) {
-    const named = attention.length
-      ? ` Flagged objects: ${attention
-          .slice(0, 4)
-          .map((o) => o.name)
-          .join(', ')}.`
-      : '';
-    return `There are ${summary.openAlerts} open alerts in the latest sync.${named} ${summary.briefHighlight}`;
-  }
-
-  if (q.includes('decision') || q.includes('approval') || q.includes('task')) {
-    return `There are ${summary.openDecisions} open decisions and ${counts?.tasks ?? summary.openDecisions} tasks in the model. Prioritize them before the next brief cycle.`;
-  }
-
-  if (q.includes('brief') || q.includes('today') || q.includes('morning') || q.includes('summarize')) {
-    const uem =
-      counts
-        ? ` Model snapshot — branches ${counts.branches}, people ${counts.people}, alerts ${counts.notifications}.`
-        : '';
-    return `Daily brief (${synced} via ${summary.connectorName}): ${summary.briefHighlight}.${uem}`;
-  }
-
-  if (q.includes('connector') || q.includes('system') || q.includes('source')) {
-    return `Latest source is ${summary.connectorName} (${summary.connectorId}), health ${summary.healthScore}, capabilities ${(model?.capabilities || ['read', 'sync']).join(', ')}.`;
-  }
-
-  return `From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions${counts ? `, ${counts.branches} branches / ${counts.people} people` : ''}. ${summary.briefHighlight}`;
-}
-
+export { buildEllineaAnswer } from '@/lib/ellinea-engine';
 
 type Msg = { role: 'user' | 'assistant'; text: string };
 
@@ -99,7 +29,7 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: 'assistant',
-      text: 'Hi — I am Ellinea. Ask about health, alerts, decisions, or your daily brief.',
+      text: 'Hi — I am Ellinea. Ask about health, alerts, recommendations, or your daily brief.',
     },
   ]);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -134,7 +64,14 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
     setMessages((prev) => [...prev, { role: 'user', text: q }]);
     setInput('');
     window.setTimeout(() => {
-      const answer = buildEllineaAnswer(q, summary);
+      const prefs = readUiPrefs();
+      const orgId = getSession()?.organization.id;
+      const memory =
+        prefs.ellineaUseMemory && orgId ? readEllineaMemory(orgId) : [];
+      const answer = buildEllineaAnswer(q, summary, {
+        memory,
+        useMemory: prefs.ellineaUseMemory,
+      });
       setMessages((prev) => [...prev, { role: 'assistant', text: answer }]);
       setBusy(false);
     }, 280);
@@ -180,7 +117,7 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
         </div>
 
         <div className={styles.suggestions}>
-          {['How are we performing?', 'Any risks?', 'Which branches?', 'Daily brief', 'Timeline'].map(
+          {['How are we performing?', 'What do you recommend?', 'Daily brief', 'Any risks?', 'Timeline'].map(
             (s) => (
             <button key={s} type="button" className={styles.chip} onClick={() => send(s)} disabled={busy}>
               {s}

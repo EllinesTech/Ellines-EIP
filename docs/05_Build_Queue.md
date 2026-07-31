@@ -15,11 +15,11 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
 | **3 — Executive Command Center** | ~90% | KPIs + UEM + Timeline + Search + **Notifications** shipped |
-| **4 — Ellinea AI** | ~15% | Thin brief + template Q&A — **next** deepen |
-| **5 — Workflow & Automation** | 0% | Not started |
-| **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
+| **4 — Ellinea AI** | ~45% | Brief + recommendations + local memory + template Q&A; LLM still deferred |
+| **5 — Workflow & Automation** | 0% | **next** after Ellinea context/chat polish |
+| **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
-**Critical path remaining:** **Ellinea AI deepen (4.x)** → email/push notifications → Workflows / write under Owner policy.
+**Critical path remaining:** Ellinea context/chat polish (4.5–4.6) → email/push notifications → Workflows.
 
 **Feature settings rule:** new user-facing surfaces must ship a System Settings control when behavior is preference-shaped (display, density, notification filters, etc.).
 
@@ -81,7 +81,12 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `in_progress` | Template Q&A now uses UEM counts/objects/timeline; LLM still deferred |
+| 4.1 | Natural Language Q&A | `done` | Template engine over snapshot + UEM (LLM deferred) |
+| 4.2 | CEO Daily Brief | `done` | Ask Ellinea + chat; auto-load toggle in System Settings |
+| 4.3 | Explainable Recommendations | `done` | Evidence + confidence on Ask Ellinea; settings toggle |
+| 4.4 | Enterprise Memory | `in_progress` | Local org notes (browser); server/RAG later |
+| 4.5 | Context Engine | `next` | Role / org DNA-aware responses |
+| 4.6 | Chat Interface | `done` | Panel + `/app/ellinea`; deepen with 4.5 |
 
 ---
 
@@ -95,7 +100,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ## Recently landed on main (through 2026-07-31)
 
-- Sync scheduler: per-install intervals, run-due on Connectors load, Pages cron hook
+- Ellinea: daily brief, explainable recommendations, local Enterprise Memory + settings toggles
+- Notification Center; Org Admin densify; Pages deploy-safe (no cron); GitHub Actions only
+- Sync scheduler: per-install intervals, run-due on Connectors load
 - Universal Enterprise Model normalize + Command Center object counts
 - Pages Functions import verify gate; Work Console density + settings typography
 - System Settings, profile shell, org datetime prefs (Pages)

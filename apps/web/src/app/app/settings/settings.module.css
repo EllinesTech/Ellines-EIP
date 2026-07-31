@@ -78,8 +78,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 36px;
-  padding: 0.3rem 0.65rem;
+  min-height: 32px;
+  padding: 0.28rem 0.55rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
@@ -187,22 +187,26 @@
 .form label {
   display: flex;
   flex-direction: column;
-  gap: 0.28rem;
-  font-size: 0.78rem;
-  font-weight: 650;
-  color: #c5cddb;
+  gap: 0.22rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8b95a8;
 }
 
 .form input,
 .form select {
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   color: #f4f7fb;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  min-height: 36px;
+  border-radius: 7px;
+  padding: 0.32rem 0.5rem;
+  min-height: 32px;
   background: #0b0e14;
 }
 

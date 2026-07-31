@@ -9,27 +9,27 @@
 .form label {
   display: flex;
   flex-direction: column;
-  gap: 0.28rem;
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  color: #c5cddb;
+  gap: 0.22rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8b95a8;
 }
 
 .form input,
 .form select,
 .table select {
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   color: #f4f7fb;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  min-height: 36px;
+  border-radius: 7px;
+  padding: 0.32rem 0.5rem;
+  min-height: 32px;
   background: #0b0e14;
 }
 
@@ -44,11 +44,11 @@
 .primary,
 .ghost {
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  border-radius: 8px;
-  padding: 0.45rem 0.85rem;
-  min-height: 36px;
+  border-radius: 7px;
+  padding: 0.35rem 0.7rem;
+  min-height: 32px;
   cursor: pointer;
   border: none;
 }
@@ -56,7 +56,7 @@
 .primary {
   background: linear-gradient(135deg, #7c3aed, #3b82f6);
   color: #fff;
-  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.28);
 }
 
 .primary:disabled,

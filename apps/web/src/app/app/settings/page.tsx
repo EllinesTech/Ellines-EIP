@@ -308,6 +308,63 @@ export default function SystemSettingsPage() {
 
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>This browser</p>
+          <h2 className={settingsStyles.cardTitle}>Ellinea AI</h2>
+          <p className={settingsStyles.cardHint}>
+            Daily brief, recommendations, and local Enterprise Memory on Ask Ellinea.
+          </p>
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Auto daily brief</strong>
+            <p>Load the morning brief when you open Ask Ellinea.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaAutoBrief}
+            label="Toggle Ellinea auto brief"
+            onClick={() =>
+              persistUi({ ...uiPrefs, ellineaAutoBrief: !uiPrefs.ellineaAutoBrief })
+            }
+          />
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Recommendations</strong>
+            <p>Show explainable insights with evidence and confidence scores.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaShowRecommendations}
+            label="Toggle Ellinea recommendations"
+            onClick={() =>
+              persistUi({
+                ...uiPrefs,
+                ellineaShowRecommendations: !uiPrefs.ellineaShowRecommendations,
+              })
+            }
+          />
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Enterprise Memory</strong>
+            <p>Use local policy/decision notes when answering (this browser only).</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaUseMemory}
+            label="Toggle Ellinea memory"
+            onClick={() =>
+              persistUi({ ...uiPrefs, ellineaUseMemory: !uiPrefs.ellineaUseMemory })
+            }
+          />
+        </div>
+        <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
+          <Link href="/app/ellinea" className={styles.primaryLink}>
+            Open Ask Ellinea →
+          </Link>
+        </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
           <p className={settingsStyles.cardEyebrow}>Organization</p>
           <h2 className={settingsStyles.cardTitle}>Clock &amp; date</h2>
           <p className={settingsStyles.cardHint}>

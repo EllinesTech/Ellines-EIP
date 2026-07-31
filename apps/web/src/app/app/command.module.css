@@ -37,10 +37,10 @@
 }
 
 .header h1 {
-  margin: 0 0 0.15rem;
-  font-size: clamp(1.375rem, 1.6vw, 1.75rem); /* 22–28px enterprise desktop */
+  margin: 0 0 0.1rem;
+  font-size: clamp(1.2rem, 1.35vw, 1.45rem); /* 19–23px — denser SaaS */
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   color: #fff;
 }
@@ -48,9 +48,9 @@
 .lede {
   margin: 0;
   color: var(--c-muted);
-  line-height: 1.45;
-  font-size: 0.8125rem; /* 13px secondary */
-  max-width: 40rem;
+  line-height: 1.4;
+  font-size: 0.75rem; /* 12px secondary */
+  max-width: 38rem;
 }
 
 .headerActions {
@@ -63,9 +63,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 40px;
-  padding: 0.4rem 0.75rem;
-  border-radius: 9px;
+  min-height: 32px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 7px;
   border: 1px solid var(--c-line);
   background: transparent;
   color: var(--c-muted);
@@ -650,16 +650,16 @@
 .timeline {
   background: var(--c-card);
   border: 1px solid var(--c-line);
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
 }
 
 .brief h2,
 .health h2 {
-  margin: 0.25rem 0 0.4rem;
+  margin: 0.15rem 0 0.3rem;
   color: #fff;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   letter-spacing: -0.02em;
 }
 

@@ -1,0 +1,124 @@
+.recs,
+.memory {
+  margin-top: 0.65rem;
+  background: var(--c-card, #161b26);
+  border: 1px solid var(--c-line, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+}
+
+.recsHint {
+  margin: 0.2rem 0 0.55rem;
+  color: #8b95a8;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.recList,
+.memoryList,
+.evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.recList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.recItem {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  padding: 0.55rem 0.65rem;
+  background: #0f131b;
+}
+
+.recItem[data-priority='high'] {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.recItem[data-priority='medium'] {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.recTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.recTop strong {
+  font-size: 0.8125rem;
+  color: #f4f7fb;
+}
+
+.confidence {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #a78bfa;
+  letter-spacing: 0.04em;
+}
+
+.recItem > p {
+  margin: 0.3rem 0 0.35rem;
+  font-size: 0.75rem;
+  color: #8b95a8;
+  line-height: 1.4;
+}
+
+.evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.evidence li {
+  font-size: 0.7rem;
+  color: #c4b5fd;
+  line-height: 1.35;
+}
+
+.evidence li::before {
+  content: '· ';
+  color: #7c3aed;
+}
+
+.answer {
+  margin: 0.75rem 0 0;
+  line-height: 1.45;
+  color: #c4b5fd;
+  font-size: 0.8125rem;
+}
+
+.memoryList {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.memoryList li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f131b;
+}
+
+.memoryList strong {
+  display: block;
+  font-size: 0.78rem;
+  color: #f4f7fb;
+}
+
+.memoryList p {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  color: #8b95a8;
+  line-height: 1.4;
+}

@@ -18,6 +18,12 @@ export type UiPrefs = {
   notifySyncEvents: boolean;
   /** Include open alerts from the enterprise snapshot. */
   notifyAlerts: boolean;
+  /** Auto-load Daily Brief on Ask Ellinea. */
+  ellineaAutoBrief: boolean;
+  /** Show explainable recommendations on Ask Ellinea. */
+  ellineaShowRecommendations: boolean;
+  /** Ground answers with local Enterprise Memory notes. */
+  ellineaUseMemory: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -33,6 +39,9 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   notifyBadge: true,
   notifySyncEvents: true,
   notifyAlerts: true,
+  ellineaAutoBrief: true,
+  ellineaShowRecommendations: true,
+  ellineaUseMemory: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -52,6 +61,9 @@ export function readUiPrefs(): UiPrefs {
       notifyBadge: parsed.notifyBadge !== false,
       notifySyncEvents: parsed.notifySyncEvents !== false,
       notifyAlerts: parsed.notifyAlerts !== false,
+      ellineaAutoBrief: parsed.ellineaAutoBrief !== false,
+      ellineaShowRecommendations: parsed.ellineaShowRecommendations !== false,
+      ellineaUseMemory: parsed.ellineaUseMemory !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;
