@@ -81,7 +81,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `next` | Thin Daily Brief + template Ask Ellinea from snapshot; deepen LLM next |
+| 4.1–4.6 | NL Q&A, Daily Brief, Memory, Chat | `in_progress` | Template Q&A now uses UEM counts/objects/timeline; LLM still deferred |
 
 ---
 

@@ -1,13 +1,23 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { buildEllineaAnswer } from '@/components/ellinea-chat';
 import { fetchEnterpriseSummary, type EnterpriseSummaryDto } from '@/lib/api';
 import styles from '../command.module.css';
+import adminStyles from '../admin/admin.module.css';
+
+const PROMPTS = [
+  'How are all my businesses performing today?',
+  'Which branches need attention?',
+  'Summarize yesterday\'s critical alerts.',
+  'What happened recently?',
+  'How many people are in the model?',
+];
 
 export default function EllineaPage() {
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
-  const [question, setQuestion] = useState('How are all my businesses performing today?');
+  const [question, setQuestion] = useState(PROMPTS[0]);
   const [answer, setAnswer] = useState('');
 
   useEffect(() => {
@@ -26,6 +36,9 @@ export default function EllineaPage() {
     setAnswer(buildEllineaAnswer(question, summary));
   }
 
+  const synced = summary?.status === 'synced';
+  const counts = summary?.model?.counts;
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -33,64 +46,78 @@ export default function EllineaPage() {
           <p className={styles.eyebrow}>Ellinea AI</p>
           <h1>Ask Ellinea</h1>
           <p className={styles.lede}>
-            Grounded answers from your latest connector sync — full NL engine lands in Phase 4.
+            Grounded answers from your latest connector sync and Universal Enterprise Model. Full LLM
+            reasoning lands next.
           </p>
         </div>
-        <img
-          src="/brand/ellinea-mark.png"
-          alt="Ellinea AI"
-          className={styles.ellineaChip}
-          style={{ height: 48 }}
-        />
+        <div className={styles.headerActions}>
+          <Link href="/app/timeline" className={styles.ghostBtn}>
+            Timeline
+          </Link>
+          <Link href="/app/notifications" className={styles.ghostBtn}>
+            Notifications
+          </Link>
+          <img
+            src="/brand/ellinea-mark.png"
+            alt="Ellinea AI"
+            className={styles.ellineaChip}
+            style={{ height: 40 }}
+          />
+        </div>
       </header>
 
       <section className={styles.brief}>
         <div className={styles.panelLabel}>Daily Brief</div>
-        <h2>
-          {summary?.status === 'synced' ? 'Prepared from live snapshot' : 'Waiting for connectors'}
-        </h2>
+        <h2>{synced ? 'Prepared from live snapshot' : 'Waiting for connectors'}</h2>
         <p>
-          {summary?.status === 'synced'
-            ? summary.briefHighlight
-            : 'Sync Demo JSON Systems under Connectors to unlock a grounded morning brief.'}
+          {synced
+            ? summary!.briefHighlight
+            : 'Sync a connector under Connectors to unlock a grounded morning brief.'}
         </p>
+        {synced && counts ? (
+          <p>
+            <strong>
+              UEM · {counts.branches} branches · {counts.people} people · {counts.tasks} tasks ·{' '}
+              {counts.notifications} alerts
+            </strong>
+          </p>
+        ) : null}
       </section>
 
-      <section className={styles.brief} style={{ marginTop: '1rem' }}>
+      <section className={styles.brief} style={{ marginTop: '0.75rem' }}>
         <div className={styles.panelLabel}>Ask</div>
-        <form onSubmit={onAsk} style={{ display: 'grid', gap: '0.75rem', marginTop: '0.75rem' }}>
-          <input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            style={{
-              font: 'inherit',
-              padding: '0.7rem 0.85rem',
-              borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: '#0b0e14',
-              color: '#f4f7fb',
-            }}
-            aria-label="Question for Ellinea"
-          />
-          <button
-            type="submit"
-            style={{
-              justifySelf: 'start',
-              font: 'inherit',
-              fontWeight: 700,
-              padding: '0.6rem 1.1rem',
-              borderRadius: 10,
-              border: 'none',
-              color: '#fff',
-              background: 'linear-gradient(135deg, #7c3aed, #3b82f6)',
-              cursor: 'pointer',
-            }}
-          >
+        <div className={styles.headerActions} style={{ marginTop: '0.55rem' }}>
+          {PROMPTS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={styles.ghostBtn}
+              onClick={() => {
+                setQuestion(p);
+                setAnswer(buildEllineaAnswer(p, summary));
+              }}
+            >
+              {p.length > 36 ? `${p.slice(0, 34)}…` : p}
+            </button>
+          ))}
+        </div>
+        <form className={adminStyles.form} onSubmit={onAsk} style={{ marginTop: '0.75rem' }}>
+          <label style={{ gridColumn: '1 / -1' }}>
+            Question
+            <input
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              aria-label="Question for Ellinea"
+            />
+          </label>
+          <button type="submit" className={adminStyles.primary}>
             Ask Ellinea
           </button>
         </form>
         {answer ? (
-          <p style={{ marginTop: '1rem', lineHeight: 1.55, color: '#c4b5fd' }}>{answer}</p>
+          <p style={{ marginTop: '0.85rem', lineHeight: 1.5, color: '#c4b5fd', fontSize: '0.875rem' }}>
+            {answer}
+          </p>
         ) : null}
       </section>
     </div>
