@@ -112,6 +112,8 @@ Deliver a working **Enterprise Intelligence Platform** that connects 3–5 exter
 | Offline edge deployment | v1.1 |
 | Industry solution packs | v1.2 |
 | RPA connectors | v2.0 |
+| Ellinea continuous learning (feedback + DNA) | v1.0 late / v1.1 |
+| Ellinea AI standalone service + SDK | v1.1–v2.0 |
 
 ---
 

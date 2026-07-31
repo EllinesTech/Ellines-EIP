@@ -15,18 +15,19 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped |
 | **3 — Owner / Admin Command Center** | ~92% | **Active focus** — polish Owner + IT Admin dashboard before other roles |
-| **4 — Ellinea AI** | ~65% | Brief + recs + memory + role context; LLM deferred |
+| **4 — Ellinea AI** | ~65% | Brief + recs + memory + role context; **learning + standalone** planned (see 4.7–4.S) |
 | **5 — Workflow & Automation** | ~15% | Approvals stub only — pause deep workflow until Owner/Admin dash is solid |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
 ### Priority order (do this first → next → later)
 
-1. **Now — Owner / IT Admin dashboard** (`1.5` / `3.x` polish): Org Admin, Connectors, Overview for Owner/Admin, Notifications (delete/read), System Settings density, authority clarity.
-2. **Next — Owner/Admin intelligence:** Ellinea brief/recs as Owner sees them; Approvals decide path for Owner/IT.
-3. **Then — Executive / manager / member consoles:** role-adaptive Overview refinements (not the current focus).
-4. **Later — Workflow depth (5.2+), email/push, LLM/RAG.**
+1. **Now — Owner / IT Admin dashboard** (`3.7`): Org Admin, Connectors, Overview, Notifications, Settings, authority clarity.
+2. **Next — Owner/Admin intelligence:** Ellinea as Owner/IT sees it; Approvals decide path.
+3. **Then — Ellinea learning loop** (`4.7`–`4.9`): feedback on recommendations → Enterprise DNA → continuous org understanding (helps business people get better advice over time).
+4. **Then — other role consoles** (executive / manager / member).
+5. **Later —** Workflow depth (5.2+), email/push, LLM/RAG (`4.10`), **Ellinea standalone product** (`4.S`).
 
-**Critical path:** Finish **Owner/Admin Work Console** → then other roles → then workflow rules / email / LLM.
+**Critical path:** Owner/Admin Work Console → Owner/Admin Ellinea → **learn & recommend better** → other roles → workflow / LLM → **Ellinea as reusable engine**.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -83,17 +84,26 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ---
 
-## Phase 4 — Ellinea AI
+## Phase 4 — Ellinea AI (intelligence that keeps learning)
+
+Blueprint principle: *“Continuously learn from enterprise knowledge through Ellinea AI.”*  
+Today: template Q&A + local memory. Target: understand **this** business and recommend with rising confidence.
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | 4.1 | Natural Language Q&A | `done` | Template engine over snapshot + UEM (LLM deferred) |
 | 4.2 | CEO Daily Brief | `done` | Ask Ellinea + chat; auto-load toggle in System Settings |
 | 4.3 | Explainable Recommendations | `done` | Evidence + confidence on Ask Ellinea; settings toggle |
-| 4.4 | Enterprise Memory | `in_progress` | Local org notes (browser); server/RAG later |
+| 4.4 | Enterprise Memory | `in_progress` | Local org notes (browser); **server Memory + RAG** unlocks real learning |
 | 4.5 | Context Engine | `done` | Role + org framing; settings toggle; rec filtering |
 | 4.6 | Chat Interface | `done` | Panel + `/app/ellinea` |
-| 4.x | LLM / RAG | `todo` | External model when keys + Memory service exist |
+| 4.7 | Recommendation feedback loop | `todo` | Accept / dismiss / “helpful?” on insights → re-rank next brief (Owner/Admin first) |
+| 4.8 | Enterprise DNA capture | `todo` | Learn policies from Memory + Approvals + Owner decisions (lexicon: Enterprise DNA™) |
+| 4.9 | Continuous learning signals | `todo` | Store outcomes over time (what was approved, what alerts repeated) so Ellinea adapts per org |
+| 4.10 | LLM / RAG | `todo` | External model + retrieval over server Enterprise Memory |
+| 4.S | **Ellinea AI standalone** | `todo` | **Productize after EIP core:** `services/ellinea-ai` + SDK/API so other Ellines products (and custom systems) can plug into the same intelligence engine — see Phase 6 |
+
+**Why this matters for business people:** Ellinea should not only answer once — it should remember how *their* org decides, what worked, and recommend the next action with evidence.
 
 ---
 
@@ -105,6 +115,23 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 5.2 | Business Rules Engine | `todo` | Deferred until Owner/Admin dash polish (3.7) lands |
 | 5.3 | Scheduled Reports | `todo` | Daily/weekly reports |
 | 5.4 | Event Bus | `todo` | Internal pub/sub |
+
+---
+
+## Phase 6 — Ellinea AI as a product (after EIP Foundation)
+
+Goal: Ellinea is the **intelligence engine inside EIP**, then also a **standalone Ellines Tech product** other systems can adopt (hospitals, ERP front-ends, new Ellines apps) without forking EIP.
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| 6.1 | Extract `services/ellinea-ai` | `todo` | Move engine out of web-only templates into a Nest (or similar) service |
+| 6.2 | Ellinea API contract | `todo` | `ask`, `brief`, `recommend`, `memory.write/read`, `feedback` — org-scoped, JWT |
+| 6.3 | `@ellines/ellinea-sdk` | `todo` | TypeScript client for EIP + future products |
+| 6.4 | Bring-your-own connectors | `todo` | Accept UEM snapshots / events from any System B (not only EIP Hub) |
+| 6.5 | Tenant learning isolation | `todo` | Per-org Memory + DNA only — never leak across customers |
+| 6.6 | Ellinea console (thin) | `todo` | Optional standalone UI for partners embedding Ellinea |
+
+**Suggestion (product):** Brand **Ellinea AI™** as “Intelligence that empowers” — EIP is the first flagship consumer; SDK is how Ellines builds the next systems faster.
 
 ---
 

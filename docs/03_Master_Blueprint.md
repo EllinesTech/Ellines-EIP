@@ -129,6 +129,20 @@ Ellinea AI combines Enterprise Intelligence, Enterprise Memory, Enterprise Conte
 - Enterprise Memory (document + decision storage)
 - Context-aware responses (role, org, department)
 
+### Continuous learning (v1.0 → v1.1)
+- Capture Owner/Admin feedback on recommendations (helpful / dismiss)
+- Grow Enterprise Memory™ and Enterprise DNA™ from decisions and approvals
+- Re-rank insights from outcomes over time (per organization only)
+- Ground answers with RAG once server Memory exists
+
+### Ellinea as a standalone engine (post-Foundation)
+Ellinea AI is the intelligence product of Ellines Tech. EIP is the first full platform that embeds it. After Foundation, extract Ellinea as:
+- a dedicated service + API (`ask` / `brief` / `recommend` / `memory` / `feedback`)
+- an SDK other Ellines products and partner systems can use
+- tenant-isolated learning so each business teaches Ellinea *its* way of working
+
+See build queue Phase 4 (`4.7`–`4.10`, `4.S`) and Phase 6.
+
 ### Future Capabilities (v2.0+)
 - Autonomous AI agents
 - Enterprise knowledge graph
@@ -238,8 +252,8 @@ Ellinea AI combines Enterprise Intelligence, Enterprise Memory, Enterprise Conte
 | Version | Focus | Major Deliverables |
 |---------|-------|-------------------|
 | **1.0** | Foundation | Core platform, AI, integrations, security |
-| **1.1** | Growth | Mobile, offline sync, multi-company |
-| **2.0** | Enterprise | Marketplace, advanced analytics, industry packs |
+| **1.1** | Growth + learning | Mobile, offline, multi-company; Ellinea feedback/DNA; Ellinea API extract start |
+| **2.0** | Enterprise | Marketplace, advanced analytics, industry packs; **Ellinea standalone SDK** |
 | **3.0** | Autonomous | AI agents, digital twin, predictive operations |
 
 *Detailed v1.0 scope: [02_MVP_Scope_v1.0.md](./02_MVP_Scope_v1.0.md)*
