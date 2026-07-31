@@ -113,8 +113,9 @@ while queue has next/in_progress and not blocked:
 | 5.1a | Multi-step approval templates | `done` | simple / IT→Owner / Manager→Exec→Owner |
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
 | 5.3 | Scheduled Reports | `done` | Local schedules + preview |
-| 3.x | Other-role Overview polish | `next` | Executive / manager / member Overview |
-| 3.x | Email/push notifications | `todo` | Later — `services/notification` |
+| 3.x | Other-role Overview polish | `done` | Role-specific copy, real CTAs, empty sync state |
+| 3.x | Email/push notifications | `next` | Needs `services/notification` — document path; UI prefs already exist |
+| 5.4 | Event Bus | `todo` | |
 
 ---
 
@@ -149,7 +150,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 5.2 | Business Rules Engine | `done` | `/app/rules` + Overview flag hits (local) |
 | 5.3 | Scheduled Reports | `done` | `/app/reports` local schedules + preview |
 | 5.4 | Event Bus | `todo` | Internal pub/sub |
-| 3.x | Other-role Overview polish | `next` | Executive / manager / member Overview |
+| 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
+| 3.x | Email/push notifications | `next` | Service + org policy later; prefs already on Settings |
 
 ---
 

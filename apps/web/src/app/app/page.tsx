@@ -425,25 +425,63 @@ function ClientOverview({
   ];
 
   const title =
-    variant === 'executive' ? 'Executive overview' : variant === 'manager' ? 'Branch & team view' : 'What needs you';
+    variant === 'executive'
+      ? 'Executive overview'
+      : variant === 'manager'
+        ? 'Branch & team view'
+        : 'What needs you';
+  const eyebrow =
+    variant === 'executive'
+      ? 'Executive'
+      : variant === 'manager'
+        ? 'Manager'
+        : 'Work Console';
+  const lede = synced
+    ? variant === 'executive'
+      ? 'Health, decisions, and Ellinea brief for org-wide direction.'
+      : variant === 'manager'
+        ? 'Team pressure, open decisions, and branch attention from the latest sync.'
+        : 'Tasks and alerts that need your attention — Ask Ellinea when stuck.'
+    : 'Welcome back — sync is pending. Ellinea lights up when IT connects systems.';
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Enterprise Overview</p>
-          <h1>{title}</h1>
-          <p className={styles.lede}>
-            {synced
-              ? 'Real-time overview of your organization from connected systems.'
-              : 'Welcome back — sync is pending. Ellinea is ready when your IT admin connects systems.'}
-          </p>
+          <p className={styles.eyebrow}>{eyebrow}</p>
+          <h1>
+            {title}
+            {name ? `, ${name}` : ''}
+          </h1>
+          <p className={styles.lede}>{lede}</p>
         </div>
         <div className={styles.headerActions}>
-          <span className={styles.ghostBtn}>Add Widget</span>
-          <span className={styles.ghostBtn}>Share</span>
+          <Link href="/app/ellinea" className={styles.ghostBtn}>
+            Ask Ellinea
+          </Link>
+          <Link href="/app/approvals" className={styles.ghostBtn}>
+            Approvals
+          </Link>
+          <Link href="/app/notifications" className={styles.ghostBtn}>
+            Notifications
+          </Link>
+          <Link href="/app/timeline" className={styles.ghostBtn}>
+            Timeline
+          </Link>
         </div>
       </header>
+
+      {!synced ? (
+        <section className={styles.emptyCallout} role="status">
+          <div>
+            <strong>Waiting on connectors</strong>
+            <p>Your IT Admin syncs systems under Connectors. Meanwhile you can still open Ellinea and Approvals.</p>
+          </div>
+          <Link href="/app/ellinea" className={styles.aiBtn}>
+            Ask Ellinea
+          </Link>
+        </section>
+      ) : null}
 
       <div className={styles.gridClientTop}>
         <section className={styles.card}>
@@ -565,14 +603,19 @@ function ClientOverview({
         <Link href="/app/ellinea" className={styles.quickLink}>
           Ask Ellinea
         </Link>
-        <Link href="/app" className={styles.quickLink}>
-          View brief
+        <Link href="/app/approvals" className={styles.quickLink}>
+          Approvals ({synced ? decisions : '—'})
+        </Link>
+        <Link href="/app/notifications" className={styles.quickLink}>
+          Alerts ({synced ? alerts : '—'})
+        </Link>
+        <Link href="/app/search" className={styles.quickLink}>
+          Search
         </Link>
         <Link href="/app/profile" className={styles.quickLink}>
-          Open profile
+          Profile
         </Link>
         <span className={styles.quickLink}>Systems: {synced ? systems : 0}</span>
-        <span className={styles.quickLink}>Alerts: {synced ? alerts : '—'}</span>
       </div>
     </div>
   );
