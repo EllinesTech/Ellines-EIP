@@ -3,11 +3,16 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  canDecideApprovals,
+  APPROVAL_TEMPLATES,
+  advanceApproval,
+  canActOnCurrentStep,
+  createApprovalRequest,
   readApprovals,
   seedApprovalsFromSummary,
+  templateLabel,
   writeApprovals,
   type ApprovalRequest,
+  type ApprovalTemplateId,
 } from '@/lib/approvals';
 import { fetchEnterpriseSummary, getSession } from '@/lib/api';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
@@ -23,6 +28,7 @@ export default function ApprovalsPage() {
   const [prefs, setPrefs] = useState<UiPrefs | null>(null);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
+  const [templateId, setTemplateId] = useState<ApprovalTemplateId>('it_then_owner');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -55,33 +61,23 @@ export default function ApprovalsPage() {
   function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    const next: ApprovalRequest = {
-      id: `appr_${Date.now()}`,
+    const next = createApprovalRequest({
       title: title.trim(),
       detail: detail.trim() || 'Manual approval request',
       requester: actorName || 'You',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
+      templateId,
       source: 'manual',
-    };
+    });
     persist([next, ...items]);
     setTitle('');
     setDetail('');
   }
 
   function decide(id: string, status: 'approved' | 'rejected') {
-    if (!canDecideApprovals(role)) return;
     setBusy(true);
     persist(
       items.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status,
-              decidedAt: new Date().toISOString(),
-              decidedBy: actorName || role,
-            }
-          : item,
+        item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
       ),
     );
     setBusy(false);
@@ -89,7 +85,6 @@ export default function ApprovalsPage() {
 
   const pending = items.filter((i) => i.status === 'pending');
   const decided = items.filter((i) => i.status !== 'pending');
-  const canDecide = canDecideApprovals(role);
 
   return (
     <div className={styles.page}>
@@ -98,8 +93,10 @@ export default function ApprovalsPage() {
           <p className={styles.eyebrow}>Workflow</p>
           <h1>Approvals</h1>
           <p className={styles.lede}>
-            Multi-step server workflows come next. This queue is org-local for now
-            {prefs?.approvalsSeedFromDecisions ? ' and seeds from open decisions after sync.' : '.'}
+            Multi-step templates: IT → Owner, Manager → Exec → Owner, or single decide
+            {prefs?.approvalsSeedFromDecisions
+              ? '. Snapshot seeds use IT → Owner.'
+              : '.'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -125,7 +122,20 @@ export default function ApprovalsPage() {
               minLength={3}
             />
           </label>
-          <label style={{ gridColumn: 'span 2' }}>
+          <label>
+            Template
+            <select
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value as ApprovalTemplateId)}
+            >
+              {APPROVAL_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ gridColumn: '1 / -1' }}>
             Detail
             <input
               value={detail}
@@ -133,6 +143,9 @@ export default function ApprovalsPage() {
               placeholder="Context for the approver"
             />
           </label>
+          <p className={styles.lede} style={{ gridColumn: '1 / -1', margin: 0 }}>
+            {APPROVAL_TEMPLATES.find((t) => t.id === templateId)?.description}
+          </p>
           <button type="submit" className={adminStyles.primary}>
             Submit
           </button>
@@ -145,40 +158,59 @@ export default function ApprovalsPage() {
           <p className={styles.lede}>No pending approvals.</p>
         ) : (
           <ul className={localStyles.list}>
-            {pending.map((item) => (
-              <li key={item.id}>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                  <span className={localStyles.meta}>
-                    {item.requester} · {new Date(item.createdAt).toLocaleString()}
-                    {item.source === 'decision-seed' ? ' · from snapshot' : ''}
-                  </span>
-                </div>
-                {canDecide ? (
-                  <div className={localStyles.actions}>
-                    <button
-                      type="button"
-                      className={adminStyles.primary}
-                      disabled={busy}
-                      onClick={() => decide(item.id, 'approved')}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      className={adminStyles.ghost}
-                      disabled={busy}
-                      onClick={() => decide(item.id, 'rejected')}
-                    >
-                      Reject
-                    </button>
+            {pending.map((item) => {
+              const canAct = canActOnCurrentStep(item, role);
+              const step = item.steps[item.currentStepIndex];
+              return (
+                <li key={item.id}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <span className={localStyles.meta}>
+                      {item.requester} · {templateLabel(item.templateId)} · step{' '}
+                      {(item.currentStepIndex || 0) + 1}/{item.steps.length}: {step?.label}
+                      {item.source === 'decision-seed' ? ' · from snapshot' : ''}
+                    </span>
+                    <ol className={localStyles.steps}>
+                      {item.steps.map((s, i) => (
+                        <li
+                          key={`${item.id}-${s.key}-${i}`}
+                          data-status={s.status}
+                          data-current={i === item.currentStepIndex && item.status === 'pending'}
+                        >
+                          {s.label}
+                          {s.decidedBy ? ` · ${s.status} by ${s.decidedBy}` : ''}
+                        </li>
+                      ))}
+                    </ol>
                   </div>
-                ) : (
-                  <span className={localStyles.meta}>Awaiting Owner / IT / exec / manager</span>
-                )}
-              </li>
-            ))}
+                  {canAct ? (
+                    <div className={localStyles.actions}>
+                      <button
+                        type="button"
+                        className={adminStyles.primary}
+                        disabled={busy}
+                        onClick={() => decide(item.id, 'approved')}
+                      >
+                        Approve step
+                      </button>
+                      <button
+                        type="button"
+                        className={adminStyles.ghost}
+                        disabled={busy}
+                        onClick={() => decide(item.id, 'rejected')}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={localStyles.meta}>
+                      Awaiting {step?.actorRole === 'decider' ? 'decider' : step?.actorRole}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -193,7 +225,7 @@ export default function ApprovalsPage() {
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
                   <span className={localStyles.meta}>
-                    {item.status} by {item.decidedBy || '—'}
+                    {templateLabel(item.templateId)} · {item.status} by {item.decidedBy || '—'}
                     {item.decidedAt ? ` · ${new Date(item.decidedAt).toLocaleString()}` : ''}
                   </span>
                 </div>

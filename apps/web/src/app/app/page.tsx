@@ -14,6 +14,7 @@ import {
   weekSeries,
 } from '@/components/dashboard/charts';
 import { fetchEnterpriseSummary, getSession, listInstallations, type ConnectorInstallationDto, type EnterpriseSummaryDto } from '@/lib/api';
+import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
 
@@ -25,6 +26,7 @@ function AdminOverview({
   variant,
   uiPrefs,
   installations,
+  ruleHits,
 }: {
   name: string;
   role: string;
@@ -33,6 +35,7 @@ function AdminOverview({
   variant: WorkHomeVariant;
   uiPrefs: UiPrefs;
   installations: ConnectorInstallationDto[];
+  ruleHits: RuleHit[];
 }) {
   const isOwner = role === 'owner';
   const health = synced ? summary!.healthScore : 0;
@@ -78,6 +81,7 @@ function AdminOverview({
     { href: '/app/audit', label: 'Audit Center' },
     { href: '/app/connectors', label: 'Connectors' },
     { href: '/app/approvals', label: 'Approvals' },
+    { href: '/app/rules', label: 'Rules' },
     { href: '/app/notifications', label: 'Notifications' },
     { href: '/app/ellinea', label: 'Ask Ellinea' },
     { href: '/app/settings', label: 'System Settings' },
@@ -121,6 +125,18 @@ function AdminOverview({
           </Link>
         ))}
       </nav>
+
+      {ruleHits.length ? (
+        <section className={styles.emptyCallout} role="status">
+          <div>
+            <strong>Business rules fired</strong>
+            <p>{ruleHits.map((h) => h.message).join(' ')}</p>
+          </div>
+          <Link href="/app/rules" className={styles.aiBtn}>
+            Manage rules
+          </Link>
+        </section>
+      ) : null}
 
       {!synced ? (
         <section className={styles.emptyCallout} role="status">
@@ -570,6 +586,7 @@ export default function CommandCenterPage() {
   const [isPlatform, setIsPlatform] = useState(false);
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
   const [installations, setInstallations] = useState<ConnectorInstallationDto[]>([]);
+  const [ruleHits, setRuleHits] = useState<RuleHit[]>([]);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
 
   useEffect(() => {
@@ -587,7 +604,23 @@ export default function CommandCenterPage() {
     };
     window.addEventListener(UI_PREFS_EVENT, onPrefs);
     fetchEnterpriseSummary()
-      .then(setSummary)
+      .then((summary) => {
+        setSummary(summary);
+        if (s?.organization.id && (isOrgAdminRole(s.user.role) || s.isPlatformAdmin)) {
+          const rules = readBusinessRules(s.organization.id);
+          setRuleHits(
+            evaluateBusinessRules(rules, {
+              openAlerts: summary.openAlerts || 0,
+              openDecisions: summary.openDecisions || 0,
+              healthScore: summary.healthScore || 0,
+              synced: summary.status === 'synced',
+            }).filter((h) => {
+              const rule = rules.find((r) => r.id === h.ruleId);
+              return rule?.then === 'flag_overview';
+            }),
+          );
+        }
+      })
       .catch(() => setSummary(null));
     if (isOrgAdminRole(s?.user.role) || s?.isPlatformAdmin) {
       listInstallations()
@@ -610,6 +643,7 @@ export default function CommandCenterPage() {
         variant={variant}
         uiPrefs={uiPrefs}
         installations={installations}
+        ruleHits={ruleHits}
       />
     );
   }

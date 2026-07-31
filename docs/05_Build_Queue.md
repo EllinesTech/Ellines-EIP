@@ -34,7 +34,7 @@ while queue has next/in_progress and not blocked:
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
 | **4 — Ellinea AI** | ~80% | Feedback + DNA shipped; signals next; standalone how-to later |
-| **5 — Workflow & Automation** | ~15% | Approvals stub; deep workflow after Owner/Admin dash |
+| **5 — Workflow & Automation** | ~45% | Approvals multi-step + rules shipped; reports next |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
 ### Priority order (first → next → later)
@@ -110,9 +110,11 @@ while queue has next/in_progress and not blocked:
 | 4.7 | Recommendation feedback | `done` | Helpful/dismiss on Ask Ellinea |
 | 4.8 | Enterprise DNA capture | `done` | Memory + Approvals + feedback → DNA traits |
 | 4.9 | Continuous learning signals | `done` | Signals strip on Ask Ellinea |
-| 5.1a | Multi-step approval templates | `next` | Owner/IT workflow deepen |
+| 5.1a | Multi-step approval templates | `done` | simple / IT→Owner / Manager→Exec→Owner |
+| 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
+| 5.3 | Scheduled Reports | `next` | Daily/weekly report stub |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
-| 3.x | Other-role Overview polish | `todo` | After Approvals deepen |
+| 3.x | Other-role Overview polish | `todo` | After reports stub |
 
 ---
 
@@ -133,7 +135,6 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
 | 4.10 | LLM / RAG | `todo` | After server Memory |
-| 5.1a | Multi-step approval templates | `next` | Deepen Approvals for Owner/IT |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
 
@@ -143,10 +144,10 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 5.1 | Approval Workflows | `in_progress` | Local queue for Owner/IT |
-| 5.1a | Multi-step approval templates | `next` | Request → IT review → Owner decide |
-| 5.2 | Business Rules Engine | `todo` | Deferred |
-| 5.3 | Scheduled Reports | `todo` | |
+| 5.1 | Approval Workflows | `done` | Local queue + multi-step templates |
+| 5.1a | Multi-step approval templates | `done` | IT→Owner, Manager→Exec→Owner, single |
+| 5.2 | Business Rules Engine | `done` | `/app/rules` + Overview flag hits (local) |
+| 5.3 | Scheduled Reports | `next` | Daily/weekly report stub |
 | 5.4 | Event Bus | `todo` | |
 
 ---

@@ -56,3 +56,36 @@
   flex-shrink: 0;
   gap: 0.35rem;
 }
+
+.steps {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.steps li {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8b95a8;
+  background: #0b0e14;
+}
+
+.steps li[data-status='approved'] {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.steps li[data-status='rejected'] {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.steps li[data-current='true'] {
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.45);
+}
