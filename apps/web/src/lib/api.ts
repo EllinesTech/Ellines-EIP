@@ -250,7 +250,7 @@ export function listConnectors() {
 
 export function syncConnector(
   connectorId: string,
-  options?: { endpoint?: string; headers?: Record<string, string> },
+  options?: { endpoint?: string; headers?: Record<string, string>; csvText?: string },
 ) {
   return request<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
     method: 'POST',

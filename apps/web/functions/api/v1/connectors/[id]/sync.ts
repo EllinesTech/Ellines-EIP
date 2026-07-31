@@ -9,9 +9,18 @@ import {
 import demoSeed from '../../../../shared/demo-enterprise.json';
 import restSample from '../../../../shared/rest-enterprise-sample.json';
 
+const CSV_SAMPLE = `metric,value
+healthScore,81
+connectedSystems,4
+openAlerts,1
+openDecisions,3
+briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
+`;
+
 type SyncBody = {
   endpoint?: string;
   headers?: Record<string, string>;
+  csvText?: string;
 };
 
 function asNumber(value: unknown, fallback = 0): number {
@@ -67,6 +76,60 @@ function normalizeEnterprisePayload(raw: unknown) {
     ),
     timeline,
   };
+}
+
+function parseCsvToEnterprisePayload(csvText: string) {
+  const lines = csvText
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) throw new Error('CSV is empty');
+
+  const split = (line: string) =>
+    line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+
+  const header = split(lines[0]).map((h) => h.toLowerCase());
+  const map: Record<string, string> = {};
+  const looksWide =
+    header.includes('healthscore') ||
+    header.includes('health') ||
+    header.includes('connectedsystems') ||
+    header.includes('systems');
+
+  if (looksWide && lines.length >= 2) {
+    const values = split(lines[1]);
+    header.forEach((h, i) => {
+      if (values[i] !== undefined) map[h] = values[i];
+    });
+  } else {
+    for (const line of lines) {
+      const cols = split(line);
+      if (cols.length < 2) continue;
+      const key = cols[0].toLowerCase();
+      if (key === 'metric' || key === 'key' || key === 'field') continue;
+      map[key] = cols.slice(1).join(',').trim();
+    }
+  }
+
+  return normalizeEnterprisePayload({
+    healthScore: map.healthscore ?? map.health ?? map.score,
+    connectedSystems: map.connectedsystems ?? map.systems ?? map.connected_systems,
+    openAlerts: map.openalerts ?? map.alerts ?? map.open_alerts,
+    openDecisions: map.opendecisions ?? map.decisions ?? map.open_decisions,
+    briefHighlight:
+      map.briefhighlight ??
+      map.brief ??
+      map.summary ??
+      map.message ??
+      'Imported from CSV file export.',
+    timeline: [
+      {
+        title: 'CSV / file import',
+        detail: 'Enterprise snapshot loaded from a file export — no vendor API required.',
+      },
+    ],
+  });
 }
 
 function resolveEndpoint(requestUrl: string, endpoint?: string): string {
@@ -232,6 +295,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         'rest-api',
         'REST API Systems',
         normalizeEnterprisePayload(raw),
+      );
+      return json(summary);
+    }
+
+    if (connectorId === 'csv-file') {
+      const csvText = (body.csvText && body.csvText.trim()) || CSV_SAMPLE;
+      const summary = await upsertSnapshot(
+        context.env,
+        auth.organizationId,
+        auth.sub,
+        'csv-file',
+        'CSV / File Import',
+        parseCsvToEnterprisePayload(csvText),
       );
       return json(summary);
     }

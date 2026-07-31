@@ -13,7 +13,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~90% | Access layers landed; Gateway deferred while Integration Hub unlocks live KPIs |
-| **2 — Integration Hub** | ~40% | Demo JSON + REST API connector (URL sync into snapshot) |
+| **2 — Integration Hub** | ~50% | Demo JSON + REST + CSV/file; catalog shows DB/email/SFTP next |
 | **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
@@ -43,8 +43,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 |----|------|--------|-------|
 | 2.1 | Connector Framework + SDK | `done` | SDK + Demo JSON connector; snapshot via Pages/Nest; Connectors Sync UI |
 | 2.2 | REST API Connector | `done` | SDK `createRestApiConnector` + Connectors UI endpoint + sample JSON sync |
-| 2.3 | PostgreSQL Connector | `next` | |
-| 2.4 | CSV/File Connector | `todo` | P1 — demo JSON covers file-style path for now |
+| 2.3 | PostgreSQL Connector | `next` | Preferred when vendors will not expose an API |
+| 2.4 | CSV/File Connector | `done` | Paste/import CSV — no API path; catalog shows DB/email/SFTP as coming |
 | 2.5 | Email Connector | `todo` | P1 |
 | 2.6 | Universal Enterprise Model | `todo` | Snapshot fields are a thin start |
 | 2.7 | Sync Scheduler | `todo` | Manual Sync now for MVP |

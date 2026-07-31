@@ -208,3 +208,175 @@ function emptyRestSummary(name: string) {
     timeline: [] as { title: string; detail: string }[],
   };
 }
+
+/** Parse CSV text (key/value or wide header row) into enterprise fields — no API required. */
+export function parseCsvToEnterprisePayload(csvText: string): EnterprisePayload {
+  const lines = csvText
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) {
+    throw new Error('CSV is empty');
+  }
+
+  const split = (line: string) =>
+    line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+
+  const header = split(lines[0]).map((h) => h.toLowerCase());
+  const map: Record<string, string> = {};
+
+  const looksWide =
+    header.includes('healthscore') ||
+    header.includes('health') ||
+    header.includes('connectedsystems') ||
+    header.includes('systems');
+
+  if (looksWide && lines.length >= 2) {
+    const values = split(lines[1]);
+    header.forEach((h, i) => {
+      if (values[i] !== undefined) map[h] = values[i];
+    });
+  } else {
+    for (const line of lines) {
+      const cols = split(line);
+      if (cols.length < 2) continue;
+      const key = cols[0].toLowerCase();
+      if (key === 'metric' || key === 'key' || key === 'field') continue;
+      map[key] = cols.slice(1).join(',').trim();
+    }
+  }
+
+  return normalizeEnterprisePayload({
+    healthScore: map.healthscore ?? map.health ?? map.score,
+    connectedSystems: map.connectedsystems ?? map.systems ?? map.connected_systems,
+    openAlerts: map.openalerts ?? map.alerts ?? map.open_alerts,
+    openDecisions: map.opendecisions ?? map.decisions ?? map.open_decisions,
+    briefHighlight:
+      map.briefhighlight ?? map.brief ?? map.summary ?? map.message ?? 'Imported from CSV file export.',
+    timeline: [
+      {
+        title: 'CSV / file import',
+        detail: 'Enterprise snapshot loaded from a file export — no vendor API required.',
+      },
+    ],
+  });
+}
+
+export type CsvFileConnectorOptions = {
+  csvText: string;
+  connectorName?: string;
+};
+
+/**
+ * CSV / File connector — for systems that only export files (ERP nightly dump, Excel, etc.).
+ * IT pastes or uploads CSV; EIP normalizes into the Universal Enterprise Model.
+ */
+export function createCsvFileConnector(options: CsvFileConnectorOptions): ConnectorPlugin {
+  let csvText = options.csvText;
+  const name = options.connectorName || 'CSV / File Import';
+
+  return defineConnector({
+    id: 'csv-file',
+    name,
+    version: '0.1.0',
+    type: 'file',
+    async configure(config) {
+      if (typeof config.csvText === 'string') csvText = config.csvText;
+    },
+    async testConnection() {
+      return Boolean(csvText?.trim());
+    },
+    async sync() {
+      try {
+        const payload = parseCsvToEnterprisePayload(csvText);
+        return {
+          ok: true,
+          summary: {
+            connectorId: 'csv-file',
+            connectorName: name,
+            ...payload,
+            syncedAt: new Date().toISOString(),
+          },
+          message: 'Synced from CSV / file export',
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          summary: {
+            connectorId: 'csv-file',
+            connectorName: name,
+            healthScore: 0,
+            connectedSystems: 0,
+            openAlerts: 0,
+            openDecisions: 0,
+            briefHighlight: '',
+            timeline: [],
+          },
+          message: err instanceof Error ? err.message : 'CSV sync failed',
+        };
+      }
+    },
+    async disconnect() {},
+  });
+}
+
+/** Catalog of connection methods EIP supports or plans — API is only one path. */
+export const CONNECTOR_CATALOG = [
+  {
+    id: 'rest-api',
+    name: 'REST / HTTP API',
+    type: 'api' as ConnectorType,
+    status: 'available' as const,
+    blurb: 'Pull JSON from any HTTPS endpoint when the system exposes one.',
+  },
+  {
+    id: 'csv-file',
+    name: 'CSV / File export',
+    type: 'file' as ConnectorType,
+    status: 'available' as const,
+    blurb: 'No API needed — import nightly CSV/Excel dumps the business already produces.',
+  },
+  {
+    id: 'demo-json',
+    name: 'Demo JSON seed',
+    type: 'file' as ConnectorType,
+    status: 'available' as const,
+    blurb: 'Built-in sample feed for demos and smoke tests.',
+  },
+  {
+    id: 'postgres',
+    name: 'PostgreSQL (read-only)',
+    type: 'database' as ConnectorType,
+    status: 'coming' as const,
+    blurb: 'Connect straight to the system database when vendors will not ship an API.',
+  },
+  {
+    id: 'sqlserver',
+    name: 'SQL Server / MySQL',
+    type: 'database' as ConnectorType,
+    status: 'planned' as const,
+    blurb: 'Read-only DB sync for common on-prem ERPs and HIS backends.',
+  },
+  {
+    id: 'email-imap',
+    name: 'Email (IMAP)',
+    type: 'email' as ConnectorType,
+    status: 'coming' as const,
+    blurb: 'Ingest reports and alerts mailed from legacy systems.',
+  },
+  {
+    id: 'sftp',
+    name: 'SFTP / folder drop',
+    type: 'file' as ConnectorType,
+    status: 'planned' as const,
+    blurb: 'Watch a folder or SFTP inbox — still the #1 pattern for healthcare and supply chain.',
+  },
+  {
+    id: 'webhook',
+    name: 'Webhooks / events',
+    type: 'event' as ConnectorType,
+    status: 'planned' as const,
+    blurb: 'Receive pushes when a system can call EIP, without EIP polling.',
+  },
+] as const;

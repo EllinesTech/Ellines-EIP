@@ -31,7 +31,7 @@ export class EnterpriseController {
   sync(
     @Request() req: { user: { userId: string; organizationId: string } },
     @Param('id') id: string,
-    @Body() body?: { endpoint?: string; headers?: Record<string, string> },
+    @Body() body?: { endpoint?: string; headers?: Record<string, string>; csvText?: string },
   ) {
     return this.enterprise.syncConnector(req.user.organizationId, req.user.userId, id, body);
   }

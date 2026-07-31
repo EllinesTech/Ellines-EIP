@@ -14,6 +14,73 @@ import adminStyles from '../admin/admin.module.css';
 
 const DEFAULT_REST_ENDPOINT = '/api/v1/connectors/rest-sample';
 
+const DEFAULT_CSV = `metric,value
+healthScore,81
+connectedSystems,4
+openAlerts,1
+openDecisions,3
+briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
+`;
+
+const CATALOG = [
+  {
+    id: 'csv-file',
+    title: 'CSV / File export',
+    tag: 'No API needed',
+    blurb: 'Import nightly CSV/Excel dumps the business already produces.',
+    state: 'live',
+  },
+  {
+    id: 'rest-api',
+    title: 'REST / HTTP API',
+    tag: 'When API exists',
+    blurb: 'Pull JSON from any HTTPS endpoint IT can reach.',
+    state: 'live',
+  },
+  {
+    id: 'demo-json',
+    title: 'Demo JSON seed',
+    tag: 'Demo',
+    blurb: 'Built-in sample for smoke tests and demos.',
+    state: 'live',
+  },
+  {
+    id: 'postgres',
+    title: 'PostgreSQL (read-only)',
+    tag: 'Coming next',
+    blurb: 'Connect to the system database when vendors will not ship an API.',
+    state: 'soon',
+  },
+  {
+    id: 'email-imap',
+    title: 'Email (IMAP)',
+    tag: 'Planned',
+    blurb: 'Ingest mailed reports and alerts from legacy systems.',
+    state: 'soon',
+  },
+  {
+    id: 'sftp',
+    title: 'SFTP / folder drop',
+    tag: 'Planned',
+    blurb: 'Watch SFTP/inbox folders — common in healthcare and supply chain.',
+    state: 'soon',
+  },
+  {
+    id: 'sqlserver',
+    title: 'SQL Server / MySQL',
+    tag: 'Planned',
+    blurb: 'Read-only DB sync for on-prem ERP and HIS backends.',
+    state: 'soon',
+  },
+  {
+    id: 'webhook',
+    title: 'Webhooks / events',
+    tag: 'Planned',
+    blurb: 'Receive pushes when a system can call EIP.',
+    state: 'soon',
+  },
+] as const;
+
 export default function ConnectorsPage() {
   const router = useRouter();
   const [ok, setOk] = useState(false);
@@ -22,6 +89,7 @@ export default function ConnectorsPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [restEndpoint, setRestEndpoint] = useState(DEFAULT_REST_ENDPOINT);
+  const [csvText, setCsvText] = useState(DEFAULT_CSV);
 
   useEffect(() => {
     const s = getSession();
@@ -34,8 +102,10 @@ export default function ConnectorsPage() {
       return;
     }
     setOk(true);
-    const saved = localStorage.getItem('eip_rest_endpoint');
-    if (saved) setRestEndpoint(saved);
+    const savedUrl = localStorage.getItem('eip_rest_endpoint');
+    if (savedUrl) setRestEndpoint(savedUrl);
+    const savedCsv = localStorage.getItem('eip_csv_text');
+    if (savedCsv) setCsvText(savedCsv);
   }, [router]);
 
   async function load() {
@@ -57,12 +127,14 @@ export default function ConnectorsPage() {
     setError('');
     setNotice('');
     try {
-      const options =
-        id === 'rest-api'
-          ? { endpoint: restEndpoint.trim() || DEFAULT_REST_ENDPOINT }
-          : undefined;
-      if (id === 'rest-api' && options?.endpoint) {
-        localStorage.setItem('eip_rest_endpoint', options.endpoint);
+      let options: { endpoint?: string; csvText?: string } | undefined;
+      if (id === 'rest-api') {
+        options = { endpoint: restEndpoint.trim() || DEFAULT_REST_ENDPOINT };
+        localStorage.setItem('eip_rest_endpoint', options.endpoint!);
+      }
+      if (id === 'csv-file') {
+        options = { csvText: csvText.trim() || DEFAULT_CSV };
+        localStorage.setItem('eip_csv_text', options.csvText!);
       }
       const summary = await syncConnector(id, options);
       setNotice(
@@ -91,8 +163,9 @@ export default function ConnectorsPage() {
           <p className={styles.eyebrow}>Integration Hub · IT Admin</p>
           <h1>Connectors</h1>
           <p className={styles.lede}>
-            Connect Systems of Record without custom code. Demo JSON for a quick seed; REST API for any
-            JSON endpoint your business already exposes.
+            Ellines does not need a vendor developer to hand you an API. Connect how the business already
+            moves data — files, databases, email, or APIs when they exist. Ellinea only reads the normalized
+            snapshot.
           </p>
         </div>
       </header>
@@ -101,30 +174,80 @@ export default function ConnectorsPage() {
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
 
       <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
-        <div className={styles.panelLabel}>REST API endpoint</div>
+        <div className={styles.panelLabel}>How EIP connects (many paths)</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '0.75rem',
+            marginTop: '0.75rem',
+          }}
+        >
+          {CATALOG.map((c) => (
+            <article
+              key={c.id}
+              style={{
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                padding: '0.85rem 0.9rem',
+                background: c.state === 'live' ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
+              }}
+            >
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#a78bfa' }}>
+                {c.tag}
+              </div>
+              <strong style={{ display: 'block', marginTop: 6, color: '#fff' }}>{c.title}</strong>
+              <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#8b95a8', lineHeight: 1.4 }}>
+                {c.blurb}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
+        <div className={styles.panelLabel}>CSV / File (no API)</div>
         <p style={{ marginBottom: '0.75rem' }}>
-          Paste a JSON URL from ERP, CRM, HIS, or your own API. Ellinea and the Command Center read the
-          normalized snapshot after Sync — no developer required per system.
+          If the system only exports files, paste the CSV here and Sync. This is the standard path when
+          developers will not provide an API.
         </p>
-        <label className={adminStyles.form} style={{ display: 'block' }}>
-          <span style={{ display: 'block', marginBottom: '0.35rem', color: '#8b95a8', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Endpoint URL
-          </span>
-          <input
-            value={restEndpoint}
-            onChange={(e) => setRestEndpoint(e.target.value)}
-            placeholder={DEFAULT_REST_ENDPOINT}
-            style={{ width: '100%', maxWidth: 640 }}
-            aria-label="REST connector endpoint"
-          />
-        </label>
-        <p className={styles.lede} style={{ marginTop: '0.65rem', marginBottom: 0 }}>
-          Default sample: <code>{DEFAULT_REST_ENDPOINT}</code> — replace with your system&apos;s HTTPS JSON URL when ready.
+        <textarea
+          value={csvText}
+          onChange={(e) => setCsvText(e.target.value)}
+          rows={7}
+          aria-label="CSV content"
+          style={{
+            width: '100%',
+            maxWidth: 720,
+            font: 'inherit',
+            fontSize: '0.85rem',
+            padding: '0.75rem 0.85rem',
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: '#0b0e14',
+            color: '#f4f7fb',
+            resize: 'vertical',
+          }}
+        />
+      </section>
+
+      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
+        <div className={styles.panelLabel}>REST API endpoint (optional)</div>
+        <p style={{ marginBottom: '0.75rem' }}>
+          Use only when the system exposes JSON over HTTPS. Otherwise use CSV / File or wait for Database /
+          Email connectors.
         </p>
+        <input
+          value={restEndpoint}
+          onChange={(e) => setRestEndpoint(e.target.value)}
+          placeholder={DEFAULT_REST_ENDPOINT}
+          style={{ width: '100%', maxWidth: 640 }}
+          aria-label="REST connector endpoint"
+        />
       </section>
 
       <section className={adminStyles.tableWrap}>
-        <div className={styles.panelLabel}>Available connectors</div>
+        <div className={styles.panelLabel}>Ready to sync now</div>
         <table className={adminStyles.table}>
           <thead>
             <tr>

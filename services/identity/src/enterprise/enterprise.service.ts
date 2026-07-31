@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
+  createCsvFileConnector,
   createDemoJsonConnector,
   createRestApiConnector,
   normalizeEnterprisePayload,
@@ -13,6 +14,14 @@ import type { ConnectorStatus, EnterpriseSummary } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import demoSeed from './demo-enterprise.json';
 import restSample from './rest-enterprise-sample.json';
+
+const CSV_SAMPLE = `metric,value
+healthScore,81
+connectedSystems,4
+openAlerts,1
+openDecisions,3
+briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
+`;
 
 @Injectable()
 export class EnterpriseService {
@@ -79,7 +88,18 @@ export class EnterpriseService {
         message:
           activeId === 'rest-api'
             ? 'Last sync OK'
-            : 'Point at any JSON REST URL (sample included)',
+            : 'JSON HTTPS URL when the system exposes an API',
+      },
+      {
+        id: 'csv-file',
+        name: 'CSV / File Import',
+        type: 'file',
+        status: activeId === 'csv-file' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'csv-file' ? lastAt : null,
+        message:
+          activeId === 'csv-file'
+            ? 'Last sync OK'
+            : 'No API needed — paste a CSV export from the business system',
       },
     ];
   }
@@ -88,7 +108,7 @@ export class EnterpriseService {
     organizationId: string,
     actorUserId: string,
     connectorId: string,
-    options?: { endpoint?: string; headers?: Record<string, string> },
+    options?: { endpoint?: string; headers?: Record<string, string>; csvText?: string },
   ) {
     if (connectorId === 'demo-json') {
       const connector = createDemoJsonConnector(demoSeed);
@@ -138,6 +158,17 @@ export class EnterpriseService {
       const result = await connector.sync();
       if (!result.ok) {
         throw new ServiceUnavailableException(result.message || 'REST sync failed');
+      }
+      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
+    }
+
+    if (connectorId === 'csv-file') {
+      const connector = createCsvFileConnector({
+        csvText: (options?.csvText && options.csvText.trim()) || CSV_SAMPLE,
+      });
+      const result = await connector.sync();
+      if (!result.ok) {
+        throw new BadRequestException(result.message || 'CSV sync failed');
       }
       return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
     }

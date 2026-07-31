@@ -48,7 +48,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       message:
         activeId === 'rest-api'
           ? 'Last sync OK'
-          : 'Point at any JSON REST URL (sample included)',
+          : 'JSON HTTPS URL when the system exposes an API',
+    },
+    {
+      id: 'csv-file',
+      name: 'CSV / File Import',
+      type: 'file',
+      status: activeId === 'csv-file' ? 'synced' : 'idle',
+      lastSyncedAt: activeId === 'csv-file' ? lastAt : null,
+      message:
+        activeId === 'csv-file'
+          ? 'Last sync OK'
+          : 'No API needed — paste a CSV export from the business system',
     },
   ]);
 };
