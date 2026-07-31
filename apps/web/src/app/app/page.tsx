@@ -244,7 +244,10 @@ function AdminOverview({
 
         <section className={styles.card}>
           <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>Recent Activities</h2>
+            <h2 className={styles.cardTitle}>Enterprise Timeline</h2>
+            <Link href="/app/timeline" className={styles.primaryLink}>
+              Open →
+            </Link>
           </div>
           <ul className={styles.list}>
             {timeline.map((item) => (
@@ -254,7 +257,14 @@ function AdminOverview({
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
                 </div>
-                <span className={styles.time}>just now</span>
+                <span className={styles.time}>
+                  {synced && summary?.syncedAt
+                    ? new Date(summary.syncedAt).toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </span>
               </li>
             ))}
           </ul>

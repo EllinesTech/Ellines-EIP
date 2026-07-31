@@ -83,6 +83,17 @@ function IconPlatform() {
   );
 }
 
+function IconTimeline() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 4v16" />
+      <circle cx="12" cy="7" r="2.2" />
+      <circle cx="12" cy="12" r="2.2" />
+      <circle cx="12" cy="17" r="2.2" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -94,6 +105,7 @@ function IconSettings() {
 
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
+  { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
@@ -239,11 +251,13 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           ? 'IT Admin'
           : pathname.startsWith('/app/platform')
             ? 'Platform'
-            : pathname.startsWith('/app/profile')
-              ? 'Profile'
-              : pathname.startsWith('/app/settings')
-                ? 'System Settings'
-                : 'EIP Dashboard — Overview';
+              : pathname.startsWith('/app/timeline')
+                ? 'Enterprise Timeline'
+                : pathname.startsWith('/app/profile')
+                  ? 'Profile'
+                  : pathname.startsWith('/app/settings')
+                    ? 'System Settings'
+                    : 'EIP Dashboard — Overview';
 
   const profileActive = pathname.startsWith('/app/profile');
 
