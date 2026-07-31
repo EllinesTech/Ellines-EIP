@@ -34,18 +34,18 @@ while queue has next/in_progress and not blocked:
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
-| **5 — Workflow & Automation** | ~60% | Approvals, rules, reports, event bus, SMTP/Resend outbox |
+| **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | `todo` | v1.1+ simplified phone app (roadmap) |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
 
-1. **Done (this slice) —** notification SMTP / Resend outbox delivery (secrets optional; simulated without them).
-2. **Later —** Web Push / VAPID, **Mobile Work Companion** (v1.1).
+1. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
+2. **Later —** **Mobile Work Companion** (v1.1).
 3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** SQL + Platform suspend + SMTP outbox slice done → Mobile Companion in v1.1 (no further v1.0 `next` until queued).
+**Critical path:** SQL + Platform suspend + notification delivery (email + push) done → Mobile Companion in v1.1 (no further v1.0 `next` until queued).
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -204,7 +204,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 2.x | SQL Server / MySQL | `done` | Read-only connectors; TCP on Identity |
 | 1.5b | Platform suspend / disable org | `done` | `settings.platformStatus`; login + sync blocked; Platform UI |
 | 3.x | Notification SMTP worker | `done` | Pages deliver: Resend/SMTP when secrets set; else `simulated`. Needs human Pages secrets to go live. |
-| 3.x | Web Push / VAPID | `next` | Browser push beyond simulated channel |
+| 3.x | Web Push / VAPID | `done` | VAPID env + `/sw-push.js` + push-subscription API; simulated without keys. |
 
 ---
 
@@ -226,6 +226,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Web Push / VAPID:** subscription API + `/sw-push.js`; deliver attempts push when VAPID secrets + browser sub exist; else simulated/failed with clear message. Human Pages secrets required for live push.
 - **Notification SMTP / Resend slice:** `POST /api/v1/notifications/deliver` attempts real email when `RESEND_API_KEY` or `SMTP_*` / `ELLINEA_SMTP_*` are on Pages; otherwise keeps `simulated` (CI-safe). Human must set Pages secrets for live mail.
 - **Platform suspend/disable org:** Super Admin Suspend/Resume on `/app/platform`; blocks login + connector sync
 - **SQL Server / MySQL connectors:** read-only catalog + Identity TCP drivers (`mssql`, `mysql2`); Pages soft-test / 501 sync like Postgres

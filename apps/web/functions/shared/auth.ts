@@ -45,6 +45,13 @@ export interface Env {
   ELLINEA_SMTP_SECURE?: string;
   /** Alias for RESEND_API_KEY when using Ellinea-prefixed secrets. */
   ELLINEA_SMTP_API_KEY?: string;
+  /** Web Push VAPID (optional; without keys push stays simulated). */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
+  ELLINEA_VAPID_PUBLIC_KEY?: string;
+  ELLINEA_VAPID_PRIVATE_KEY?: string;
+  ELLINEA_VAPID_SUBJECT?: string;
 }
 
 export function getAdminClient(env: Env): SupabaseClient {

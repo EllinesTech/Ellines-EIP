@@ -5,13 +5,17 @@ import Link from 'next/link';
 import { isOrgAdminRole } from '@ellines-eip/shared';
 import { useRouter } from 'next/navigation';
 import {
+  deletePushSubscription,
   deliverNotification,
   fetchNotifyDeliveryPolicy,
+  fetchPushSubscriptionStatus,
   getSession,
   listNotifyOutbox,
   saveNotifyDeliveryPolicy,
+  savePushSubscription,
   type NotifyDeliveryPolicyDto,
   type NotifyOutboxItemDto,
+  type PushSubscriptionStatusDto,
 } from '@/lib/api';
 import { publishEnterpriseEvent } from '@/lib/event-bus';
 import styles from '../command.module.css';
@@ -43,11 +47,21 @@ function writeLocal(next: DeliveryPrefs) {
   localStorage.setItem(KEY, JSON.stringify(next));
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
 export default function NotifyPolicyPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
   const [prefs, setPrefs] = useState<DeliveryPrefs>(DEFAULTS);
   const [outbox, setOutbox] = useState<NotifyOutboxItemDto[]>([]);
+  const [pushStatus, setPushStatus] = useState<PushSubscriptionStatusDto | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -72,6 +86,9 @@ export default function NotifyPolicyPage() {
       .catch(() => undefined);
     listNotifyOutbox()
       .then(setOutbox)
+      .catch(() => undefined);
+    fetchPushSubscriptionStatus()
+      .then(setPushStatus)
       .catch(() => undefined);
   }, [router]);
 
@@ -118,6 +135,81 @@ export default function NotifyPolicyPage() {
       .finally(() => setBusy(false));
   }
 
+  function onTestPush() {
+    setBusy(true);
+    deliverNotification({
+      channel: 'push',
+      subject: 'EIP test push',
+      body: 'Browser push from Delivery policy. Needs VAPID secrets + a registered subscription.',
+      eventType: 'notify.push_test',
+    })
+      .then((item) => {
+        setNotice(item.message || `Push ${item.status}`);
+        return listNotifyOutbox();
+      })
+      .then(setOutbox)
+      .catch(() => setNotice('Test push failed.'))
+      .finally(() => setBusy(false));
+  }
+
+  async function onRegisterPush() {
+    setBusy(true);
+    try {
+      const status = await fetchPushSubscriptionStatus();
+      setPushStatus(status);
+      if (!status.vapidConfigured || !status.vapidPublicKey) {
+        setNotice('VAPID not configured on Pages — push stays simulated until keys are set.');
+        return;
+      }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setNotice('This browser does not support Web Push.');
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        setNotice('Notification permission denied.');
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw-push.js');
+      await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(status.vapidPublicKey) as BufferSource,
+      });
+      const json = sub.toJSON();
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+        setNotice('Browser returned an incomplete push subscription.');
+        return;
+      }
+      const saved = await savePushSubscription({
+        endpoint: json.endpoint,
+        expirationTime: json.expirationTime ?? null,
+        keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+      });
+      setPushStatus(saved);
+      if (!prefs.pushEnabled) {
+        persist({ ...prefs, pushEnabled: true });
+      }
+      setNotice(`Browser push registered (${saved.endpointHost || 'ok'}).`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Push registration failed.';
+      setNotice(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onUnregisterPush() {
+    setBusy(true);
+    deletePushSubscription()
+      .then((status) => {
+        setPushStatus(status);
+        setNotice('Browser push subscription removed.');
+      })
+      .catch(() => setNotice('Could not remove push subscription.'))
+      .finally(() => setBusy(false));
+  }
+
   if (!allowed) {
     return (
       <div className={styles.page}>
@@ -126,6 +218,12 @@ export default function NotifyPolicyPage() {
     );
   }
 
+  const pushHint = pushStatus?.vapidConfigured
+    ? pushStatus.subscribed
+      ? `Subscribed (${pushStatus.endpointHost || 'browser'})`
+      : 'VAPID ready — register this browser'
+    : 'VAPID keys not on Pages — push simulated';
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -133,8 +231,9 @@ export default function NotifyPolicyPage() {
           <p className={styles.eyebrow}>Notifications</p>
           <h1>Delivery policy</h1>
           <p className={styles.lede}>
-            Org email/push preferences synced to the server. Email uses Resend or SMTP when Pages
-            secrets are set; otherwise deliveries stay simulated in the outbox (+ audit).
+            Org email/push preferences synced to the server. Email uses Resend or SMTP and push uses
+            VAPID when Pages secrets are set; otherwise deliveries stay simulated in the outbox (+
+            audit).
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -201,7 +300,7 @@ export default function NotifyPolicyPage() {
           <div className={settingsStyles.toggleRow}>
             <div className={settingsStyles.toggleCopy}>
               <strong>Push (browser)</strong>
-              <p>Reserved channel — simulated until VAPID keys exist.</p>
+              <p>{pushHint}</p>
             </div>
             <button
               type="button"
@@ -248,6 +347,25 @@ export default function NotifyPolicyPage() {
             >
               Test email delivery
             </button>
+            <button
+              type="button"
+              className={adminStyles.ghost}
+              disabled={busy}
+              onClick={onRegisterPush}
+            >
+              Register browser push
+            </button>
+            <button
+              type="button"
+              className={adminStyles.ghost}
+              disabled={busy || !pushStatus?.subscribed}
+              onClick={onUnregisterPush}
+            >
+              Unregister push
+            </button>
+            <button type="button" className={adminStyles.ghost} disabled={busy} onClick={onTestPush}>
+              Test push delivery
+            </button>
           </div>
         </form>
       </section>
@@ -256,7 +374,7 @@ export default function NotifyPolicyPage() {
         <div className={styles.panelLabel}>Outbox · {outbox.length}</div>
         <p className={styles.lede}>
           Outbox respects policy channels. Statuses: simulated (no secrets), delivered / failed
-          (Resend or SMTP), skipped (channel off). Push stays simulated until VAPID exists.
+          (Resend, SMTP, or VAPID), skipped (channel off).
         </p>
         {!outbox.length ? (
           <p className={styles.lede}>No outbox items yet — run a test delivery.</p>

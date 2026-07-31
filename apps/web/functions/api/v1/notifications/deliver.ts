@@ -6,6 +6,11 @@ import {
   type Env,
 } from '../../../shared/auth';
 import { mailProviderLabel, resolveMailConfig, sendOutboundEmail } from '../../../shared/mail';
+import {
+  normalizePushSubscription,
+  resolveVapidConfig,
+  sendWebPush,
+} from '../../../shared/web-push';
 
 type Channel = 'email' | 'push' | 'in_app';
 
@@ -29,13 +34,19 @@ type OutboxItem = {
   status: OutboxStatus;
   at: string;
   to?: string;
-  provider?: 'resend' | 'smtp' | 'none';
+  provider?: 'resend' | 'smtp' | 'vapid' | 'none';
   detail?: string;
 };
 
 function normalizeOutbox(raw: unknown): OutboxItem[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((x) => x && typeof x === 'object').slice(0, 50) as OutboxItem[];
+}
+
+function readUserPushSub(settings: Record<string, unknown>, userId: string) {
+  const raw = settings.notifyPushSubscriptions;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  return normalizePushSubscription((raw as Record<string, unknown>)[userId]);
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -142,12 +153,34 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auditAction = 'notify.simulated';
     }
   } else if (channel === 'push') {
-    status = 'simulated';
-    provider = 'none';
-    detail = 'Push simulated — VAPID / Web Push provider not configured.';
-    auditAction = 'notify.simulated';
+    const vapid = resolveVapidConfig(context.env);
+    const sub = readUserPushSub(settings, auth.sub);
+    if (!vapid) {
+      status = 'simulated';
+      provider = 'none';
+      detail =
+        'Simulated — set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY on Pages for browser push.';
+      auditAction = 'notify.simulated';
+    } else if (!sub) {
+      status = 'failed';
+      provider = 'vapid';
+      detail =
+        'VAPID configured but no push subscription for this user — use Register browser push on Delivery policy.';
+      auditAction = 'notify.failed';
+    } else {
+      const result = await sendWebPush(context.env, sub, { title: subject, body: text });
+      provider = 'vapid';
+      if (result.ok) {
+        status = 'delivered';
+        detail = `Push delivered via VAPID to ${new URL(sub.endpoint).host}.`;
+        auditAction = 'notify.delivered';
+      } else {
+        status = 'failed';
+        detail = result.error;
+        auditAction = 'notify.failed';
+      }
+    }
   } else {
-    // in_app — no external provider
     status = 'simulated';
     provider = 'none';
     detail = 'In-app channel recorded in outbox (no external send).';

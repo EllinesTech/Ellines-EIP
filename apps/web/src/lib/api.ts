@@ -423,7 +423,7 @@ export type NotifyOutboxItemDto = {
   status: 'queued' | 'simulated' | 'skipped' | 'delivered' | 'failed';
   at: string;
   to?: string;
-  provider?: 'resend' | 'smtp' | 'none';
+  provider?: 'resend' | 'smtp' | 'vapid' | 'none';
   detail?: string;
   message?: string;
 };
@@ -442,6 +442,34 @@ export function deliverNotification(payload: {
   return request<NotifyOutboxItemDto>('/api/v1/notifications/deliver', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export type PushSubscriptionStatusDto = {
+  vapidConfigured: boolean;
+  vapidPublicKey: string | null;
+  subscribed: boolean;
+  endpointHost: string | null;
+};
+
+export function fetchPushSubscriptionStatus() {
+  return request<PushSubscriptionStatusDto>('/api/v1/notifications/push-subscription');
+}
+
+export function savePushSubscription(subscription: {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: { p256dh: string; auth: string };
+}) {
+  return request<PushSubscriptionStatusDto>('/api/v1/notifications/push-subscription', {
+    method: 'PUT',
+    body: JSON.stringify(subscription),
+  });
+}
+
+export function deletePushSubscription() {
+  return request<PushSubscriptionStatusDto>('/api/v1/notifications/push-subscription', {
+    method: 'DELETE',
   });
 }
 
