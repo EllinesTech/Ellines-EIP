@@ -16,10 +16,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
 | **3 — Executive Command Center** | ~90% | KPIs + UEM + Timeline + Search + **Notifications** shipped |
 | **4 — Ellinea AI** | ~65% | Brief + recs + memory + **role context**; LLM still deferred |
-| **5 — Workflow & Automation** | 0% | **next** — Approvals / rules after Ellinea polish |
+| **5 — Workflow & Automation** | ~15% | Approvals queue stub shipped; rules/reports/event bus next |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
-**Critical path remaining:** Ellinea context/chat polish (4.5–4.6) → email/push notifications → Workflows.
+**Critical path remaining:** Workflow rules + reports → email/push notifications → LLM when Memory service exists.
 
 **Feature settings rule:** new user-facing surfaces must ship a System Settings control when behavior is preference-shaped (display, density, notification filters, etc.).
 
@@ -95,12 +95,16 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 5.1–5.4 | Approvals, rules, reports, event bus | `next` | `services/workflow` missing — start with approval stubs |
+| 5.1 | Approval Workflows | `in_progress` | Local queue + decide UI + settings; multi-step service later |
+| 5.2 | Business Rules Engine | `next` | If/then on enterprise events |
+| 5.3 | Scheduled Reports | `todo` | Daily/weekly reports |
+| 5.4 | Event Bus | `todo` | Internal pub/sub |
 
 ---
 
 ## Recently landed on main (through 2026-07-31)
 
+- Approvals queue stub (local) + System Settings toggles
 - Ellinea: daily brief, explainable recommendations, local Enterprise Memory + settings toggles
 - Notification Center; Org Admin densify; Pages deploy-safe (no cron); GitHub Actions only
 - Sync scheduler: per-install intervals, run-due on Connectors load

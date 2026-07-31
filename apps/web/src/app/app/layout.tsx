@@ -103,6 +103,15 @@ function IconNotifications() {
   );
 }
 
+function IconApprovals() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M9 11l3 3L20 6" />
+      <path d="M4 6h8M4 12h5M4 18h12" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -116,6 +125,7 @@ const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
   { href: '/app/notifications', label: 'Notifications', icon: <IconNotifications /> },
+  { href: '/app/approvals', label: 'Approvals', icon: <IconApprovals /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
@@ -244,6 +254,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const visibleNav = NAV.filter((item) => {
     if (item.adminOnly && !orgAdmin) return false;
     if (item.platformOnly && !platformAdmin) return false;
+    if (item.href === '/app/approvals' && !uiPrefs.showApprovalsNav) return false;
     return true;
   }).map((item) =>
     item.href === '/app/admin'
@@ -264,6 +275,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
             ? 'Platform'
               : pathname.startsWith('/app/notifications')
                 ? 'Notifications'
+                : pathname.startsWith('/app/approvals')
+                  ? 'Approvals'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')

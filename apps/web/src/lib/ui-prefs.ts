@@ -26,6 +26,10 @@ export type UiPrefs = {
   ellineaUseMemory: boolean;
   /** Frame answers and recommendations by signed-in role. */
   ellineaRoleContext: boolean;
+  /** Show Approvals in the Work Console nav. */
+  showApprovalsNav: boolean;
+  /** Seed approval queue from open decisions after sync. */
+  approvalsSeedFromDecisions: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -45,6 +49,8 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   ellineaShowRecommendations: true,
   ellineaUseMemory: true,
   ellineaRoleContext: true,
+  showApprovalsNav: true,
+  approvalsSeedFromDecisions: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -68,6 +74,8 @@ export function readUiPrefs(): UiPrefs {
       ellineaShowRecommendations: parsed.ellineaShowRecommendations !== false,
       ellineaUseMemory: parsed.ellineaUseMemory !== false,
       ellineaRoleContext: parsed.ellineaRoleContext !== false,
+      showApprovalsNav: parsed.showApprovalsNav !== false,
+      approvalsSeedFromDecisions: parsed.approvalsSeedFromDecisions !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

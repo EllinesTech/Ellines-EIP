@@ -378,6 +378,50 @@ export default function SystemSettingsPage() {
 
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>This browser</p>
+          <h2 className={settingsStyles.cardTitle}>Approvals</h2>
+          <p className={settingsStyles.cardHint}>
+            Local approval queue until the workflow service ships.
+          </p>
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Show in nav</strong>
+            <p>Include Approvals in the Work Console sidebar.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.showApprovalsNav}
+            label="Toggle Approvals nav"
+            onClick={() =>
+              persistUi({ ...uiPrefs, showApprovalsNav: !uiPrefs.showApprovalsNav })
+            }
+          />
+        </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Seed from decisions</strong>
+            <p>Create a pending approval when the snapshot has open decisions.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.approvalsSeedFromDecisions}
+            label="Toggle approvals seed from decisions"
+            onClick={() =>
+              persistUi({
+                ...uiPrefs,
+                approvalsSeedFromDecisions: !uiPrefs.approvalsSeedFromDecisions,
+              })
+            }
+          />
+        </div>
+        <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
+          <Link href="/app/approvals" className={styles.primaryLink}>
+            Open Approvals →
+          </Link>
+        </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
           <p className={settingsStyles.cardEyebrow}>Organization</p>
           <h2 className={settingsStyles.cardTitle}>Clock &amp; date</h2>
           <p className={settingsStyles.cardHint}>
