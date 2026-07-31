@@ -595,6 +595,29 @@ export function ingestEnterpriseSnapshot(payload: Record<string, unknown>) {
   });
 }
 
+export type WebhookSecretDto = {
+  configured: boolean;
+  secretPreview: string | null;
+  organizationId: string;
+  endpoint: string;
+  secret?: string;
+  message?: string;
+  headers?: Record<string, string>;
+};
+
+/** Owner/IT: masked webhook secret + endpoint for System B pushes. */
+export function fetchWebhookSecret() {
+  return request<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret');
+}
+
+/** Owner/IT: rotate webhook secret (full value returned once). */
+export function rotateWebhookSecret() {
+  return request<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret', {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export type EllineaLearningDto = {
   feedback: Record<string, { helpful: number; dismiss: number }>;
   dna: {

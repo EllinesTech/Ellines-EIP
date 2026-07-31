@@ -1,7 +1,16 @@
 # Deploy Identity to Fly from monorepo root (Dockerfile needs workspace context).
 #
-# Required GitHub Actions secret:
-#   FLY_API_TOKEN  — Fly deploy / org token (https://fly.io/user/personal_access_tokens)
+# ONLY this workflow needs GitHub Actions secret FLY_API_TOKEN.
+# Deploy Cloudflare Pages does NOT use Fly and does NOT need FLY_API_TOKEN.
+#
+# Create token: https://fly.io/user/personal_access_tokens
+# Add secret: GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name (exact): FLY_API_TOKEN
+# Docs: docs/08_Live_Identity_Setup.md
+#
+# Path filters are identity-relevant only. Do NOT include package-lock.json —
+# lockfile bumps from other services (api-gateway, ellinea-ai, integration-hub)
+# must not trigger a Fly Identity deploy.
 
 name: Deploy Identity (Fly)
 
@@ -12,7 +21,6 @@ on:
       - 'services/identity/**'
       - 'packages/shared/**'
       - 'packages/connectors-sdk/**'
-      - 'package-lock.json'
       - '.github/workflows/deploy-identity.yml'
   workflow_dispatch:
 
@@ -33,7 +41,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           if [ -z "$FLY_API_TOKEN" ]; then
-            echo "::error::Missing GitHub Actions secret FLY_API_TOKEN. Create a Fly deploy token at https://fly.io/user/personal_access_tokens and add it under Settings → Secrets → Actions. See docs/08_Live_Identity_Setup.md."
+            echo "::error title=Missing FLY_API_TOKEN::This Identity-only workflow needs GitHub Actions secret FLY_API_TOKEN. Pages deploy does not. Create a Fly token at https://fly.io/user/personal_access_tokens → GitHub repo Settings → Secrets and variables → Actions → New repository secret named exactly FLY_API_TOKEN. See docs/08_Live_Identity_Setup.md"
             exit 1
           fi
 

@@ -26,8 +26,18 @@ export class HubController {
   @Get('hub/capabilities')
   capabilities() {
     return {
-      connectors: ['rest-api', 'openapi', 'postgres', 'csv-file', 'email-imap', 'sftp', 'external-ingest'],
+      connectors: [
+        'rest-api',
+        'openapi',
+        'postgres',
+        'csv-file',
+        'email-imap',
+        'sftp',
+        'external-ingest',
+        'webhook',
+      ],
       ingest: 'POST /api/v1/enterprise/ingest (Pages)',
+      webhook: 'POST /api/v1/webhooks/enterprise (Pages)',
       normalize: 'POST /api/v1/hub/normalize (this service)',
     };
   }

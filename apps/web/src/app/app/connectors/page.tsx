@@ -15,6 +15,8 @@ import {
   updateInstallation,
   runDueConnectorSyncs,
   ingestEnterpriseSnapshot,
+  fetchWebhookSecret,
+  rotateWebhookSecret,
   type ConnectorInstallConfigDto,
   type ConnectorInstallationDto,
   type ConnectorPackDto,
@@ -129,6 +131,10 @@ export default function ConnectorsPage() {
   const [byoJson, setByoJson] = useState(
     '{\n  "connectorName": "External System B",\n  "healthScore": 78,\n  "connectedSystems": 1,\n  "openAlerts": 2,\n  "openDecisions": 1,\n  "briefHighlight": "Pushed from an external UEM feed.",\n  "timeline": [{ "title": "External ingest", "detail": "BYO snapshot" }]\n}',
   );
+  const [webhookConfigured, setWebhookConfigured] = useState(false);
+  const [webhookPreview, setWebhookPreview] = useState<string | null>(null);
+  const [webhookOrgId, setWebhookOrgId] = useState('');
+  const [webhookSecretOnce, setWebhookSecretOnce] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -146,9 +152,18 @@ export default function ConnectorsPage() {
   async function load() {
     setError('');
     try {
-      const [inst, p] = await Promise.all([listInstallations(), listPublishedPacks()]);
+      const [inst, p, wh] = await Promise.all([
+        listInstallations(),
+        listPublishedPacks(),
+        fetchWebhookSecret().catch(() => null),
+      ]);
       setInstallations(inst);
       setPacks(p);
+      if (wh) {
+        setWebhookConfigured(wh.configured);
+        setWebhookPreview(wh.secretPreview);
+        setWebhookOrgId(wh.organizationId);
+      }
       try {
         const due = await runDueConnectorSyncs();
         if (due.ran > 0) {
@@ -459,6 +474,55 @@ export default function ConnectorsPage() {
           }}
         >
           Ingest external snapshot
+        </button>
+      </section>
+
+      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
+        <div className={styles.panelLabel}>Webhooks / events</div>
+        <p className={styles.lede}>
+          System B can push UEM JSON to <code>POST /api/v1/webhooks/enterprise</code> (no polling).
+          Auth with headers <code>X-EIP-Organization-Id</code> + <code>X-EIP-Webhook-Secret</code>, or
+          Owner/IT Bearer JWT.
+        </p>
+        <p className={styles.lede}>
+          {webhookConfigured
+            ? `Secret configured · ${webhookPreview || '••••'}`
+            : 'No webhook secret yet — rotate to create one.'}
+          {webhookOrgId ? (
+            <>
+              {' '}
+              · Org <code>{webhookOrgId}</code>
+            </>
+          ) : null}
+        </p>
+        {webhookSecretOnce ? (
+          <p className={adminStyles.notice}>
+            New secret (copy now): <code>{webhookSecretOnce}</code>
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className={adminStyles.primary}
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            setError('');
+            setWebhookSecretOnce(null);
+            void rotateWebhookSecret()
+              .then((res) => {
+                setWebhookConfigured(true);
+                setWebhookPreview(res.secretPreview);
+                setWebhookOrgId(res.organizationId);
+                setWebhookSecretOnce(res.secret || null);
+                setNotice(res.message || 'Webhook secret rotated');
+              })
+              .catch((err) => {
+                setError(err instanceof Error ? err.message : 'Rotate failed');
+              })
+              .finally(() => setBusy(false));
+          }}
+        >
+          {webhookConfigured ? 'Rotate webhook secret' : 'Create webhook secret'}
         </button>
       </section>
 

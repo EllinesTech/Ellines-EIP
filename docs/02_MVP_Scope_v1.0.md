@@ -102,7 +102,7 @@ Deliver a working **Enterprise Intelligence Platform** that connects 3–5 exter
 
 | Feature | Target Version |
 |---------|---------------|
-| Mobile apps (iOS/Android) | v1.1 |
+| **Mobile Work Companion** (simplified phone app: fleet/car tracking, employee register, pull live data, summary reports, Ellinea suggestions, work-email summarization — wraps Systems of Record; Owner / permitted employees) | v1.1 |
 | Marketplace / connector store | v2.0 |
 | Digital twin | v2.0+ |
 | IoT / GPS connectors | v2.0 |

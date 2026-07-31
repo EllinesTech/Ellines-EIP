@@ -252,7 +252,7 @@ See build queue Phase 4 (`4.7`–`4.10`, `4.S`) and Phase 6.
 | Version | Focus | Major Deliverables |
 |---------|-------|-------------------|
 | **1.0** | Foundation | Core platform, AI, integrations, security |
-| **1.1** | Growth + learning | Mobile, offline, multi-company; Ellinea feedback/DNA; Ellinea API extract start |
+| **1.1** | Growth + learning | **Mobile Work Companion** (phone ops: fleet, people, reports, Ellinea everywhere — wraps SoR); offline; multi-company; Ellinea API extract |
 | **2.0** | Enterprise | Marketplace, advanced analytics, industry packs; **Ellinea standalone SDK** |
 | **3.0** | Autonomous | AI agents, digital twin, predictive operations |
 

@@ -520,7 +520,7 @@ export const CONNECTOR_CATALOG = [
     id: 'webhook',
     name: 'Webhooks / events',
     type: 'event' as ConnectorType,
-    status: 'planned' as const,
+    status: 'available' as const,
     blurb: 'Receive pushes when a system can call EIP, without EIP polling.',
   },
 ] as const;

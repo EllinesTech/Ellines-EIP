@@ -31,23 +31,21 @@ while queue has next/in_progress and not blocked:
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
-| **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
+| **2 — Integration Hub** | ~100% | Webhooks / events + hub stub done |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
 | **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
-| **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
-| **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
+| **7 — Mobile Work Companion** | `todo` | v1.1+ simplified phone app (roadmap) |
+| **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
 
-1. **Now — Owner / IT Admin dashboard** (`3.7` → `3.8` → left-behind Owner/Admin items).
-2. **Next — Owner/Admin intelligence** (Ellinea + Approvals for Owner/IT).
-3. **Then — Ellinea learning** (`4.7`–`4.9`).
-4. **Then — other role consoles.**
-5. **Later —** workflow depth, email/push, LLM (`4.10`), **Ellinea standalone** (`4.S` / Phase 6) + **how-to use the brain**.
+1. **Now —** remaining Phase 2 depth (SQL Server / MySQL when HIS needs it).
+2. **Later —** workflow depth, email SMTP worker, **Mobile Work Companion** (v1.1).
+3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** Owner/Admin Work Console → Owner/Admin Ellinea → learn & recommend → other roles → workflow / LLM → Ellinea reusable engine (+ how-to).
+**Critical path:** Webhooks done → SQL when needed → Mobile Companion in v1.1 (wraps SoR; Ellinea central).
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -88,9 +86,9 @@ while queue has next/in_progress and not blocked:
 | 2.6 | Universal Enterprise Model | `done` | |
 | 2.7 | Sync Scheduler | `done` | No Pages cron |
 | 2.8 | Connector health on Owner/IT Overview | `done` | Install status chips on admin Overview |
-| 2.x | `services/integration-hub` | `todo` | Optional microservice |
-| 2.x | Webhooks / events | `todo` | System B pushes to EIP |
-| 2.x | SQL Server / MySQL | `todo` | When HIS needs it |
+| 2.x | `services/integration-hub` | `done` | Optional microservice |
+| 2.x | Webhooks / events | `done` | `POST /api/v1/webhooks/enterprise` + secret rotate on Connectors |
+| 2.x | SQL Server / MySQL | `next` | When HIS needs it |
 
 ---
 
@@ -130,7 +128,7 @@ while queue has next/in_progress and not blocked:
 | 4.H | How to use Ellinea brain | `done` | Same as 6.7 |
 | 1.3 | API Gateway | `done` | Edge routing service |
 | 2.x | Integration hub service | `done` | `services/integration-hub` |
-| 2.x | Webhooks / events | `next` | System B pushes to EIP |
+| 2.x | Webhooks / events | `done` | Pages webhook + org secret; catalog available |
 
 ---
 
@@ -192,8 +190,26 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 |----|------|--------|-------|
 | 1.3 | API Gateway | `done` | Nest/Fastify edge; route /auth /enterprise /ellinea |
 | 2.x | `services/integration-hub` | `done` | Nest stub :3003 |
-| 2.x | Webhooks / events | `next` | System B pushes to EIP |
-| 2.x | Webhooks / events | `todo` | System B pushes to EIP |
+| 2.x | Webhooks / events | `done` | System B push endpoint + Owner/IT secret |
+| 2.x | SQL Server / MySQL | `next` | When HIS needs it |
+
+---
+
+## Phase 7 — Mobile Work Companion (v1.1+ — roadmap only)
+
+Simplified **phone app** so Owner and permitted employees can track day-to-day ops with **Ellinea AI** in the loop. EIP remains an intelligence layer **above** Systems of Record — it wraps and enhances HIS/ERP/CRM; it does **not** replace them (“god mode” ops view, not a new SoR).
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| 7.1 | Mobile Work Companion vision | `todo` | Product brief: phone-first Work Console slice |
+| 7.2 | Fleet / company car tracking | `todo` | Via connectors / GPS later — surface status + Ellinea alerts |
+| 7.3 | Employee register (people directory) | `todo` | Read from SoR / UEM people; Owner-scoped actions |
+| 7.4 | Pull live data + summary reports | `todo` | Sync-backed KPIs and scheduled report previews on phone |
+| 7.5 | Ellinea suggestions on mobile | `todo` | Ask Ellinea + recommendations everywhere |
+| 7.6 | Work email summarization | `todo` | Build on email connector; Ellinea summarize for work inbox |
+| 7.7 | Access: Owner + permitted employees | `todo` | Same role model; no bypass of SoR authority |
+
+Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `todo` until MVP web path is stable.
 
 ## Recently landed on main (through 2026-07-31)
 

@@ -73,6 +73,8 @@ export default function EllineaPage() {
   const [signals, setSignals] = useState<LearningSignal[]>([]);
   const [answerMode, setAnswerMode] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteBody, setNoteBody] = useState('');
 
   function refreshSignals(
     organizationId: string,
