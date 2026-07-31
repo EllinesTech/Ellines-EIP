@@ -595,6 +595,28 @@ export function ingestEnterpriseSnapshot(payload: Record<string, unknown>) {
   });
 }
 
+export type EllineaLearningDto = {
+  feedback: Record<string, { helpful: number; dismiss: number }>;
+  dna: {
+    organizationId: string;
+    updatedAt: string;
+    traits: { id: string; label: string; detail: string; source: string }[];
+    summary: string;
+  } | null;
+};
+
+export function fetchEllineaLearning() {
+  return request<EllineaLearningDto>('/api/v1/orgs/me/ellinea-learning');
+}
+
+export function saveEllineaLearning(payload: EllineaLearningDto) {
+  return request<EllineaLearningDto>('/api/v1/orgs/me/ellinea-learning', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+
 
 export function listConnectors() {
   return request<ConnectorStatusDto[]>('/api/v1/connectors');

@@ -12,6 +12,8 @@ import {
   rebuildEnterpriseDna,
   recordRecFeedback,
   writeEllineaMemory,
+  writeEnterpriseDna,
+  writeRecFeedback,
   type EllineaMemoryNote,
   type EllineaRecommendation,
   type EnterpriseDnaSnapshot,
@@ -20,9 +22,11 @@ import {
 import { readApprovals } from '@/lib/approvals';
 import {
   askEllineaApi,
+  fetchEllineaLearning,
   fetchEllineaMemory,
   fetchEnterpriseSummary,
   getSession,
+  saveEllineaLearning,
   saveEllineaMemory,
   type EnterpriseSummaryDto,
 } from '@/lib/api';
@@ -136,6 +140,43 @@ export default function EllineaPage() {
         .catch(() => undefined);
     }
 
+    if (orgIdForSync) {
+      fetchEllineaLearning()
+        .then((learning) => {
+          if (learning.feedback && Object.keys(learning.feedback).length) {
+            writeRecFeedback(orgIdForSync, learning.feedback);
+          }
+          if (learning.dna) {
+            writeEnterpriseDna({
+              organizationId: orgIdForSync,
+              updatedAt: learning.dna.updatedAt,
+              summary: learning.dna.summary,
+              traits: learning.dna.traits.map((t) => ({
+                id: t.id,
+                label: t.label,
+                detail: t.detail,
+                source: (t.source as EnterpriseDnaSnapshot['traits'][number]['source']) || 'memory',
+              })),
+            });
+            if (ui.ellineaUseDna) {
+              setDna({
+                organizationId: orgIdForSync,
+                updatedAt: learning.dna.updatedAt,
+                summary: learning.dna.summary,
+                traits: learning.dna.traits.map((t) => ({
+                  id: t.id,
+                  label: t.label,
+                  detail: t.detail,
+                  source:
+                    (t.source as EnterpriseDnaSnapshot['traits'][number]['source']) || 'memory',
+                })),
+              });
+            }
+          }
+        })
+        .catch(() => undefined);
+    }
+
     fetchEnterpriseSummary()
       .then((s) => {
         setSummary(s);
@@ -178,6 +219,27 @@ export default function EllineaPage() {
       .catch(() => setSummary(null));
   }, []);
 
+  function persistLearning(organizationId: string, dnaSnap: EnterpriseDnaSnapshot | null) {
+    writeRecFeedback(organizationId, readRecFeedback(organizationId));
+    if (dnaSnap) writeEnterpriseDna(dnaSnap);
+    void saveEllineaLearning({
+      feedback: readRecFeedback(organizationId),
+      dna: dnaSnap
+        ? {
+            organizationId: dnaSnap.organizationId,
+            updatedAt: dnaSnap.updatedAt,
+            summary: dnaSnap.summary,
+            traits: dnaSnap.traits.map((t) => ({
+              id: t.id,
+              label: t.label,
+              detail: t.detail,
+              source: t.source,
+            })),
+          }
+        : null,
+    }).catch(() => undefined);
+  }
+
   function persistMemory(next: EllineaMemoryNote[]) {
     if (!orgId) return;
     setMemory(next);
@@ -189,7 +251,9 @@ export default function EllineaPage() {
       .catch(() => undefined);
     const session = getSession();
     if (prefs?.ellineaUseDna !== false) {
-      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, next));
+      const nextDna = refreshDna(orgId, session?.organization.name, session?.user.role, next);
+      setDna(nextDna);
+      persistLearning(orgId, nextDna);
     }
     refreshSignals(orgId, summary, next);
   }
@@ -254,9 +318,12 @@ export default function EllineaPage() {
     if (!orgId || prefs?.ellineaRecFeedback === false) return;
     recordRecFeedback(orgId, recId, vote);
     const session = getSession();
+    let nextDna: EnterpriseDnaSnapshot | null = null;
     if (prefs?.ellineaUseDna !== false) {
-      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, memory));
+      nextDna = refreshDna(orgId, session?.organization.name, session?.user.role, memory);
+      setDna(nextDna);
     }
+    persistLearning(orgId, nextDna);
     setRecs(
       buildRankedRecommendations(summary, {
         role: session?.user.role,
