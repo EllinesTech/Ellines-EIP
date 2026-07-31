@@ -1,46 +1,25 @@
-# Ellinea AI Service
+# Ellinea AI service (Phase 6.1)
 
-Enterprise Intelligence Engine — the AI layer of Ellines EIP.
+Standalone Nest stub that packages Ellinea reasoning for reuse outside the Work Console.
 
-## Responsibilities
+## Package
 
-- Natural language Q&A over enterprise data
-- CEO Daily Brief generation
-- Explainable recommendations with confidence scores
-- Enterprise Memory (document + decision storage)
-- Context engine (role, org, Enterprise DNA-aware)
-- RAG pipeline over connected data and memory
+Core engine lives in `@ellines-eip/ellinea-ai` (`packages/ellinea-ai`):
 
-## Port
+- Q&A / daily brief / recommendations
+- Enterprise Memory helpers
+- DNA + learning signals
+- Local RAG retrieval
 
-`3003` (default)
+## Run
 
-## Core Capabilities (v1.0)
-
-| Capability | Description |
-|-----------|-------------|
-| NL Q&A | Ask questions about enterprise data in plain language |
-| Daily Brief | Automated morning executive summary |
-| Recommendations | Explainable insights with evidence + confidence |
-| Enterprise Memory | Store and retrieve policies, decisions, documents |
-| Context Engine | Role and org-aware response tailoring |
-
-## Example Queries
-
-```
-"How are all my businesses performing today?"
-"Summarize yesterday's critical alerts."
-"Which branches need immediate attention?"
-"Generate this week's executive report."
+```bash
+npm run build -w @ellines-eip/ellinea-ai
+npm run build -w @ellines-eip/ellinea-service
+npm run start -w @ellines-eip/ellinea-service
 ```
 
-## AI Governance
+Health: `http://localhost:3002/api/v1/health`  
+Ask: `POST /api/v1/ellinea/ask` with `{ question, summary?, memory? }`
 
-- All recommendations include evidence and confidence score
-- Sensitive actions require human approval
-- Every AI action logged in Audit Center
-- Customer data never leaves their environment (configurable)
-
-## Status
-
-🔲 Not yet implemented — Phase 4 (Priority P0)
+The live web app still uses same-origin Pages Functions for Memory + optional LLM; this service is the extractable brain for other Ellines products.

@@ -33,7 +33,7 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~95% | RAG + optional LLM Ask shipped; standalone later |
+| **4 — Ellinea AI** | ~98% | Core extracted to `@ellines-eip/ellinea-ai`; Phase 6 API next |
 | **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
@@ -118,7 +118,8 @@ while queue has next/in_progress and not blocked:
 | 5.4 | Event Bus | `done` | Local pub/sub + log on Rules / Approvals |
 | 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
 | 4.10 | LLM / RAG | `done` | RAG retrieve + `POST /api/v1/ellinea/ask` |
-| 6.1 | Extract `services/ellinea-ai` | `next` | Productize Ellinea engine |
+| 6.1 | Extract `services/ellinea-ai` | `done` | `@ellines-eip/ellinea-ai` + Nest stub |
+| 6.2 | Ellinea API contract | `next` | ask / brief / recommend / memory / feedback |
 
 ---
 
@@ -164,8 +165,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 6.1 | Extract `services/ellinea-ai` | `next` | Start Ellinea productization |
-| 6.2 | Ellinea API contract | `todo` | ask / brief / recommend / memory / feedback |
+| 6.1 | Extract `services/ellinea-ai` | `done` | Package + Nest stub on :3002 |
+| 6.2 | Ellinea API contract | `next` | ask / brief / recommend / memory / feedback |
 | 6.3 | `@ellines/ellinea-sdk` | `todo` | |
 | 6.4 | Bring-your-own connectors | `todo` | UEM snapshots from any System B |
 | 6.5 | Tenant learning isolation | `todo` | |
