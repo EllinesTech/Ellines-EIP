@@ -66,7 +66,8 @@ CEO, HR, Finance, etc. are **personas** (widget packs / scopes) inside the Work 
 
 - **Not** an org RBAC role. Customer IT cannot grant it.
 - Granted when the user’s email is listed in `PLATFORM_ADMIN_EMAILS` (Pages / Identity env).
-- Console: tenant list, connector packs, feature-flag placeholders, platform health stubs.
+- Console: tenant list (suspend / resume), connector packs, feature-flag placeholders, platform health stubs.
+- **Suspend org:** stores `settings.platformStatus = suspended`; blocks tenant login (except platform allowlist) and connector sync.
 
 ---
 

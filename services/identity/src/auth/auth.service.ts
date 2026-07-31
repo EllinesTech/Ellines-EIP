@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-import { isPlatformAdminEmail, parsePlatformAdminEmails } from '@ellines-eip/shared';
+import { isPlatformAdminEmail, isOrganizationSuspended, parsePlatformAdminEmails } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -103,6 +103,18 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const allowlist = parsePlatformAdminEmails(
+      this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
+    );
+    if (
+      isOrganizationSuspended(user.organization.settings) &&
+      !isPlatformAdminEmail(user.email, allowlist)
+    ) {
+      throw new UnauthorizedException(
+        'This organization is suspended. Contact Ellines support.',
+      );
     }
 
     await this.prisma.auditLog.create({
@@ -377,6 +389,18 @@ export class AuthService {
 
     if (!user || !user.isActive || user.email.toLowerCase() !== payload.email.toLowerCase()) {
       throw new UnauthorizedException('Invalid or expired SSO token');
+    }
+
+    const allowlist = parsePlatformAdminEmails(
+      this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
+    );
+    if (
+      isOrganizationSuspended(user.organization.settings) &&
+      !isPlatformAdminEmail(user.email, allowlist)
+    ) {
+      throw new UnauthorizedException(
+        'This organization is suspended. Contact Ellines support.',
+      );
     }
 
     await this.prisma.auditLog.create({

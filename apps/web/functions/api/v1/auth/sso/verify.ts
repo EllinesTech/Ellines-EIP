@@ -6,6 +6,11 @@ import {
   verifySsoChallenge,
   type Env,
 } from '../../../../shared/auth';
+import {
+  isOrganizationSuspended,
+  isPlatformAdminEmail,
+  parsePlatformAdminEmails,
+} from '@ellines-eip/shared';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -29,7 +34,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const { data: user, error } = await supabase
       .from('users')
       .select(
-        'id, email, full_name, organization_id, role, is_active, created_at, updated_at, organizations ( id, name, slug )',
+        'id, email, full_name, organization_id, role, is_active, created_at, updated_at, organizations ( id, name, slug, settings )',
       )
       .eq('id', claims.sub)
       .maybeSingle();
@@ -42,12 +47,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const orgRel = user.organizations as
-      | { id: string; name: string; slug: string }
-      | { id: string; name: string; slug: string }[]
+      | { id: string; name: string; slug: string; settings?: unknown }
+      | { id: string; name: string; slug: string; settings?: unknown }[]
       | null;
     const org = Array.isArray(orgRel) ? orgRel[0] : orgRel;
     if (!org) {
       return json({ statusCode: 500, message: 'Organization missing for user' }, 500);
+    }
+
+    const allowlist = parsePlatformAdminEmails(context.env.PLATFORM_ADMIN_EMAILS);
+    if (
+      isOrganizationSuspended(org.settings) &&
+      !isPlatformAdminEmail((user.email as string).toLowerCase(), allowlist)
+    ) {
+      return json(
+        { statusCode: 403, message: 'This organization is suspended. Contact Ellines support.' },
+        403,
+      );
     }
 
     await supabase.from('audit_logs').insert({

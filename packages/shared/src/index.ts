@@ -253,6 +253,21 @@ export function mergeOrganizationSettings(
   return { ...base, ...patch };
 }
 
+/** Platform Super Admin tenant lifecycle — stored in org settings.platformStatus. */
+export type PlatformOrgStatus = 'active' | 'suspended';
+
+export function readPlatformOrgStatus(settings: unknown): PlatformOrgStatus {
+  const obj =
+    settings && typeof settings === 'object' && !Array.isArray(settings)
+      ? (settings as Record<string, unknown>)
+      : {};
+  return obj.platformStatus === 'suspended' ? 'suspended' : 'active';
+}
+
+export function isOrganizationSuspended(settings: unknown): boolean {
+  return readPlatformOrgStatus(settings) === 'suspended';
+}
+
 /** Short clock / log-style date+time for shell, timelines, and audit UIs. */
 export function formatOrgDateTime(
   date: Date,

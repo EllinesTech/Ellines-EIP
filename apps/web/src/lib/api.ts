@@ -459,6 +459,13 @@ export function listPlatformOrgs() {
   return request<PlatformOrg[]>('/api/v1/platform/orgs');
 }
 
+export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspended') {
+  return request<PlatformOrg>(`/api/v1/platform/orgs/${orgId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function listPlatformFlags() {
   return request<FeatureFlag[]>('/api/v1/platform/flags');
 }

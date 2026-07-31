@@ -6,6 +6,7 @@ import {
   requireAuth,
   type Env,
 } from '../../../shared/auth';
+import { readPlatformOrgStatus } from '@ellines-eip/shared';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -23,7 +24,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
   const { data: orgs, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, created_at')
+    .select('id, name, slug, created_at, settings')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -42,7 +43,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         slug: o.slug,
         createdAt: new Date(o.created_at as string).toISOString(),
         userCount: count ?? 0,
-        status: 'active' as const,
+        status: readPlatformOrgStatus(o.settings),
       };
     }),
   );

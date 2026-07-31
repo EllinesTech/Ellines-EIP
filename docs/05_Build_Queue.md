@@ -41,11 +41,11 @@ while queue has next/in_progress and not blocked:
 
 ### Priority order (first → next → later)
 
-1. **Now —** Platform Super Admin: suspend / disable org.
-2. **Later —** workflow depth, email SMTP worker, **Mobile Work Companion** (v1.1).
+1. **Now —** notification / SMTP worker depth (when needed), workflow polish.
+2. **Later —** email SMTP worker, **Mobile Work Companion** (v1.1).
 3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** SQL connectors done → Platform suspend/disable → Mobile Companion in v1.1 (wraps SoR; Ellinea central).
+**Critical path:** SQL + Platform suspend done → notification/SMTP depth → Mobile Companion in v1.1.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -188,9 +188,9 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 |---------|---------------|-----|------|
 | **Ask** | Floating “Ask Ellinea AI” (+ optional “Open full Ask workspace” → `/app/ellinea`) | Everyone | Everyday chat / Q&A |
 | **Ellinea settings** | System Settings → **Ellinea AI** card (brief, recs, memory, DNA, LLM+RAG, …) | Everyone | Preference home — **not** a top-level nav item |
-| **Ellinea console** | `/app/ellinea-console` via Settings → “Operator console (API)” | Owner/IT only | Operator / API lab for SDK + contract smoke — **not** everyday chat; **not** side nav |
+| **Ellinea console** | `/app/ellinea-console` via side nav (Owner/IT) + Settings → “Operator console (API)” | Owner/IT only | Operator / API lab for SDK + contract smoke — **not** everyday chat |
 
-**Do not** add Ask or Console back to the Work Console side nav. Keep the console route. Future: console may evolve into a thin **standalone Ellinea operator product** (Phase 6), but EIP Work Console nav stays clean.
+**Do not** add Ask back to the Work Console side nav. Keep the console route (and Owner/IT side-nav link above Settings). Future: console may evolve into a thin **standalone Ellinea operator product** (Phase 6), but Ask stays float-first.
 
 ---
 
@@ -202,7 +202,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 2.x | `services/integration-hub` | `done` | Nest stub :3003 |
 | 2.x | Webhooks / events | `done` | System B push endpoint + Owner/IT secret |
 | 2.x | SQL Server / MySQL | `done` | Read-only connectors; TCP on Identity |
-| 1.5b | Platform suspend / disable org | `next` | Super Admin: suspend tenant; block login + sync |
+| 1.5b | Platform suspend / disable org | `done` | `settings.platformStatus`; login + sync blocked; Platform UI |
+| 3.x | Notification SMTP worker | `next` | Real email delivery beyond outbox simulator |
 
 ---
 
@@ -224,8 +225,9 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Platform suspend/disable org:** Super Admin Suspend/Resume on `/app/platform`; blocks login + connector sync
 - **SQL Server / MySQL connectors:** read-only catalog + Identity TCP drivers (`mssql`, `mysql2`); Pages soft-test / 501 sync like Postgres
-- **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab via Settings link only (no side-nav Ask/Console). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
+- **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab at `/app/ellinea-console` (side nav above Settings). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
 - Audit Center (`/app/audit`), change password on Profile, connector health chips on Overview
 - Org structure (branches/departments) on Org Admin + Pages APIs
 - Owner/IT Overview ops rail + empty states; roadmap keep-going

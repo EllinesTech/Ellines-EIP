@@ -18,6 +18,7 @@ import {
   withScheduleAfterSync,
   type InstallConfig,
 } from '../../../../../shared/connectors';
+import { isOrganizationSuspended } from '@ellines-eip/shared';
 
 const CSV_SAMPLE = `metric,value
 healthScore,81
@@ -127,6 +128,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const id = context.params.id as string;
   const supabase = getAdminClient(context.env);
+
+  const { data: orgRow } = await supabase
+    .from('organizations')
+    .select('settings')
+    .eq('id', auth.organizationId)
+    .maybeSingle();
+  if (isOrganizationSuspended(orgRow?.settings)) {
+    return json({ statusCode: 403, message: 'Organization is suspended' }, 403);
+  }
+
   const { data: existing } = await supabase
     .from('connector_installations')
     .select('*')

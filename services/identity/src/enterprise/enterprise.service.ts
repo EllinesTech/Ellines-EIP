@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -10,6 +11,7 @@ import type {
   ConnectorStatus,
   EnterpriseSummary,
 } from '@ellines-eip/shared';
+import { isOrganizationSuspended } from '@ellines-eip/shared';
 import {
   assertReadOnlySql,
   buildAuthHeaders,
@@ -382,6 +384,7 @@ export class EnterpriseService {
   }
 
   async syncInstallation(organizationId: string, actorUserId: string, id: string) {
+    await this.assertOrgNotSuspended(organizationId);
     const row = await this.prisma.connectorInstallation.findFirst({
       where: { id, organizationId },
     });
@@ -421,6 +424,7 @@ export class EnterpriseService {
     connectorId: string,
     options?: ConnectorInstallConfig,
   ) {
+    await this.assertOrgNotSuspended(organizationId);
     if (connectorId === 'demo-json') {
       const connector = createDemoJsonConnector(normalizeEnterprisePayload(demoSeed));
       const result = await connector.sync();
@@ -492,6 +496,17 @@ export class EnterpriseService {
       return this.toPackDto(row);
     } catch {
       throw new BadRequestException('Pack slug already exists');
+    }
+  }
+
+  private async assertOrgNotSuspended(organizationId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { settings: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    if (isOrganizationSuspended(org.settings)) {
+      throw new ForbiddenException('Organization is suspended');
     }
   }
 

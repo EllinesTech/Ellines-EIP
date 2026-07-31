@@ -14,6 +14,7 @@ import {
   listPlatformOrgs,
   PlatformOrg,
   updatePlatformOrgDateTimeSettings,
+  updatePlatformOrgStatus,
   type ConnectorInstallationDto,
   type OrgDateTimeSettingsDto,
 } from '@/lib/api';
@@ -120,12 +121,42 @@ export default function PlatformAdminPage() {
       });
       setTimeFormat(saved.timeFormat);
       setDateStyle(saved.dateStyle);
-      const name = orgs.find((o) => o.id === settingsOrgId)?.name || 'tenant';
-      setNotice(`Date & time display updated for ${name}.`);
+      setNotice('Tenant date & time saved.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save date settings');
+      setError(err instanceof Error ? err.message : 'Failed to save org date settings');
     } finally {
       setSettingsBusy(false);
+    }
+  }
+
+  async function onToggleOrgStatus(org: PlatformOrg) {
+    const next = org.status === 'suspended' ? 'active' : 'suspended';
+    const label = next === 'suspended' ? 'Suspend' : 'Resume';
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`${label} organization “${org.name}”? ${
+        next === 'suspended'
+          ? 'Users will not be able to sign in; connector sync is blocked.'
+          : 'Users can sign in again.'
+      }`)
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const updated = await updatePlatformOrgStatus(org.id, next);
+      setOrgs((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      setNotice(
+        next === 'suspended'
+          ? `Suspended ${updated.name}.`
+          : `Resumed ${updated.name}.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update organization status');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -383,6 +414,10 @@ export default function PlatformAdminPage() {
 
       <section className={adminStyles.tableWrap}>
         <div className={styles.panelLabel}>Tenants</div>
+        <p className={styles.lede}>
+          Suspend blocks tenant login and connector sync. Platform operators on the allowlist can
+          still sign in to manage the org.
+        </p>
         {loading ? (
           <p className={styles.lede}>Loading…</p>
         ) : (
@@ -394,6 +429,7 @@ export default function PlatformAdminPage() {
                 <th>Users</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -402,8 +438,18 @@ export default function PlatformAdminPage() {
                   <td>{o.name}</td>
                   <td>{o.slug}</td>
                   <td>{o.userCount}</td>
-                  <td>{o.status}</td>
+                  <td>{o.status === 'suspended' ? 'Suspended' : 'Active'}</td>
                   <td>{new Date(o.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      disabled={busy}
+                      onClick={() => void onToggleOrgStatus(o)}
+                    >
+                      {o.status === 'suspended' ? 'Resume' : 'Suspend'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

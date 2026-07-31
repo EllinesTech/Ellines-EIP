@@ -8,6 +8,7 @@ import {
   UseGuards,
   Request,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -44,6 +45,26 @@ export class PlatformController {
   listOrgs(@Request() req: { user: { email: string } }) {
     this.assertPlatformAdmin(req.user.email);
     return this.platform.listOrganizations();
+  }
+
+  @Patch('orgs/:id')
+  updateOrgStatus(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { status?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    const status =
+      body.status === 'suspended' ? 'suspended' : body.status === 'active' ? 'active' : null;
+    if (!status) {
+      throw new BadRequestException('status must be active or suspended');
+    }
+    return this.platform.updateOrganizationStatus(
+      id,
+      status,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Get('orgs/:id/settings')
