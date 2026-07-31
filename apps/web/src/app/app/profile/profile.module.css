@@ -1,0 +1,137 @@
+.card {
+  background: #161b26;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem 1.35rem 1.4rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.photoBlock {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  flex-wrap: wrap;
+}
+
+.photoBtn {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  border: 2px solid rgba(139, 92, 246, 0.45);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.photoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoInitials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.55rem;
+  letter-spacing: 0.02em;
+}
+
+.photoOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 14, 20, 0.62);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.photoBtn:hover .photoOverlay,
+.photoBtn:focus-visible .photoOverlay {
+  opacity: 1;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photoMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.photoMeta strong {
+  font-size: 1.15rem;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.photoMeta > span {
+  font-size: 0.85rem;
+  color: #8b95a8;
+}
+
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
+.bio {
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #f4f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  background: #0b0e14;
+  resize: vertical;
+  min-height: 4.5rem;
+  width: 100%;
+}
+
+.bio:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.55);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.saveRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 560px) {
+  .photoBlock {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

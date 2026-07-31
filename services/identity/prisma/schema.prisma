@@ -21,6 +21,8 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  /** Display prefs e.g. { timeFormat, dateStyle } — org/platform admin editable. */
+  settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -68,6 +70,12 @@ model User {
   email          String   @unique
   passwordHash   String   @map("password_hash")
   fullName       String   @map("full_name")
+  /** Optional job title shown on profile (e.g. Chief Executive). */
+  title          String?
+  /** Short personal bio / about. */
+  bio            String?  @db.Text
+  /** Profile photo as compressed data URL (or external URL later). */
+  avatarUrl      String?  @map("avatar_url") @db.Text
   organizationId String   @map("organization_id")
   role           UserRole @default(member)
   isActive       Boolean  @default(true) @map("is_active")

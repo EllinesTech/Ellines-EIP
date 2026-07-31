@@ -1,63 +1,229 @@
 'use client';
 
 import Link from 'next/link';
-import { getSession } from '@/lib/api';
-import { isOrgAdminRole } from '@ellines-eip/shared';
-import { useEffect, useState } from 'react';
+import {
+  formatOrgDateTime,
+  isOrgAdminRole,
+} from '@ellines-eip/shared';
+import {
+  cacheOrgDateTimeSettings,
+  fetchOrgDateTimeSettings,
+  getSession,
+  updateOrgDateTimeSettings,
+  type OrgDateTimeSettingsDto,
+} from '@/lib/api';
+import {
+  DEFAULT_UI_PREFS,
+  readUiPrefs,
+  writeUiPrefs,
+  type UiAccent,
+  type UiPrefs,
+  type UiTheme,
+} from '@/lib/ui-prefs';
+import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
+import adminStyles from '../admin/admin.module.css';
+import settingsStyles from './settings.module.css';
 
-export default function SettingsPage() {
-  const [email, setEmail] = useState('—');
-  const [org, setOrg] = useState('—');
-  const [role, setRole] = useState('—');
+export default function SystemSettingsPage() {
   const [orgAdmin, setOrgAdmin] = useState(false);
-  const [platformAdmin, setPlatformAdmin] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
+
+  const [timeFormat, setTimeFormat] = useState<OrgDateTimeSettingsDto['timeFormat']>('12h');
+  const [dateStyle, setDateStyle] = useState<OrgDateTimeSettingsDto['dateStyle']>('short');
+  const [clockPreview, setClockPreview] = useState(() =>
+    formatOrgDateTime(new Date(), { timeFormat: '12h', dateStyle: 'short' }),
+  );
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const s = getSession();
     if (!s) return;
-    setEmail(s.user.email);
-    setOrg(s.organization.name);
-    setRole(s.user.role);
     setOrgAdmin(isOrgAdminRole(s.user.role));
-    setPlatformAdmin(Boolean(s.isPlatformAdmin));
+    setOrgId(s.organization.id);
+    setUiPrefs(readUiPrefs());
+    fetchOrgDateTimeSettings()
+      .then((prefs) => {
+        setTimeFormat(prefs.timeFormat);
+        setDateStyle(prefs.dateStyle);
+        cacheOrgDateTimeSettings(s.organization.id, prefs);
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
   }, []);
+
+  useEffect(() => {
+    setClockPreview(formatOrgDateTime(new Date(), { timeFormat, dateStyle }));
+  }, [timeFormat, dateStyle]);
+
+  function persistUi(next: UiPrefs) {
+    setUiPrefs(next);
+    writeUiPrefs(next);
+    setNotice('Display preferences updated on this device.');
+    setError('');
+  }
+
+  async function onSaveClock(e: FormEvent) {
+    e.preventDefault();
+    if (!orgAdmin) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const saved = await updateOrgDateTimeSettings({ timeFormat, dateStyle });
+      setTimeFormat(saved.timeFormat);
+      setDateStyle(saved.dateStyle);
+      if (orgId) cacheOrgDateTimeSettings(orgId, saved);
+      setNotice('Organization clock and date format saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save clock settings');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Workspace</p>
-          <h1>Settings</h1>
-          <p className={styles.lede}>Your profile for this Ellines EIP organization.</p>
+          <h1>System Settings</h1>
+          <p className={styles.lede}>
+            Theme, accent color, and clock display for the Work Console. Personal name and photo stay
+            on your profile.
+          </p>
         </div>
       </header>
+
+      {error ? <p className={adminStyles.error}>{error}</p> : null}
+      {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
+
+      <section className={settingsStyles.card}>
+        <div className={styles.panelLabel}>Appearance</div>
+        <p className={styles.lede}>Local to this browser — does not change other users.</p>
+
+        <div className={settingsStyles.block}>
+          <span className={settingsStyles.fieldLabel}>Theme</span>
+          <div className={settingsStyles.optionRow} role="group" aria-label="Theme">
+            {(
+              [
+                { id: 'dark', label: 'Dark' },
+                { id: 'dim', label: 'Dim' },
+              ] as { id: UiTheme; label: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={
+                  uiPrefs.theme === opt.id
+                    ? `${settingsStyles.option} ${settingsStyles.optionActive}`
+                    : settingsStyles.option
+                }
+                onClick={() => persistUi({ ...uiPrefs, theme: opt.id })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={settingsStyles.block}>
+          <span className={settingsStyles.fieldLabel}>Accent color</span>
+          <div className={settingsStyles.optionRow} role="group" aria-label="Accent color">
+            {(
+              [
+                { id: 'violet', label: 'Violet', swatch: '#7c3aed' },
+                { id: 'blue', label: 'Blue', swatch: '#2563EB' },
+                { id: 'teal', label: 'Teal', swatch: '#0d9488' },
+              ] as { id: UiAccent; label: string; swatch: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={
+                  uiPrefs.accent === opt.id
+                    ? `${settingsStyles.option} ${settingsStyles.optionActive}`
+                    : settingsStyles.option
+                }
+                onClick={() => persistUi({ ...uiPrefs, accent: opt.id })}
+              >
+                <span
+                  className={settingsStyles.swatch}
+                  style={{ background: opt.swatch }}
+                  aria-hidden
+                />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={styles.panelLabel}>Clock &amp; date</div>
+        <p className={styles.lede}>
+          {orgAdmin
+            ? 'Organization-wide formats used in the sidebar clock and logs.'
+            : 'Your organization clock format. Only IT Admin can change it for everyone.'}
+        </p>
+
+        <form className={adminStyles.form} onSubmit={(e) => void onSaveClock(e)}>
+          <label>
+            Time format
+            <select
+              value={timeFormat}
+              disabled={!orgAdmin || busy}
+              onChange={(e) =>
+                setTimeFormat(e.target.value as OrgDateTimeSettingsDto['timeFormat'])
+              }
+            >
+              <option value="12h">12-hour (7:14 PM)</option>
+              <option value="24h">24-hour (19:14)</option>
+            </select>
+          </label>
+          <label>
+            Date style
+            <select
+              value={dateStyle}
+              disabled={!orgAdmin || busy}
+              onChange={(e) =>
+                setDateStyle(e.target.value as OrgDateTimeSettingsDto['dateStyle'])
+              }
+            >
+              <option value="short">Short (Fri 31 Jul)</option>
+              <option value="medium">Medium (31 Jul 2026)</option>
+              <option value="log">Log (2026-07-31)</option>
+            </select>
+          </label>
+          <label>
+            Preview
+            <input
+              readOnly
+              value={`${clockPreview.day} · ${clockPreview.time}`}
+              aria-label="Clock preview"
+            />
+          </label>
+          {orgAdmin ? (
+            <button type="submit" className={adminStyles.primary} disabled={busy}>
+              {busy ? 'Saving…' : 'Save clock settings'}
+            </button>
+          ) : null}
+        </form>
+      </section>
+
       <section className={styles.brief}>
-        <div className={styles.panelLabel}>Account</div>
-        <p suppressHydrationWarning>
-          <strong>Organization:</strong> {org}
+        <div className={styles.panelLabel}>Your profile</div>
+        <p className={styles.lede}>Photo, name, title, and bio are separate from system display.</p>
+        <p>
+          <Link href="/app/profile" className={styles.primaryLink}>
+            Edit profile →
+          </Link>
         </p>
-        <p suppressHydrationWarning>
-          <strong>Email:</strong> {email}
-        </p>
-        <p suppressHydrationWarning>
-          <strong>Role:</strong> {role}
-          {platformAdmin ? ' · platform operator' : ''}
-        </p>
-        {orgAdmin ? (
-          <p>
-            <Link href="/app/admin" className={styles.primaryLink}>
-              Open IT Admin (users &amp; rights) →
-            </Link>
-          </p>
-        ) : null}
-        {platformAdmin ? (
-          <p>
-            <Link href="/app/platform" className={styles.primaryLink}>
-              Open Platform Super Admin →
-            </Link>
-          </p>
-        ) : null}
       </section>
     </div>
   );

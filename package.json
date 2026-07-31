@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "predev": "npm run build:shared",
-    "dev": "concurrently -n shared,sdk,identity,web -c gray,yellow,magenta,cyan \"npm run dev -w @ellines-eip/shared\" \"npm run dev -w @ellines-eip/connectors-sdk\" \"npm run dev:identity\" \"npm run dev:web\"",
+    "dev": "node scripts/free-ports.mjs 3100 3001 && concurrently -n shared,sdk,identity,web -c gray,yellow,magenta,cyan \"npm run dev -w @ellines-eip/shared\" \"npm run dev -w @ellines-eip/connectors-sdk\" \"npm run dev:identity\" \"npm run dev:web\"",
     "dev:identity": "npm run dev -w @ellines-eip/identity",
     "dev:web": "npm run dev -w @ellines-eip/web",
     "build": "npm run build --workspaces --if-present",
@@ -28,7 +28,7 @@
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.2.4"
   },
   "engines": {
     "node": ">=20.0.0"

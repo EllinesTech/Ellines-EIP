@@ -436,8 +436,8 @@ function ClientOverview({
         <Link href="/app" className={styles.quickLink}>
           View brief
         </Link>
-        <Link href="/app/settings" className={styles.quickLink}>
-          Open settings
+        <Link href="/app/profile" className={styles.quickLink}>
+          Open profile
         </Link>
         <span className={styles.quickLink}>Systems: {synced ? systems : 0}</span>
         <span className={styles.quickLink}>Alerts: {synced ? alerts : '—'}</span>

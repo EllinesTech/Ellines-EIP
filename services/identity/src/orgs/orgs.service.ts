@@ -7,8 +7,11 @@ import {
 import {
   assertCanAssignRole,
   assertCanManageOrgUser,
+  normalizeOrgDateTimeSettings,
+  type OrgDateTimeSettings,
   type UserRole,
 } from '@ellines-eip/shared';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -35,6 +38,28 @@ export class OrgsService {
       createdAt: org.createdAt.toISOString(),
       counts: org._count,
     };
+  }
+
+  async getSettings(organizationId: string): Promise<OrgDateTimeSettings> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { settings: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    return normalizeOrgDateTimeSettings(org.settings);
+  }
+
+  async updateSettings(
+    organizationId: string,
+    patch: Partial<OrgDateTimeSettings>,
+  ): Promise<OrgDateTimeSettings> {
+    const current = await this.getSettings(organizationId);
+    const next = normalizeOrgDateTimeSettings({ ...current, ...patch });
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { settings: next as unknown as Prisma.InputJsonValue },
+    });
+    return next;
   }
 
   async listUsers(organizationId: string) {

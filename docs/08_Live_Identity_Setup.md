@@ -34,8 +34,10 @@ In the repo → Settings → Secrets → Actions:
 
 | Secret | Value |
 |--------|--------|
-| `FLY_API_TOKEN` | same Fly token (Identity deploys on push) |
-| `NEXT_PUBLIC_API_URL` | `https://ellines-eip-identity.fly.dev` (optional; web already defaults to this in production) |
+| `FLY_API_TOKEN` | **Required** for [Deploy Identity (Fly)](../.github/workflows/deploy-identity.yml). Same Fly deploy token as above. Without it the workflow fails immediately (`no access token available` / empty `FLY_API_TOKEN`). |
+| `NEXT_PUBLIC_API_URL` | `https://ellines-eip-identity.fly.dev` (optional; live web uses same-origin Pages Functions unless overridden) |
+
+After adding `FLY_API_TOKEN`, re-run the workflow (`Actions` → Deploy Identity → `Run workflow`) or push a change under `services/identity/**`.
 
 ## 4. Log in live
 

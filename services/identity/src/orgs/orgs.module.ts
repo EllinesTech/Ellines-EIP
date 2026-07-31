@@ -7,5 +7,6 @@ import { OrgsService } from './orgs.service';
   imports: [AuthModule],
   controllers: [OrgsController],
   providers: [OrgsService],
+  exports: [OrgsService],
 })
 export class OrgsModule {}

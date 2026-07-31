@@ -6,16 +6,20 @@ import {
   ConnectorPackDto,
   createPlatformConnectorPack,
   FeatureFlag,
+  fetchPlatformOrgDateTimeSettings,
   getSession,
   listInstallations,
   listPlatformConnectorPacks,
   listPlatformFlags,
   listPlatformOrgs,
   PlatformOrg,
+  updatePlatformOrgDateTimeSettings,
   type ConnectorInstallationDto,
+  type OrgDateTimeSettingsDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
+import { formatOrgDateTime } from '@ellines-eip/shared';
 
 export default function PlatformAdminPage() {
   const router = useRouter();
@@ -34,6 +38,11 @@ export default function PlatformAdminPage() {
   const [description, setDescription] = useState('');
   const [catalogId, setCatalogId] = useState('openapi');
   const [fromInstallationId, setFromInstallationId] = useState('');
+
+  const [settingsOrgId, setSettingsOrgId] = useState('');
+  const [timeFormat, setTimeFormat] = useState<OrgDateTimeSettingsDto['timeFormat']>('12h');
+  const [dateStyle, setDateStyle] = useState<OrgDateTimeSettingsDto['dateStyle']>('short');
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   useEffect(() => {
     const s = getSession();
@@ -62,6 +71,9 @@ export default function PlatformAdminPage() {
       setFlags(f);
       setPacks(p);
       setInstallations(inst);
+      if (!settingsOrgId && o[0]) {
+        setSettingsOrgId(o[0].id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load platform data');
     } finally {
@@ -73,6 +85,49 @@ export default function PlatformAdminPage() {
     if (!allowed) return;
     void load();
   }, [allowed]);
+
+  useEffect(() => {
+    if (!allowed || !settingsOrgId) return;
+    let cancelled = false;
+    setSettingsBusy(true);
+    fetchPlatformOrgDateTimeSettings(settingsOrgId)
+      .then((prefs) => {
+        if (cancelled) return;
+        setTimeFormat(prefs.timeFormat);
+        setDateStyle(prefs.dateStyle);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load org date settings');
+      })
+      .finally(() => {
+        if (!cancelled) setSettingsBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, settingsOrgId]);
+
+  async function onSaveOrgDateTime() {
+    if (!settingsOrgId) return;
+    setSettingsBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const saved = await updatePlatformOrgDateTimeSettings(settingsOrgId, {
+        timeFormat,
+        dateStyle,
+      });
+      setTimeFormat(saved.timeFormat);
+      setDateStyle(saved.dateStyle);
+      const name = orgs.find((o) => o.id === settingsOrgId)?.name || 'tenant';
+      setNotice(`Date & time display updated for ${name}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save date settings');
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
 
   async function onSavePack() {
     setBusy(true);
@@ -126,6 +181,76 @@ export default function PlatformAdminPage() {
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
+
+      <section className={adminStyles.tableWrap}>
+        <div className={styles.panelLabel}>Tenant date &amp; time</div>
+        <p className={styles.lede}>
+          Set 12/24-hour and short/log date style for any organization. Org Owner/IT Admin can also
+          change this under Settings for their own tenant.
+        </p>
+        <div className={adminStyles.form}>
+          <label>
+            Organization
+            <select
+              value={settingsOrgId}
+              disabled={settingsBusy || orgs.length === 0}
+              onChange={(e) => setSettingsOrgId(e.target.value)}
+            >
+              {orgs.length === 0 ? <option value="">No tenants</option> : null}
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Time format
+            <select
+              value={timeFormat}
+              disabled={settingsBusy || !settingsOrgId}
+              onChange={(e) =>
+                setTimeFormat(e.target.value as OrgDateTimeSettingsDto['timeFormat'])
+              }
+            >
+              <option value="12h">12-hour</option>
+              <option value="24h">24-hour</option>
+            </select>
+          </label>
+          <label>
+            Date style
+            <select
+              value={dateStyle}
+              disabled={settingsBusy || !settingsOrgId}
+              onChange={(e) =>
+                setDateStyle(e.target.value as OrgDateTimeSettingsDto['dateStyle'])
+              }
+            >
+              <option value="short">Short</option>
+              <option value="medium">Medium</option>
+              <option value="log">Log (YYYY-MM-DD)</option>
+            </select>
+          </label>
+          <label>
+            Preview
+            <input
+              readOnly
+              value={(() => {
+                const p = formatOrgDateTime(new Date(), { timeFormat, dateStyle });
+                return `${p.day} · ${p.time}`;
+              })()}
+            />
+          </label>
+          <button
+            type="button"
+            className={adminStyles.primary}
+            disabled={settingsBusy || !settingsOrgId}
+            onClick={() => void onSaveOrgDateTime()}
+          >
+            {settingsBusy ? 'Saving…' : 'Save for tenant'}
+          </button>
+        </div>
+      </section>
 
       <div className={styles.kpis}>
         <article className={styles.kpi}>

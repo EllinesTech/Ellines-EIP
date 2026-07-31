@@ -1,4 +1,7 @@
 # Deploy Identity to Fly from monorepo root (Dockerfile needs workspace context).
+#
+# Required GitHub Actions secret:
+#   FLY_API_TOKEN  — Fly deploy / org token (https://fly.io/user/personal_access_tokens)
 
 name: Deploy Identity (Fly)
 
@@ -8,6 +11,7 @@ on:
     paths:
       - 'services/identity/**'
       - 'packages/shared/**'
+      - 'packages/connectors-sdk/**'
       - 'package-lock.json'
       - '.github/workflows/deploy-identity.yml'
   workflow_dispatch:
@@ -22,9 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Require FLY_API_TOKEN
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::Missing GitHub Actions secret FLY_API_TOKEN. Create a Fly deploy token at https://fly.io/user/personal_access_tokens and add it under Settings → Secrets → Actions. See docs/08_Live_Identity_Setup.md."
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
 
       - name: Deploy
         run: flyctl deploy --remote-only --config services/identity/fly.toml --dockerfile services/identity/Dockerfile --app ellines-eip-identity

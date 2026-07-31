@@ -3,14 +3,26 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { isOrgAdminRole, isOrgOwnerRole } from '@ellines-eip/shared';
+import { isOrgAdminRole, isOrgOwnerRole, formatOrgDateTime } from '@ellines-eip/shared';
 import EllineaChatPanel from '@/components/ellinea-chat';
 import {
   AuthSession,
+  cacheOrgDateTimeSettings,
   clearSession,
+  DATETIME_PREFS_EVENT,
+  fetchOrgDateTimeSettings,
   getSession,
+  PROFILE_UPDATED_EVENT,
+  readCachedOrgDateTimeSettings,
   refreshSessionFlags,
+  type OrgDateTimeSettingsDto,
 } from '@/lib/api';
+import {
+  DEFAULT_UI_PREFS,
+  readUiPrefs,
+  UI_PREFS_EVENT,
+  type UiPrefs,
+} from '@/lib/ui-prefs';
 import styles from './shell.module.css';
 
 type NavItem = {
@@ -86,7 +98,7 @@ const NAV: NavItem[] = [
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
-  { href: '/app/settings', label: 'Settings', icon: <IconSettings /> },
+  { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
 ];
 
 function initials(name: string) {
@@ -96,19 +108,6 @@ function initials(name: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function formatShellClock(date: Date) {
-  const day = date.toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  const time = date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  return { day, time, iso: date.toISOString() };
-}
-
 export default function AppShellLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -116,6 +115,11 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
+  const [dateTimePrefs, setDateTimePrefs] = useState<OrgDateTimeSettingsDto>({
+    timeFormat: '12h',
+    dateStyle: 'short',
+  });
   const [clock, setClock] = useState<{ day: string; time: string; iso: string } | null>(null);
 
   useEffect(() => {
@@ -125,6 +129,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       return;
     }
     setSessionState(s);
+    setUiPrefs(readUiPrefs());
+    const cached = readCachedOrgDateTimeSettings(s.organization.id);
+    if (cached) setDateTimePrefs(cached);
     const orgAdmin = isOrgAdminRole(s.user.role);
     const platformAdmin = Boolean(s.isPlatformAdmin);
     const isAdminShell = orgAdmin || platformAdmin;
@@ -142,14 +149,47 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       .catch(() => {
         /* keep local session if /me is briefly unavailable */
       });
+    fetchOrgDateTimeSettings()
+      .then((prefs) => {
+        setDateTimePrefs(prefs);
+        cacheOrgDateTimeSettings(s.organization.id, prefs);
+      })
+      .catch(() => {
+        /* keep defaults / cache if settings endpoint is briefly unavailable */
+      });
   }, [router]);
 
   useEffect(() => {
-    const tick = () => setClock(formatShellClock(new Date()));
+    function onPrefs(e: Event) {
+      const detail = (e as CustomEvent<{ orgId: string; settings: OrgDateTimeSettingsDto }>).detail;
+      const s = getSession();
+      if (!detail || !s || detail.orgId !== s.organization.id) return;
+      setDateTimePrefs(detail.settings);
+    }
+    function onProfile(e: Event) {
+      const detail = (e as CustomEvent<AuthSession>).detail;
+      if (detail) setSessionState(detail);
+    }
+    function onUiPrefs(e: Event) {
+      const detail = (e as CustomEvent<UiPrefs>).detail;
+      if (detail) setUiPrefs(detail);
+    }
+    window.addEventListener(DATETIME_PREFS_EVENT, onPrefs);
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfile);
+    window.addEventListener(UI_PREFS_EVENT, onUiPrefs);
+    return () => {
+      window.removeEventListener(DATETIME_PREFS_EVENT, onPrefs);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onProfile);
+      window.removeEventListener(UI_PREFS_EVENT, onUiPrefs);
+    };
+  }, []);
+
+  useEffect(() => {
+    const tick = () => setClock(formatOrgDateTime(new Date(), dateTimePrefs));
     tick();
     const id = window.setInterval(tick, 30_000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [dateTimePrefs]);
 
   function toggleCollapse() {
     setCollapsed((prev) => {
@@ -199,12 +239,20 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           ? 'IT Admin'
           : pathname.startsWith('/app/platform')
             ? 'Platform'
-            : pathname.startsWith('/app/settings')
-              ? 'Settings'
-              : 'EIP Dashboard — Overview';
+            : pathname.startsWith('/app/profile')
+              ? 'Profile'
+              : pathname.startsWith('/app/settings')
+                ? 'System Settings'
+                : 'EIP Dashboard — Overview';
+
+  const profileActive = pathname.startsWith('/app/profile');
 
   return (
-    <div className={`${styles.shell} ${collapsed ? styles.shellCollapsed : ''}`}>
+    <div
+      className={`${styles.shell} ${collapsed ? styles.shellCollapsed : ''}`}
+      data-theme={uiPrefs.theme}
+      data-accent={uiPrefs.accent}
+    >
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <img src="/brand/logo-hex.png" alt="" className={styles.brandIcon} />
@@ -253,23 +301,35 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className={styles.sidebarFooter}>
+          {clock ? (
+            <time className={styles.railClock} dateTime={clock.iso} title="Local date and time">
+              <span className={styles.railClockDay}>{clock.day}</span>
+              <span className={styles.railClockTime}>{clock.time}</span>
+            </time>
+          ) : (
+            <div className={styles.railClock} aria-hidden>
+              <span className={styles.railClockDay}>···</span>
+            </div>
+          )}
           <Link
-            href="/app/settings"
-            className={
-              pathname.startsWith('/app/settings')
-                ? `${styles.profile} ${styles.profileActive}`
-                : styles.profile
-            }
-            title="Profile & settings"
+            href="/app/profile"
+            className={profileActive ? `${styles.profile} ${styles.profileActive}` : styles.profile}
+            title="Open profile"
+            aria-label={`Open profile for ${session.user.fullName}`}
           >
             <div className={styles.avatar}>
-              {initials(session.user.fullName)}
+              {session.user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={session.user.avatarUrl} alt="" className={styles.avatarImg} />
+              ) : (
+                initials(session.user.fullName)
+              )}
               <span className={styles.avatarStatus} aria-hidden />
             </div>
             <div className={styles.profileMeta}>
               <div className={styles.profileName}>{session.user.fullName}</div>
               <div className={styles.profileRole}>
-                {session.user.role}
+                {session.user.title || session.user.role}
                 {platformAdmin ? ' · platform' : ''}
               </div>
             </div>
@@ -311,19 +371,6 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className={styles.topRight}>
-            {clock ? (
-              <time className={styles.clock} dateTime={clock.iso} title="Local date and time">
-                <span className={styles.clockDate}>{clock.day}</span>
-                <span className={styles.clockSep} aria-hidden>
-                  ·
-                </span>
-                <span className={styles.clockTime}>{clock.time}</span>
-              </time>
-            ) : (
-              <span className={styles.clock} aria-hidden>
-                <span className={styles.clockDate}>···</span>
-              </span>
-            )}
             <button type="button" className={styles.iconBtn} aria-label="Notifications" title="Notifications">
               <svg viewBox="0 0 24 24" aria-hidden>
                 <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
@@ -332,12 +379,17 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
               <span className={styles.badge} />
             </button>
             <Link
-              href="/app/settings"
+              href="/app/profile"
               className={styles.topAvatar}
-              title="Profile & settings"
-              aria-label="Profile and settings"
+              title="Profile"
+              aria-label="Open profile"
             >
-              {initials(session.user.fullName)}
+              {session.user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={session.user.avatarUrl} alt="" className={styles.topAvatarImg} />
+              ) : (
+                initials(session.user.fullName)
+              )}
             </Link>
             <button type="button" className={styles.signOut} onClick={logout}>
               Sign out

@@ -16,9 +16,11 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SsoRequestDto } from './dto/sso-request.dto';
 import { SsoVerifyDto } from './dto/sso-verify.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const SSO_TOKEN_TTL = '15m';
+const MAX_AVATAR_CHARS = 180_000;
 
 @Injectable()
 export class AuthService {
@@ -133,6 +135,64 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    const allowlist = parsePlatformAdminEmails(
+      this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
+    );
+    return {
+      user: this.sanitizeUser(user),
+      organization: {
+        id: user.organization.id,
+        name: user.organization.name,
+        slug: user.organization.slug,
+      },
+      isPlatformAdmin: isPlatformAdminEmail(user.email, allowlist),
+    };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const data: {
+      fullName?: string;
+      title?: string | null;
+      bio?: string | null;
+      avatarUrl?: string | null;
+    } = {};
+
+    if (dto.fullName !== undefined) {
+      const name = dto.fullName.trim();
+      if (name.length < 2) {
+        throw new BadRequestException('Full name must be at least 2 characters');
+      }
+      data.fullName = name;
+    }
+    if (dto.title !== undefined) {
+      data.title = dto.title.trim() || null;
+    }
+    if (dto.bio !== undefined) {
+      data.bio = dto.bio.trim() || null;
+    }
+    if (dto.avatarUrl !== undefined) {
+      const raw = dto.avatarUrl.trim();
+      if (!raw) {
+        data.avatarUrl = null;
+      } else if (!raw.startsWith('data:image/')) {
+        throw new BadRequestException('Avatar must be an image data URL');
+      } else if (raw.length > MAX_AVATAR_CHARS) {
+        throw new BadRequestException('Avatar image is too large — use a smaller photo');
+      } else {
+        data.avatarUrl = raw;
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No profile fields to update');
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      include: { organization: true },
+    });
+
     const allowlist = parsePlatformAdminEmails(
       this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
     );
@@ -356,6 +416,9 @@ export class AuthService {
     id: string;
     email: string;
     fullName: string;
+    title?: string | null;
+    bio?: string | null;
+    avatarUrl?: string | null;
     organizationId: string;
     role: string;
     isActive: boolean;
@@ -366,6 +429,9 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      title: user.title ?? null,
+      bio: user.bio ?? null,
+      avatarUrl: user.avatarUrl ?? null,
       organizationId: user.organizationId,
       role: user.role,
       isActive: user.isActive,

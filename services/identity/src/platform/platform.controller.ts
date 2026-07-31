@@ -2,17 +2,24 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  Patch,
   Post,
   UseGuards,
   Request,
   ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isPlatformAdminEmail, parsePlatformAdminEmails } from '@ellines-eip/shared';
+import {
+  isPlatformAdminEmail,
+  parsePlatformAdminEmails,
+  type OrgDateTimeSettings,
+} from '@ellines-eip/shared';
 import type { ConnectorInstallConfig } from '@ellines-eip/connectors-sdk';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformService } from './platform.service';
 import { EnterpriseService } from '../enterprise/enterprise.service';
+import { OrgsService } from '../orgs/orgs.service';
 
 @Controller('platform')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +27,7 @@ export class PlatformController {
   constructor(
     private readonly platform: PlatformService,
     private readonly enterprise: EnterpriseService,
+    private readonly orgs: OrgsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -36,6 +44,25 @@ export class PlatformController {
   listOrgs(@Request() req: { user: { email: string } }) {
     this.assertPlatformAdmin(req.user.email);
     return this.platform.listOrganizations();
+  }
+
+  @Get('orgs/:id/settings')
+  getOrgSettings(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.orgs.getSettings(id);
+  }
+
+  @Patch('orgs/:id/settings')
+  updateOrgSettings(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+    @Body() body: Partial<OrgDateTimeSettings>,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.orgs.updateSettings(id, body);
   }
 
   @Get('flags')

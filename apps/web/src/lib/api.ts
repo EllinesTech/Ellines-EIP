@@ -15,6 +15,9 @@ export interface AuthUser {
   id: string;
   email: string;
   fullName: string;
+  title?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
   organizationId: string;
   role: string;
   isActive: boolean;
@@ -134,6 +137,40 @@ export function fetchMe() {
   }>('/api/v1/auth/me');
 }
 
+export function updateMyProfile(payload: {
+  fullName?: string;
+  title?: string;
+  bio?: string;
+  avatarUrl?: string;
+}) {
+  return request<{
+    user: AuthUser;
+    organization: AuthOrganization;
+    isPlatformAdmin?: boolean;
+  }>('/api/v1/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export const PROFILE_UPDATED_EVENT = 'eip-profile-updated';
+
+export function applyProfileToSession(user: AuthUser, isPlatformAdmin?: boolean) {
+  const current = getSession();
+  if (!current) return null;
+  const next: AuthSession = {
+    ...current,
+    user: { ...current.user, ...user },
+    isPlatformAdmin:
+      isPlatformAdmin !== undefined ? Boolean(isPlatformAdmin) : current.isPlatformAdmin,
+  };
+  setSession(next);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT, { detail: next }));
+  }
+  return next;
+}
+
 /** Refresh session flags (e.g. isPlatformAdmin) from /auth/me without re-login. */
 export async function refreshSessionFlags(): Promise<AuthSession | null> {
   const current = getSession();
@@ -204,6 +241,56 @@ export function inviteOrgUser(payload: {
 
 export function updateOrgUser(userId: string, payload: { role?: string; isActive?: boolean }) {
   return request<OrgMember>(`/api/v1/orgs/me/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type OrgDateTimeSettingsDto = {
+  timeFormat: '12h' | '24h';
+  dateStyle: 'short' | 'medium' | 'log';
+};
+
+const DATETIME_CACHE_PREFIX = 'eip_datetime_prefs:';
+export const DATETIME_PREFS_EVENT = 'eip-datetime-prefs';
+
+export function cacheOrgDateTimeSettings(orgId: string, settings: OrgDateTimeSettingsDto) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(`${DATETIME_CACHE_PREFIX}${orgId}`, JSON.stringify(settings));
+  window.dispatchEvent(new CustomEvent(DATETIME_PREFS_EVENT, { detail: { orgId, settings } }));
+}
+
+export function readCachedOrgDateTimeSettings(orgId: string): OrgDateTimeSettingsDto | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(`${DATETIME_CACHE_PREFIX}${orgId}`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OrgDateTimeSettingsDto;
+  } catch {
+    return null;
+  }
+}
+
+export function fetchOrgDateTimeSettings() {
+  return request<OrgDateTimeSettingsDto>('/api/v1/orgs/me/settings');
+}
+
+export function updateOrgDateTimeSettings(payload: Partial<OrgDateTimeSettingsDto>) {
+  return request<OrgDateTimeSettingsDto>('/api/v1/orgs/me/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchPlatformOrgDateTimeSettings(orgId: string) {
+  return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
+}
+
+export function updatePlatformOrgDateTimeSettings(
+  orgId: string,
+  payload: Partial<OrgDateTimeSettingsDto>,
+) {
+  return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });

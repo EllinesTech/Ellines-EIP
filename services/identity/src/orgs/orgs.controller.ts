@@ -7,8 +7,16 @@ import {
   Param,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
-import { ORG_ADMIN_ROLES } from '@ellines-eip/shared';
+import { ConfigService } from '@nestjs/config';
+import {
+  ORG_ADMIN_ROLES,
+  isOrgAdminRole,
+  isPlatformAdminEmail,
+  parsePlatformAdminEmails,
+  type OrgDateTimeSettings,
+} from '@ellines-eip/shared';
 import { OrgsService } from './orgs.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -21,11 +29,37 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Controller('orgs')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrgsController {
-  constructor(private readonly orgs: OrgsService) {}
+  constructor(
+    private readonly orgs: OrgsService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Get('me')
   getMyOrg(@Request() req: { user: { organizationId: string } }) {
     return this.orgs.getOrganization(req.user.organizationId);
+  }
+
+  @Get('me/settings')
+  getSettings(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getSettings(req.user.organizationId);
+  }
+
+  @Patch('me/settings')
+  updateSettings(
+    @Request() req: { user: { email: string; organizationId: string; role: string } },
+    @Body() body: Partial<OrgDateTimeSettings>,
+  ) {
+    const allowlist = parsePlatformAdminEmails(
+      this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
+    );
+    const canEdit =
+      isOrgAdminRole(req.user.role) || isPlatformAdminEmail(req.user.email, allowlist);
+    if (!canEdit) {
+      throw new ForbiddenException(
+        'Only organization admins or platform operators can change date & time settings',
+      );
+    }
+    return this.orgs.updateSettings(req.user.organizationId, body);
   }
 
   @Get('me/users')

@@ -188,6 +188,64 @@ export function workHomeVariant(role: string | undefined | null): WorkHomeVarian
   return 'member';
 }
 
+/** Org display prefs — set by Owner/IT Admin or Platform Super Admin. */
+export type TimeFormat = '12h' | '24h';
+export type DateStyle = 'short' | 'medium' | 'log';
+
+export interface OrgDateTimeSettings {
+  timeFormat: TimeFormat;
+  dateStyle: DateStyle;
+}
+
+export const DEFAULT_ORG_DATETIME_SETTINGS: OrgDateTimeSettings = {
+  timeFormat: '12h',
+  dateStyle: 'short',
+};
+
+export function normalizeOrgDateTimeSettings(raw: unknown): OrgDateTimeSettings {
+  const obj =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const timeFormat: TimeFormat = obj.timeFormat === '24h' ? '24h' : '12h';
+  const dateStyle: DateStyle =
+    obj.dateStyle === 'medium' || obj.dateStyle === 'log' ? obj.dateStyle : 'short';
+  return { timeFormat, dateStyle };
+}
+
+/** Short clock / log-style date+time for shell, timelines, and audit UIs. */
+export function formatOrgDateTime(
+  date: Date,
+  settings: OrgDateTimeSettings = DEFAULT_ORG_DATETIME_SETTINGS,
+): { day: string; time: string; iso: string } {
+  const prefs = normalizeOrgDateTimeSettings(settings);
+  let day: string;
+  if (prefs.dateStyle === 'log') {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    day = `${y}-${m}-${d}`;
+  } else if (prefs.dateStyle === 'medium') {
+    day = date.toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } else {
+    day = date.toLocaleDateString(undefined, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+  const time = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: prefs.timeFormat === '12h',
+  });
+  return { day, time, iso: date.toISOString() };
+}
+
 export const SERVICE_PORTS = {
   apiGateway: 3000,
   identity: 3001,
