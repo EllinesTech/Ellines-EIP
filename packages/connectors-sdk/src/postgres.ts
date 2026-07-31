@@ -1,3 +1,8 @@
+import {
+  inferUemFromMetrics,
+  type UemModel,
+} from '@ellines-eip/shared';
+
 /** Read-only PostgreSQL helpers — no vendor API required. */
 
 export function assertReadOnlySql(sql: string): string {
@@ -42,6 +47,7 @@ export function rowsToEnterprisePayload(
   openDecisions: number;
   briefHighlight: string;
   timeline: { title: string; detail: string }[];
+  model: UemModel;
 } {
   if (!rows.length) {
     return {
@@ -51,6 +57,11 @@ export function rowsToEnterprisePayload(
       openDecisions: 0,
       briefHighlight: `${systemName}: query returned no rows.`,
       timeline: [{ title: 'PostgreSQL sync', detail: 'Empty result set' }],
+      model: inferUemFromMetrics({
+        connectedSystems: 1,
+        sourceSystem: systemName,
+        timelineLength: 1,
+      }),
     };
   }
 
@@ -74,7 +85,7 @@ export function rowsToEnterprisePayload(
     }
   }
 
-  return {
+  const payload = {
     healthScore: Math.min(
       100,
       Math.max(0, asNumber(map.healthscore ?? map.health ?? map.score, 65)),
@@ -98,6 +109,16 @@ export function rowsToEnterprisePayload(
         detail: `${rows.length} row(s) from reporting query — no vendor API required.`,
       },
     ],
+  };
+  return {
+    ...payload,
+    model: inferUemFromMetrics({
+      connectedSystems: payload.connectedSystems,
+      openAlerts: payload.openAlerts,
+      openDecisions: payload.openDecisions,
+      sourceSystem: systemName,
+      timelineLength: payload.timeline.length,
+    }),
   };
 }
 

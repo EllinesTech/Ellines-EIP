@@ -256,6 +256,23 @@ export const SERVICE_PORTS = {
   web: 3100,
 } as const;
 
+export {
+  UEM_OBJECT_KINDS,
+  emptyUemCounts,
+  inferUemFromMetrics,
+  normalizeUemModel,
+  packTimelineStorage,
+  unpackTimelineStorage,
+  type EnterpriseTimelineEvent,
+  type TimelineStorage,
+  type UemCounts,
+  type UemModel,
+  type UemObject,
+  type UemObjectKind,
+} from './uem';
+
+import type { UemModel } from './uem';
+
 /** Normalized enterprise summary for Command Center + Ellinea brief. */
 export interface EnterpriseSummary {
   organizationId: string;
@@ -267,6 +284,8 @@ export interface EnterpriseSummary {
   openDecisions: number;
   briefHighlight: string;
   timeline: { title: string; detail: string }[];
+  /** Universal Enterprise Model slice from last sync (optional for legacy snapshots). */
+  model?: UemModel | null;
   syncedAt: string | null;
   status: 'idle' | 'synced' | 'error';
 }

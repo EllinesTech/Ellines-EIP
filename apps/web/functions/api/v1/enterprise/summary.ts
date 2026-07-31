@@ -6,6 +6,7 @@ import {
   type Env,
 } from '../../../shared/auth';
 import seed from '../../../shared/demo-enterprise.json';
+import { unpackTimelineStorage } from '../../../shared/uem';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -38,11 +39,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       openDecisions: 0,
       briefHighlight: 'No connector sync yet. Open Connectors and run Sync now.',
       timeline: [],
+      model: null,
       syncedAt: null,
       status: 'idle',
       seedAvailable: Boolean(seed),
     });
   }
+
+  const { events, model } = unpackTimelineStorage(snap.timeline);
 
   return json({
     organizationId: snap.organization_id,
@@ -53,7 +57,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     openAlerts: snap.open_alerts,
     openDecisions: snap.open_decisions,
     briefHighlight: snap.brief_highlight,
-    timeline: snap.timeline,
+    timeline: events,
+    model,
     syncedAt: new Date(snap.synced_at as string).toISOString(),
     status: 'synced',
   });

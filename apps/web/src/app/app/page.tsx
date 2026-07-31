@@ -58,13 +58,6 @@ function AdminOverview({
           },
         ];
 
-  const modules = [
-    { label: 'Connectors', pct: synced ? Math.min(98, 55 + systems * 12) : 22 },
-    { label: 'Ellinea', pct: synced ? 78 : 40 },
-    { label: 'IT Admin', pct: 64 },
-    { label: 'Settings', pct: 48 },
-  ];
-
   const donut = [
     { name: 'Decisions', value: Math.max(1, decisions), color: chartColors.GREEN },
     { name: 'Alerts', value: Math.max(1, alerts), color: chartColors.BLUE },
@@ -120,6 +113,24 @@ function AdminOverview({
           </div>
         </article>
       </div>
+
+      {synced && summary?.model?.counts ? (
+        <div className={styles.uemStrip} aria-label="Universal Enterprise Model counts">
+          {(
+            [
+              ['Branches', summary.model.counts.branches],
+              ['People', summary.model.counts.people],
+              ['Tasks', summary.model.counts.tasks],
+              ['Alerts', summary.model.counts.notifications],
+            ] as const
+          ).map(([label, value]) => (
+            <article key={label} className={styles.uemChip}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </article>
+          ))}
+        </div>
+      ) : null}
 
       <div className={styles.gridAdmin}>
         <section className={styles.card}>
@@ -190,19 +201,25 @@ function AdminOverview({
       <div className={styles.gridAdminBottom}>
         <section className={styles.card}>
           <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>Top Modules</h2>
+            <h2 className={styles.cardTitle}>Enterprise objects</h2>
           </div>
-          <div className={styles.bars}>
-            {modules.map((m) => (
-              <div key={m.label} className={styles.barRow}>
-                <span>{m.label}</span>
-                <div className={styles.track}>
-                  <div className={styles.fill} style={{ width: `${m.pct}%` }} />
-                </div>
-                <em>{m.pct}%</em>
-              </div>
-            ))}
-          </div>
+          {synced && summary?.model?.objects?.length ? (
+            <ul className={styles.uemObjects}>
+              {summary.model.objects.slice(0, 6).map((obj) => (
+                <li key={obj.id}>
+                  <span className={styles.uemKind}>{obj.kind}</span>
+                  <div>
+                    <strong>{obj.name}</strong>
+                    <p>{obj.status || 'synced'}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.lede}>
+              Sync a connector to populate branches, people, tasks, and other UEM objects.
+            </p>
+          )}
         </section>
 
         <section className={styles.card}>

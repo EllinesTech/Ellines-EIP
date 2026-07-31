@@ -4,6 +4,60 @@
   "openAlerts": 3,
   "openDecisions": 5,
   "briefHighlight": "Operations steady; three branches need attention on inventory risk and overdue approvals.",
+  "sourceSystem": "Demo JSON Systems",
+  "model": {
+    "version": "1.0",
+    "sourceSystem": "Demo JSON Systems",
+    "capabilities": ["read", "sync", "normalize"],
+    "counts": {
+      "branches": 3,
+      "departments": 5,
+      "people": 42,
+      "documents": 18,
+      "assets": 11,
+      "tasks": 5,
+      "notifications": 3,
+      "events": 3
+    },
+    "objects": [
+      {
+        "id": "br-nairobi",
+        "kind": "branch",
+        "name": "Nairobi HQ",
+        "status": "attention"
+      },
+      {
+        "id": "br-mombasa",
+        "kind": "branch",
+        "name": "Mombasa Ops",
+        "status": "healthy"
+      },
+      {
+        "id": "br-kisumu",
+        "kind": "branch",
+        "name": "Kisumu Clinic",
+        "status": "attention"
+      },
+      {
+        "id": "dept-finance",
+        "kind": "department",
+        "name": "Finance",
+        "status": "active"
+      },
+      {
+        "id": "task-appr-1",
+        "kind": "task",
+        "name": "Overdue branch approvals",
+        "status": "open"
+      },
+      {
+        "id": "notif-inv",
+        "kind": "notification",
+        "name": "Inventory risk — Nairobi",
+        "status": "open"
+      }
+    ]
+  },
   "timeline": [
     {
       "title": "Demo connector online",

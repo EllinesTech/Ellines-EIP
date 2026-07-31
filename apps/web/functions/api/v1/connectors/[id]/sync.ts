@@ -8,6 +8,11 @@ import {
 } from '../../../../shared/auth';
 import demoSeed from '../../../../shared/demo-enterprise.json';
 import restSample from '../../../../shared/rest-enterprise-sample.json';
+import {
+  normalizeEnterprisePayload,
+  parseCsvToEnterprisePayload,
+  toTimelineStorage,
+} from '../../../../shared/connectors';
 
 const CSV_SAMPLE = `metric,value
 healthScore,81
@@ -22,115 +27,6 @@ type SyncBody = {
   headers?: Record<string, string>;
   csvText?: string;
 };
-
-function asNumber(value: unknown, fallback = 0): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(n) ? Math.round(n) : fallback;
-}
-
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
-}
-
-function normalizeEnterprisePayload(raw: unknown) {
-  const root = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const data =
-    root.data && typeof root.data === 'object'
-      ? (root.data as Record<string, unknown>)
-      : root.enterprise && typeof root.enterprise === 'object'
-        ? (root.enterprise as Record<string, unknown>)
-        : root;
-
-  const timelineRaw = data.timeline ?? data.events ?? data.activity ?? [];
-  const timeline = Array.isArray(timelineRaw)
-    ? timelineRaw
-        .map((item) => {
-          if (!item || typeof item !== 'object') return null;
-          const row = item as Record<string, unknown>;
-          const title = asString(row.title ?? row.name ?? row.event, '');
-          const detail = asString(row.detail ?? row.description ?? row.message, '');
-          if (!title) return null;
-          return { title, detail: detail || title };
-        })
-        .filter((x): x is { title: string; detail: string } => Boolean(x))
-        .slice(0, 12)
-    : [];
-
-  return {
-    healthScore: Math.min(
-      100,
-      Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
-    ),
-    connectedSystems: Math.max(
-      0,
-      asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
-    ),
-    openAlerts: Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0)),
-    openDecisions: Math.max(
-      0,
-      asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
-    ),
-    briefHighlight: asString(
-      data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-      'REST sync completed with no brief text.',
-    ),
-    timeline,
-  };
-}
-
-function parseCsvToEnterprisePayload(csvText: string) {
-  const lines = csvText
-    .replace(/^\uFEFF/, '')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (!lines.length) throw new Error('CSV is empty');
-
-  const split = (line: string) =>
-    line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
-
-  const header = split(lines[0]).map((h) => h.toLowerCase());
-  const map: Record<string, string> = {};
-  const looksWide =
-    header.includes('healthscore') ||
-    header.includes('health') ||
-    header.includes('connectedsystems') ||
-    header.includes('systems');
-
-  if (looksWide && lines.length >= 2) {
-    const values = split(lines[1]);
-    header.forEach((h, i) => {
-      if (values[i] !== undefined) map[h] = values[i];
-    });
-  } else {
-    for (const line of lines) {
-      const cols = split(line);
-      if (cols.length < 2) continue;
-      const key = cols[0].toLowerCase();
-      if (key === 'metric' || key === 'key' || key === 'field') continue;
-      map[key] = cols.slice(1).join(',').trim();
-    }
-  }
-
-  return normalizeEnterprisePayload({
-    healthScore: map.healthscore ?? map.health ?? map.score,
-    connectedSystems: map.connectedsystems ?? map.systems ?? map.connected_systems,
-    openAlerts: map.openalerts ?? map.alerts ?? map.open_alerts,
-    openDecisions: map.opendecisions ?? map.decisions ?? map.open_decisions,
-    briefHighlight:
-      map.briefhighlight ??
-      map.brief ??
-      map.summary ??
-      map.message ??
-      'Imported from CSV file export.',
-    timeline: [
-      {
-        title: 'CSV / file import',
-        detail: 'Enterprise snapshot loaded from a file export — no vendor API required.',
-      },
-    ],
-  });
-}
 
 function resolveEndpoint(requestUrl: string, endpoint?: string): string {
   const origin = new URL(requestUrl).origin;
@@ -158,6 +54,7 @@ async function upsertSnapshot(
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
+  const packedTimeline = toTimelineStorage(payload);
   const row = {
     id: crypto.randomUUID(),
     organization_id: organizationId,
@@ -168,7 +65,7 @@ async function upsertSnapshot(
     open_alerts: payload.openAlerts,
     open_decisions: payload.openDecisions,
     brief_highlight: payload.briefHighlight,
-    timeline: payload.timeline,
+    timeline: packedTimeline,
     synced_at: syncedAt,
     created_at: syncedAt,
     updated_at: syncedAt,
@@ -224,6 +121,7 @@ async function upsertSnapshot(
     openDecisions: payload.openDecisions,
     briefHighlight: payload.briefHighlight,
     timeline: payload.timeline,
+    model: payload.model || null,
     syncedAt,
     status: 'synced' as const,
   };

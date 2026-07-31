@@ -1,3 +1,10 @@
+import {
+  inferUemFromMetrics,
+  normalizeUemModel,
+  packTimelineStorage,
+  type UemModel,
+} from './uem';
+
 /** Connector helpers for Cloudflare Pages Functions (mirrors connectors-sdk). */
 
 export type InstallConfig = {
@@ -113,26 +120,54 @@ export function normalizeEnterprisePayload(raw: unknown) {
         .slice(0, 12)
     : [];
 
+  const healthScore = Math.min(
+    100,
+    Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
+  );
+  const connectedSystems = Math.max(
+    0,
+    asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
+  );
+  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0));
+  const openDecisions = Math.max(
+    0,
+    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
+  );
+  const briefHighlight = asString(
+    data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
+    'REST sync completed with no brief text.',
+  );
+
+  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system, '');
+  let model: UemModel | null = null;
+  if (data.model || data.uem || data.objects || data.counts) {
+    model = normalizeUemModel(data, {
+      sourceSystem: sourceSystem || undefined,
+      fallbackCapabilities: ['read', 'sync'],
+    });
+  } else {
+    model = inferUemFromMetrics({
+      connectedSystems,
+      openAlerts,
+      openDecisions,
+      sourceSystem: sourceSystem || undefined,
+      timelineLength: timeline.length,
+    });
+  }
+
   return {
-    healthScore: Math.min(
-      100,
-      Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
-    ),
-    connectedSystems: Math.max(
-      0,
-      asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
-    ),
-    openAlerts: Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0)),
-    openDecisions: Math.max(
-      0,
-      asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
-    ),
-    briefHighlight: asString(
-      data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-      'REST sync completed with no brief text.',
-    ),
+    healthScore,
+    connectedSystems,
+    openAlerts,
+    openDecisions,
+    briefHighlight,
     timeline,
+    model,
   };
+}
+
+export function toTimelineStorage(payload: ReturnType<typeof normalizeEnterprisePayload>) {
+  return packTimelineStorage(payload.timeline, payload.model);
 }
 
 export function parseCsvToEnterprisePayload(csvText: string) {

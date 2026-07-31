@@ -14,6 +14,7 @@ import {
   parseCsvToEnterprisePayload,
   parseOpenApiDocument,
   syncOpenApiRoutes,
+  toTimelineStorage,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 
@@ -35,6 +36,7 @@ async function upsertSnapshot(
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
+  const packedTimeline = toTimelineStorage(payload);
   const row = {
     id: crypto.randomUUID(),
     organization_id: organizationId,
@@ -45,7 +47,7 @@ async function upsertSnapshot(
     open_alerts: payload.openAlerts,
     open_decisions: payload.openDecisions,
     brief_highlight: payload.briefHighlight,
-    timeline: payload.timeline,
+    timeline: packedTimeline,
     synced_at: syncedAt,
     created_at: syncedAt,
     updated_at: syncedAt,
@@ -98,6 +100,7 @@ async function upsertSnapshot(
     openDecisions: payload.openDecisions,
     briefHighlight: payload.briefHighlight,
     timeline: payload.timeline,
+    model: payload.model || null,
     syncedAt,
     status: 'synced' as const,
   };

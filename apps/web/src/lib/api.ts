@@ -314,6 +314,28 @@ export interface EnterpriseSummaryDto {
   openDecisions: number;
   briefHighlight: string;
   timeline: { title: string; detail: string }[];
+  model?: {
+    version: '1.0';
+    sourceSystem?: string;
+    capabilities: string[];
+    counts: {
+      branches: number;
+      departments: number;
+      people: number;
+      documents: number;
+      assets: number;
+      tasks: number;
+      notifications: number;
+      events: number;
+    };
+    objects: {
+      id: string;
+      kind: string;
+      name: string;
+      status?: string;
+      branchId?: string;
+    }[];
+  } | null;
   syncedAt: string | null;
   status: 'idle' | 'synced' | 'error';
 }

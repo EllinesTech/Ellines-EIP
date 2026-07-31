@@ -13,13 +13,13 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
-| **2 — Integration Hub** | ~90% | **MVP connectors done** (REST, OpenAPI, Postgres, CSV, Email, SFTP + packs/wizard). Next: deepen UEM |
-| **3 — Executive Command Center** | ~55% | Work Console KPIs from connector sync; Timeline / Search / Notifications still open |
+| **2 — Integration Hub** | ~95% | MVP connectors done; **UEM normalize + Command Center object counts shipped**. Next: Sync Scheduler |
+| **3 — Executive Command Center** | ~60% | Work Console KPIs + UEM strip from connector sync; Timeline / Search / Notifications still open |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
 
-**Critical path remaining:** **2.6 Universal Enterprise Model** → Sync Scheduler (2.7) → Ellinea AI deepen → Workflows / write under Owner policy.
+**Critical path remaining:** **2.7 Sync Scheduler** → Ellinea AI deepen → Timeline / Search / Notifications → Workflows / write under Owner policy.
 
 **MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
 
@@ -53,8 +53,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 2.4 | CSV/File Connector | `done` | Paste/import CSV — no API path |
 | 2.5 | Email Connector | `done` | IMAP via Identity (`imapflow`); Pages saves config |
 | 2.5a | SFTP / folder drop | `done` | Pull CSV via Identity (`ssh2-sftp-client`); Pages saves config |
-| 2.6 | Universal Enterprise Model | `next` | Snapshot fields are a thin start — deepen for System B capabilities |
-| 2.7 | Sync Scheduler | `todo` | Manual Sync now for MVP |
+| 2.6 | Universal Enterprise Model | `done` | Shared UEM types + normalize; timeline stores events+model; Command Center shows counts/objects |
+| 2.7 | Sync Scheduler | `next` | Manual Sync now for MVP — add interval jobs next |
 | 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |
 | 2.x | Webhooks / events | `todo` | Planned — System B pushes to EIP |
 | 2.x | SQL Server / MySQL | `todo` | Same pattern as Postgres when HIS needs it |

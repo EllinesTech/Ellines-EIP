@@ -4,6 +4,12 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type {
+  ConnectorInstallation,
+  ConnectorPack,
+  ConnectorStatus,
+  EnterpriseSummary,
+} from '@ellines-eip/shared';
 import {
   assertReadOnlySql,
   buildAuthHeaders,
@@ -17,15 +23,11 @@ import {
   parseCsvToEnterprisePayload,
   parseOpenApiDocument,
   syncOpenApiRoutes,
+  toTimelineStorage,
+  fromTimelineStorage,
   type ConnectorInstallConfig,
   type ImapMessageSummary,
 } from '@ellines-eip/connectors-sdk';
-import type {
-  ConnectorInstallation,
-  ConnectorPack,
-  ConnectorStatus,
-  EnterpriseSummary,
-} from '@ellines-eip/shared';
 import { ImapFlow } from 'imapflow';
 import { Client } from 'pg';
 import SftpClient from 'ssh2-sftp-client';
@@ -114,10 +116,12 @@ export class EnterpriseService {
         openDecisions: 0,
         briefHighlight: 'No connector sync yet. Open Connectors and run Sync now.',
         timeline: [],
+        model: null,
         syncedAt: null,
         status: 'idle',
       };
     }
+    const { events, model } = fromTimelineStorage(snap.timeline);
     return {
       organizationId: snap.organizationId,
       connectorId: snap.connectorId,
@@ -127,7 +131,8 @@ export class EnterpriseService {
       openAlerts: snap.openAlerts,
       openDecisions: snap.openDecisions,
       briefHighlight: snap.briefHighlight,
-      timeline: snap.timeline as { title: string; detail: string }[],
+      timeline: events,
+      model,
       syncedAt: snap.syncedAt.toISOString(),
       status: 'synced',
     };
@@ -379,7 +384,7 @@ export class EnterpriseService {
     options?: ConnectorInstallConfig,
   ) {
     if (connectorId === 'demo-json') {
-      const connector = createDemoJsonConnector(demoSeed);
+      const connector = createDemoJsonConnector(normalizeEnterprisePayload(demoSeed));
       const result = await connector.sync();
       if (!result.ok) {
         throw new ServiceUnavailableException(result.message || 'Sync failed');
@@ -521,7 +526,7 @@ export class EnterpriseService {
     displayName?: string,
   ) {
     if (catalogId === 'demo-json') {
-      const connector = createDemoJsonConnector(demoSeed);
+      const connector = createDemoJsonConnector(normalizeEnterprisePayload(demoSeed));
       const result = await connector.sync();
       if (!result.ok) throw new ServiceUnavailableException(result.message || 'Sync failed');
       return result.summary;
@@ -847,11 +852,21 @@ export class EnterpriseService {
       openDecisions: number;
       briefHighlight: string;
       timeline: { title: string; detail: string }[];
+      model?: import('@ellines-eip/shared').UemModel | null;
       syncedAt?: string;
     },
     connectorId: string,
   ) {
     const syncedAt = new Date(s.syncedAt || Date.now());
+    const packedTimeline = toTimelineStorage({
+      healthScore: s.healthScore,
+      connectedSystems: s.connectedSystems,
+      openAlerts: s.openAlerts,
+      openDecisions: s.openDecisions,
+      briefHighlight: s.briefHighlight,
+      timeline: s.timeline,
+      model: s.model ?? null,
+    });
     const snap = await this.prisma.enterpriseSnapshot.upsert({
       where: { organizationId },
       create: {
@@ -863,7 +878,7 @@ export class EnterpriseService {
         openAlerts: s.openAlerts,
         openDecisions: s.openDecisions,
         briefHighlight: s.briefHighlight,
-        timeline: s.timeline,
+        timeline: packedTimeline as object,
         syncedAt,
       },
       update: {
@@ -874,7 +889,7 @@ export class EnterpriseService {
         openAlerts: s.openAlerts,
         openDecisions: s.openDecisions,
         briefHighlight: s.briefHighlight,
-        timeline: s.timeline,
+        timeline: packedTimeline as object,
         syncedAt,
       },
     });
@@ -887,6 +902,7 @@ export class EnterpriseService {
         metadata: { connectorId },
       },
     });
+    const { events, model } = fromTimelineStorage(snap.timeline);
     return {
       organizationId: snap.organizationId,
       connectorId: snap.connectorId,
@@ -896,7 +912,8 @@ export class EnterpriseService {
       openAlerts: snap.openAlerts,
       openDecisions: snap.openDecisions,
       briefHighlight: snap.briefHighlight,
-      timeline: snap.timeline as { title: string; detail: string }[],
+      timeline: events,
+      model,
       syncedAt: snap.syncedAt.toISOString(),
       status: 'synced' as const,
     };

@@ -1,4 +1,10 @@
-import type { EnterpriseSummary } from '@ellines-eip/shared';
+import type { EnterpriseSummary, UemModel } from '@ellines-eip/shared';
+import {
+  inferUemFromMetrics,
+  normalizeUemModel,
+  packTimelineStorage,
+  unpackTimelineStorage,
+} from '@ellines-eip/shared';
 
 export {
   parseOpenApiDocument,
@@ -24,6 +30,13 @@ export {
   createSftpConnector,
   type SftpConnectorConfig,
 } from './sftp';
+
+export {
+  inferUemFromMetrics,
+  normalizeUemModel,
+  packTimelineStorage,
+  unpackTimelineStorage,
+};
 
 export type ConnectorType = 'api' | 'database' | 'file' | 'email' | 'event';
 
@@ -119,6 +132,7 @@ export type EnterprisePayload = {
   openDecisions: number;
   briefHighlight: string;
   timeline: { title: string; detail: string }[];
+  model?: UemModel | null;
 };
 
 export function defineConnector(plugin: ConnectorPlugin): ConnectorPlugin {
@@ -159,26 +173,59 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
         .slice(0, 12)
     : [];
 
+  const healthScore = Math.min(
+    100,
+    Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
+  );
+  const connectedSystems = Math.max(
+    0,
+    asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
+  );
+  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0));
+  const openDecisions = Math.max(
+    0,
+    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
+  );
+  const briefHighlight = asString(
+    data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
+    'REST sync completed with no brief text.',
+  );
+
+  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system, '');
+  let model: UemModel | null = null;
+  if (data.model || data.uem || data.objects || data.counts) {
+    model = normalizeUemModel(data, {
+      sourceSystem: sourceSystem || undefined,
+      fallbackCapabilities: ['read', 'sync'],
+    });
+  } else {
+    model = inferUemFromMetrics({
+      connectedSystems,
+      openAlerts,
+      openDecisions,
+      sourceSystem: sourceSystem || undefined,
+      timelineLength: timeline.length,
+    });
+  }
+
   return {
-    healthScore: Math.min(
-      100,
-      Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
-    ),
-    connectedSystems: Math.max(
-      0,
-      asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
-    ),
-    openAlerts: Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0)),
-    openDecisions: Math.max(
-      0,
-      asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
-    ),
-    briefHighlight: asString(
-      data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-      'REST sync completed with no brief text.',
-    ),
+    healthScore,
+    connectedSystems,
+    openAlerts,
+    openDecisions,
+    briefHighlight,
     timeline,
+    model,
   };
+}
+
+/** Persist-ready timeline JSON (events + UEM) for enterprise_snapshots.timeline */
+export function toTimelineStorage(payload: EnterprisePayload) {
+  return packTimelineStorage(payload.timeline, payload.model);
+}
+
+export function fromTimelineStorage(raw: unknown) {
+  return unpackTimelineStorage(raw);
 }
 
 /** Demo JSON / file-style connector — returns a fixed enterprise snapshot. */
@@ -293,6 +340,7 @@ function emptyRestSummary(name: string) {
     openDecisions: 0,
     briefHighlight: '',
     timeline: [] as { title: string; detail: string }[],
+    model: null as UemModel | null,
   };
 }
 

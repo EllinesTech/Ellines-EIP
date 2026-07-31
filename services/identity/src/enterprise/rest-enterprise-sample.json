@@ -4,6 +4,48 @@
   "openAlerts": 2,
   "openDecisions": 4,
   "briefHighlight": "REST feed healthy — five systems online; two alerts need ops review before end of day.",
+  "sourceSystem": "REST API Systems",
+  "model": {
+    "version": "1.0",
+    "sourceSystem": "REST API Systems",
+    "capabilities": ["read", "sync", "normalize"],
+    "counts": {
+      "branches": 5,
+      "departments": 8,
+      "people": 120,
+      "documents": 34,
+      "assets": 22,
+      "tasks": 4,
+      "notifications": 2,
+      "events": 3
+    },
+    "objects": [
+      {
+        "id": "br-1",
+        "kind": "branch",
+        "name": "Central Warehouse",
+        "status": "healthy"
+      },
+      {
+        "id": "br-2",
+        "kind": "branch",
+        "name": "East Clinic",
+        "status": "attention"
+      },
+      {
+        "id": "task-1",
+        "kind": "task",
+        "name": "Finance approval queue",
+        "status": "open"
+      },
+      {
+        "id": "notif-1",
+        "kind": "notification",
+        "name": "Ops alert — stock delay",
+        "status": "open"
+      }
+    ]
+  },
   "timeline": [
     {
       "title": "REST connector sample online",
