@@ -4,9 +4,15 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  createOrgBranch,
+  createOrgDepartment,
   getSession,
   inviteOrgUser,
+  listOrgBranches,
+  listOrgDepartments,
   listOrgUsers,
+  OrgBranch,
+  OrgDepartment,
   OrgMember,
   updateOrgUser,
 } from '@/lib/api';
@@ -25,6 +31,8 @@ export default function AdminPage() {
   const [actorRole, setActorRole] = useState('member');
   const [actorId, setActorId] = useState('');
   const [users, setUsers] = useState<OrgMember[]>([]);
+  const [branches, setBranches] = useState<OrgBranch[]>([]);
+  const [departments, setDepartments] = useState<OrgDepartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -32,6 +40,10 @@ export default function AdminPage() {
   const [inviteRole, setInviteRole] = useState('member');
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [branchName, setBranchName] = useState('');
+  const [branchCode, setBranchCode] = useState('');
+  const [deptName, setDeptName] = useState('');
+  const [deptBranchId, setDeptBranchId] = useState('');
 
   useEffect(() => {
     const s = getSession();
@@ -48,13 +60,20 @@ export default function AdminPage() {
     setAllowed(true);
   }, [router]);
 
-  async function loadUsers() {
+  async function loadAll() {
     setLoading(true);
     setError('');
     try {
-      setUsers(await listOrgUsers());
+      const [u, b, d] = await Promise.all([
+        listOrgUsers(),
+        listOrgBranches(),
+        listOrgDepartments(),
+      ]);
+      setUsers(u);
+      setBranches(b);
+      setDepartments(d);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load users');
+      setError(err instanceof Error ? err.message : 'Failed to load admin data');
     } finally {
       setLoading(false);
     }
@@ -62,7 +81,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!allowed) return;
-    void loadUsers();
+    void loadAll();
   }, [allowed]);
 
   const assignableRoles = rolesAssignableBy(actorRole);
@@ -83,9 +102,47 @@ export default function AdminPage() {
       setInviteEmail('');
       setInviteName('');
       setInviteRole('member');
-      await loadUsers();
+      await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invite failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCreateBranch(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await createOrgBranch({
+        name: branchName,
+        code: branchCode.trim() || undefined,
+      });
+      setBranchName('');
+      setBranchCode('');
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create branch');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCreateDepartment(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await createOrgDepartment({
+        name: deptName,
+        branchId: deptBranchId || undefined,
+      });
+      setDeptName('');
+      setDeptBranchId('');
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create department');
     } finally {
       setBusy(false);
     }
@@ -96,7 +153,7 @@ export default function AdminPage() {
     setError('');
     try {
       await updateOrgUser(userId, { role });
-      await loadUsers();
+      await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Role update failed');
     } finally {
@@ -109,7 +166,7 @@ export default function AdminPage() {
     setError('');
     try {
       await updateOrgUser(user.id, { isActive: !user.isActive });
-      await loadUsers();
+      await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed');
     } finally {
@@ -135,8 +192,8 @@ export default function AdminPage() {
           <h1>{isOwner ? 'People & authority' : 'Users & access'}</h1>
           <p className={styles.lede}>
             {isOwner
-              ? 'Invite IT Admins and work users. Only you can grant or revoke IT.'
-              : 'Invite executives, managers, and members. Owner/IT stays with the Owner.'}
+              ? 'Invite IT Admins and work users. Manage branches and departments. Only you can grant or revoke IT.'
+              : 'Invite executives, managers, and members. Maintain org structure. Owner/IT stays with the Owner.'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -200,6 +257,94 @@ export default function AdminPage() {
             {busy ? 'Working…' : 'Invite'}
           </button>
         </form>
+      </section>
+
+      <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
+        <div className={styles.panelLabel}>Org structure · Branches</div>
+        <form className={adminStyles.form} onSubmit={(e) => void onCreateBranch(e)}>
+          <label>
+            Branch name
+            <input
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+              required
+              minLength={2}
+              placeholder="Nairobi HQ"
+            />
+          </label>
+          <label>
+            Code
+            <input
+              value={branchCode}
+              onChange={(e) => setBranchCode(e.target.value)}
+              placeholder="NBO"
+            />
+          </label>
+          <button type="submit" className={adminStyles.primary} disabled={busy}>
+            Add branch
+          </button>
+        </form>
+        {branches.length ? (
+          <ul className={adminStyles.structList}>
+            {branches.map((b) => (
+              <li key={b.id}>
+                <strong>{b.name}</strong>
+                <span>{b.code || '—'}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={styles.lede} style={{ marginTop: '0.5rem' }}>
+            No branches yet — add sites so Ellinea and connectors can ground by location.
+          </p>
+        )}
+      </section>
+
+      <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
+        <div className={styles.panelLabel}>Org structure · Departments</div>
+        <form className={adminStyles.form} onSubmit={(e) => void onCreateDepartment(e)}>
+          <label>
+            Department
+            <input
+              value={deptName}
+              onChange={(e) => setDeptName(e.target.value)}
+              required
+              minLength={2}
+              placeholder="Operations"
+            />
+          </label>
+          <label>
+            Branch (optional)
+            <select value={deptBranchId} onChange={(e) => setDeptBranchId(e.target.value)}>
+              <option value="">Org-wide</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className={adminStyles.primary} disabled={busy}>
+            Add department
+          </button>
+        </form>
+        {departments.length ? (
+          <ul className={adminStyles.structList}>
+            {departments.map((d) => {
+              const branch = branches.find((b) => b.id === d.branchId);
+              return (
+                <li key={d.id}>
+                  <strong>{d.name}</strong>
+                  <span>{branch ? branch.name : 'Org-wide'}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className={styles.lede} style={{ marginTop: '0.5rem' }}>
+            No departments yet.
+          </p>
+        )}
       </section>
 
       <section className={adminStyles.tableWrap}>

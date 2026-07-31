@@ -16,9 +16,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~95% | Owner vs IT hardened; audit UI + org structure still thin |
+| **1 — Platform Foundation** | ~96% | Org structure UI landing; audit UI + change password still todo |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped |
-| **3 — Owner / Admin Command Center** | ~94% | **Active** — Owner/IT Overview polish landing; org structure next |
+| **3 — Owner / Admin Command Center** | ~96% | **Active** — 3.7 done; 3.8 org structure landing |
 | **4 — Ellinea AI** | ~65% | Learning + standalone planned; **how-to demo later** (Phase 6) |
 | **5 — Workflow & Automation** | ~15% | Approvals stub; deep workflow after Owner/Admin dash |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
@@ -51,7 +51,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.4a | Audit Center UI | `todo` | `/app/admin` or `/app/audit` — invite/role/sync events for Owner/IT |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform` |
 | 1.5a | Owner vs IT authority | `done` | Only Owner assigns Owner & IT |
-| 1.6 | Org structure UI (branches / depts) | `next` | Nest APIs exist; **Pages Functions + Work Console UI** left behind |
+| 1.6 | Org structure UI (branches / depts) | `done` | Pages Functions + Org Admin forms |
 | 1.7 | Org profile (name / slug display) | `todo` | Owner edits org display name in Settings |
 
 ---
@@ -88,9 +88,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.4 | Enterprise Timeline | `done` | |
 | 3.5 | Enterprise Search | `done` | |
 | 3.6 | Notification Center | `done` | Delete one / all; mark read; settings |
-| 3.7 | Owner / IT Admin dashboard polish | `done` | Owner/IT copy, ops rail, Approvals/Ellinea KPI links, Admin shortcuts |
-| 3.8 | Org structure in Admin | `next` | Branches + departments UI (ties to 1.6) |
-| 3.9 | Owner/IT empty states | `todo` | Clear CTAs when no connectors / no members |
+| 3.7 | Owner / IT Admin dashboard polish | `done` | Owner/IT copy, ops rail, Approvals/Ellinea KPI links |
+| 3.8 | Org structure in Admin | `done` | Branches + departments on `/app/admin` |
+| 3.9 | Owner/IT empty states | `next` | Clear CTAs when no connectors / no members |
+| 1.4a | Audit Center UI | `todo` | After empty states — Owner/IT audit feed |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
 | 3.x | Other-role Overview polish | `todo` | After Owner/Admin path |
 
@@ -146,6 +147,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 ## Recently landed on main (through 2026-07-31)
 
+- Org structure (branches/departments) on Org Admin + Pages APIs
 - Owner/IT Overview ops rail + authority copy; roadmap keep-going + left-behind backlog
 - Notification delete; Ellinea learning + standalone phases documented
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify

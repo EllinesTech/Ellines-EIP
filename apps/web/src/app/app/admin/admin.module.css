@@ -303,3 +303,33 @@
   color: #8b95a8;
   line-height: 1.35;
 }
+
+.structList {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.structList li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f131b;
+  font-size: 0.78rem;
+}
+
+.structList strong {
+  color: #f4f7fb;
+  font-weight: 650;
+}
+
+.structList span {
+  color: #8b95a8;
+  font-size: 0.7rem;
+}

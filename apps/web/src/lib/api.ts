@@ -246,6 +246,42 @@ export function updateOrgUser(userId: string, payload: { role?: string; isActive
   });
 }
 
+export type OrgBranch = {
+  id: string;
+  name: string;
+  code: string | null;
+  createdAt: string;
+};
+
+export type OrgDepartment = {
+  id: string;
+  name: string;
+  branchId: string | null;
+  createdAt: string;
+};
+
+export function listOrgBranches() {
+  return request<OrgBranch[]>('/api/v1/orgs/me/branches');
+}
+
+export function createOrgBranch(payload: { name: string; code?: string }) {
+  return request<OrgBranch>('/api/v1/orgs/me/branches', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listOrgDepartments() {
+  return request<OrgDepartment[]>('/api/v1/orgs/me/departments');
+}
+
+export function createOrgDepartment(payload: { name: string; branchId?: string }) {
+  return request<OrgDepartment>('/api/v1/orgs/me/departments', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export type OrgDateTimeSettingsDto = {
   timeFormat: '12h' | '24h';
   dateStyle: 'short' | 'medium' | 'log';
