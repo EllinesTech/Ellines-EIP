@@ -53,6 +53,17 @@
   --dash-purple: #0d9488;
 }
 
+.shell[data-density='compact'] {
+  --dash-content-pad-y: 1rem;
+  --dash-content-pad-x: 1.15rem;
+  font-size: 0.9375rem;
+}
+
+.shell[data-density='comfortable'] {
+  --dash-content-pad-y: 1.25rem;
+  --dash-content-pad-x: 1.4rem;
+}
+
 .shellCollapsed {
   grid-template-columns: 76px 1fr;
 }
@@ -653,7 +664,7 @@
 }
 
 .content {
-  padding: 1.35rem 1.5rem 5.5rem;
+  padding: var(--dash-content-pad-y, 1.25rem) var(--dash-content-pad-x, 1.4rem) 5.25rem;
   animation: rise 0.4s ease both;
   flex: 1 1 auto;
   min-height: 0;
@@ -662,6 +673,8 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
 .appFooter {

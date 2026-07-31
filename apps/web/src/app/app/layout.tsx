@@ -252,6 +252,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       className={`${styles.shell} ${collapsed ? styles.shellCollapsed : ''}`}
       data-theme={uiPrefs.theme}
       data-accent={uiPrefs.accent}
+      data-density={uiPrefs.density}
     >
       <aside className={styles.sidebar}>
         <div className={styles.brand}>

@@ -8,18 +8,20 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ---
 
-## Where we are (2026-07-30)
+## Where we are (2026-07-31)
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened |
-| **2 — Integration Hub** | ~85% | Wizard + OpenAPI + Postgres + Email + SFTP; packs; Demo demoted |
-| **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
+| **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
+| **2 — Integration Hub** | ~90% | **MVP connectors done** (REST, OpenAPI, Postgres, CSV, Email, SFTP + packs/wizard). Next: deepen UEM |
+| **3 — Executive Command Center** | ~55% | Work Console KPIs from connector sync; Timeline / Search / Notifications still open |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
-| **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); see [10_Cloudflare_Pages_GitHub.md](./10_Cloudflare_Pages_GitHub.md) |
+| **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
 
-**Critical path remaining:** real System B install → UEM deepen → Ellinea AI → Workflows / write capabilities under Owner policy.
+**Critical path remaining:** **2.6 Universal Enterprise Model** → Sync Scheduler (2.7) → Ellinea AI deepen → Workflows / write under Owner policy.
+
+**MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
 
 ---
 
@@ -88,17 +90,16 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ---
 
-## Recently landed on main (2026-07-30)
+## Recently landed on main (through 2026-07-31)
 
-- Access layers: Work Console, Org IT Admin (`/app/admin`), Platform Super Admin (`/app/platform`); see [09_Access_Layers.md](./09_Access_Layers.md)
-- Org user invite / role / deactivate APIs (Nest + Pages Functions); role-adaptive Command Center mock KPIs
-- Auth UX complete (1.2b): register fix, forgot/reset password pages, work-email SSO (Pages + Nest)
-- Identity hardening (1.2a): RolesGuard, password reset tokens, Jest unit tests
-- Brand assets (Ellinea + EIP logos, favicons, splash)
-- Splash / login / register / app shell visual refresh
-- Agent sync pipeline (land on `main` after build; auto-merge `agent/*` PRs)
+- System Settings, profile shell, org datetime prefs (Pages)
+- Pages Functions import-path fix for connector installations (deploy runtime)
+- Owner vs IT hardening; Email IMAP + SFTP connectors; Pages deploy docs
+- Connector install wizard + OpenAPI + Postgres + platform packs
+- REST API + CSV/file connectors; live sync into enterprise snapshot
+- Access layers: Work Console / Org IT / Platform Super Admin ([09_Access_Layers.md](./09_Access_Layers.md))
+- Auth UX (1.2b) + Identity hardening (1.2a); brand + splash/login refresh
 - Identity Fly Dockerfile + deploy workflow + demo seed / login docs
-- Identity invite DTO / package tweaks
 
 ---
 
@@ -120,4 +121,4 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 
 ---
 
-*Last status review: 2026-07-30*
+*Last status review: 2026-07-31*

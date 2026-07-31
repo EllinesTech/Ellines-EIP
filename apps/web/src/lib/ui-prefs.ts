@@ -1,9 +1,11 @@
 export type UiTheme = 'dark' | 'dim';
 export type UiAccent = 'violet' | 'blue' | 'teal';
+export type UiDensity = 'comfortable' | 'compact';
 
 export type UiPrefs = {
   theme: UiTheme;
   accent: UiAccent;
+  density: UiDensity;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -12,6 +14,7 @@ export const UI_PREFS_EVENT = 'eip-ui-prefs';
 export const DEFAULT_UI_PREFS: UiPrefs = {
   theme: 'dark',
   accent: 'violet',
+  density: 'comfortable',
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -24,6 +27,7 @@ export function readUiPrefs(): UiPrefs {
       theme: parsed.theme === 'dim' ? 'dim' : 'dark',
       accent:
         parsed.accent === 'blue' || parsed.accent === 'teal' ? parsed.accent : 'violet',
+      density: parsed.density === 'compact' ? 'compact' : 'comfortable',
     };
   } catch {
     return DEFAULT_UI_PREFS;
