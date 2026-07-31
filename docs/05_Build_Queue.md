@@ -113,8 +113,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.4a | Server Enterprise Memory API | `todo` | Persist policies/decisions per org |
 | 4.5 | Context Engine | `done` | Role + org framing |
 | 4.6 | Chat Interface | `done` | |
-| 4.7 | Recommendation feedback loop | `next` | Accept / dismiss / “helpful?” on insights → re-rank |
-| 4.8 | Enterprise DNA capture | `todo` | From Memory + Approvals |
+| 4.7 | Recommendation feedback loop | `done` | Helpful/dismiss → re-rank; settings toggle |
+| 4.8 | Enterprise DNA capture | `next` | From Memory + Approvals |
 | 4.9 | Continuous learning signals | `todo` | Outcomes over time |
 | 4.10 | LLM / RAG | `todo` | After server Memory |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
