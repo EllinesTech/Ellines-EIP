@@ -129,7 +129,8 @@ while queue has next/in_progress and not blocked:
 | 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 | 4.H | How to use Ellinea brain | `done` | Same as 6.7 |
 | 1.3 | API Gateway | `done` | Edge routing service |
-| 2.x | Integration hub service | `next` | Optional microservice extract |
+| 2.x | Integration hub service | `done` | `services/integration-hub` |
+| 2.x | Webhooks / events | `next` | System B pushes to EIP |
 
 ---
 
@@ -189,8 +190,9 @@ Blueprint: *â€œContinuously learn from enterprise knowledge through Ellinea AI.â
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 1.3 | API Gateway | `next` | Nest/Fastify edge; route /auth /enterprise /ellinea |
-| 2.x | `services/integration-hub` | `todo` | Optional microservice |
+| 1.3 | API Gateway | `done` | Nest/Fastify edge; route /auth /enterprise /ellinea |
+| 2.x | `services/integration-hub` | `done` | Nest stub :3003 |
+| 2.x | Webhooks / events | `next` | System B pushes to EIP |
 | 2.x | Webhooks / events | `todo` | System B pushes to EIP |
 
 ## Recently landed on main (through 2026-07-31)
