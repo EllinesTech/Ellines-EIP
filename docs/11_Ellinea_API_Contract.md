@@ -65,4 +65,4 @@ MVP stub is open on localhost. Production will require JWT (same as Identity) an
 
 ## Client SDK
 
-`@ellines/ellinea-sdk` (queue 6.3) will wrap these routes.
+`@ellines-eip/ellinea-sdk` — `createEllineaClient({ baseUrl })` wraps health / ask / brief / recommend / memorySearch / feedback.
