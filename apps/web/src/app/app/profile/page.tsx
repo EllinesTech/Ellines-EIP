@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { roleLabel } from '@ellines-eip/shared';
 import {
   applyProfileToSession,
+  changePassword,
   getSession,
   updateMyProfile,
 } from '@/lib/api';
@@ -64,7 +65,10 @@ export default function ProfileSettingsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
   useEffect(() => {
     const s = getSession();
     if (!s) return;
@@ -117,6 +121,28 @@ export default function ProfileSettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save profile');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onChangePassword(e: FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    setPwBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await changePassword({ currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setNotice(result.message || 'Password updated.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change password');
+    } finally {
+      setPwBusy(false);
     }
   }
 
@@ -237,6 +263,50 @@ export default function ProfileSettingsPage() {
               {busy ? 'Saving…' : 'Save profile'}
             </button>
           </div>
+        </form>
+      </section>
+
+      <section className={profileStyles.card} style={{ marginTop: '0.75rem' }}>
+        <div className={styles.panelLabel}>Change password</div>
+        <p className={styles.lede} style={{ marginBottom: '0.55rem' }}>
+          Update your sign-in password. Minimum 8 characters.
+        </p>
+        <form className={adminStyles.form} onSubmit={(e) => void onChangePassword(e)}>
+          <label>
+            Current password
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </label>
+          <label>
+            New password
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </label>
+          <label>
+            Confirm new
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </label>
+          <button type="submit" className={adminStyles.primary} disabled={pwBusy}>
+            {pwBusy ? 'Updating…' : 'Update password'}
+          </button>
         </form>
       </section>
 

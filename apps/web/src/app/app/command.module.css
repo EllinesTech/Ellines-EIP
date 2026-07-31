@@ -82,6 +82,50 @@
   max-width: 36rem;
 }
 
+.healthStrip {
+  margin: 0 0 0.75rem;
+}
+
+.healthChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.healthChip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 7.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--c-line);
+  background: #0f131b;
+  text-decoration: none;
+  color: inherit;
+}
+
+.healthChip strong {
+  font-size: 0.75rem;
+  color: #f4f7fb;
+}
+
+.healthChip span {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b95a8;
+}
+
+.healthChip[data-status='synced'] span {
+  color: #34d399;
+}
+
+.healthChip[data-status='error'] span {
+  color: #f87171;
+}
+
 .eyebrow {
   margin: 0 0 0.2rem;
   font-size: 0.6875rem;

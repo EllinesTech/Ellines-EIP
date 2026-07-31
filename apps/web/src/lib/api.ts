@@ -282,6 +282,28 @@ export function createOrgDepartment(payload: { name: string; branchId?: string }
   });
 }
 
+export type AuditLogDto = {
+  id: string;
+  action: string;
+  resource: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  actorUserId: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
+};
+
+export function listOrgAuditLogs(limit = 80) {
+  return request<AuditLogDto[]>(`/api/v1/orgs/me/audit-logs?limit=${limit}`);
+}
+
+export function changePassword(payload: { currentPassword: string; newPassword: string }) {
+  return request<{ message: string }>('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export type OrgDateTimeSettingsDto = {
   timeFormat: '12h' | '24h';
   dateStyle: 'short' | 'medium' | 'log';

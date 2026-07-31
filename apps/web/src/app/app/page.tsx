@@ -13,7 +13,7 @@ import {
   sparkSeries,
   weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, type ConnectorInstallationDto, type EnterpriseSummaryDto } from '@/lib/api';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
 
@@ -24,6 +24,7 @@ function AdminOverview({
   synced,
   variant,
   uiPrefs,
+  installations,
 }: {
   name: string;
   role: string;
@@ -31,6 +32,7 @@ function AdminOverview({
   synced: boolean;
   variant: WorkHomeVariant;
   uiPrefs: UiPrefs;
+  installations: ConnectorInstallationDto[];
 }) {
   const isOwner = role === 'owner';
   const health = synced ? summary!.healthScore : 0;
@@ -73,6 +75,7 @@ function AdminOverview({
 
   const ops = [
     { href: '/app/admin', label: isOwner ? 'People & authority' : 'Users & access' },
+    { href: '/app/audit', label: 'Audit Center' },
     { href: '/app/connectors', label: 'Connectors' },
     { href: '/app/approvals', label: 'Approvals' },
     { href: '/app/notifications', label: 'Notifications' },
@@ -132,6 +135,25 @@ function AdminOverview({
           <Link href="/app/connectors" className={styles.aiBtn}>
             Open Connectors
           </Link>
+        </section>
+      ) : null}
+
+      {installations.length ? (
+        <section className={styles.healthStrip} aria-label="Connector health">
+          <div className={styles.panelLabel}>Connector health</div>
+          <div className={styles.healthChips}>
+            {installations.slice(0, 8).map((inst) => (
+              <Link
+                key={inst.id}
+                href="/app/connectors"
+                className={styles.healthChip}
+                data-status={inst.status || 'idle'}
+              >
+                <strong>{inst.displayName}</strong>
+                <span>{inst.status || 'idle'}</span>
+              </Link>
+            ))}
+          </div>
         </section>
       ) : null}
 
@@ -547,6 +569,7 @@ export default function CommandCenterPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlatform, setIsPlatform] = useState(false);
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
+  const [installations, setInstallations] = useState<ConnectorInstallationDto[]>([]);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
 
   useEffect(() => {
@@ -566,6 +589,11 @@ export default function CommandCenterPage() {
     fetchEnterpriseSummary()
       .then(setSummary)
       .catch(() => setSummary(null));
+    if (isOrgAdminRole(s?.user.role) || s?.isPlatformAdmin) {
+      listInstallations()
+        .then(setInstallations)
+        .catch(() => setInstallations([]));
+    }
     return () => window.removeEventListener(UI_PREFS_EVENT, onPrefs);
   }, []);
 
@@ -581,6 +609,7 @@ export default function CommandCenterPage() {
         synced={synced}
         variant={variant}
         uiPrefs={uiPrefs}
+        installations={installations}
       />
     );
   }

@@ -112,6 +112,15 @@ function IconApprovals() {
   );
 }
 
+function IconAudit() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M8 6h11M8 12h11M8 18h8" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -128,6 +137,7 @@ const NAV: NavItem[] = [
   { href: '/app/approvals', label: 'Approvals', icon: <IconApprovals /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
+  { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
@@ -277,6 +287,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                 ? 'Notifications'
                 : pathname.startsWith('/app/approvals')
                   ? 'Approvals'
+                : pathname.startsWith('/app/audit')
+                  ? 'Audit Center'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')

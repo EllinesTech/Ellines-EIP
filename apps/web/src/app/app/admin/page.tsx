@@ -206,6 +206,9 @@ export default function AdminPage() {
           <Link href="/app/approvals" className={styles.ghostBtn}>
             Approvals
           </Link>
+          <Link href="/app/audit" className={styles.ghostBtn}>
+            Audit
+          </Link>
           <Link href="/app/settings" className={styles.ghostBtn}>
             System Settings
           </Link>

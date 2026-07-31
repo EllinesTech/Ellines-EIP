@@ -16,9 +16,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~96% | Org structure UI landing; audit UI + change password still todo |
-| **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped |
-| **3 — Owner / Admin Command Center** | ~96% | **Active** — 3.7 done; 3.8 org structure landing |
+| **1 — Platform Foundation** | ~98% | Audit Center + change password shipped; org profile still todo |
+| **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
+| **3 — Owner / Admin Command Center** | ~98% | **Active** — Owner/Admin path nearly complete |
 | **4 — Ellinea AI** | ~65% | Learning + standalone planned; **how-to demo later** (Phase 6) |
 | **5 — Workflow & Automation** | ~15% | Approvals stub; deep workflow after Owner/Admin dash |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
@@ -45,14 +45,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.2 | Identity Core | `done` | NestJS: register/login JWT, orgs, branches, depts, invite, roles, AuditLog model |
 | 1.2a | Harden Identity | `done` | RolesGuard; forgot/reset; Jest unit tests |
 | 1.2b | Auth UX complete | `done` | Pages forgot/reset + SSO; login/register wired |
-| 1.2c | Change password (profile) | `todo` | Left behind — Owner/users change password while logged in |
+| 1.2c | Change password (profile) | `done` | Profile form + `/api/v1/auth/change-password` |
 | 1.3 | API Gateway | `todo` | Deferred — Hub first |
-| 1.4 | Audit Trail | `in_progress` | Writes exist; **Owner/IT audit log UI** still missing |
-| 1.4a | Audit Center UI | `todo` | `/app/admin` or `/app/audit` — invite/role/sync events for Owner/IT |
+| 1.4 | Audit Trail | `done` | Writes + Owner/IT Audit Center UI |
+| 1.4a | Audit Center UI | `done` | `/app/audit` + Pages list API |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform` |
 | 1.5a | Owner vs IT authority | `done` | Only Owner assigns Owner & IT |
 | 1.6 | Org structure UI (branches / depts) | `done` | Pages Functions + Org Admin forms |
-| 1.7 | Org profile (name / slug display) | `todo` | Owner edits org display name in Settings |
+| 1.7 | Org profile (name / slug display) | `next` | Owner edits org display name in Settings |
 
 ---
 
@@ -71,7 +71,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 2.5a | SFTP / folder drop | `done` | |
 | 2.6 | Universal Enterprise Model | `done` | |
 | 2.7 | Sync Scheduler | `done` | No Pages cron |
-| 2.8 | Connector health on Owner/IT Overview | `todo` | Per-install status chips on admin Overview |
+| 2.8 | Connector health on Owner/IT Overview | `done` | Install status chips on admin Overview |
 | 2.x | `services/integration-hub` | `todo` | Optional microservice |
 | 2.x | Webhooks / events | `todo` | System B pushes to EIP |
 | 2.x | SQL Server / MySQL | `todo` | When HIS needs it |
@@ -91,7 +91,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.7 | Owner / IT Admin dashboard polish | `done` | Owner/IT copy, ops rail, Approvals/Ellinea KPI links |
 | 3.8 | Org structure in Admin | `done` | Branches + departments on `/app/admin` |
 | 3.9 | Owner/IT empty states | `done` | No-sync callout on Overview; empty members on Admin |
-| 1.4a | Audit Center UI | `next` | Owner/IT audit feed of invites, roles, structure, sync |
+| 1.4a | Audit Center UI | `done` | `/app/audit` feed |
+| 1.7 | Org profile (name) | `next` | Owner edits org display name |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
 | 3.x | Other-role Overview polish | `todo` | After Owner/Admin path |
 
@@ -147,12 +148,12 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 ## Recently landed on main (through 2026-07-31)
 
+- Audit Center (`/app/audit`), change password on Profile, connector health chips on Overview
 - Org structure (branches/departments) on Org Admin + Pages APIs
-- Owner/IT Overview ops rail + authority copy; roadmap keep-going + left-behind backlog
+- Owner/IT Overview ops rail + empty states; roadmap keep-going
 - Notification delete; Ellinea learning + standalone phases documented
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
-- Sync scheduler; UEM; density; System Settings; Owner vs IT; connectors
 
 ---
 

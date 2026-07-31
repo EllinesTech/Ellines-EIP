@@ -333,3 +333,9 @@
   color: #8b95a8;
   font-size: 0.7rem;
 }
+
+.actionCode {
+  font-size: 0.72rem;
+  color: #c4b5fd;
+  word-break: break-all;
+}
