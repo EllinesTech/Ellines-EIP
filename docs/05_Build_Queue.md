@@ -112,9 +112,9 @@ while queue has next/in_progress and not blocked:
 | 4.9 | Continuous learning signals | `done` | Signals strip on Ask Ellinea |
 | 5.1a | Multi-step approval templates | `done` | simple / IT→Owner / Manager→Exec→Owner |
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
-| 5.3 | Scheduled Reports | `next` | Daily/weekly report stub |
+| 5.3 | Scheduled Reports | `done` | Local schedules + preview |
+| 3.x | Other-role Overview polish | `next` | Executive / manager / member Overview |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
-| 3.x | Other-role Overview polish | `todo` | After reports stub |
 
 ---
 
@@ -147,8 +147,9 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 5.1 | Approval Workflows | `done` | Local queue + multi-step templates |
 | 5.1a | Multi-step approval templates | `done` | IT→Owner, Manager→Exec→Owner, single |
 | 5.2 | Business Rules Engine | `done` | `/app/rules` + Overview flag hits (local) |
-| 5.3 | Scheduled Reports | `next` | Daily/weekly report stub |
-| 5.4 | Event Bus | `todo` | |
+| 5.3 | Scheduled Reports | `done` | `/app/reports` local schedules + preview |
+| 5.4 | Event Bus | `todo` | Internal pub/sub |
+| 3.x | Other-role Overview polish | `next` | Executive / manager / member Overview |
 
 ---
 
