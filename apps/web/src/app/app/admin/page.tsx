@@ -140,6 +140,15 @@ export default function AdminPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
+          <Link href="/app" className={styles.ghostBtn}>
+            Overview
+          </Link>
+          <Link href="/app/connectors" className={styles.ghostBtn}>
+            Connectors
+          </Link>
+          <Link href="/app/approvals" className={styles.ghostBtn}>
+            Approvals
+          </Link>
           <Link href="/app/settings" className={styles.ghostBtn}>
             System Settings
           </Link>

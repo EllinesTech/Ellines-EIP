@@ -27,6 +27,34 @@
   margin-bottom: 0.9rem;
 }
 
+.opsRail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: -0.25rem 0 0.75rem;
+}
+
+.opsLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--c-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: #c5cddb;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.opsLink:hover {
+  color: #fff;
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.12);
+}
+
 .eyebrow {
   margin: 0 0 0.2rem;
   font-size: 0.6875rem;

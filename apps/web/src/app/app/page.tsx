@@ -19,17 +19,20 @@ import styles from './command.module.css';
 
 function AdminOverview({
   name,
+  role,
   summary,
   synced,
   variant,
   uiPrefs,
 }: {
   name: string;
+  role: string;
   summary: EnterpriseSummaryDto | null;
   synced: boolean;
   variant: WorkHomeVariant;
   uiPrefs: UiPrefs;
 }) {
+  const isOwner = role === 'owner';
   const health = synced ? summary!.healthScore : 0;
   const systems = synced ? summary!.connectedSystems : 0;
   const alerts = synced ? summary!.openAlerts : 0;
@@ -68,30 +71,53 @@ function AdminOverview({
   ];
   const totalTasks = donut.reduce((a, b) => a + b.value, 0);
 
+  const ops = [
+    { href: '/app/admin', label: isOwner ? 'People & authority' : 'Users & access' },
+    { href: '/app/connectors', label: 'Connectors' },
+    { href: '/app/approvals', label: 'Approvals' },
+    { href: '/app/notifications', label: 'Notifications' },
+    { href: '/app/ellinea', label: 'Ask Ellinea' },
+    { href: '/app/settings', label: 'System Settings' },
+  ];
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Work Console</p>
+          <p className={styles.eyebrow}>
+            {isOwner ? 'Organization Owner' : 'IT Admin'} · Command Center
+          </p>
           <h1>Welcome back, {name}</h1>
           <p className={styles.lede}>
-            {synced
-              ? 'Live enterprise snapshot from your connectors.'
-              : 'Sync a connector to unlock live KPIs.'}
+            {isOwner
+              ? synced
+                ? 'Owner view — live snapshot, people authority, and Ellinea for org-wide decisions.'
+                : 'Owner view — invite IT, then sync a connector to unlock live KPIs.'
+              : synced
+                ? 'IT Admin view — connectors, access for work roles, and sync health.'
+                : 'IT Admin view — open Connectors and sync Demo JSON Systems to unlock live KPIs.'}
           </p>
         </div>
         <div className={styles.headerActions}>
-          <Link href="/app/timeline" className={styles.ghostBtn}>
-            Timeline
-          </Link>
-          <Link href="/app/search" className={styles.ghostBtn}>
-            Search
+          <Link href="/app/admin" className={styles.ghostBtn}>
+            {isOwner ? 'Org Admin' : 'IT Admin'}
           </Link>
           <Link href="/app/connectors" className={styles.ghostBtn}>
             Connectors
           </Link>
+          <Link href="/app/approvals" className={styles.ghostBtn}>
+            Approvals
+          </Link>
         </div>
       </header>
+
+      <nav className={styles.opsRail} aria-label="Owner and IT shortcuts">
+        {ops.map((item) => (
+          <Link key={item.href} href={item.href} className={styles.opsLink}>
+            {item.label}
+          </Link>
+        ))}
+      </nav>
 
       <div className={styles.kpis}>
         <article className={styles.kpi}>
@@ -114,26 +140,26 @@ function AdminOverview({
             </div>
           ) : null}
         </article>
-        <article className={styles.kpi}>
+        <Link href="/app/approvals" className={styles.kpi} style={{ textDecoration: 'none', color: 'inherit' }}>
           <span>Open Decisions</span>
           <strong>{synced ? String(decisions) : '—'}</strong>
-          <em>{synced ? 'In queue' : '—'}</em>
+          <em>{synced ? 'Open Approvals →' : '—'}</em>
           {uiPrefs.showSparklines ? (
             <div className={styles.spark}>
               <Sparkline data={sparks.decisions} color={chartColors.BLUE} />
             </div>
           ) : null}
-        </article>
-        <article className={styles.kpi}>
+        </Link>
+        <Link href="/app/ellinea" className={styles.kpi} style={{ textDecoration: 'none', color: 'inherit' }}>
           <span>Ellinea Status</span>
           <strong>Ready</strong>
-          <em className={styles.pos}>Standing by</em>
+          <em className={styles.pos}>Ask Ellinea →</em>
           {uiPrefs.showSparklines ? (
             <div className={styles.spark}>
               <Sparkline data={sparks.ready} color={chartColors.GREEN} />
             </div>
           ) : null}
-        </article>
+        </Link>
       </div>
 
       {synced && summary?.model?.counts && uiPrefs.showUemStrip ? (
@@ -200,6 +226,9 @@ function AdminOverview({
         <section className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Notifications</h2>
+            <Link href="/app/notifications" className={styles.primaryLink}>
+              Open →
+            </Link>
           </div>
           <ul className={styles.list}>
             {timeline.slice(0, 4).map((item, i) => (
@@ -497,6 +526,7 @@ function ClientOverview({
 
 export default function CommandCenterPage() {
   const [name, setName] = useState('there');
+  const [role, setRole] = useState('member');
   const [variant, setVariant] = useState<WorkHomeVariant>('member');
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlatform, setIsPlatform] = useState(false);
@@ -507,6 +537,7 @@ export default function CommandCenterPage() {
     const s = getSession();
     const first = s?.user.fullName?.split(' ')[0];
     if (first) setName(first);
+    setRole(s?.user.role || 'member');
     setVariant(workHomeVariant(s?.user.role));
     setIsAdmin(isOrgAdminRole(s?.user.role));
     setIsPlatform(Boolean(s?.isPlatformAdmin));
@@ -529,6 +560,7 @@ export default function CommandCenterPage() {
     return (
       <AdminOverview
         name={name}
+        role={role}
         summary={summary}
         synced={synced}
         variant={variant}
