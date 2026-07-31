@@ -60,7 +60,7 @@ while queue has next/in_progress and not blocked:
 | 1.2a | Harden Identity | `done` | RolesGuard; forgot/reset; Jest unit tests |
 | 1.2b | Auth UX complete | `done` | Pages forgot/reset + SSO; login/register wired |
 | 1.2c | Change password (profile) | `done` | Profile form + `/api/v1/auth/change-password` |
-| 1.3 | API Gateway | `todo` | Deferred — Hub first |
+| 1.3 | API Gateway | `next` | Nest/Fastify edge routing |
 | 1.4 | Audit Trail | `done` | Writes + Owner/IT Audit Center UI |
 | 1.4a | Audit Center UI | `done` | `/app/audit` + Pages list API |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform` |
@@ -124,7 +124,9 @@ while queue has next/in_progress and not blocked:
 | 6.4 | Bring-your-own connectors | `done` | `POST /api/v1/enterprise/ingest` + Connectors UI |
 | 6.5 | Tenant learning isolation | `done` | Server Memory + Learning (feedback/DNA) per org JWT |
 | 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` Owner/IT operator surface |
-| 6.7 | Standalone operator guide | `next` | How-to wire Memory + DNA + API into another product |
+| 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
+| 4.H | How to use Ellinea brain | `done` | Same as 6.7 |
+| 1.3 | API Gateway | `next` | Edge routing service |
 
 ---
 
@@ -146,7 +148,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
 | 4.10 | LLM / RAG | `done` | Local RAG + optional OpenAI-compatible Ask; settings toggle |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
-| 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
+| 4.H | **How to use Ellinea brain (standalone)** | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 
 ---
 
@@ -176,14 +178,17 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 6.4 | Bring-your-own connectors | `done` | External UEM ingest endpoint + Connectors paste UI |
 | 6.5 | Tenant learning isolation | `done` | `GET/PUT /api/v1/orgs/me/ellinea-learning` |
 | 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` |
-| 6.7 | Standalone operator guide | `next` | **How-to:** wire Memory + DNA + API into another Ellines product |
-| 6.3 | `@ellines/ellinea-sdk` | `todo` | |
-| 6.4 | Bring-your-own connectors | `todo` | UEM snapshots from any System B |
-| 6.5 | Tenant learning isolation | `todo` | |
-| 6.6 | Ellinea console (thin) | `todo` | |
-| 6.7 | Standalone operator guide | `todo` | **How-to:** wire Memory + DNA + API into another Ellines product |
+| 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 
 ---
+
+## Phase 1 leftovers / platform depth
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| 1.3 | API Gateway | `next` | Nest/Fastify edge; route /auth /enterprise /ellinea |
+| 2.x | `services/integration-hub` | `todo` | Optional microservice |
+| 2.x | Webhooks / events | `todo` | System B pushes to EIP |
 
 ## Recently landed on main (through 2026-07-31)
 
