@@ -180,6 +180,8 @@ export default function PlatformAdminPage() {
               <option value="rest-api">rest-api</option>
               <option value="postgres">postgres</option>
               <option value="csv-file">csv-file</option>
+              <option value="email-imap">email-imap</option>
+              <option value="sftp">sftp</option>
             </select>
           </label>
           <label>

@@ -57,5 +57,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       'database',
       'Reporting DB / replica when vendors will not ship an API',
     ),
+    item(
+      'email-imap',
+      'Email (IMAP)',
+      'email',
+      'Ingest mailed reports when the prime system has no API',
+    ),
+    item('sftp', 'SFTP / folder drop', 'file', 'Pull CSV dumps from SFTP — common in healthcare HIS'),
   ]);
 };

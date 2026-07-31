@@ -217,12 +217,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         displayName || 'CSV / File Import',
         parseCsvToEnterprisePayload(csvText),
       );
-    } else if (catalogId === 'postgres') {
+    } else if (catalogId === 'postgres' || catalogId === 'email-imap' || catalogId === 'sftp') {
       return json(
         {
           statusCode: 501,
           message:
-            'PostgreSQL sync needs the Identity API (TCP). Config is saved — point NEXT_PUBLIC_API_URL at Nest Identity, or use CSV/REST/OpenAPI on Pages.',
+            `${catalogId} sync needs the Identity API (TCP). Config is saved — point NEXT_PUBLIC_API_URL at Nest Identity, or use CSV/REST/OpenAPI on Pages.`,
         },
         501,
       );

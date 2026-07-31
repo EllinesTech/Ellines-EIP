@@ -14,6 +14,16 @@ export {
   type PostgresConnectorOptions,
   type PostgresQueryFn,
 } from './postgres';
+export {
+  createImapConnector,
+  emailsToEnterprisePayload,
+  type ImapConnectorConfig,
+  type ImapMessageSummary,
+} from './email-imap';
+export {
+  createSftpConnector,
+  type SftpConnectorConfig,
+} from './sftp';
 
 export type ConnectorType = 'api' | 'database' | 'file' | 'email' | 'event';
 
@@ -45,6 +55,20 @@ export type ConnectorInstallConfig = {
   sql?: string;
   fieldMap?: Record<string, string>;
   systemName?: string;
+  /** IMAP */
+  imapHost?: string;
+  imapPort?: number;
+  imapUser?: string;
+  imapPassword?: string;
+  imapMailbox?: string;
+  imapSecure?: boolean;
+  /** SFTP */
+  sftpHost?: string;
+  sftpPort?: number;
+  sftpUsername?: string;
+  sftpPassword?: string;
+  sftpPrivateKey?: string;
+  sftpRemotePath?: string;
 };
 
 export function buildAuthHeaders(config: ConnectorInstallConfig): Record<string, string> {
@@ -432,14 +456,14 @@ export const CONNECTOR_CATALOG = [
     id: 'email-imap',
     name: 'Email (IMAP)',
     type: 'email' as ConnectorType,
-    status: 'coming' as const,
+    status: 'available' as const,
     blurb: 'Ingest reports and alerts mailed from legacy systems.',
   },
   {
     id: 'sftp',
     name: 'SFTP / folder drop',
     type: 'file' as ConnectorType,
-    status: 'planned' as const,
+    status: 'available' as const,
     blurb: 'Watch a folder or SFTP inbox — still the #1 pattern for healthcare and supply chain.',
   },
   {

@@ -60,7 +60,18 @@ export const EIP_ROLES: UserRole[] = [
 /** Roles that can mutate org membership and structure. */
 export const ORG_ADMIN_ROLES: UserRole[] = ['owner', 'admin'];
 
-/** Roles assignable by org admins (owners may also assign `owner`). */
+/**
+ * Roles IT (`admin`) may assign. Owner may also assign `owner` and `admin` (IT).
+ * Work roles only for delegated IT — authority to grant IT stays with Owner.
+ */
+export const ORG_IT_ASSIGNABLE_ROLES: UserRole[] = [
+  'executive',
+  'manager',
+  'member',
+  'viewer',
+];
+
+/** @deprecated Prefer rolesAssignableBy(actorRole) */
 export const ORG_ASSIGNABLE_ROLES: UserRole[] = [
   'admin',
   'executive',
@@ -69,8 +80,76 @@ export const ORG_ASSIGNABLE_ROLES: UserRole[] = [
   'viewer',
 ];
 
+/** Human labels — Owner = business org admin; admin = invited IT. */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  owner: 'Owner (business)',
+  admin: 'IT Admin',
+  executive: 'Executive',
+  manager: 'Manager',
+  member: 'Member',
+  viewer: 'Viewer',
+};
+
+export function roleLabel(role: string | undefined | null): string {
+  if (!role) return 'Unknown';
+  return ROLE_LABELS[role as UserRole] || role;
+}
+
+/** Roles the actor is allowed to assign when inviting / changing users. */
+export function rolesAssignableBy(actorRole: string | undefined | null): UserRole[] {
+  if (actorRole === 'owner') return [...EIP_ROLES];
+  if (actorRole === 'admin') return [...ORG_IT_ASSIGNABLE_ROLES];
+  return [];
+}
+
+/**
+ * Owner grants IT. IT cannot create Owner or IT Admin — only work roles.
+ * Returns an error message or null if allowed.
+ */
+export function assertCanAssignRole(
+  actorRole: string | undefined | null,
+  nextRole: UserRole,
+): string | null {
+  if (actorRole === 'owner') return null;
+  if (actorRole === 'admin') {
+    if (nextRole === 'owner' || nextRole === 'admin') {
+      return 'Only the Owner can assign Owner or IT Admin';
+    }
+    if (!ORG_IT_ASSIGNABLE_ROLES.includes(nextRole)) {
+      return 'IT Admin cannot assign that role';
+    }
+    return null;
+  }
+  return 'Only Owner or IT Admin can assign roles';
+}
+
+/**
+ * IT may manage work users only. Owner/IT accounts are Owner-controlled.
+ */
+export function assertCanManageOrgUser(
+  actorRole: string | undefined | null,
+  targetRole: string | undefined | null,
+): string | null {
+  if (actorRole === 'owner') return null;
+  if (actorRole === 'admin') {
+    if (targetRole === 'owner' || targetRole === 'admin') {
+      return 'Only the Owner can manage Owner or IT Admin accounts';
+    }
+    return null;
+  }
+  return 'Only Owner or IT Admin can manage users';
+}
+
 export function isOrgAdminRole(role: string | undefined | null): boolean {
   return role === 'owner' || role === 'admin';
+}
+
+export function isOrgOwnerRole(role: string | undefined | null): boolean {
+  return role === 'owner';
+}
+
+export function isOrgItRole(role: string | undefined | null): boolean {
+  return role === 'admin';
 }
 
 export function isWorkConsoleRole(role: string | undefined | null): boolean {

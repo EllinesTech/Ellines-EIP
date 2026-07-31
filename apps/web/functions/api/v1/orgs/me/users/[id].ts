@@ -1,6 +1,7 @@
 import {
   EIP_ROLES,
   assertCanAssignRole,
+  assertCanManageOrgUser,
   getAdminClient,
   json,
   options,
@@ -50,6 +51,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     if (!target) {
       return json({ statusCode: 404, message: 'User not found' }, 404);
+    }
+
+    const manageErr = assertCanManageOrgUser(auth.role, target.role as string);
+    if (manageErr) {
+      return json({ statusCode: 403, message: manageErr }, 403);
     }
 
     if (body.role !== undefined) {

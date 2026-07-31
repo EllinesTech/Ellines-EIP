@@ -12,14 +12,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~90% | Access layers landed; Gateway deferred while Integration Hub unlocks live KPIs |
-| **2 — Integration Hub** | ~70% | Install wizard + persisted configs; OpenAPI; Postgres (Identity); packs stub |
+| **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened |
+| **2 — Integration Hub** | ~85% | Wizard + OpenAPI + Postgres + Email + SFTP; packs; Demo demoted |
 | **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
-| **Hosting** | Live | Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (UI + same-origin `/api/v1` auth); Nest Identity on Fly optional |
+| **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); see [10_Cloudflare_Pages_GitHub.md](./10_Cloudflare_Pages_GitHub.md) |
 
-**Critical path remaining:** Email/SFTP connectors + UEM deepen → Ellinea AI → Workflows.
+**Critical path remaining:** real System B install → UEM deepen → Ellinea AI → Workflows / write capabilities under Owner policy.
 
 ---
 
@@ -33,7 +33,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.2b | Auth UX complete (register/login/forgot/SSO on live Pages) | `done` | Fixed register `updated_at`; Pages forgot/reset + work-email SSO; login/register UI wired |
 | 1.3 | API Gateway | `todo` | Deferred — Hub connectors unlock more value first; resume when multi-service needs it |
 | 1.4 | Audit Trail | `in_progress` | Prisma model exists; invite/update user audited on Pages + Nest |
-| 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform`; see [09_Access_Layers.md](./09_Access_Layers.md) |
+| 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform`; Owner vs IT labels + authority |
+| 1.5a | Owner vs IT authority | `done` | Only Owner assigns/manages Owner & IT; IT invites work roles only |
 
 ---
 
@@ -47,11 +48,14 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 2.2b | OpenAPI / Swagger ingest | `done` | Upload JSON → list capabilities → select GET routes → sync |
 | 2.3 | PostgreSQL Connector | `done` | Read-only SELECT via Identity (`pg`); Pages saves config (TCP sync needs Nest) |
 | 2.3a | Platform connector packs | `done` | Super Admin publish pack; Org IT install with credentials only |
-| 2.4 | CSV/File Connector | `done` | Paste/import CSV — no API path; catalog shows DB/email/SFTP as coming |
-| 2.5 | Email Connector | `next` | P1 |
-| 2.6 | Universal Enterprise Model | `todo` | Snapshot fields are a thin start |
+| 2.4 | CSV/File Connector | `done` | Paste/import CSV — no API path |
+| 2.5 | Email Connector | `done` | IMAP via Identity (`imapflow`); Pages saves config |
+| 2.5a | SFTP / folder drop | `done` | Pull CSV via Identity (`ssh2-sftp-client`); Pages saves config |
+| 2.6 | Universal Enterprise Model | `next` | Snapshot fields are a thin start — deepen for System B capabilities |
 | 2.7 | Sync Scheduler | `todo` | Manual Sync now for MVP |
 | 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |
+| 2.x | Webhooks / events | `todo` | Planned — System B pushes to EIP |
+| 2.x | SQL Server / MySQL | `todo` | Same pattern as Postgres when HIS needs it |
 
 ---
 

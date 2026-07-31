@@ -2,7 +2,12 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { EIP_ROLES, isOrgAdminRole } from '@ellines-eip/shared';
+import {
+  isOrgAdminRole,
+  isOrgOwnerRole,
+  roleLabel,
+  rolesAssignableBy,
+} from '@ellines-eip/shared';
 import {
   getSession,
   inviteOrgUser,
@@ -60,10 +65,8 @@ export default function AdminPage() {
     void loadUsers();
   }, [allowed]);
 
-  const assignableRoles = EIP_ROLES.filter((r) => {
-    if (r === 'owner') return actorRole === 'owner';
-    return true;
-  });
+  const assignableRoles = rolesAssignableBy(actorRole);
+  const isOwner = isOrgOwnerRole(actorRole);
 
   async function onInvite(e: FormEvent) {
     e.preventDefault();
@@ -126,10 +129,14 @@ export default function AdminPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Org IT Admin</p>
-          <h1>Users &amp; rights</h1>
+          <p className={styles.eyebrow}>
+            {isOwner ? 'Organization Owner' : 'IT Admin'}
+          </p>
+          <h1>{isOwner ? 'People & authority' : 'Users & access'}</h1>
           <p className={styles.lede}>
-            Invite members and assign roles for this organization. Platform Super Admin is separate.
+            {isOwner
+              ? 'You own this organization. Invite IT Admins and work users. Only you can grant or revoke IT.'
+              : 'You run systems for the Owner. Invite executives, managers, and members — Owner/IT accounts stay with the Owner.'}
           </p>
         </div>
       </header>
@@ -170,7 +177,7 @@ export default function AdminPage() {
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
               {assignableRoles.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>
@@ -197,39 +204,45 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className={u.isActive ? undefined : adminStyles.inactive}>
-                  <td>{u.fullName}</td>
-                  <td>{u.email}</td>
-                  <td>
-                    <select
-                      value={u.role}
-                      disabled={busy || (u.role === 'owner' && actorRole !== 'owner')}
-                      onChange={(e) => void onRoleChange(u.id, e.target.value)}
-                    >
-                      {assignableRoles
-                        .concat(u.role === 'owner' && actorRole !== 'owner' ? (['owner'] as const) : [])
-                        .filter((r, i, arr) => arr.indexOf(r) === i)
-                        .map((r) => (
+              {users.map((u) => {
+                const locked =
+                  !isOwner && (u.role === 'owner' || u.role === 'admin');
+                const roleOptions = locked
+                  ? [u.role]
+                  : assignableRoles.includes(u.role as never)
+                    ? assignableRoles
+                    : [...assignableRoles, u.role as never];
+                return (
+                  <tr key={u.id} className={u.isActive ? undefined : adminStyles.inactive}>
+                    <td>{u.fullName}</td>
+                    <td>{u.email}</td>
+                    <td>
+                      <select
+                        value={u.role}
+                        disabled={busy || locked}
+                        onChange={(e) => void onRoleChange(u.id, e.target.value)}
+                      >
+                        {roleOptions.map((r) => (
                           <option key={r} value={r}>
-                            {r}
+                            {roleLabel(r)}
                           </option>
                         ))}
-                    </select>
-                  </td>
-                  <td>{u.isActive ? 'Active' : 'Inactive'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className={adminStyles.ghost}
-                      disabled={busy || u.id === actorId}
-                      onClick={() => void onToggleActive(u)}
-                    >
-                      {u.isActive ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      </select>
+                    </td>
+                    <td>{u.isActive ? 'Active' : 'Inactive'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={adminStyles.ghost}
+                        disabled={busy || u.id === actorId || locked}
+                        onClick={() => void onToggleActive(u)}
+                      >
+                        {u.isActive ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

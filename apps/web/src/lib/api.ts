@@ -257,6 +257,18 @@ export interface ConnectorInstallConfigDto {
   sql?: string;
   systemName?: string;
   fieldMap?: Record<string, string>;
+  imapHost?: string;
+  imapPort?: number;
+  imapUser?: string;
+  imapPassword?: string;
+  imapMailbox?: string;
+  imapSecure?: boolean;
+  sftpHost?: string;
+  sftpPort?: number;
+  sftpUsername?: string;
+  sftpPassword?: string;
+  sftpPrivateKey?: string;
+  sftpRemotePath?: string;
 }
 
 export interface ConnectorInstallationDto {

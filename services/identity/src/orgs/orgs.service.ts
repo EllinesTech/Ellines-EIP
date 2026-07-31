@@ -4,7 +4,11 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import type { UserRole } from '@ellines-eip/shared';
+import {
+  assertCanAssignRole,
+  assertCanManageOrgUser,
+  type UserRole,
+} from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -54,7 +58,8 @@ export class OrgsService {
     }
 
     const nextRole = (dto.role || 'member') as UserRole;
-    this.assertCanAssignRole(actorRole, nextRole);
+    const assignErr = assertCanAssignRole(actorRole, nextRole);
+    if (assignErr) throw new ForbiddenException(assignErr);
 
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
@@ -115,8 +120,12 @@ export class OrgsService {
     });
     if (!target) throw new NotFoundException('User not found');
 
+    const manageErr = assertCanManageOrgUser(actor.role, target.role);
+    if (manageErr) throw new ForbiddenException(manageErr);
+
     if (dto.role !== undefined) {
-      this.assertCanAssignRole(actor.role, dto.role as UserRole);
+      const assignErr = assertCanAssignRole(actor.role, dto.role as UserRole);
+      if (assignErr) throw new ForbiddenException(assignErr);
       if (target.role === 'owner' && dto.role !== 'owner') {
         await this.assertNotLastOwner(organizationId, target.id);
       }
@@ -161,12 +170,6 @@ export class OrgsService {
       isActive: user.isActive,
       createdAt: user.createdAt.toISOString(),
     };
-  }
-
-  private assertCanAssignRole(actorRole: string, nextRole: UserRole) {
-    if (nextRole === 'owner' && actorRole !== 'owner') {
-      throw new ForbiddenException('Only owners can assign the owner role');
-    }
   }
 
   private async assertNotLastOwner(organizationId: string, excludeUserId: string) {

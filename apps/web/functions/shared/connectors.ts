@@ -16,9 +16,29 @@ export type InstallConfig = {
   connectionString?: string;
   sql?: string;
   systemName?: string;
+  imapHost?: string;
+  imapPort?: number;
+  imapUser?: string;
+  imapPassword?: string;
+  imapMailbox?: string;
+  imapSecure?: boolean;
+  sftpHost?: string;
+  sftpPort?: number;
+  sftpUsername?: string;
+  sftpPassword?: string;
+  sftpPrivateKey?: string;
+  sftpRemotePath?: string;
 };
 
-const SECRET_KEYS = ['apiKey', 'bearerToken', 'basicPass', 'connectionString'] as const;
+const SECRET_KEYS = [
+  'apiKey',
+  'bearerToken',
+  'basicPass',
+  'connectionString',
+  'imapPassword',
+  'sftpPassword',
+  'sftpPrivateKey',
+] as const;
 
 export function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...config };

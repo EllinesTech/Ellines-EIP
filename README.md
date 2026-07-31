@@ -28,6 +28,7 @@ Ellines EIP is an AI-native enterprise intelligence platform that sits **above**
 | [Automation prompt](./docs/06_Automation_Prompt.md) | Cursor Automations instructions |
 | [Demo login](./docs/07_Demo_Login.md) | Live site test account |
 | [Live Identity setup](./docs/08_Live_Identity_Setup.md) | One-time Fly deploy steps |
+| [Cloudflare Pages ↔ GitHub](./docs/10_Cloudflare_Pages_GitHub.md) | Actions secrets + deploy to eip.ellines.co.ke |
 | [AGENTS.md](./AGENTS.md) | Instructions for Cursor Cloud Agents |
 
 ## Repository Structure

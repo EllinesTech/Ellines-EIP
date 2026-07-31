@@ -9,12 +9,16 @@ import {
   buildAuthHeaders,
   createCsvFileConnector,
   createDemoJsonConnector,
+  createImapConnector,
   createPostgresConnector,
   createRestApiConnector,
+  createSftpConnector,
   normalizeEnterprisePayload,
+  parseCsvToEnterprisePayload,
   parseOpenApiDocument,
   syncOpenApiRoutes,
   type ConnectorInstallConfig,
+  type ImapMessageSummary,
 } from '@ellines-eip/connectors-sdk';
 import type {
   ConnectorInstallation,
@@ -22,7 +26,9 @@ import type {
   ConnectorStatus,
   EnterpriseSummary,
 } from '@ellines-eip/shared';
+import { ImapFlow } from 'imapflow';
 import { Client } from 'pg';
+import SftpClient from 'ssh2-sftp-client';
 import { PrismaService } from '../prisma/prisma.service';
 import demoSeed from './demo-enterprise.json';
 import restSample from './rest-enterprise-sample.json';
@@ -35,7 +41,25 @@ openDecisions,3
 briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
 `;
 
-const SECRET_KEYS = ['apiKey', 'bearerToken', 'basicPass', 'connectionString'] as const;
+const SECRET_KEYS = [
+  'apiKey',
+  'bearerToken',
+  'basicPass',
+  'connectionString',
+  'imapPassword',
+  'sftpPassword',
+  'sftpPrivateKey',
+] as const;
+
+const ALLOWED_CATALOG = [
+  'rest-api',
+  'openapi',
+  'csv-file',
+  'postgres',
+  'demo-json',
+  'email-imap',
+  'sftp',
+] as const;
 
 function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...config };
@@ -171,6 +195,28 @@ export class EnterpriseService {
             ? 'Last sync OK'
             : 'Reporting DB / replica when vendors will not ship an API',
       },
+      {
+        id: 'email-imap',
+        name: 'Email (IMAP)',
+        type: 'email',
+        status: activeId === 'email-imap' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'email-imap' ? lastAt : null,
+        message:
+          activeId === 'email-imap'
+            ? 'Last sync OK'
+            : 'Ingest mailed reports when the prime system has no API',
+      },
+      {
+        id: 'sftp',
+        name: 'SFTP / folder drop',
+        type: 'file',
+        status: activeId === 'sftp' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'sftp' ? lastAt : null,
+        message:
+          activeId === 'sftp'
+            ? 'Last sync OK'
+            : 'Pull CSV dumps from SFTP — common in healthcare HIS',
+      },
     ];
   }
 
@@ -194,8 +240,7 @@ export class EnterpriseService {
   ): Promise<ConnectorInstallation> {
     const catalogId = body.catalogId?.trim();
     if (!catalogId) throw new BadRequestException('catalogId is required');
-    const allowed = ['rest-api', 'openapi', 'csv-file', 'postgres', 'demo-json'];
-    if (!allowed.includes(catalogId)) {
+    if (!(ALLOWED_CATALOG as readonly string[]).includes(catalogId)) {
       throw new BadRequestException(`Unsupported catalogId: ${catalogId}`);
     }
 
@@ -437,6 +482,36 @@ export class EnterpriseService {
       await this.pgQuery(config.connectionString, 'SELECT 1 AS ok');
       return true;
     }
+    if (catalogId === 'email-imap') {
+      const connector = createImapConnector({
+        config: {
+          host: config.imapHost || '',
+          port: config.imapPort,
+          user: config.imapUser || '',
+          password: config.imapPassword || '',
+          mailbox: config.imapMailbox,
+          secure: config.imapSecure,
+          limit: 1,
+        },
+        fetchMail: (c) => this.fetchImapMail(c),
+      });
+      return connector.testConnection();
+    }
+    if (catalogId === 'sftp') {
+      const connector = createSftpConnector({
+        config: {
+          host: config.sftpHost || '',
+          port: config.sftpPort,
+          username: config.sftpUsername || '',
+          password: config.sftpPassword,
+          privateKey: config.sftpPrivateKey,
+          remotePath: config.sftpRemotePath || '',
+        },
+        fetchFileText: (c) => this.fetchSftpFile(c),
+        parseCsv: parseCsvToEnterprisePayload,
+      });
+      return connector.testConnection();
+    }
     throw new NotFoundException('Unknown connector');
   }
 
@@ -546,7 +621,133 @@ export class EnterpriseService {
       return result.summary;
     }
 
+    if (catalogId === 'email-imap') {
+      const connector = createImapConnector({
+        config: {
+          host: config.imapHost || '',
+          port: config.imapPort,
+          user: config.imapUser || '',
+          password: config.imapPassword || '',
+          mailbox: config.imapMailbox,
+          secure: config.imapSecure,
+          limit: 20,
+        },
+        connectorName: displayName || config.systemName || 'Email (IMAP)',
+        fetchMail: (c) => this.fetchImapMail(c),
+      });
+      const result = await connector.sync();
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'IMAP sync failed');
+      return result.summary;
+    }
+
+    if (catalogId === 'sftp') {
+      const connector = createSftpConnector({
+        config: {
+          host: config.sftpHost || '',
+          port: config.sftpPort,
+          username: config.sftpUsername || '',
+          password: config.sftpPassword,
+          privateKey: config.sftpPrivateKey,
+          remotePath: config.sftpRemotePath || '',
+        },
+        connectorName: displayName || config.systemName || 'SFTP / folder drop',
+        fetchFileText: (c) => this.fetchSftpFile(c),
+        parseCsv: parseCsvToEnterprisePayload,
+      });
+      const result = await connector.sync();
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'SFTP sync failed');
+      return result.summary;
+    }
+
     throw new NotFoundException('Unknown connector');
+  }
+
+  private async fetchImapMail(config: {
+    host: string;
+    port?: number;
+    user: string;
+    password: string;
+    mailbox?: string;
+    secure?: boolean;
+    limit?: number;
+  }): Promise<ImapMessageSummary[]> {
+    if (!config.host?.trim() || !config.user?.trim() || !config.password) {
+      throw new BadRequestException('IMAP host, user, and password are required');
+    }
+    const client = new ImapFlow({
+      host: config.host.trim(),
+      port: config.port || (config.secure === false ? 143 : 993),
+      secure: config.secure !== false,
+      auth: { user: config.user, pass: config.password },
+      logger: false,
+    });
+    await client.connect();
+    try {
+      const mailbox = config.mailbox || 'INBOX';
+      const lock = await client.getMailboxLock(mailbox);
+      try {
+        const limit = Math.min(50, Math.max(1, config.limit ?? 20));
+        const exists =
+          client.mailbox && typeof client.mailbox === 'object' && 'exists' in client.mailbox
+            ? Number((client.mailbox as { exists: number }).exists)
+            : 0;
+        if (!exists) return [];
+        const from = Math.max(1, exists - limit + 1);
+        const messages: ImapMessageSummary[] = [];
+        for await (const msg of client.fetch(`${from}:*`, { envelope: true })) {
+          const env = msg.envelope;
+          const subject = env?.subject || '(no subject)';
+          const fromAddr = env?.from?.[0]
+            ? `${env.from[0].name || ''} <${env.from[0].address || ''}>`.trim()
+            : '';
+          const date = env?.date ? new Date(env.date).toISOString() : '';
+          messages.push({
+            subject,
+            from: fromAddr,
+            date,
+            snippet: subject,
+          });
+        }
+        return messages.reverse().slice(0, limit);
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+  }
+
+  private async fetchSftpFile(config: {
+    host: string;
+    port?: number;
+    username: string;
+    password?: string;
+    privateKey?: string;
+    remotePath: string;
+  }): Promise<string> {
+    if (!config.host?.trim() || !config.username?.trim() || !config.remotePath?.trim()) {
+      throw new BadRequestException('SFTP host, username, and remotePath are required');
+    }
+    if (!config.password && !config.privateKey) {
+      throw new BadRequestException('SFTP password or privateKey is required');
+    }
+    const sftp = new SftpClient();
+    try {
+      await sftp.connect({
+        host: config.host.trim(),
+        port: config.port || 22,
+        username: config.username,
+        password: config.password,
+        privateKey: config.privateKey,
+        readyTimeout: 12000,
+      });
+      const buf = await sftp.get(config.remotePath);
+      if (Buffer.isBuffer(buf)) return buf.toString('utf8');
+      if (typeof buf === 'string') return buf;
+      throw new Error('Unexpected SFTP file payload');
+    } finally {
+      await sftp.end().catch(() => undefined);
+    }
   }
 
   private async pgQuery(

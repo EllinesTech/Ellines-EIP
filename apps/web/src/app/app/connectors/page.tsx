@@ -64,10 +64,22 @@ const TYPES = [
     blurb: 'Paste a nightly CSV/Excel dump the business already produces.',
   },
   {
+    id: 'email-imap',
+    title: 'Email (IMAP)',
+    tag: 'Legacy reports',
+    blurb: 'Ingest mailed reports and alerts from the prime system.',
+  },
+  {
+    id: 'sftp',
+    title: 'SFTP / folder drop',
+    tag: 'Healthcare / supply chain',
+    blurb: 'Pull CSV dumps from an SFTP inbox the HIS or ERP already fills.',
+  },
+  {
     id: 'demo-json',
     title: 'Demo JSON seed',
-    tag: 'Demo',
-    blurb: 'Built-in sample for smoke tests.',
+    tag: 'Smoke test only',
+    blurb: 'Built-in sample — not for production. Prefer a real system path above.',
   },
 ] as const;
 
@@ -96,6 +108,16 @@ export default function ConnectorsPage() {
   const [csvText, setCsvText] = useState(DEFAULT_CSV);
   const [connectionString, setConnectionString] = useState('');
   const [sql, setSql] = useState(DEFAULT_SQL);
+  const [imapHost, setImapHost] = useState('');
+  const [imapPort, setImapPort] = useState('993');
+  const [imapUser, setImapUser] = useState('');
+  const [imapPassword, setImapPassword] = useState('');
+  const [imapMailbox, setImapMailbox] = useState('INBOX');
+  const [sftpHost, setSftpHost] = useState('');
+  const [sftpPort, setSftpPort] = useState('22');
+  const [sftpUsername, setSftpUsername] = useState('');
+  const [sftpPassword, setSftpPassword] = useState('');
+  const [sftpRemotePath, setSftpRemotePath] = useState('');
   const [openApiText, setOpenApiText] = useState('');
   const [openApiBaseUrl, setOpenApiBaseUrl] = useState('');
   const [parsed, setParsed] = useState<OpenApiParseResult | null>(null);
@@ -178,6 +200,21 @@ export default function ConnectorsPage() {
         config.connectionString = connectionString;
       }
       config.sql = sql;
+    }
+    if (catalogId === 'email-imap') {
+      config.imapHost = imapHost.trim();
+      config.imapPort = Number(imapPort) || 993;
+      config.imapUser = imapUser.trim();
+      if (imapPassword && imapPassword !== '***') config.imapPassword = imapPassword;
+      config.imapMailbox = imapMailbox.trim() || 'INBOX';
+      config.imapSecure = true;
+    }
+    if (catalogId === 'sftp') {
+      config.sftpHost = sftpHost.trim();
+      config.sftpPort = Number(sftpPort) || 22;
+      config.sftpUsername = sftpUsername.trim();
+      if (sftpPassword && sftpPassword !== '***') config.sftpPassword = sftpPassword;
+      config.sftpRemotePath = sftpRemotePath.trim();
     }
     if (catalogId === 'openapi') {
       if (openApiText.trim()) {
@@ -345,11 +382,12 @@ export default function ConnectorsPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Integration Hub · IT Admin</p>
+          <p className={styles.eyebrow}>Integration Hub · Owner / IT</p>
           <h1>Connectors</h1>
           <p className={styles.lede}>
-            Install a connection without the vendor writing an EIP plugin. Upload OpenAPI, point at a
-            database, or drop a CSV — config is saved per organization.
+            Connect System B (HIS, ERP, CRM…) so Owner, IT, and employees can see and act on what that
+            system can do — without waiting for the vendor to build an EIP plugin. Install via OpenAPI,
+            API, database, CSV, email, or SFTP. Config is saved per organization.
           </p>
         </div>
         <button type="button" className={adminStyles.primary} onClick={openWizard} disabled={busy}>
@@ -568,14 +606,94 @@ export default function ConnectorsPage() {
                       <textarea value={sql} onChange={(e) => setSql(e.target.value)} rows={6} />
                     </label>
                     <p className={styles.lede}>
-                      Postgres sync runs on the Identity API (TCP). On Pages-only deploys, save config
-                      here and sync via Nest Identity.
+                      Postgres / IMAP / SFTP sync runs on the Identity API (TCP). On Pages-only
+                      deploys, save config here and sync via Nest Identity.
                     </p>
                   </>
                 ) : null}
 
+                {catalogId === 'email-imap' ? (
+                  <>
+                    <label>
+                      IMAP host
+                      <input
+                        value={imapHost}
+                        onChange={(e) => setImapHost(e.target.value)}
+                        placeholder="imap.vendor.com"
+                      />
+                    </label>
+                    <label>
+                      Port
+                      <input value={imapPort} onChange={(e) => setImapPort(e.target.value)} />
+                    </label>
+                    <label>
+                      User
+                      <input value={imapUser} onChange={(e) => setImapUser(e.target.value)} />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        type="password"
+                        value={imapPassword}
+                        onChange={(e) => setImapPassword(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Mailbox
+                      <input
+                        value={imapMailbox}
+                        onChange={(e) => setImapMailbox(e.target.value)}
+                        placeholder="INBOX"
+                      />
+                    </label>
+                  </>
+                ) : null}
+
+                {catalogId === 'sftp' ? (
+                  <>
+                    <label>
+                      SFTP host
+                      <input
+                        value={sftpHost}
+                        onChange={(e) => setSftpHost(e.target.value)}
+                        placeholder="sftp.vendor.com"
+                      />
+                    </label>
+                    <label>
+                      Port
+                      <input value={sftpPort} onChange={(e) => setSftpPort(e.target.value)} />
+                    </label>
+                    <label>
+                      Username
+                      <input
+                        value={sftpUsername}
+                        onChange={(e) => setSftpUsername(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        type="password"
+                        value={sftpPassword}
+                        onChange={(e) => setSftpPassword(e.target.value)}
+                      />
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Remote file path (CSV)
+                      <input
+                        value={sftpRemotePath}
+                        onChange={(e) => setSftpRemotePath(e.target.value)}
+                        placeholder="/exports/enterprise_daily.csv"
+                      />
+                    </label>
+                  </>
+                ) : null}
+
                 {catalogId === 'demo-json' ? (
-                  <p className={styles.lede}>No credentials — built-in demo seed.</p>
+                  <p className={styles.lede}>
+                    Smoke test only — prefer OpenAPI, Postgres, CSV, Email, or SFTP for real System B
+                    data.
+                  </p>
                 ) : null}
               </div>
               <div className={adminStyles.wizardActions}>

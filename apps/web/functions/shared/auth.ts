@@ -128,10 +128,32 @@ export function requireOrgAdmin(role: string): Response | null {
 }
 
 export function assertCanAssignRole(actorRole: string, nextRole: UserRole): string | null {
-  if (nextRole === 'owner' && actorRole !== 'owner') {
-    return 'Only owners can assign the owner role';
+  if (actorRole === 'owner') return null;
+  if (actorRole === 'admin') {
+    if (nextRole === 'owner' || nextRole === 'admin') {
+      return 'Only the Owner can assign Owner or IT Admin';
+    }
+    const itRoles: UserRole[] = ['executive', 'manager', 'member', 'viewer'];
+    if (!itRoles.includes(nextRole)) {
+      return 'IT Admin cannot assign that role';
+    }
+    return null;
   }
-  return null;
+  return 'Only Owner or IT Admin can assign roles';
+}
+
+export function assertCanManageOrgUser(
+  actorRole: string,
+  targetRole: string,
+): string | null {
+  if (actorRole === 'owner') return null;
+  if (actorRole === 'admin') {
+    if (targetRole === 'owner' || targetRole === 'admin') {
+      return 'Only the Owner can manage Owner or IT Admin accounts';
+    }
+    return null;
+  }
+  return 'Only Owner or IT Admin can manage users';
 }
 
 export function parsePlatformAdminEmails(raw?: string | null): string[] {

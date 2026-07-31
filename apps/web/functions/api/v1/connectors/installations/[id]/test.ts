@@ -68,6 +68,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       message =
         'Config saved. PostgreSQL TCP test requires the Identity API (Nest). Format looks ready.';
       ok = true;
+    } else if (catalogId === 'email-imap') {
+      if (!config.imapHost?.trim() || !config.imapUser?.trim()) {
+        throw new Error('IMAP host and user are required');
+      }
+      message =
+        'Config saved. IMAP TCP test/sync requires the Identity API (Nest). Format looks ready.';
+      ok = true;
+    } else if (catalogId === 'sftp') {
+      if (!config.sftpHost?.trim() || !config.sftpUsername?.trim() || !config.sftpRemotePath?.trim()) {
+        throw new Error('SFTP host, username, and remotePath are required');
+      }
+      message =
+        'Config saved. SFTP TCP test/sync requires the Identity API (Nest). Format looks ready.';
+      ok = true;
     } else {
       return json({ statusCode: 404, message: 'Unknown connector' }, 404);
     }

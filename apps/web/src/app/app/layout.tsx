@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { isOrgAdminRole } from '@ellines-eip/shared';
+import { isOrgAdminRole, isOrgOwnerRole } from '@ellines-eip/shared';
 import EllineaChatPanel from '@/components/ellinea-chat';
 import {
   AuthSession,
@@ -83,7 +83,7 @@ function IconSettings() {
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
-  { href: '/app/admin', label: 'IT Admin', icon: <IconAdmin />, adminOnly: true },
+  { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
   { href: '/app/settings', label: 'Settings', icon: <IconSettings /> },
@@ -96,6 +96,19 @@ function initials(name: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function formatShellClock(date: Date) {
+  const day = date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  const time = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return { day, time, iso: date.toISOString() };
+}
+
 export default function AppShellLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,6 +116,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [clock, setClock] = useState<{ day: string; time: string; iso: string } | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -129,6 +143,13 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         /* keep local session if /me is briefly unavailable */
       });
   }, [router]);
+
+  useEffect(() => {
+    const tick = () => setClock(formatShellClock(new Date()));
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   function toggleCollapse() {
     setCollapsed((prev) => {
@@ -161,7 +182,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     if (item.adminOnly && !orgAdmin) return false;
     if (item.platformOnly && !platformAdmin) return false;
     return true;
-  });
+  }).map((item) =>
+    item.href === '/app/admin'
+      ? {
+          ...item,
+          label: isOrgOwnerRole(session.user.role) ? 'Org Admin' : 'IT Admin',
+        }
+      : item,
+  );
   const pageTitle =
     pathname.startsWith('/app/ellinea')
       ? 'Ask Ellinea'
@@ -283,6 +311,19 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className={styles.topRight}>
+            {clock ? (
+              <time className={styles.clock} dateTime={clock.iso} title="Local date and time">
+                <span className={styles.clockDate}>{clock.day}</span>
+                <span className={styles.clockSep} aria-hidden>
+                  ·
+                </span>
+                <span className={styles.clockTime}>{clock.time}</span>
+              </time>
+            ) : (
+              <span className={styles.clock} aria-hidden>
+                <span className={styles.clockDate}>···</span>
+              </span>
+            )}
             <button type="button" className={styles.iconBtn} aria-label="Notifications" title="Notifications">
               <svg viewBox="0 0 24 24" aria-hidden>
                 <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
@@ -304,6 +345,19 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className={styles.content}>{children}</div>
+        <footer className={styles.appFooter}>
+          <div className={styles.appFooterInner}>
+            <span className={styles.appFooterBrand}>Ellines EIP</span>
+            <span className={styles.appFooterDot} aria-hidden>
+              ·
+            </span>
+            <span>Developed by Ellines Tech</span>
+            <span className={styles.appFooterDot} aria-hidden>
+              ·
+            </span>
+            <span>© {new Date().getFullYear()}</span>
+          </div>
+        </footer>
       </div>
 
       {!chatOpen ? (
