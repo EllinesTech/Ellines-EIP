@@ -33,7 +33,9 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~98% | Core extracted to `@ellines-eip/ellinea-ai`; Phase 6 API next |
+| **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
+| **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
+| **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
@@ -60,7 +62,7 @@ while queue has next/in_progress and not blocked:
 | 1.2a | Harden Identity | `done` | RolesGuard; forgot/reset; Jest unit tests |
 | 1.2b | Auth UX complete | `done` | Pages forgot/reset + SSO; login/register wired |
 | 1.2c | Change password (profile) | `done` | Profile form + `/api/v1/auth/change-password` |
-| 1.3 | API Gateway | `next` | Nest/Fastify edge routing |
+| 1.3 | API Gateway | `done` | `services/api-gateway` Nest proxy stub |
 | 1.4 | Audit Trail | `done` | Writes + Owner/IT Audit Center UI |
 | 1.4a | Audit Center UI | `done` | `/app/audit` + Pages list API |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform` |
@@ -126,7 +128,8 @@ while queue has next/in_progress and not blocked:
 | 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` Owner/IT operator surface |
 | 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 | 4.H | How to use Ellinea brain | `done` | Same as 6.7 |
-| 1.3 | API Gateway | `next` | Edge routing service |
+| 1.3 | API Gateway | `done` | Edge routing service |
+| 2.x | Integration hub service | `next` | Optional microservice extract |
 
 ---
 
