@@ -1,30 +1,20 @@
-# Notification Service
+# Notification delivery (MVP)
 
-Enterprise alerts and messaging across channels.
+Outbound email/push for Ellines EIP.
 
-## Responsibilities
+## Live path (now)
 
-- In-app notifications
-- Email alerts
-- SMS / WhatsApp — v1.1
-- Push notifications — v1.1
-- Notification preferences per user/role
-- Alert escalation rules
+Pages Functions on the web app:
 
-## Port
+| Endpoint | Role |
+|----------|------|
+| `GET/PUT /api/v1/orgs/me/notify-policy` | Org delivery prefs (Owner/IT) |
+| `GET/POST /api/v1/notifications/deliver` | Outbox list + enqueue/simulate |
 
-`3005` (default)
+UI: `/app/notify-policy` · Audit actions: `notify.policy_updated`, `notify.simulated`, `notify.skipped`.
 
-## Notification Types (v1.0)
+Deliveries are **simulated** (outbox + audit) until SMTP / Web Push providers are configured. Policy channels gate whether a job is `simulated` or `skipped`.
 
-| Type | Channel | Example |
-|------|---------|---------|
-| Critical Alert | In-app + Email | Revenue drop detected |
-| Daily Brief | Email | CEO morning summary |
-| Approval Request | In-app | Leave approval pending |
-| Sync Failure | In-app + Email | Connector sync error |
-| Workflow Complete | In-app | Report generated |
+## Future Nest worker
 
-## Status
-
-🔲 Not yet implemented — Phase 3
+This folder is reserved for `services/notification` (SMTP worker, digest cron, VAPID push). The Pages outbox contract above stays the client API; the worker will drain the same settings JSON / a dedicated table later.

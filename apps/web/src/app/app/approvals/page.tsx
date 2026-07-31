@@ -14,7 +14,7 @@ import {
   type ApprovalRequest,
   type ApprovalTemplateId,
 } from '@/lib/approvals';
-import { fetchEnterpriseSummary, getSession } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, deliverNotification } from '@/lib/api';
 import { publishEnterpriseEvent } from '@/lib/event-bus';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
@@ -94,6 +94,12 @@ export default function ApprovalsPage() {
         step: updated.currentStepIndex,
         overall: updated.status,
       });
+      void deliverNotification({
+        channel: 'email',
+        subject: `Approval ${status}: ${updated.title}`,
+        body: `${updated.title} is now ${updated.status} (step ${updated.currentStepIndex + 1}).`,
+        eventType: `approval.${status}`,
+      }).catch(() => undefined);
     }
     setBusy(false);
   }

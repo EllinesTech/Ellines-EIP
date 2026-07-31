@@ -1,0 +1,7 @@
+{
+  "name": "@ellines-eip/notification",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reserved Nest worker for EIP outbound email/push — live path is Pages Functions for now.",
+  "scripts": {}
+}

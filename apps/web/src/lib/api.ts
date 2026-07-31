@@ -396,6 +396,51 @@ export function askEllineaApi(payload: {
   });
 }
 
+export type NotifyDeliveryPolicyDto = {
+  emailDigest: boolean;
+  emailAlerts: boolean;
+  pushEnabled: boolean;
+  digestCadence: 'daily' | 'weekly' | 'off';
+};
+
+export function fetchNotifyDeliveryPolicy() {
+  return request<NotifyDeliveryPolicyDto>('/api/v1/orgs/me/notify-policy');
+}
+
+export function saveNotifyDeliveryPolicy(policy: NotifyDeliveryPolicyDto) {
+  return request<NotifyDeliveryPolicyDto>('/api/v1/orgs/me/notify-policy', {
+    method: 'PUT',
+    body: JSON.stringify(policy),
+  });
+}
+
+export type NotifyOutboxItemDto = {
+  id: string;
+  channel: 'email' | 'push' | 'in_app';
+  subject: string;
+  body: string;
+  eventType: string;
+  status: 'queued' | 'simulated' | 'skipped';
+  at: string;
+  message?: string;
+};
+
+export function listNotifyOutbox() {
+  return request<NotifyOutboxItemDto[]>('/api/v1/notifications/deliver');
+}
+
+export function deliverNotification(payload: {
+  channel?: 'email' | 'push' | 'in_app';
+  subject: string;
+  body: string;
+  eventType?: string;
+}) {
+  return request<NotifyOutboxItemDto>('/api/v1/notifications/deliver', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchPlatformOrgDateTimeSettings(orgId: string) {
   return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
 }

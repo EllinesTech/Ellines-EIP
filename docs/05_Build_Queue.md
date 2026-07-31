@@ -114,10 +114,11 @@ while queue has next/in_progress and not blocked:
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
 | 5.3 | Scheduled Reports | `done` | Local schedules + preview |
 | 3.x | Other-role Overview polish | `done` | Role-specific copy, real CTAs, empty sync state |
-| 3.x | Email/push notifications | `next` | Delivery policy UI done; notification service stub next |
+| 3.x | Email/push notifications | `done` | Server policy + simulated outbox (`/api/v1/notifications/deliver`) |
 | 5.4 | Event Bus | `done` | Local pub/sub + log on Rules / Approvals |
 | 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
 | 4.10 | LLM / RAG | `done` | RAG retrieve + `POST /api/v1/ellinea/ask` |
+| 6.1 | Extract `services/ellinea-ai` | `next` | Productize Ellinea engine |
 
 ---
 
@@ -155,7 +156,7 @@ Blueprint: *â€œContinuously learn from enterprise knowledge through Ellinea AI.â
 | 4.4a | Server Enterprise Memory | `done` | Persist policies/decisions per org |
 | 4.10 | LLM / RAG | `done` | Grounded provider path |
 | 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
-| 3.x | Email/push notifications | `next` | Policy UI done; `services/notification` next |
+| 3.x | Email/push notifications | `done` | Policy + outbox simulator; SMTP worker later |
 
 ---
 
@@ -163,7 +164,7 @@ Blueprint: *â€œContinuously learn from enterprise knowledge through Ellinea AI.â
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 6.1 | Extract `services/ellinea-ai` | `todo` | |
+| 6.1 | Extract `services/ellinea-ai` | `next` | Start Ellinea productization |
 | 6.2 | Ellinea API contract | `todo` | ask / brief / recommend / memory / feedback |
 | 6.3 | `@ellines/ellinea-sdk` | `todo` | |
 | 6.4 | Bring-your-own connectors | `todo` | UEM snapshots from any System B |
