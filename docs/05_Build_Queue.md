@@ -90,8 +90,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.6 | Notification Center | `done` | Delete one / all; mark read; settings |
 | 3.7 | Owner / IT Admin dashboard polish | `done` | Owner/IT copy, ops rail, Approvals/Ellinea KPI links |
 | 3.8 | Org structure in Admin | `done` | Branches + departments on `/app/admin` |
-| 3.9 | Owner/IT empty states | `next` | Clear CTAs when no connectors / no members |
-| 1.4a | Audit Center UI | `todo` | After empty states — Owner/IT audit feed |
+| 3.9 | Owner/IT empty states | `done` | No-sync callout on Overview; empty members on Admin |
+| 1.4a | Audit Center UI | `next` | Owner/IT audit feed of invites, roles, structure, sync |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
 | 3.x | Other-role Overview polish | `todo` | After Owner/Admin path |
 

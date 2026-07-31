@@ -351,6 +351,13 @@ export default function AdminPage() {
         <div className={styles.panelLabel}>Members</div>
         {loading ? (
           <p className={styles.lede}>Loading members…</p>
+        ) : users.length === 0 ? (
+          <div className={styles.emptyCallout} style={{ marginTop: '0.5rem' }}>
+            <div>
+              <strong>No members yet</strong>
+              <p>Invite an IT Admin or work user above so the org is not just you.</p>
+            </div>
+          </div>
         ) : (
           <table className={adminStyles.table}>
             <thead>

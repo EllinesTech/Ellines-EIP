@@ -119,6 +119,22 @@ function AdminOverview({
         ))}
       </nav>
 
+      {!synced ? (
+        <section className={styles.emptyCallout} role="status">
+          <div>
+            <strong>{isOwner ? 'Connect your first system' : 'Sync a connector'}</strong>
+            <p>
+              {isOwner
+                ? 'Ask IT (or open Connectors yourself) to sync Demo JSON Systems — then Ellinea and KPIs light up.'
+                : 'Open Connectors → install or pick Demo JSON Systems → Sync now.'}
+            </p>
+          </div>
+          <Link href="/app/connectors" className={styles.aiBtn}>
+            Open Connectors
+          </Link>
+        </section>
+      ) : null}
+
       <div className={styles.kpis}>
         <article className={styles.kpi}>
           <span>Enterprise Health</span>
