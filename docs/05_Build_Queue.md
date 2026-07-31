@@ -123,7 +123,7 @@ while queue has next/in_progress and not blocked:
 | 6.3 | `@ellines/ellinea-sdk` | `done` | `@ellines-eip/ellinea-sdk` createEllineaClient |
 | 6.4 | Bring-your-own connectors | `done` | `POST /api/v1/enterprise/ingest` + Connectors UI |
 | 6.5 | Tenant learning isolation | `done` | Server Memory + Learning (feedback/DNA) per org JWT |
-| 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` Owner/IT operator surface |
+| 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` Owner/IT **operator / API lab** only — not Work Console nav |
 | 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 | 4.H | How to use Ellinea brain | `done` | Same as 6.7 |
 | 1.3 | API Gateway | `done` | Edge routing service |
@@ -179,8 +179,18 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 6.3 | `@ellines/ellinea-sdk` | `done` | `createEllineaClient` in packages/ellinea-sdk |
 | 6.4 | Bring-your-own connectors | `done` | External UEM ingest endpoint + Connectors paste UI |
 | 6.5 | Tenant learning isolation | `done` | `GET/PUT /api/v1/orgs/me/ellinea-learning` |
-| 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` |
+| 6.6 | Ellinea console (thin) | `done` | `/app/ellinea-console` — operator/API smoke UI; linked from Settings |
 | 6.7 | Standalone operator guide | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
+
+### Ellinea surfaces in EIP (product decision — do not invent a second Ask nav)
+
+| Surface | Route / entry | Who | Role |
+|---------|---------------|-----|------|
+| **Ask** | Floating “Ask Ellinea AI” (+ optional “Open full Ask workspace” → `/app/ellinea`) | Everyone | Everyday chat / Q&A |
+| **Ellinea settings** | System Settings → **Ellinea AI** card (brief, recs, memory, DNA, LLM+RAG, …) | Everyone | Preference home — **not** a top-level nav item |
+| **Ellinea console** | `/app/ellinea-console` via Settings → “Operator console (API)” | Owner/IT only | Operator / API lab for SDK + contract smoke — **not** everyday chat; **not** side nav |
+
+**Do not** add Ask or Console back to the Work Console side nav. Keep the console route. Future: console may evolve into a thin **standalone Ellinea operator product** (Phase 6), but EIP Work Console nav stays clean.
 
 ---
 
@@ -213,6 +223,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab via Settings link only (no side-nav Ask/Console). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
 - Audit Center (`/app/audit`), change password on Profile, connector health chips on Overview
 - Org structure (branches/departments) on Org Admin + Pages APIs
 - Owner/IT Overview ops rail + empty states; roadmap keep-going

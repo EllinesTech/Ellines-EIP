@@ -203,6 +203,26 @@
   cursor: not-allowed;
 }
 
+.expandRow {
+  padding: 0 1rem 0.85rem;
+  border-top: none;
+}
+
+.expandLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #93c5fd;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.expandLink:hover {
+  color: #bfdbfe;
+  text-decoration: underline;
+}
+
 @keyframes riseChat {
   from {
     opacity: 0;

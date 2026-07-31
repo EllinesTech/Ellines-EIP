@@ -362,7 +362,8 @@ export default function SystemSettingsPage() {
           <p className={settingsStyles.cardEyebrow}>This browser</p>
           <h2 className={settingsStyles.cardTitle}>Ellinea AI</h2>
           <p className={settingsStyles.cardHint}>
-            Daily brief, recommendations, and org-synced Enterprise Memory on Ask Ellinea.
+            Preference home for Ellinea (brief, recs, memory, DNA, LLM+RAG). Everyday Ask is the
+            floating panel; Owner/IT can open the operator console for API smoke tests.
           </p>
         </div>
         <div className={settingsStyles.toggleRow}>
@@ -460,8 +461,13 @@ export default function SystemSettingsPage() {
         </div>
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
-            Open Ask Ellinea →
+            Open full Ask workspace →
           </Link>
+          {orgAdmin ? (
+            <Link href="/app/ellinea-console" className={styles.primaryLink}>
+              Operator console (API) →
+            </Link>
+          ) : null}
         </div>
       </section>
 

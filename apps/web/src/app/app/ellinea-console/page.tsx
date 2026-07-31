@@ -98,11 +98,12 @@ export default function EllineaConsolePage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Ellinea · product console</p>
+          <p className={styles.eyebrow}>Ellinea · operator / API lab</p>
           <h1>Ellinea console</h1>
           <p className={styles.lede}>
-            Thin operator surface over the Ellinea contract (ask / brief / recommend / memory). For
-            reuse outside Work Console via <code>@ellines-eip/ellinea-sdk</code>.
+            Owner/IT smoke UI over the Ellinea contract (ask / brief / recommend / memory) — not
+            everyday chat. Everyday Ask stays in the float / full workspace; prefs live under System
+            Settings. Reuse outside EIP via <code>@ellines-eip/ellinea-sdk</code>.
           </p>
         </div>
         <div className={styles.headerActions}>

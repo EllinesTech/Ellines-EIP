@@ -10,7 +10,9 @@ Ellinea is packaged so other Ellines products can reuse the same intelligence wi
 | HTTP API | `services/ellinea-ai` | Nest on `:3002` — ask / brief / recommend / memory / feedback |
 | Client SDK | `@ellines-eip/ellinea-sdk` | `createEllineaClient({ baseUrl })` |
 | Live org data | Pages Functions | Memory, learning, optional LLM Ask, enterprise ingest |
-| Operator UI | `/app/ellinea-console` | Thin Owner/IT console inside EIP |
+| Operator UI | `/app/ellinea-console` | Owner/IT **operator / API lab** (SDK + contract smoke) — not everyday chat |
+
+**EIP placement (do not invent a second Ask nav):** everyday Ask is the floating “Ask Ellinea AI” panel (optional full workspace `/app/ellinea`). Preferences live on System Settings → **Ellinea AI** card. The console stays an advanced Owner/IT surface linked from that card as “Operator console (API)” — keep the route; it is **not** Work Console side nav. It may later become a thin standalone Ellinea operator product; EIP nav stays clean.
 
 Contract details: [11_Ellinea_API_Contract.md](./11_Ellinea_API_Contract.md)
 
@@ -73,8 +75,8 @@ const chunks = retrieveEllineaContext({ question, summary, memory });
 ## Demo path inside EIP
 
 1. Sign in as Owner/IT → Connectors → ingest a BYO snapshot (or sync).
-2. Ask Ellinea → add Memory notes → mark recommendations helpful.
-3. Open **Ellinea console** → Run brief / recommend / Ask API.
+2. Use floating **Ask Ellinea AI** (or full Ask workspace) → add Memory notes → mark recommendations helpful.
+3. System Settings → **Ellinea AI** → open **Operator console (API)** → run brief / recommend / Ask API smoke.
 4. Confirm Audit shows `enterprise.ingest` / `notify.*` / org learning updates as applicable.
 
 ## Tenant isolation

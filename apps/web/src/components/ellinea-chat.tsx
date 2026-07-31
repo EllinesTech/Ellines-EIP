@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   fetchEnterpriseSummary,
@@ -146,6 +147,12 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
             </svg>
           </button>
         </form>
+
+        <div className={styles.expandRow}>
+          <Link href="/app/ellinea" className={styles.expandLink} onClick={onClose}>
+            Open full Ask workspace
+          </Link>
+        </div>
       </div>
     </div>
   );
