@@ -80,8 +80,14 @@
   --dash-search-h: 40px;
 }
 
+.shell[data-reduce-motion='true'] .content,
+.shell[data-reduce-motion='true'] :global(*) {
+  animation: none !important;
+  transition: none !important;
+}
+
 .shellCollapsed {
-  grid-template-columns: 76px 1fr;
+  grid-template-columns: 72px 1fr;
 }
 
 .sidebar {

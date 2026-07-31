@@ -39,6 +39,8 @@ In [EllinesTech/Ellines-EIP](https://github.com/EllinesTech/Ellines-EIP) → **S
 
 Pages **Functions** live under `apps/web/functions/` and deploy with the `out/` static export.
 
+**Do not** put `[triggers] crons` in `apps/web/wrangler.toml` — that breaks `wrangler pages deploy` on free/account cron limits. Connector schedules use opportunistic `POST /api/v1/connectors/run-due` when IT opens Connectors.
+
 ## Connect checklist (one-time)
 
 1. Confirm the GitHub remote is `https://github.com/EllinesTech/Ellines-EIP.git`.

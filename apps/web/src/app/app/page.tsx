@@ -14,6 +14,7 @@ import {
   weekSeries,
 } from '@/components/dashboard/charts';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
+import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
 
 function AdminOverview({
@@ -21,11 +22,13 @@ function AdminOverview({
   summary,
   synced,
   variant,
+  uiPrefs,
 }: {
   name: string;
   summary: EnterpriseSummaryDto | null;
   synced: boolean;
   variant: WorkHomeVariant;
+  uiPrefs: UiPrefs;
 }) {
   const health = synced ? summary!.healthScore : 0;
   const systems = synced ? summary!.connectedSystems : 0;
@@ -69,13 +72,24 @@ function AdminOverview({
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Work Console · Org command + IT</p>
+          <p className={styles.eyebrow}>Work Console</p>
           <h1>Welcome back, {name}</h1>
           <p className={styles.lede}>
             {synced
               ? 'Live enterprise snapshot from your connectors.'
-              : 'Sync Demo JSON Systems in Connectors to unlock live KPIs.'}
+              : 'Sync a connector to unlock live KPIs.'}
           </p>
+        </div>
+        <div className={styles.headerActions}>
+          <Link href="/app/timeline" className={styles.ghostBtn}>
+            Timeline
+          </Link>
+          <Link href="/app/search" className={styles.ghostBtn}>
+            Search
+          </Link>
+          <Link href="/app/connectors" className={styles.ghostBtn}>
+            Connectors
+          </Link>
         </div>
       </header>
 
@@ -84,37 +98,45 @@ function AdminOverview({
           <span>Enterprise Health</span>
           <strong>{synced ? String(health) : '—'}</strong>
           <em className={synced ? styles.pos : undefined}>{synced ? 'Live composite' : 'Awaiting sync'}</em>
-          <div className={styles.spark}>
-            <Sparkline data={sparks.health} color={chartColors.BLUE} />
-          </div>
+          {uiPrefs.showSparklines ? (
+            <div className={styles.spark}>
+              <Sparkline data={sparks.health} color={chartColors.BLUE} />
+            </div>
+          ) : null}
         </article>
         <article className={styles.kpi}>
           <span>Connected Systems</span>
           <strong>{synced ? String(systems) : '0'}</strong>
           <em className={synced ? styles.warn : undefined}>{synced ? 'Synced' : 'Connect to unlock'}</em>
-          <div className={styles.spark}>
-            <Sparkline data={sparks.systems} color={chartColors.VIOLET} />
-          </div>
+          {uiPrefs.showSparklines ? (
+            <div className={styles.spark}>
+              <Sparkline data={sparks.systems} color={chartColors.VIOLET} />
+            </div>
+          ) : null}
         </article>
         <article className={styles.kpi}>
           <span>Open Decisions</span>
           <strong>{synced ? String(decisions) : '—'}</strong>
           <em>{synced ? 'In queue' : '—'}</em>
-          <div className={styles.spark}>
-            <Sparkline data={sparks.decisions} color={chartColors.BLUE} />
-          </div>
+          {uiPrefs.showSparklines ? (
+            <div className={styles.spark}>
+              <Sparkline data={sparks.decisions} color={chartColors.BLUE} />
+            </div>
+          ) : null}
         </article>
         <article className={styles.kpi}>
           <span>Ellinea Status</span>
           <strong>Ready</strong>
           <em className={styles.pos}>Standing by</em>
-          <div className={styles.spark}>
-            <Sparkline data={sparks.ready} color={chartColors.GREEN} />
-          </div>
+          {uiPrefs.showSparklines ? (
+            <div className={styles.spark}>
+              <Sparkline data={sparks.ready} color={chartColors.GREEN} />
+            </div>
+          ) : null}
         </article>
       </div>
 
-      {synced && summary?.model?.counts ? (
+      {synced && summary?.model?.counts && uiPrefs.showUemStrip ? (
         <div className={styles.uemStrip} aria-label="Universal Enterprise Model counts">
           {(
             [
@@ -479,6 +501,7 @@ export default function CommandCenterPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPlatform, setIsPlatform] = useState(false);
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
+  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
 
   useEffect(() => {
     const s = getSession();
@@ -487,16 +510,31 @@ export default function CommandCenterPage() {
     setVariant(workHomeVariant(s?.user.role));
     setIsAdmin(isOrgAdminRole(s?.user.role));
     setIsPlatform(Boolean(s?.isPlatformAdmin));
+    setUiPrefs(readUiPrefs());
+    const onPrefs = (e: Event) => {
+      const detail = (e as CustomEvent<UiPrefs>).detail;
+      if (detail) setUiPrefs(detail);
+    };
+    window.addEventListener(UI_PREFS_EVENT, onPrefs);
     fetchEnterpriseSummary()
       .then(setSummary)
       .catch(() => setSummary(null));
+    return () => window.removeEventListener(UI_PREFS_EVENT, onPrefs);
   }, []);
 
   const synced = summary?.status === 'synced';
   const showAdmin = isAdmin || isPlatform;
 
   if (showAdmin) {
-    return <AdminOverview name={name} summary={summary} synced={synced} variant={variant} />;
+    return (
+      <AdminOverview
+        name={name}
+        summary={summary}
+        synced={synced}
+        variant={variant}
+        uiPrefs={uiPrefs}
+      />
+    );
   }
 
   return <ClientOverview name={name} summary={summary} synced={synced} variant={variant} />;

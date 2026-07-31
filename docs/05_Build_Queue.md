@@ -54,7 +54,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 2.5 | Email Connector | `done` | IMAP via Identity (`imapflow`); Pages saves config |
 | 2.5a | SFTP / folder drop | `done` | Pull CSV via Identity (`ssh2-sftp-client`); Pages saves config |
 | 2.6 | Universal Enterprise Model | `done` | Shared UEM types + normalize; timeline stores events+model; Command Center shows counts/objects |
-| 2.7 | Sync Scheduler | `done` | Per-install interval + nextSyncAt; run-due on Connectors load; cron hook registered |
+| 2.7 | Sync Scheduler | `done` | Per-install interval + nextSyncAt; run-due on Connectors load (no Pages cron — deploy-safe) |
 | 2.x | `services/integration-hub` microservice | `todo` | Logic hosted on Identity + Pages Functions for now |
 | 2.x | Webhooks / events | `todo` | Planned — System B pushes to EIP |
 | 2.x | SQL Server / MySQL | `todo` | Same pattern as Postgres when HIS needs it |

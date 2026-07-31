@@ -56,6 +56,13 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: npm run build -w @ellines-eip/web
 
+      - name: Assert static export exists
+        working-directory: apps/web
+        run: |
+          test -d out
+          test -f out/index.html
+          echo "Static export OK ($(find out -type f | wc -l) files)"
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
@@ -63,6 +70,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.114.0"
           workingDirectory: apps/web
+          # Direct upload only — no cron triggers in wrangler.toml (breaks Pages on free tier).
           command: pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

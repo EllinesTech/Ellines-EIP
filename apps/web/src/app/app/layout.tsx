@@ -270,6 +270,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       data-theme={uiPrefs.theme}
       data-accent={uiPrefs.accent}
       data-density={uiPrefs.density}
+      data-reduce-motion={uiPrefs.reduceMotion ? 'true' : 'false'}
     >
       <aside className={styles.sidebar}>
         <div className={styles.brand}>

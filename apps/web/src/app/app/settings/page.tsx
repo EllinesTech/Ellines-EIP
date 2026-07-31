@@ -26,6 +26,29 @@ import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import settingsStyles from './settings.module.css';
 
+function Toggle({
+  on,
+  onClick,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={on ? `${settingsStyles.switch} ${settingsStyles.switchOn}` : settingsStyles.switch}
+      onClick={onClick}
+    >
+      <span className={settingsStyles.switchKnob} />
+    </button>
+  );
+}
+
 export default function SystemSettingsPage() {
   const [orgAdmin, setOrgAdmin] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -95,8 +118,7 @@ export default function SystemSettingsPage() {
           <p className={styles.eyebrow}>Workspace</p>
           <h1>System Settings</h1>
           <p className={styles.lede}>
-            Display, density, and organization clock for the Work Console. Profile details stay
-            separate.
+            Appearance and density for this browser. Organization clock applies to everyone.
           </p>
         </div>
       </header>
@@ -109,11 +131,11 @@ export default function SystemSettingsPage() {
           <p className={settingsStyles.cardEyebrow}>This browser</p>
           <h2 className={settingsStyles.cardTitle}>Appearance</h2>
           <p className={settingsStyles.cardHint}>
-            Theme, accent, and layout density apply only on this device.
+            Theme, accent, and density — local only. Does not change other users.
           </p>
         </div>
 
-        <div className={settingsStyles.grid}>
+        <div className={settingsStyles.appearanceGrid}>
           <div className={settingsStyles.block}>
             <span className={settingsStyles.fieldLabel}>Theme</span>
             <div className={settingsStyles.optionRow} role="group" aria-label="Theme">
@@ -140,6 +162,34 @@ export default function SystemSettingsPage() {
           </div>
 
           <div className={settingsStyles.block}>
+            <span className={settingsStyles.fieldLabel}>Layout density</span>
+            <div className={settingsStyles.optionRow} role="group" aria-label="Layout density">
+              {(
+                [
+                  { id: 'comfortable', label: 'Comfortable' },
+                  { id: 'compact', label: 'Compact' },
+                ] as { id: UiDensity; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={
+                    uiPrefs.density === opt.id
+                      ? `${settingsStyles.option} ${settingsStyles.optionActive}`
+                      : settingsStyles.option
+                  }
+                  onClick={() => persistUi({ ...uiPrefs, density: opt.id })}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className={settingsStyles.fieldHint}>
+              Comfortable ≈ enterprise default. Compact packs more onto 1080p.
+            </p>
+          </div>
+
+          <div className={settingsStyles.block} style={{ gridColumn: '1 / -1' }}>
             <span className={settingsStyles.fieldLabel}>Accent color</span>
             <div className={settingsStyles.optionRow} role="group" aria-label="Accent color">
               {(
@@ -169,34 +219,41 @@ export default function SystemSettingsPage() {
               ))}
             </div>
           </div>
+        </div>
 
-          <div className={settingsStyles.block}>
-            <span className={settingsStyles.fieldLabel}>Layout density</span>
-            <p className={settingsStyles.fieldHint}>
-              Comfortable is the enterprise default (~12% tighter than marketing UI). Compact packs
-              ~20% more onto 1080p for power users.
-            </p>
-            <div className={settingsStyles.optionRow} role="group" aria-label="Layout density">
-              {(
-                [
-                  { id: 'comfortable', label: 'Comfortable' },
-                  { id: 'compact', label: 'Compact' },
-                ] as { id: UiDensity; label: string }[]
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={
-                    uiPrefs.density === opt.id
-                      ? `${settingsStyles.option} ${settingsStyles.optionActive}`
-                      : settingsStyles.option
-                  }
-                  onClick={() => persistUi({ ...uiPrefs, density: opt.id })}
-                >
-                  {opt.label}
-                </button>
-              ))}
+        <div style={{ marginTop: '0.85rem' }}>
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>UEM count strip</strong>
+              <p>Show branches / people / tasks / alerts under Overview KPIs.</p>
             </div>
+            <Toggle
+              on={uiPrefs.showUemStrip}
+              label="Toggle UEM count strip"
+              onClick={() => persistUi({ ...uiPrefs, showUemStrip: !uiPrefs.showUemStrip })}
+            />
+          </div>
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>KPI sparklines</strong>
+              <p>Mini trend charts on Overview metric cards.</p>
+            </div>
+            <Toggle
+              on={uiPrefs.showSparklines}
+              label="Toggle KPI sparklines"
+              onClick={() => persistUi({ ...uiPrefs, showSparklines: !uiPrefs.showSparklines })}
+            />
+          </div>
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>Reduce motion</strong>
+              <p>Limit hover lifts and entrance animation in the Work Console.</p>
+            </div>
+            <Toggle
+              on={uiPrefs.reduceMotion}
+              label="Toggle reduce motion"
+              onClick={() => persistUi({ ...uiPrefs, reduceMotion: !uiPrefs.reduceMotion })}
+            />
           </div>
         </div>
       </section>
@@ -207,7 +264,7 @@ export default function SystemSettingsPage() {
           <h2 className={settingsStyles.cardTitle}>Clock &amp; date</h2>
           <p className={settingsStyles.cardHint}>
             {orgAdmin
-              ? 'Formats used in the sidebar clock and activity timestamps for everyone in this org.'
+              ? 'Formats for sidebar clock and activity timestamps across the org.'
               : 'Organization clock format. Only Owner or IT Admin can change it.'}
           </p>
         </div>
@@ -263,9 +320,9 @@ export default function SystemSettingsPage() {
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
           <p className={settingsStyles.cardEyebrow}>Account</p>
-          <h2 className={settingsStyles.cardTitle}>Related settings</h2>
+          <h2 className={settingsStyles.cardTitle}>Related</h2>
           <p className={settingsStyles.cardHint}>
-            Personal identity and org administration live on their own screens.
+            Profile and admin tools live on their own screens.
           </p>
         </div>
         <div className={settingsStyles.linkRow}>

@@ -6,6 +6,12 @@ export type UiPrefs = {
   theme: UiTheme;
   accent: UiAccent;
   density: UiDensity;
+  /** Show Universal Enterprise Model count strip on Overview. */
+  showUemStrip: boolean;
+  /** Soften chart sparklines on KPI cards. */
+  showSparklines: boolean;
+  /** Prefer reduced motion (respects OS when true). */
+  reduceMotion: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -15,6 +21,9 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   theme: 'dark',
   accent: 'violet',
   density: 'comfortable',
+  showUemStrip: true,
+  showSparklines: true,
+  reduceMotion: false,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -28,6 +37,9 @@ export function readUiPrefs(): UiPrefs {
       accent:
         parsed.accent === 'blue' || parsed.accent === 'teal' ? parsed.accent : 'violet',
       density: parsed.density === 'compact' ? 'compact' : 'comfortable',
+      showUemStrip: parsed.showUemStrip !== false,
+      showSparklines: parsed.showSparklines !== false,
+      reduceMotion: parsed.reduceMotion === true,
     };
   } catch {
     return DEFAULT_UI_PREFS;
