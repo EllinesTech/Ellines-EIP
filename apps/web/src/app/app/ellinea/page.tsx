@@ -1,28 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { buildEllineaAnswer } from '@/components/ellinea-chat';
 import { fetchEnterpriseSummary, type EnterpriseSummaryDto } from '@/lib/api';
 import styles from '../command.module.css';
-
-function buildAnswer(question: string, summary: EnterpriseSummaryDto | null): string {
-  const q = question.toLowerCase();
-  if (!summary || summary.status !== 'synced') {
-    return 'I do not have a live enterprise snapshot yet. Ask IT to open Connectors and sync Demo JSON Systems, then ask again.';
-  }
-  if (q.includes('health') || q.includes('performing') || q.includes('how are')) {
-    return `Enterprise health is ${summary.healthScore}/100 across ${summary.connectedSystems} connected systems. ${summary.briefHighlight}`;
-  }
-  if (q.includes('alert') || q.includes('risk')) {
-    return `There are ${summary.openAlerts} open alerts in the latest sync. ${summary.briefHighlight}`;
-  }
-  if (q.includes('decision') || q.includes('approval')) {
-    return `There are ${summary.openDecisions} open decisions waiting. Prioritize them before the next brief cycle.`;
-  }
-  if (q.includes('brief') || q.includes('today') || q.includes('morning')) {
-    return `Daily brief: ${summary.briefHighlight} (synced ${summary.syncedAt ? new Date(summary.syncedAt).toLocaleString() : 'recently'} via ${summary.connectorName}).`;
-  }
-  return `From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}`;
-}
 
 export default function EllineaPage() {
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
@@ -34,7 +15,7 @@ export default function EllineaPage() {
       .then((s) => {
         setSummary(s);
         if (s.status === 'synced') {
-          setAnswer(buildAnswer('brief today', s));
+          setAnswer(buildEllineaAnswer('brief today', s));
         }
       })
       .catch(() => setSummary(null));
@@ -42,7 +23,7 @@ export default function EllineaPage() {
 
   function onAsk(e: FormEvent) {
     e.preventDefault();
-    setAnswer(buildAnswer(question, summary));
+    setAnswer(buildEllineaAnswer(question, summary));
   }
 
   return (

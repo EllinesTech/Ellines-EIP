@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
 import { isOrgAdminRole } from '@ellines-eip/shared';
+import EllineaChatPanel from '@/components/ellinea-chat';
 import {
   AuthSession,
   clearSession,
@@ -81,10 +82,10 @@ function IconSettings() {
 
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
-  { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/admin', label: 'IT Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
+  { href: '/app/ellinea', label: 'Ask Ellinea', icon: <IconEllinea /> },
   { href: '/app/settings', label: 'Settings', icon: <IconSettings /> },
 ];
 
@@ -101,6 +102,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<AuthSession | null>(null);
   const [ready, setReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     const s = getSession();
@@ -304,12 +306,16 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <div className={styles.content}>{children}</div>
       </div>
 
-      <Link href="/app/ellinea" className={styles.fab}>
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <path d="M21 12a8.5 8.5 0 01-8.5 8.5H7l-4 3V12A8.5 8.5 0 0112.5 3.5 8.5 8.5 0 0121 12z" />
-        </svg>
-        Ask Ellinea AI
-      </Link>
+      {!chatOpen ? (
+        <button type="button" className={styles.fab} onClick={() => setChatOpen(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <path d="M21 12a8.5 8.5 0 01-8.5 8.5H7l-4 3V12A8.5 8.5 0 0112.5 3.5 8.5 8.5 0 0121 12z" />
+          </svg>
+          Ask Ellinea AI
+        </button>
+      ) : null}
+
+      <EllineaChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }
