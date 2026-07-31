@@ -13,17 +13,22 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
-| **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
-| **3 — Executive Command Center** | ~90% | KPIs + UEM + Timeline + Search + **Notifications** shipped |
-| **4 — Ellinea AI** | ~65% | Brief + recs + memory + **role context**; LLM still deferred |
-| **5 — Workflow & Automation** | ~15% | Approvals queue stub shipped; rules/reports/event bus next |
+| **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped |
+| **3 — Owner / Admin Command Center** | ~92% | **Active focus** — polish Owner + IT Admin dashboard before other roles |
+| **4 — Ellinea AI** | ~65% | Brief + recs + memory + role context; LLM deferred |
+| **5 — Workflow & Automation** | ~15% | Approvals stub only — pause deep workflow until Owner/Admin dash is solid |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
-**Critical path remaining:** Workflow rules + reports → email/push notifications → LLM when Memory service exists.
+### Priority order (do this first → next → later)
 
-**Feature settings rule:** new user-facing surfaces must ship a System Settings control when behavior is preference-shaped (display, density, notification filters, etc.).
+1. **Now — Owner / IT Admin dashboard** (`1.5` / `3.x` polish): Org Admin, Connectors, Overview for Owner/Admin, Notifications (delete/read), System Settings density, authority clarity.
+2. **Next — Owner/Admin intelligence:** Ellinea brief/recs as Owner sees them; Approvals decide path for Owner/IT.
+3. **Then — Executive / manager / member consoles:** role-adaptive Overview refinements (not the current focus).
+4. **Later — Workflow depth (5.2+), email/push, LLM/RAG.**
 
-**MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
+**Critical path:** Finish **Owner/Admin Work Console** → then other roles → then workflow rules / email / LLM.
+
+**Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
 ---
 
@@ -63,7 +68,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ---
 
-## Phase 3 — Executive Command Center
+## Phase 3 — Owner / Admin Command Center (active)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
@@ -72,8 +77,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.3 | Enterprise Health Score | `done` | Snapshot `healthScore` |
 | 3.4 | Enterprise Timeline | `done` | `/app/timeline` + Overview rail; uses org clock prefs + sync timestamps |
 | 3.5 | Enterprise Search | `done` | `/app/search` + topbar; queries snapshot, timeline, UEM objects, installs |
-| 3.6 | Notification Center | `done` | `/app/notifications` + bell; settings for badge/alerts/sync; snapshot-derived feed |
-| 3.x | Email/push notifications | `todo` | Needs `services/notification` + org policy |
+| 3.6 | Notification Center | `done` | Feed + bell; mark read; **delete one / delete all**; settings |
+| 3.7 | Owner / IT Admin dashboard polish | `next` | Density, authority copy, admin Overview shortcuts — **do before other roles** |
+| 3.x | Email/push notifications | `todo` | Needs `services/notification` + org policy — later |
 
 ---
 
@@ -95,8 +101,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 5.1 | Approval Workflows | `in_progress` | Local queue + decide UI + settings; multi-step service later |
-| 5.2 | Business Rules Engine | `next` | If/then on enterprise events |
+| 5.1 | Approval Workflows | `in_progress` | Local queue OK for Owner/IT; multi-step service later |
+| 5.2 | Business Rules Engine | `todo` | Deferred until Owner/Admin dash polish (3.7) lands |
 | 5.3 | Scheduled Reports | `todo` | Daily/weekly reports |
 | 5.4 | Event Bus | `todo` | Internal pub/sub |
 
@@ -104,9 +110,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 ## Recently landed on main (through 2026-07-31)
 
+- Notification delete (one / all) + Owner/Admin-first priority in queue
 - Approvals queue stub (local) + System Settings toggles
 - Ellinea: daily brief, explainable recommendations, local Enterprise Memory + settings toggles
-- Notification Center; Org Admin densify; Pages deploy-safe (no cron); GitHub Actions only
+- Org Admin densify; Pages deploy-safe (no cron); GitHub Actions only
 - Sync scheduler: per-install intervals, run-due on Connectors load
 - Universal Enterprise Model normalize + Command Center object counts
 - Pages Functions import verify gate; Work Console density + settings typography

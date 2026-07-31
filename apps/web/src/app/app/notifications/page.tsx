@@ -18,6 +18,7 @@ import {
   type UiPrefs,
 } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
+import adminStyles from '../admin/admin.module.css';
 
 export type AppNotification = {
   id: string;
@@ -29,11 +30,13 @@ export type AppNotification = {
 };
 
 const READ_KEY = 'eip_notifications_read';
+const DELETED_KEY = 'eip_notifications_deleted';
+export const NOTIFICATIONS_CHANGED_EVENT = 'eip-notifications-changed';
 
-function readIds(): Set<string> {
+function readIdSet(key: string): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem(READ_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return new Set();
     const arr = JSON.parse(raw) as string[];
     return new Set(Array.isArray(arr) ? arr : []);
@@ -42,8 +45,13 @@ function readIds(): Set<string> {
   }
 }
 
-function writeIds(ids: Set<string>) {
-  localStorage.setItem(READ_KEY, JSON.stringify([...ids].slice(-200)));
+function writeIdSet(key: string, ids: Set<string>) {
+  localStorage.setItem(key, JSON.stringify([...ids].slice(-300)));
+  window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+}
+
+export function readDeletedNotificationIds(): Set<string> {
+  return readIdSet(DELETED_KEY);
 }
 
 export function buildNotifications(
@@ -83,7 +91,7 @@ export function buildNotifications(
       title: `${summary.openDecisions} open decision${summary.openDecisions === 1 ? '' : 's'}`,
       detail: 'Approvals and actions waiting in the enterprise queue.',
       at: syncedAt,
-      href: '/app',
+      href: '/app/approvals',
     });
   }
 
@@ -122,13 +130,15 @@ export default function NotificationsPage() {
     dateStyle: 'short',
   });
   const [read, setRead] = useState<Set<string>>(new Set());
+  const [deleted, setDeleted] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
 
   useEffect(() => {
     const s = getSession();
     if (!s) return;
     setPrefs(readUiPrefs());
-    setRead(readIds());
+    setRead(readIdSet(READ_KEY));
+    setDeleted(readIdSet(DELETED_KEY));
     const cached = readCachedOrgDateTimeSettings(s.organization.id);
     if (cached) setDatePrefs(cached);
     const onUi = (e: Event) => {
@@ -150,21 +160,50 @@ export default function NotificationsPage() {
     };
   }, []);
 
-  const items = useMemo(() => buildNotifications(summary, prefs), [summary, prefs]);
+  const allItems = useMemo(() => buildNotifications(summary, prefs), [summary, prefs]);
+  const items = useMemo(
+    () => allItems.filter((n) => !deleted.has(n.id)),
+    [allItems, deleted],
+  );
   const unread = items.filter((n) => !read.has(n.id)).length;
 
   function markAllRead() {
     const next = new Set(read);
     for (const n of items) next.add(n.id);
     setRead(next);
-    writeIds(next);
+    writeIdSet(READ_KEY, next);
   }
 
   function markRead(id: string) {
     const next = new Set(read);
     next.add(id);
     setRead(next);
-    writeIds(next);
+    writeIdSet(READ_KEY, next);
+  }
+
+  function deleteOne(id: string) {
+    const next = new Set(deleted);
+    next.add(id);
+    setDeleted(next);
+    writeIdSet(DELETED_KEY, next);
+    const nextRead = new Set(read);
+    nextRead.add(id);
+    setRead(nextRead);
+    writeIdSet(READ_KEY, nextRead);
+  }
+
+  function deleteAllVisible() {
+    if (!items.length) return;
+    const next = new Set(deleted);
+    const nextRead = new Set(read);
+    for (const n of items) {
+      next.add(n.id);
+      nextRead.add(n.id);
+    }
+    setDeleted(next);
+    setRead(nextRead);
+    writeIdSet(DELETED_KEY, next);
+    writeIdSet(READ_KEY, nextRead);
   }
 
   function formatWhen(iso: string | null) {
@@ -189,8 +228,16 @@ export default function NotificationsPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.ghostBtn} onClick={markAllRead}>
+          <button type="button" className={styles.ghostBtn} onClick={markAllRead} disabled={!unread}>
             Mark all read
+          </button>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            onClick={deleteAllVisible}
+            disabled={!items.length}
+          >
+            Delete all
           </button>
           <Link href="/app/settings" className={styles.ghostBtn}>
             Notification settings
@@ -203,7 +250,9 @@ export default function NotificationsPage() {
       <section className={styles.timeline}>
         <div className={styles.panelLabel}>Feed</div>
         {items.length === 0 ? (
-          <p className={styles.lede}>Nothing to show yet.</p>
+          <p className={styles.lede}>
+            {allItems.length ? 'All notifications deleted for this feed.' : 'Nothing to show yet.'}
+          </p>
         ) : (
           <ul className={styles.events} style={{ marginTop: '0.75rem' }}>
             {items.map((n) => {
@@ -225,7 +274,7 @@ export default function NotificationsPage() {
                       <span className={styles.time}>{formatWhen(n.at)}</span>
                     </div>
                     <p>{n.detail}</p>
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' }}>
                       {n.href ? (
                         <Link
                           href={n.href}
@@ -239,12 +288,21 @@ export default function NotificationsPage() {
                         <button
                           type="button"
                           className={styles.ghostBtn}
-                          style={{ minHeight: 32, padding: '0.25rem 0.55rem' }}
+                          style={{ minHeight: 30, padding: '0.2rem 0.5rem' }}
                           onClick={() => markRead(n.id)}
                         >
                           Mark read
                         </button>
                       ) : null}
+                      <button
+                        type="button"
+                        className={adminStyles.ghost}
+                        style={{ minHeight: 30, padding: '0.2rem 0.5rem' }}
+                        onClick={() => deleteOne(n.id)}
+                        aria-label={`Delete ${n.title}`}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </li>

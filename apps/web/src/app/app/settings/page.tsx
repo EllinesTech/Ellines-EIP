@@ -263,7 +263,8 @@ export default function SystemSettingsPage() {
           <p className={settingsStyles.cardEyebrow}>This browser</p>
           <h2 className={settingsStyles.cardTitle}>Notifications</h2>
           <p className={settingsStyles.cardHint}>
-            Control what appears in the Notification Center feed and bell badge.
+            Control what appears in the Notification Center feed and bell badge. Delete items from
+            the feed itself (one or all).
           </p>
         </div>
         <div className={settingsStyles.toggleRow}>
