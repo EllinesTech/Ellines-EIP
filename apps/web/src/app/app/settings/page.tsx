@@ -444,6 +444,20 @@ export default function SystemSettingsPage() {
             onClick={() => persistUi({ ...uiPrefs, ellineaUseDna: !uiPrefs.ellineaUseDna })}
           />
         </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>LLM + RAG</strong>
+            <p>
+              Prefer the server Ask path (OpenAI-compatible when a key is set). Always grounds on
+              sync + Memory; falls back to template+RAG.
+            </p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaUseLlm}
+            label="Toggle Ellinea LLM RAG"
+            onClick={() => persistUi({ ...uiPrefs, ellineaUseLlm: !uiPrefs.ellineaUseLlm })}
+          />
+        </div>
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open Ask Ellinea →

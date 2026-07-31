@@ -376,6 +376,26 @@ export function saveEllineaMemory(notes: EllineaMemoryNoteDto[]) {
   });
 }
 
+export type EllineaAskResponse = {
+  answer: string;
+  mode: 'llm' | 'rag_template' | 'error';
+  provider?: string;
+  groundingChars?: number;
+  error?: string;
+};
+
+export function askEllineaApi(payload: {
+  question: string;
+  summary: EnterpriseSummaryDto | null;
+  memory: EllineaMemoryNoteDto[];
+  templateAnswer: string;
+}) {
+  return request<EllineaAskResponse>('/api/v1/ellinea/ask', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchPlatformOrgDateTimeSettings(orgId: string) {
   return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
 }

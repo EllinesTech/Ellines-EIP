@@ -33,7 +33,7 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~90% | Server Memory shipped; LLM/RAG next; standalone later |
+| **4 — Ellinea AI** | ~95% | RAG + optional LLM Ask shipped; standalone later |
 | **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
@@ -114,10 +114,10 @@ while queue has next/in_progress and not blocked:
 | 5.2 | Business rules (local) | `done` | `/app/rules` + Overview flags |
 | 5.3 | Scheduled Reports | `done` | Local schedules + preview |
 | 3.x | Other-role Overview polish | `done` | Role-specific copy, real CTAs, empty sync state |
-| 3.x | Email/push notifications | `in_progress` | Delivery policy UI at `/app/notify-policy`; service later |
+| 3.x | Email/push notifications | `next` | Delivery policy UI done; notification service stub next |
 | 5.4 | Event Bus | `done` | Local pub/sub + log on Rules / Approvals |
 | 4.4a | Server Enterprise Memory API | `done` | `GET/PUT /api/v1/orgs/me/ellinea-memory` |
-| 4.10 | LLM / RAG | `next` | Grounded answers after server Memory |
+| 4.10 | LLM / RAG | `done` | RAG retrieve + `POST /api/v1/ellinea/ask` |
 
 ---
 
@@ -137,7 +137,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.7 | Recommendation feedback loop | `done` | Helpful/dismiss → re-rank; settings toggle |
 | 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
-| 4.10 | LLM / RAG | `next` | After server Memory — provider + grounded answers |
+| 4.10 | LLM / RAG | `done` | Local RAG + optional OpenAI-compatible Ask; settings toggle |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
 
@@ -153,9 +153,9 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 5.3 | Scheduled Reports | `done` | `/app/reports` local schedules + preview |
 | 5.4 | Event Bus | `done` | Browser event bus + log |
 | 4.4a | Server Enterprise Memory | `done` | Persist policies/decisions per org |
-| 4.10 | LLM / RAG | `next` | Grounded provider path |
+| 4.10 | LLM / RAG | `done` | Grounded provider path |
 | 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
-| 3.x | Email/push notifications | `in_progress` | Policy UI done; `services/notification` later |
+| 3.x | Email/push notifications | `next` | Policy UI done; `services/notification` next |
 
 ---
 

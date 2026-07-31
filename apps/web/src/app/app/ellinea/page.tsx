@@ -19,6 +19,7 @@ import {
 } from '@/lib/ellinea-engine';
 import { readApprovals } from '@/lib/approvals';
 import {
+  askEllineaApi,
   fetchEllineaMemory,
   fetchEnterpriseSummary,
   getSession,
@@ -26,6 +27,7 @@ import {
   type EnterpriseSummaryDto,
 } from '@/lib/api';
 import { publishEnterpriseEvent } from '@/lib/event-bus';
+import { formatRagGrounding, retrieveEllineaContext } from '@/lib/ellinea-rag';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -65,8 +67,8 @@ export default function EllineaPage() {
   const [memory, setMemory] = useState<EllineaMemoryNote[]>([]);
   const [dna, setDna] = useState<EnterpriseDnaSnapshot | null>(null);
   const [signals, setSignals] = useState<LearningSignal[]>([]);
-  const [noteTitle, setNoteTitle] = useState('');
-  const [noteBody, setNoteBody] = useState('');
+  const [answerMode, setAnswerMode] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
   function refreshSignals(
     organizationId: string,
@@ -195,18 +197,57 @@ export default function EllineaPage() {
   function ask(q: string) {
     const ui = prefs || readUiPrefs();
     const session = getSession();
-    setAnswer(
-      buildEllineaAnswer(q, summary, {
-        memory: ui.ellineaUseMemory ? memory : [],
-        useMemory: ui.ellineaUseMemory,
-        useRoleContext: ui.ellineaRoleContext,
-        useDna: ui.ellineaUseDna,
-        dna: ui.ellineaUseDna ? dna : null,
-        role: session?.user.role,
-        fullName: session?.user.fullName,
-        organizationName: session?.organization.name,
-      }),
-    );
+    const template = buildEllineaAnswer(q, summary, {
+      memory: ui.ellineaUseMemory ? memory : [],
+      useMemory: ui.ellineaUseMemory,
+      useRoleContext: ui.ellineaRoleContext,
+      useDna: ui.ellineaUseDna,
+      dna: ui.ellineaUseDna ? dna : null,
+      role: session?.user.role,
+      fullName: session?.user.fullName,
+      organizationName: session?.organization.name,
+    });
+    const chunks = retrieveEllineaContext({
+      question: q,
+      summary,
+      memory: ui.ellineaUseMemory ? memory : [],
+      dna: ui.ellineaUseDna ? dna : null,
+    });
+    const grounded =
+      chunks.length > 0
+        ? `${template}\n\nSources:\n${formatRagGrounding(chunks.slice(0, 4))}`
+        : template;
+
+    if (ui.ellineaUseLlm === false) {
+      setAnswer(grounded);
+      setAnswerMode('template+rag');
+      return;
+    }
+
+    setAsking(true);
+    setAnswerMode('…');
+    askEllineaApi({
+      question: q,
+      summary,
+      memory,
+      templateAnswer: grounded,
+    })
+      .then((res) => {
+        setAnswer(res.answer);
+        setAnswerMode(
+          res.mode === 'llm'
+            ? `llm · ${res.provider || 'provider'}`
+            : res.mode === 'error'
+              ? 'template+rag (llm error)'
+              : 'template+rag',
+        );
+        publishEnterpriseEvent('ellinea.ask', { mode: res.mode, qLen: q.length });
+      })
+      .catch(() => {
+        setAnswer(grounded);
+        setAnswerMode('template+rag');
+      })
+      .finally(() => setAsking(false));
   }
 
   function onFeedback(recId: string, vote: 'helpful' | 'dismiss') {
@@ -266,7 +307,7 @@ export default function EllineaPage() {
           <p className={styles.eyebrow}>Ellinea AI</p>
           <h1>Ask Ellinea</h1>
           <p className={styles.lede}>
-            Daily brief, explainable recommendations, and memory grounded in your latest sync.
+            Daily brief, RAG-grounded answers, and memory from your latest sync (LLM when configured).
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -373,10 +414,15 @@ export default function EllineaPage() {
               aria-label="Question for Ellinea"
             />
           </label>
-          <button type="submit" className={adminStyles.primary}>
-            Ask Ellinea
+          <button type="submit" className={adminStyles.primary} disabled={asking}>
+            {asking ? 'Asking…' : 'Ask Ellinea'}
           </button>
         </form>
+        {answerMode ? (
+          <p className={ellineaStyles.recsHint} style={{ marginTop: '0.45rem' }}>
+            Mode · {answerMode}
+          </p>
+        ) : null}
         {answer ? <p className={ellineaStyles.answer}>{answer}</p> : null}
       </section>
 

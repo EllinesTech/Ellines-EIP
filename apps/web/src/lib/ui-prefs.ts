@@ -34,6 +34,8 @@ export type UiPrefs = {
   ellineaRecFeedback: boolean;
   /** Use Enterprise DNA traits when answering. */
   ellineaUseDna: boolean;
+  /** Prefer LLM+RAG path when provider is configured (falls back to template). */
+  ellineaUseLlm: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -57,6 +59,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   approvalsSeedFromDecisions: true,
   ellineaRecFeedback: true,
   ellineaUseDna: true,
+  ellineaUseLlm: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -84,6 +87,7 @@ export function readUiPrefs(): UiPrefs {
       approvalsSeedFromDecisions: parsed.approvalsSeedFromDecisions !== false,
       ellineaRecFeedback: parsed.ellineaRecFeedback !== false,
       ellineaUseDna: parsed.ellineaUseDna !== false,
+      ellineaUseLlm: parsed.ellineaUseLlm !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

@@ -24,6 +24,11 @@ export interface Env {
   JWT_EXPIRES_IN?: string;
   /** Comma-separated Ellines operator emails (platform Super Admin). */
   PLATFORM_ADMIN_EMAILS?: string;
+  /** Optional OpenAI-compatible key for Ellinea Ask (4.10). */
+  ELLINEA_LLM_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  ELLINEA_LLM_BASE_URL?: string;
+  ELLINEA_LLM_MODEL?: string;
 }
 
 export function getAdminClient(env: Env): SupabaseClient {
@@ -44,7 +49,7 @@ export function json(data: unknown, status = 200): Response {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': '*',
       'access-control-allow-headers': 'Content-Type, Authorization',
-      'access-control-allow-methods': 'GET, POST, PATCH, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     },
   });
 }
