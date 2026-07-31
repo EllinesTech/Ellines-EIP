@@ -32,6 +32,8 @@ export type UiPrefs = {
   approvalsSeedFromDecisions: boolean;
   /** Learn from helpful/dismiss votes on Ellinea recommendations. */
   ellineaRecFeedback: boolean;
+  /** Use Enterprise DNA traits when answering. */
+  ellineaUseDna: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -54,6 +56,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   showApprovalsNav: true,
   approvalsSeedFromDecisions: true,
   ellineaRecFeedback: true,
+  ellineaUseDna: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -80,6 +83,7 @@ export function readUiPrefs(): UiPrefs {
       showApprovalsNav: parsed.showApprovalsNav !== false,
       approvalsSeedFromDecisions: parsed.approvalsSeedFromDecisions !== false,
       ellineaRecFeedback: parsed.ellineaRecFeedback !== false,
+      ellineaUseDna: parsed.ellineaUseDna !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

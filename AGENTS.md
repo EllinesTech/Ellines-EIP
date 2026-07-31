@@ -35,18 +35,21 @@ Full checklist: `docs/05_Build_Queue.md`.
 
 ## How to work (sync pipeline)
 
-Same loop as a human in this repo: **build → land on `main` → deploy**.
+Same loop as a human in this repo: **implement → verify → build → push `main` → deploy → next item**.
+
+**Do not stop to ask whether to continue.** After each successful land on `main`, immediately take the new first `next` / `in_progress` item from `docs/05_Build_Queue.md` and repeat until blocked (missing secrets, unfixable build, or no `next`/`in_progress`).
 
 1. Read `docs/05_Build_Queue.md` and pick the first item marked `next` (or continue `in_progress`).
-2. Create branch `agent/<id>-short-slug` from latest `main`.
+2. Create branch `agent/<id>-short-slug` from latest `main` (optional for short direct-to-main agent runs).
 3. Implement only that item (or one clearly scoped slice).
 4. Match existing patterns: NestJS identity, Next.js App Router, CSS modules, Exo 2 + brand colors (`#6F2D8D`, `#0F172A`, `#2563EB`).
 5. Do not invent purple-glow SaaS aesthetics; follow brand in `assets/brand/` and existing app CSS.
-6. Update `docs/05_Build_Queue.md` in the same change set.
-7. **Before landing:** run the required builds (see Guardrails). Fix breakages you introduced.
-8. Open a PR to `main`, then **merge it** (or push the verified commits to `main` if merge tools are unavailable). Prefer PR + merge so history stays reviewable.
+6. Update `docs/05_Build_Queue.md` in the same change set (mark done; set the following item to `next`).
+7. **Before landing:** run the required builds (see Guardrails). If Functions changed: `npm run verify:pages-functions`. Fix breakages you introduced.
+8. Open a PR to `main`, then **merge it** (or push verified commits to `main` if merge tools are unavailable). Prefer PR + merge so history stays reviewable.
 9. Do **not** force-push. Do **not** commit secrets (`.env`, tokens). Use `.env.example` as the template.
 10. Cloudflare Pages deploys automatically on push to `main`. Identity API deploys via its Fly workflow when identity paths change (or manual `fly deploy`).
+11. **Continue:** go back to step 1 for the next queue item — no confirmation pause.
 
 ### Guardrails
 

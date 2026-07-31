@@ -64,6 +64,127 @@ export function writeRecFeedback(organizationId: string, feedback: EllineaRecFee
   localStorage.setItem(feedbackStorageKey(organizationId), JSON.stringify(feedback));
 }
 
+export type EnterpriseDnaTrait = {
+  id: string;
+  label: string;
+  detail: string;
+  source: 'memory' | 'approval' | 'feedback' | 'role';
+};
+
+export type EnterpriseDnaSnapshot = {
+  organizationId: string;
+  updatedAt: string;
+  traits: EnterpriseDnaTrait[];
+  summary: string;
+};
+
+const DNA_PREFIX = 'eip_ellinea_dna_';
+
+export function dnaStorageKey(organizationId: string) {
+  return `${DNA_PREFIX}${organizationId}`;
+}
+
+export function readEnterpriseDna(organizationId: string): EnterpriseDnaSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(dnaStorageKey(organizationId));
+    if (!raw) return null;
+    return JSON.parse(raw) as EnterpriseDnaSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+export function writeEnterpriseDna(snapshot: EnterpriseDnaSnapshot) {
+  localStorage.setItem(dnaStorageKey(snapshot.organizationId), JSON.stringify(snapshot));
+}
+
+/** Rebuild Enterprise DNA™ from Memory, Approvals, and recommendation feedback. */
+export function rebuildEnterpriseDna(input: {
+  organizationId: string;
+  organizationName?: string;
+  role?: string;
+  memory: EllineaMemoryNote[];
+  approvals: { title: string; status: string; detail: string }[];
+  feedback: EllineaRecFeedback;
+}): EnterpriseDnaSnapshot {
+  const traits: EnterpriseDnaTrait[] = [];
+
+  for (const note of input.memory.slice(0, 8)) {
+    traits.push({
+      id: `mem-${note.id}`,
+      label: note.title,
+      detail: note.body,
+      source: 'memory',
+    });
+  }
+
+  const approved = input.approvals.filter((a) => a.status === 'approved').slice(0, 5);
+  const rejected = input.approvals.filter((a) => a.status === 'rejected').slice(0, 3);
+  for (const a of approved) {
+    traits.push({
+      id: `appr-${a.title.slice(0, 24)}`,
+      label: `Approves: ${a.title}`,
+      detail: a.detail || 'Owner/IT approved this path.',
+      source: 'approval',
+    });
+  }
+  for (const a of rejected) {
+    traits.push({
+      id: `rej-${a.title.slice(0, 24)}`,
+      label: `Avoids: ${a.title}`,
+      detail: a.detail || 'Previously rejected — treat as sensitive.',
+      source: 'approval',
+    });
+  }
+
+  const helpfulIds = Object.entries(input.feedback)
+    .filter(([, v]) => v.helpful > v.dismiss)
+    .sort((a, b) => b[1].helpful - a[1].helpful)
+    .slice(0, 4);
+  for (const [id, v] of helpfulIds) {
+    traits.push({
+      id: `fb-${id}`,
+      label: `Values insight type “${id}”`,
+      detail: `Marked helpful ${v.helpful}× — prioritize similar recommendations.`,
+      source: 'feedback',
+    });
+  }
+
+  if (input.role === 'owner') {
+    traits.push({
+      id: 'role-owner',
+      label: 'Owner-led authority',
+      detail: 'IT grants and org-wide risk sit with the Organization Owner.',
+      source: 'role',
+    });
+  } else if (input.role === 'admin') {
+    traits.push({
+      id: 'role-admin',
+      label: 'IT Admin hygiene',
+      detail: 'Connectors, sync health, and work-role access are primary.',
+      source: 'role',
+    });
+  }
+
+  const org = input.organizationName || 'This organization';
+  const summary = traits.length
+    ? `${org} DNA — ${traits.length} trait(s): ${traits
+        .slice(0, 3)
+        .map((t) => t.label)
+        .join('; ')}${traits.length > 3 ? '…' : ''}.`
+    : `${org} DNA is still forming. Add Memory notes, decide Approvals, and mark Ellinea insights helpful.`;
+
+  const snapshot: EnterpriseDnaSnapshot = {
+    organizationId: input.organizationId,
+    updatedAt: new Date().toISOString(),
+    traits: traits.slice(0, 20),
+    summary,
+  };
+  writeEnterpriseDna(snapshot);
+  return snapshot;
+}
+
 export function recordRecFeedback(
   organizationId: string,
   recId: string,
@@ -109,6 +230,8 @@ export type EllineaContext = {
   memory?: EllineaMemoryNote[];
   useMemory?: boolean;
   useRoleContext?: boolean;
+  dna?: EnterpriseDnaSnapshot | null;
+  useDna?: boolean;
 };
 
 function roleLens(role: string | undefined): {
@@ -312,11 +435,20 @@ export function buildEllineaAnswer(
   const memory = options?.memory || [];
   const useMemory = options?.useMemory !== false;
   const useRole = options?.useRoleContext !== false;
+  const useDna = options?.useDna !== false;
+  const dna = options?.dna;
   const lens = roleLens(options?.role);
   const prefix =
     useRole && options?.role
       ? `[${options.organizationName || 'Org'} · ${options.role}] `
       : '';
+
+  if (useDna && dna && (q.includes('dna') || q.includes('how we work') || q.includes('our culture') || q.includes('enterprise dna'))) {
+    return `${prefix}${dna.summary} Traits: ${dna.traits
+      .slice(0, 5)
+      .map((t) => t.label)
+      .join('; ')}.`;
+  }
 
   if (useMemory && memory.length && (q.includes('memory') || q.includes('policy') || q.includes('note') || q.includes('decision we'))) {
     const hit =
@@ -339,6 +471,10 @@ export function buildEllineaAnswer(
   if (q.includes('recommend') || q.includes('should i') || q.includes('next step') || q.includes('insight')) {
     const recs = buildEllineaRecommendations(summary, options);
     if (!recs.length) return `${prefix}No recommendations yet — sync richer data first.`;
+    const dnaHint =
+      useDna && dna?.traits[0]
+        ? ` Aligned with DNA “${dna.traits[0].label}”.`
+        : '';
     return (
       prefix +
       recs
@@ -347,12 +483,20 @@ export function buildEllineaAnswer(
           (r) =>
             `${r.title} (${r.confidence}% confidence, ${r.priority}): ${r.rationale} Evidence: ${r.evidence.join('; ')}`,
         )
-        .join(' · ')
+        .join(' · ') +
+      dnaHint
     );
   }
 
   if (q.includes('who am') || q.includes('my role') || q.includes('context')) {
-    return `${prefix}You are signed in ${lens.audience}. I prioritize ${lens.focus}. Ask about health, alerts, recommendations, or memory.`;
+    const dnaBit =
+      useDna && dna?.traits.length
+        ? ` Enterprise DNA: ${dna.traits
+            .slice(0, 2)
+            .map((t) => t.label)
+            .join('; ')}.`
+        : '';
+    return `${prefix}You are signed in ${lens.audience}. I prioritize ${lens.focus}.${dnaBit} Ask about health, alerts, recommendations, DNA, or memory.`;
   }
 
   if (q.includes('branch') || q.includes('site') || q.includes('location')) {

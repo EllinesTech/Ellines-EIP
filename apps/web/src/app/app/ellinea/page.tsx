@@ -7,11 +7,15 @@ import {
   buildEllineaAnswer,
   buildRankedRecommendations,
   readEllineaMemory,
+  readRecFeedback,
+  rebuildEnterpriseDna,
   recordRecFeedback,
   writeEllineaMemory,
   type EllineaMemoryNote,
   type EllineaRecommendation,
+  type EnterpriseDnaSnapshot,
 } from '@/lib/ellinea-engine';
+import { readApprovals } from '@/lib/approvals';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
@@ -21,10 +25,26 @@ import ellineaStyles from './ellinea.module.css';
 const PROMPTS = [
   'How are all my businesses performing today?',
   'What do you recommend?',
-  'Which branches need attention?',
+  'How do we work? (Enterprise DNA)',
   'Summarize today\'s brief',
   'What happened recently?',
 ];
+
+function refreshDna(
+  organizationId: string,
+  organizationName: string | undefined,
+  role: string | undefined,
+  memoryNotes: EllineaMemoryNote[],
+): EnterpriseDnaSnapshot {
+  return rebuildEnterpriseDna({
+    organizationId,
+    organizationName,
+    role,
+    memory: memoryNotes,
+    approvals: readApprovals(organizationId),
+    feedback: readRecFeedback(organizationId),
+  });
+}
 
 export default function EllineaPage() {
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
@@ -34,6 +54,7 @@ export default function EllineaPage() {
   const [answer, setAnswer] = useState('');
   const [recs, setRecs] = useState<EllineaRecommendation[]>([]);
   const [memory, setMemory] = useState<EllineaMemoryNote[]>([]);
+  const [dna, setDna] = useState<EnterpriseDnaSnapshot | null>(null);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteBody, setNoteBody] = useState('');
 
@@ -42,8 +63,20 @@ export default function EllineaPage() {
     const ui = readUiPrefs();
     setPrefs(ui);
     setOrgId(session?.organization.id ?? null);
-    if (session?.organization.id && ui.ellineaUseMemory) {
-      setMemory(readEllineaMemory(session.organization.id));
+    const mem =
+      session?.organization.id && ui.ellineaUseMemory
+        ? readEllineaMemory(session.organization.id)
+        : [];
+    setMemory(mem);
+    if (session?.organization.id && ui.ellineaUseDna) {
+      setDna(
+        refreshDna(
+          session.organization.id,
+          session.organization.name,
+          session.user.role,
+          mem,
+        ),
+      );
     }
 
     fetchEnterpriseSummary()
@@ -61,12 +94,19 @@ export default function EllineaPage() {
           if (ui.ellineaAutoBrief) {
             setAnswer(
               buildEllineaAnswer('brief today', s, {
-                memory:
-                  session?.organization.id && ui.ellineaUseMemory
-                    ? readEllineaMemory(session.organization.id)
-                    : [],
+                memory: mem,
                 useMemory: ui.ellineaUseMemory,
                 useRoleContext: ui.ellineaRoleContext,
+                useDna: ui.ellineaUseDna,
+                dna:
+                  session?.organization.id && ui.ellineaUseDna
+                    ? refreshDna(
+                        session.organization.id,
+                        session.organization.name,
+                        session.user.role,
+                        mem,
+                      )
+                    : null,
                 role: session?.user.role,
                 fullName: session?.user.fullName,
                 organizationName: session?.organization.name,
@@ -86,6 +126,8 @@ export default function EllineaPage() {
         memory: ui.ellineaUseMemory ? memory : [],
         useMemory: ui.ellineaUseMemory,
         useRoleContext: ui.ellineaRoleContext,
+        useDna: ui.ellineaUseDna,
+        dna: ui.ellineaUseDna ? dna : null,
         role: session?.user.role,
         fullName: session?.user.fullName,
         organizationName: session?.organization.name,
@@ -96,9 +138,13 @@ export default function EllineaPage() {
   function onFeedback(recId: string, vote: 'helpful' | 'dismiss') {
     if (!orgId || prefs?.ellineaRecFeedback === false) return;
     recordRecFeedback(orgId, recId, vote);
+    const session = getSession();
+    if (prefs?.ellineaUseDna !== false) {
+      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, memory));
+    }
     setRecs(
       buildRankedRecommendations(summary, {
-        role: getSession()?.user.role,
+        role: session?.user.role,
         useRoleContext: prefs?.ellineaRoleContext !== false,
         organizationId: orgId,
         useFeedback: true,
@@ -125,6 +171,10 @@ export default function EllineaPage() {
     ].slice(0, 40);
     setMemory(next);
     writeEllineaMemory(orgId, next);
+    const session = getSession();
+    if (prefs?.ellineaUseDna !== false) {
+      setDna(refreshDna(orgId, session?.organization.name, session?.user.role, next));
+    }
     setNoteTitle('');
     setNoteBody('');
   }
@@ -140,6 +190,7 @@ export default function EllineaPage() {
   const counts = summary?.model?.counts;
   const showRecs = prefs?.ellineaShowRecommendations !== false;
   const showMemory = prefs?.ellineaUseMemory !== false;
+  const showDna = prefs?.ellineaUseDna !== false;
 
   return (
     <div className={styles.page}>
@@ -261,6 +312,24 @@ export default function EllineaPage() {
         </form>
         {answer ? <p className={ellineaStyles.answer}>{answer}</p> : null}
       </section>
+
+      {showDna && dna ? (
+        <section className={ellineaStyles.recs} style={{ marginTop: '0.65rem' }}>
+          <div className={styles.panelLabel}>Enterprise DNA</div>
+          <p className={ellineaStyles.recsHint}>{dna.summary}</p>
+          <ul className={ellineaStyles.recList}>
+            {dna.traits.slice(0, 8).map((t) => (
+              <li key={t.id} className={ellineaStyles.recItem}>
+                <div className={ellineaStyles.recTop}>
+                  <strong>{t.label}</strong>
+                  <span className={ellineaStyles.confidence}>{t.source}</span>
+                </div>
+                <p>{t.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {showMemory ? (
         <section className={ellineaStyles.memory}>

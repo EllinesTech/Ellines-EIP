@@ -4,11 +4,25 @@
 **Authoritative scope:** [02_MVP_Scope_v1.0.md](./02_MVP_Scope_v1.0.md)  
 **Status key:** `done` · `in_progress` · `next` · `blocked` · `todo`
 
-Cloud Agents and Automations **must pick the first `next` item** (or continue an `in_progress` item), implement it, update status in this file, **build, then land on `main`** (PR + merge preferred) so Pages/Identity deploy. Humans keep local in sync with `git pull origin main`.
+Cloud Agents and Automations **must pick the first `next` item** (or continue an `in_progress` item), implement it, update status in this file, **verify → build → push `main` (deploy)** , then **immediately start the next `next` item**. Do not stop to ask the human between items.
 
-**Keep going:** Do not pause for confirmation between queue items. Land on `main`, take the next `next` / continue `in_progress`, repeat until blocked.
+### Continuous agent loop (mandatory)
 
-**Ellinea standalone how-to:** Deferred — after Phase 6 extract, document and demo how to use the Ellinea “brain” (Memory + DNA + learning) as a standalone product. Do **not** stop current Owner/Admin work for that explanation.
+```
+while queue has next/in_progress and not blocked:
+  1. Implement the item (one scoped slice)
+  2. Update this file (mark done; set following item to next)
+  3. npm run verify:pages-functions   # if Functions touched
+  4. npm run build:shared             # if shared touched
+  5. npm run build -w @ellines-eip/web
+  6. identity build if identity touched
+  7. git commit + git push origin main   # Pages deploys from Actions
+  8. Start step 1 on the new next item — DO NOT ASK
+```
+
+**Stop only if:** item is `blocked`, secrets missing, or a build you cannot fix after a genuine attempt. Never pause for “should I continue?” — the answer is always yes until blocked.
+
+**Ellinea standalone how-to:** Deferred — after Phase 6 extract. Do **not** stop Owner/Admin or learning work for that explanation.
 
 ---
 
@@ -16,10 +30,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **1 — Platform Foundation** | ~98% | Audit Center + change password shipped; org profile still todo |
+| **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~99% | Connector health on Owner/IT Overview |
-| **3 — Owner / Admin Command Center** | ~98% | **Active** — Owner/Admin path nearly complete |
-| **4 — Ellinea AI** | ~72% | Feedback loop shipping; DNA/signals next; standalone how-to later |
+| **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
+| **4 — Ellinea AI** | ~80% | Feedback + DNA shipped; signals next; standalone how-to later |
 | **5 — Workflow & Automation** | ~15% | Approvals stub; deep workflow after Owner/Admin dash |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
@@ -94,9 +108,10 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.4a | Audit Center UI | `done` | `/app/audit` feed |
 | 1.7 | Org profile (name) | `done` | Owner renames org in Settings |
 | 4.7 | Recommendation feedback | `done` | Helpful/dismiss on Ask Ellinea |
-| 4.8 | Enterprise DNA capture | `next` | From Memory + Approvals |
+| 4.8 | Enterprise DNA capture | `done` | Memory + Approvals + feedback → DNA traits |
+| 4.9 | Continuous learning signals | `next` | Outcomes over time |
 | 3.x | Email/push notifications | `todo` | Later — `services/notification` |
-| 3.x | Other-role Overview polish | `todo` | After Owner/Admin Ellinea learning |
+| 3.x | Other-role Overview polish | `todo` | After learning signals |
 
 ---
 
@@ -114,8 +129,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.5 | Context Engine | `done` | Role + org framing |
 | 4.6 | Chat Interface | `done` | |
 | 4.7 | Recommendation feedback loop | `done` | Helpful/dismiss → re-rank; settings toggle |
-| 4.8 | Enterprise DNA capture | `next` | From Memory + Approvals |
-| 4.9 | Continuous learning signals | `todo` | Outcomes over time |
+| 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
+| 4.9 | Continuous learning signals | `next` | Outcomes over time (alerts/approvals cadence) |
 | 4.10 | LLM / RAG | `todo` | After server Memory |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `todo` | **Explain + demo later** — after 6.1–6.3; do not block Owner/Admin work |
@@ -161,13 +176,13 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 ## Agent run protocol
 
-1. Read `AGENTS.md` and this queue.
+1. Read `AGENTS.md` and this queue (especially **Continuous agent loop**).
 2. Take the highest-priority `next` (or continue `in_progress`).
-3. Branch: `agent/<id>-short-slug` (optional when landing directly on `main` in short agent runs).
-4. Implement + run required builds (`build:shared`, web; identity if touched).
-5. Update this file; set the following item to `next`.
-6. Land on `main`. Never force-push. Never commit secrets.
-7. **Continue immediately** to the next queue item — do not wait for human confirmation.
+3. Implement + verify + build.
+4. Update this file; set the following item to `next`.
+5. Commit and push `main` (Pages deploys). Never force-push. Never commit secrets.
+6. **Immediately** go to step 2 for the next item — do not ask the human.
+7. Stop only when blocked or the queue has no `next` / `in_progress`.
 8. Humans: `git pull origin main` to match what shipped.
 
 Automation prompt: [06_Automation_Prompt.md](./06_Automation_Prompt.md)  

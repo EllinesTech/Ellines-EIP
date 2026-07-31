@@ -430,6 +430,17 @@ export default function SystemSettingsPage() {
             }
           />
         </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Enterprise DNA</strong>
+            <p>Derive how this org works from Memory, Approvals, and feedback.</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaUseDna}
+            label="Toggle Ellinea Enterprise DNA"
+            onClick={() => persistUi({ ...uiPrefs, ellineaUseDna: !uiPrefs.ellineaUseDna })}
+          />
+        </div>
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open Ask Ellinea →
