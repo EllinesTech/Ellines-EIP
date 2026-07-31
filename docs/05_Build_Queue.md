@@ -15,8 +15,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
 | **3 — Executive Command Center** | ~90% | KPIs + UEM + Timeline + Search + **Notifications** shipped |
-| **4 — Ellinea AI** | ~45% | Brief + recommendations + local memory + template Q&A; LLM still deferred |
-| **5 — Workflow & Automation** | 0% | **next** after Ellinea context/chat polish |
+| **4 — Ellinea AI** | ~65% | Brief + recs + memory + **role context**; LLM still deferred |
+| **5 — Workflow & Automation** | 0% | **next** — Approvals / rules after Ellinea polish |
 | **Hosting** | Live | Pages via GitHub Actions only (no dual CF Git builds; no Pages cron) |
 
 **Critical path remaining:** Ellinea context/chat polish (4.5–4.6) → email/push notifications → Workflows.
@@ -85,8 +85,9 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 4.2 | CEO Daily Brief | `done` | Ask Ellinea + chat; auto-load toggle in System Settings |
 | 4.3 | Explainable Recommendations | `done` | Evidence + confidence on Ask Ellinea; settings toggle |
 | 4.4 | Enterprise Memory | `in_progress` | Local org notes (browser); server/RAG later |
-| 4.5 | Context Engine | `next` | Role / org DNA-aware responses |
-| 4.6 | Chat Interface | `done` | Panel + `/app/ellinea`; deepen with 4.5 |
+| 4.5 | Context Engine | `done` | Role + org framing; settings toggle; rec filtering |
+| 4.6 | Chat Interface | `done` | Panel + `/app/ellinea` |
+| 4.x | LLM / RAG | `todo` | External model when keys + Memory service exist |
 
 ---
 
@@ -94,7 +95,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 5.1–5.4 | Approvals, rules, reports, event bus | `todo` | `services/workflow` missing |
+| 5.1–5.4 | Approvals, rules, reports, event bus | `next` | `services/workflow` missing — start with approval stubs |
 
 ---
 

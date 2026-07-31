@@ -38,8 +38,63 @@ export function writeEllineaMemory(organizationId: string, notes: EllineaMemoryN
   localStorage.setItem(memoryStorageKey(organizationId), JSON.stringify(notes.slice(0, 40)));
 }
 
+export type EllineaContext = {
+  role?: string;
+  fullName?: string;
+  organizationName?: string;
+  memory?: EllineaMemoryNote[];
+  useMemory?: boolean;
+  useRoleContext?: boolean;
+};
+
+function roleLens(role: string | undefined): {
+  audience: string;
+  focus: string;
+  recFilter?: (id: string) => boolean;
+} {
+  switch (role) {
+    case 'owner':
+      return {
+        audience: 'as Organization Owner',
+        focus: 'authority, risk, and org-wide decisions',
+        recFilter: () => true,
+      };
+    case 'admin':
+      return {
+        audience: 'as IT Admin',
+        focus: 'connectors, sync health, and access hygiene',
+        recFilter: (id) => id !== 'steady',
+      };
+    case 'executive':
+      return {
+        audience: 'for the executive view',
+        focus: 'health score, alerts, and cross-branch performance',
+        recFilter: (id) => id !== 'baseline',
+      };
+    case 'manager':
+      return {
+        audience: 'for your management lane',
+        focus: 'tasks, branch attention, and open decisions',
+        recFilter: (id) => id === 'decisions' || id === 'attention-objects' || id === 'alerts' || id === 'health',
+      };
+    case 'viewer':
+      return {
+        audience: 'in read-only mode',
+        focus: 'status and brief highlights (no write actions)',
+        recFilter: (id) => id === 'steady' || id === 'health' || id === 'alerts',
+      };
+    default:
+      return {
+        audience: 'for your work role',
+        focus: 'open alerts, tasks, and the daily brief',
+        recFilter: (id) => id !== 'baseline',
+      };
+  }
+}
+
 export function buildEllineaRecommendations(
   summary: EnterpriseSummaryDto | null,
+  context?: Pick<EllineaContext, 'role' | 'useRoleContext'>,
 ): EllineaRecommendation[] {
   if (!summary || summary.status !== 'synced') return [];
 
@@ -137,10 +192,19 @@ export function buildEllineaRecommendations(
     });
   }
 
-  return out.slice(0, 5);
+  const lens = roleLens(context?.role);
+  const filtered =
+    context?.useRoleContext === false
+      ? out
+      : out.filter((r) => !lens.recFilter || lens.recFilter(r.id));
+
+  return (filtered.length ? filtered : out).slice(0, 5);
 }
 
-export function buildDailyBriefText(summary: EnterpriseSummaryDto | null): string {
+export function buildDailyBriefText(
+  summary: EnterpriseSummaryDto | null,
+  context?: EllineaContext,
+): string {
   if (!summary || summary.status !== 'synced') {
     return 'No live snapshot yet. Sync a connector to unlock the CEO daily brief.';
   }
@@ -151,22 +215,37 @@ export function buildDailyBriefText(summary: EnterpriseSummaryDto | null): strin
   const uem = counts
     ? ` Model — branches ${counts.branches}, people ${counts.people}, tasks ${counts.tasks}, alerts ${counts.notifications}.`
     : '';
-  return `Daily brief (${synced} via ${summary.connectorName}): health ${summary.healthScore}/100, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}`;
+  const lens = roleLens(context?.role);
+  const framed =
+    context?.useRoleContext === false
+      ? ''
+      : ` Framed ${lens.audience} — focus on ${lens.focus}.`;
+  const org =
+    context?.organizationName && context.useRoleContext !== false
+      ? ` ${context.organizationName}:`
+      : '';
+  return `Daily brief${org} (${synced} via ${summary.connectorName}): health ${summary.healthScore}/100, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}${framed}`;
 }
 
 export function buildEllineaAnswer(
   question: string,
   summary: EnterpriseSummaryDto | null,
-  options?: { memory?: EllineaMemoryNote[]; useMemory?: boolean },
+  options?: EllineaContext,
 ): string {
   const q = question.toLowerCase();
   const memory = options?.memory || [];
   const useMemory = options?.useMemory !== false;
+  const useRole = options?.useRoleContext !== false;
+  const lens = roleLens(options?.role);
+  const prefix =
+    useRole && options?.role
+      ? `[${options.organizationName || 'Org'} · ${options.role}] `
+      : '';
 
   if (useMemory && memory.length && (q.includes('memory') || q.includes('policy') || q.includes('note') || q.includes('decision we'))) {
     const hit =
       memory.find((n) => q.includes(n.title.toLowerCase().slice(0, 12))) || memory[0];
-    return `From Enterprise Memory — “${hit.title}”: ${hit.body}`;
+    return `${prefix}From Enterprise Memory — “${hit.title}”: ${hit.body}`;
   }
 
   if (!summary || summary.status !== 'synced') {
@@ -180,20 +259,24 @@ export function buildEllineaAnswer(
   const attention = objects.filter((o) =>
     (o.status || '').toLowerCase().includes('attention'),
   );
-  const synced = summary.syncedAt
-    ? new Date(summary.syncedAt).toLocaleString()
-    : 'recently';
 
   if (q.includes('recommend') || q.includes('should i') || q.includes('next step') || q.includes('insight')) {
-    const recs = buildEllineaRecommendations(summary);
-    if (!recs.length) return 'No recommendations yet — sync richer data first.';
-    return recs
-      .slice(0, 3)
-      .map(
-        (r) =>
-          `${r.title} (${r.confidence}% confidence, ${r.priority}): ${r.rationale} Evidence: ${r.evidence.join('; ')}`,
-      )
-      .join(' · ');
+    const recs = buildEllineaRecommendations(summary, options);
+    if (!recs.length) return `${prefix}No recommendations yet — sync richer data first.`;
+    return (
+      prefix +
+      recs
+        .slice(0, 3)
+        .map(
+          (r) =>
+            `${r.title} (${r.confidence}% confidence, ${r.priority}): ${r.rationale} Evidence: ${r.evidence.join('; ')}`,
+        )
+        .join(' · ')
+    );
+  }
+
+  if (q.includes('who am') || q.includes('my role') || q.includes('context')) {
+    return `${prefix}You are signed in ${lens.audience}. I prioritize ${lens.focus}. Ask about health, alerts, recommendations, or memory.`;
   }
 
   if (q.includes('branch') || q.includes('site') || q.includes('location')) {
@@ -202,28 +285,28 @@ export function buildEllineaAnswer(
         .slice(0, 6)
         .map((b) => `${b.name}${b.status ? ` (${b.status})` : ''}`)
         .join('; ');
-      return `I see ${counts?.branches ?? branches.length} branch object(s) in the Universal Enterprise Model: ${list}. ${attention.length ? `${attention.length} need attention.` : 'None flagged for attention.'}`;
+      return `${prefix}I see ${counts?.branches ?? branches.length} branch object(s) in the Universal Enterprise Model: ${list}. ${attention.length ? `${attention.length} need attention.` : 'None flagged for attention.'}`;
     }
-    return `Branch count in the model is ${counts?.branches ?? 0}. Sync a richer System B feed to list named branches.`;
+    return `${prefix}Branch count in the model is ${counts?.branches ?? 0}. Sync a richer System B feed to list named branches.`;
   }
 
   if (q.includes('people') || q.includes('person') || q.includes('staff') || q.includes('employee')) {
-    return `People count in the Universal Enterprise Model is ${counts?.people ?? 0}. Tasks ${counts?.tasks ?? 0}, documents ${counts?.documents ?? 0}, assets ${counts?.assets ?? 0}.`;
+    return `${prefix}People count in the Universal Enterprise Model is ${counts?.people ?? 0}. Tasks ${counts?.tasks ?? 0}, documents ${counts?.documents ?? 0}, assets ${counts?.assets ?? 0}.`;
   }
 
   if (q.includes('timeline') || q.includes('what happened') || q.includes('recent')) {
     const events = (summary.timeline || []).slice(0, 4);
     if (!events.length) {
-      return 'No timeline events in the latest snapshot yet.';
+      return `${prefix}No timeline events in the latest snapshot yet.`;
     }
-    return `Recent enterprise events: ${events.map((e) => e.title).join(' · ')}. Open Timeline for the full feed.`;
+    return `${prefix}Recent enterprise events: ${events.map((e) => e.title).join(' · ')}. Open Timeline for the full feed.`;
   }
 
   if (q.includes('health') || q.includes('performing') || q.includes('how are') || q.includes('business')) {
     const uem = counts
       ? ` UEM: ${counts.branches} branches, ${counts.people} people, ${counts.tasks} tasks, ${counts.notifications} notifications.`
       : '';
-    return `Enterprise health is ${summary.healthScore}/100 across ${summary.connectedSystems} connected systems.${uem} ${summary.briefHighlight}`;
+    return `${prefix}Enterprise health is ${summary.healthScore}/100 across ${summary.connectedSystems} connected systems.${uem} ${summary.briefHighlight}`;
   }
 
   if (q.includes('alert') || q.includes('risk') || q.includes('attention')) {
@@ -233,19 +316,19 @@ export function buildEllineaAnswer(
           .map((o) => o.name)
           .join(', ')}.`
       : '';
-    return `There are ${summary.openAlerts} open alerts in the latest sync.${named} ${summary.briefHighlight}`;
+    return `${prefix}There are ${summary.openAlerts} open alerts in the latest sync.${named} ${summary.briefHighlight}`;
   }
 
   if (q.includes('decision') || q.includes('approval') || q.includes('task')) {
-    return `There are ${summary.openDecisions} open decisions and ${counts?.tasks ?? summary.openDecisions} tasks in the model. Prioritize them before the next brief cycle.`;
+    return `${prefix}There are ${summary.openDecisions} open decisions and ${counts?.tasks ?? summary.openDecisions} tasks in the model. Prioritize them before the next brief cycle.`;
   }
 
   if (q.includes('brief') || q.includes('today') || q.includes('morning') || q.includes('summarize')) {
-    return buildDailyBriefText(summary);
+    return buildDailyBriefText(summary, options);
   }
 
   if (q.includes('connector') || q.includes('system') || q.includes('source')) {
-    return `Latest source is ${summary.connectorName} (${summary.connectorId}), health ${summary.healthScore}, capabilities ${(model?.capabilities || ['read', 'sync']).join(', ')}.`;
+    return `${prefix}Latest source is ${summary.connectorName} (${summary.connectorId}), health ${summary.healthScore}, capabilities ${(model?.capabilities || ['read', 'sync']).join(', ')}.`;
   }
 
   if (useMemory && memory.length && q.length > 8) {
@@ -254,9 +337,9 @@ export function buildEllineaAnswer(
       return q.split(/\s+/).some((w) => w.length > 4 && hay.includes(w));
     });
     if (soft) {
-      return `From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts. Related memory “${soft.title}”: ${soft.body}`;
+      return `${prefix}From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts. Related memory “${soft.title}”: ${soft.body}`;
     }
   }
 
-  return `From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions${counts ? `, ${counts.branches} branches / ${counts.people} people` : ''}. ${summary.briefHighlight}`;
+  return `${prefix}From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions${counts ? `, ${counts.branches} branches / ${counts.people} people` : ''}. ${summary.briefHighlight}`;
 }

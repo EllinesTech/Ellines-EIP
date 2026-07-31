@@ -65,12 +65,17 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
     setInput('');
     window.setTimeout(() => {
       const prefs = readUiPrefs();
-      const orgId = getSession()?.organization.id;
+      const session = getSession();
+      const orgId = session?.organization.id;
       const memory =
         prefs.ellineaUseMemory && orgId ? readEllineaMemory(orgId) : [];
       const answer = buildEllineaAnswer(q, summary, {
         memory,
         useMemory: prefs.ellineaUseMemory,
+        useRoleContext: prefs.ellineaRoleContext,
+        role: session?.user.role,
+        fullName: session?.user.fullName,
+        organizationName: session?.organization.name,
       });
       setMessages((prev) => [...prev, { role: 'assistant', text: answer }]);
       setBusy(false);

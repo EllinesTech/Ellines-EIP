@@ -49,7 +49,12 @@ export default function EllineaPage() {
       .then((s) => {
         setSummary(s);
         if (s.status === 'synced') {
-          setRecs(buildEllineaRecommendations(s));
+          setRecs(
+            buildEllineaRecommendations(s, {
+              role: session?.user.role,
+              useRoleContext: ui.ellineaRoleContext,
+            }),
+          );
           if (ui.ellineaAutoBrief) {
             setAnswer(
               buildEllineaAnswer('brief today', s, {
@@ -58,6 +63,10 @@ export default function EllineaPage() {
                     ? readEllineaMemory(session.organization.id)
                     : [],
                 useMemory: ui.ellineaUseMemory,
+                useRoleContext: ui.ellineaRoleContext,
+                role: session?.user.role,
+                fullName: session?.user.fullName,
+                organizationName: session?.organization.name,
               }),
             );
           }
@@ -68,10 +77,15 @@ export default function EllineaPage() {
 
   function ask(q: string) {
     const ui = prefs || readUiPrefs();
+    const session = getSession();
     setAnswer(
       buildEllineaAnswer(q, summary, {
         memory: ui.ellineaUseMemory ? memory : [],
         useMemory: ui.ellineaUseMemory,
+        useRoleContext: ui.ellineaRoleContext,
+        role: session?.user.role,
+        fullName: session?.user.fullName,
+        organizationName: session?.organization.name,
       }),
     );
   }
@@ -140,7 +154,11 @@ export default function EllineaPage() {
       <section className={styles.brief}>
         <div className={styles.panelLabel}>Daily Brief</div>
         <h2>{synced ? 'Prepared from live snapshot' : 'Waiting for connectors'}</h2>
-        <p>{synced ? buildDailyBriefText(summary) : 'Sync a connector to unlock a grounded morning brief.'}</p>
+        <p>{synced ? buildDailyBriefText(summary, {
+          role: getSession()?.user.role,
+          organizationName: getSession()?.organization.name,
+          useRoleContext: prefs?.ellineaRoleContext !== false,
+        }) : 'Sync a connector to unlock a grounded morning brief.'}</p>
         {synced && counts ? (
           <p>
             <strong>

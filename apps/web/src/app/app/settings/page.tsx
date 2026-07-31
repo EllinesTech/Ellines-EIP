@@ -356,6 +356,19 @@ export default function SystemSettingsPage() {
             }
           />
         </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Role context</strong>
+            <p>Frame briefs and recommendations for your signed-in role (Owner, IT, exec…).</p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaRoleContext}
+            label="Toggle Ellinea role context"
+            onClick={() =>
+              persistUi({ ...uiPrefs, ellineaRoleContext: !uiPrefs.ellineaRoleContext })
+            }
+          />
+        </div>
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open Ask Ellinea →

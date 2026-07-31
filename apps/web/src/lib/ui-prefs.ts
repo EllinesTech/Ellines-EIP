@@ -24,6 +24,8 @@ export type UiPrefs = {
   ellineaShowRecommendations: boolean;
   /** Ground answers with local Enterprise Memory notes. */
   ellineaUseMemory: boolean;
+  /** Frame answers and recommendations by signed-in role. */
+  ellineaRoleContext: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -42,6 +44,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   ellineaAutoBrief: true,
   ellineaShowRecommendations: true,
   ellineaUseMemory: true,
+  ellineaRoleContext: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -64,6 +67,7 @@ export function readUiPrefs(): UiPrefs {
       ellineaAutoBrief: parsed.ellineaAutoBrief !== false,
       ellineaShowRecommendations: parsed.ellineaShowRecommendations !== false,
       ellineaUseMemory: parsed.ellineaUseMemory !== false,
+      ellineaRoleContext: parsed.ellineaRoleContext !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;
