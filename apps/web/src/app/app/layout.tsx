@@ -128,6 +128,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
+  const [searchQ, setSearchQ] = useState('');
   const [dateTimePrefs, setDateTimePrefs] = useState<OrgDateTimeSettingsDto>({
     timeFormat: '12h',
     dateStyle: 'short',
@@ -251,13 +252,15 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           ? 'IT Admin'
           : pathname.startsWith('/app/platform')
             ? 'Platform'
-              : pathname.startsWith('/app/timeline')
-                ? 'Enterprise Timeline'
-                : pathname.startsWith('/app/profile')
-                  ? 'Profile'
-                  : pathname.startsWith('/app/settings')
-                    ? 'System Settings'
-                    : 'EIP Dashboard — Overview';
+              : pathname.startsWith('/app/search')
+                ? 'Enterprise Search'
+                : pathname.startsWith('/app/timeline')
+                  ? 'Enterprise Timeline'
+                  : pathname.startsWith('/app/profile')
+                    ? 'Profile'
+                    : pathname.startsWith('/app/settings')
+                      ? 'System Settings'
+                      : 'EIP Dashboard — Overview';
 
   const profileActive = pathname.startsWith('/app/profile');
 
@@ -376,13 +379,26 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className={styles.topCenter}>
-            <label className={styles.search}>
+            <form
+              className={styles.search}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = searchQ.trim();
+                router.push(q ? `/app/search/?q=${encodeURIComponent(q)}` : '/app/search/');
+              }}
+            >
               <svg viewBox="0 0 24 24" aria-hidden>
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-3.5-3.5" />
               </svg>
-              <input type="search" placeholder="Search anything..." aria-label="Search" />
-            </label>
+              <input
+                type="search"
+                placeholder="Search anything..."
+                aria-label="Search"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+              />
+            </form>
           </div>
 
           <div className={styles.topRight}>

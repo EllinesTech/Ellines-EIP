@@ -14,12 +14,12 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~95% | Owner vs IT authority hardened; System Settings + profile shell shipped |
 | **2 — Integration Hub** | ~98% | MVP connectors + UEM + sync schedules shipped. Optional: hub service / webhooks / SQL Server |
-| **3 — Executive Command Center** | ~70% | KPIs + UEM + **Timeline page** shipped; next: Search |
+| **3 — Executive Command Center** | ~80% | KPIs + UEM + Timeline + **Search** shipped; next: Notifications |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
 | **Hosting** | Live | Pages via GitHub Actions → [eip.ellines.co.ke](https://eip.ellines.co.ke); Functions import verify gates deploy |
 
-**Critical path remaining:** **3.5 Enterprise Search** → Notifications → Ellinea AI deepen → Workflows / write under Owner policy.
+**Critical path remaining:** **3.6 Notification Center** → Ellinea AI deepen → Workflows / write under Owner policy.
 
 **MVP launch connectors (scope 2.2–2.5):** all `done`. Optional later: SQL Server/MySQL, webhooks, dedicated `integration-hub` service.
 
@@ -69,8 +69,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 3.2 | KPI Widgets (live) | `done` | From `/api/v1/enterprise/summary` after connector sync |
 | 3.3 | Enterprise Health Score | `done` | Snapshot `healthScore` |
 | 3.4 | Enterprise Timeline | `done` | `/app/timeline` + Overview rail; uses org clock prefs + sync timestamps |
-| 3.5 | Enterprise Search | `next` | |
-| 3.6 | Notification Center | `todo` | `services/notification` missing |
+| 3.5 | Enterprise Search | `done` | `/app/search` + topbar; queries snapshot, timeline, UEM objects, installs |
+| 3.6 | Notification Center | `next` | `services/notification` missing — start with in-app feed from snapshot alerts |
 
 ---
 
