@@ -173,7 +173,8 @@ export default function SystemSettingsPage() {
           <div className={settingsStyles.block}>
             <span className={settingsStyles.fieldLabel}>Layout density</span>
             <p className={settingsStyles.fieldHint}>
-              Compact tightens padding across the Work Console content area.
+              Comfortable is the enterprise default (~12% tighter than marketing UI). Compact packs
+              ~20% more onto 1080p for power users.
             </p>
             <div className={settingsStyles.optionRow} role="group" aria-label="Layout density">
               {(

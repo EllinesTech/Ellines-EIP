@@ -17,9 +17,16 @@
   --dash-accent: #7c3aed;
   --dash-accent-soft: rgba(124, 58, 237, 0.28);
   --dash-accent-glow: rgba(124, 58, 237, 0.18);
+  /* Enterprise density tokens — comfortable ≈ M365/Atlassian scale */
+  --dash-font: 0.9375rem; /* 15px */
+  --dash-rail-w: 220px;
+  --dash-content-pad-y: 1.05rem;
+  --dash-content-pad-x: 1.2rem;
+  --dash-topbar-pad-y: 0.65rem;
+  --dash-search-h: 42px;
 
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: var(--dash-rail-w) 1fr;
   height: 100vh;
   height: 100dvh;
   max-height: 100dvh;
@@ -27,6 +34,8 @@
   background: var(--dash-bg);
   color: var(--dash-text);
   font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  font-size: var(--dash-font);
+  line-height: 1.45;
   transition: grid-template-columns 0.28s ease;
 }
 
@@ -53,15 +62,22 @@
   --dash-purple: #0d9488;
 }
 
-.shell[data-density='compact'] {
-  --dash-content-pad-y: 1rem;
-  --dash-content-pad-x: 1.15rem;
-  font-size: 0.9375rem;
+.shell[data-density='comfortable'] {
+  --dash-font: 0.9375rem;
+  --dash-rail-w: 220px;
+  --dash-content-pad-y: 1.05rem;
+  --dash-content-pad-x: 1.2rem;
+  --dash-topbar-pad-y: 0.65rem;
+  --dash-search-h: 42px;
 }
 
-.shell[data-density='comfortable'] {
-  --dash-content-pad-y: 1.25rem;
-  --dash-content-pad-x: 1.4rem;
+.shell[data-density='compact'] {
+  --dash-font: 0.875rem; /* 14px — ~20% denser for power users */
+  --dash-rail-w: 200px;
+  --dash-content-pad-y: 0.75rem;
+  --dash-content-pad-x: 0.95rem;
+  --dash-topbar-pad-y: 0.5rem;
+  --dash-search-h: 40px;
 }
 
 .shellCollapsed {
@@ -73,7 +89,7 @@
   flex-direction: column;
   background: var(--dash-rail);
   color: var(--dash-text);
-  padding: 1rem 0.7rem 0.85rem;
+  padding: 0.85rem 0.6rem 0.7rem;
   border-right: 1px solid var(--dash-line);
   height: 100%;
   max-height: 100dvh;
@@ -85,17 +101,17 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.45rem 0.4rem 1.05rem;
+  gap: 0.6rem;
+  padding: 0.35rem 0.35rem 0.85rem;
   border-bottom: 1px solid var(--dash-line);
-  margin-bottom: 0.85rem;
-  min-height: 3.6rem;
+  margin-bottom: 0.65rem;
+  min-height: 3.1rem;
   flex-shrink: 0;
 }
 
 .brandIcon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   object-fit: contain;
   object-position: center;
@@ -124,7 +140,7 @@
 
 .brandName {
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: #ffffff;
   letter-spacing: -0.02em;
   white-space: nowrap;
@@ -199,12 +215,13 @@
 .navLink {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.72rem 0.8rem;
-  border-radius: 12px;
+  gap: 0.65rem;
+  min-height: 40px;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
   color: var(--dash-muted);
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
@@ -448,8 +465,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 1.4rem;
+  gap: 0.85rem;
+  padding: var(--dash-topbar-pad-y, 0.65rem) 1.15rem;
   background: rgba(11, 14, 20, 0.72);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--dash-line);
@@ -498,7 +515,7 @@
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.015em;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -523,17 +540,20 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.55rem 1rem;
+  gap: 0.45rem;
+  min-height: var(--dash-search-h, 42px);
+  height: var(--dash-search-h, 42px);
+  padding: 0 0.9rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--dash-line);
   color: var(--dash-muted);
+  box-sizing: border-box;
 }
 
 .search svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
   stroke: currentColor;
   fill: none;
@@ -547,8 +567,9 @@
   background: transparent;
   color: #fff;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   min-width: 0;
+  height: 100%;
 }
 
 .search input::placeholder {
@@ -664,7 +685,7 @@
 }
 
 .content {
-  padding: var(--dash-content-pad-y, 1.25rem) var(--dash-content-pad-x, 1.4rem) 5.25rem;
+  padding: var(--dash-content-pad-y, 1.05rem) var(--dash-content-pad-x, 1.2rem) 4.75rem;
   animation: rise 0.4s ease both;
   flex: 1 1 auto;
   min-height: 0;
@@ -673,8 +694,8 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .appFooter {
