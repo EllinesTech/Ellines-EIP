@@ -21,6 +21,16 @@ export {
   type PostgresQueryFn,
 } from './postgres';
 export {
+  createSqlServerConnector,
+  type SqlServerConnectorOptions,
+  type SqlServerQueryFn,
+} from './sqlserver';
+export {
+  createMysqlConnector,
+  type MysqlConnectorOptions,
+  type MysqlQueryFn,
+} from './mysql';
+export {
   createImapConnector,
   emailsToEnterprisePayload,
   type ImapConnectorConfig,
@@ -497,10 +507,17 @@ export const CONNECTOR_CATALOG = [
   },
   {
     id: 'sqlserver',
-    name: 'SQL Server / MySQL',
+    name: 'SQL Server (read-only)',
     type: 'database' as ConnectorType,
-    status: 'planned' as const,
-    blurb: 'Read-only DB sync for common on-prem ERPs and HIS backends.',
+    status: 'available' as const,
+    blurb: 'Read-only T-SQL sync for on-prem ERPs and HIS backends.',
+  },
+  {
+    id: 'mysql',
+    name: 'MySQL (read-only)',
+    type: 'database' as ConnectorType,
+    status: 'available' as const,
+    blurb: 'Read-only MySQL sync when vendors will not ship an API.',
   },
   {
     id: 'email-imap',

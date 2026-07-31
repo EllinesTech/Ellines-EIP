@@ -47,6 +47,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       'openapi',
       'csv-file',
       'postgres',
+      'sqlserver',
+      'mysql',
       'demo-json',
       'email-imap',
       'sftp',

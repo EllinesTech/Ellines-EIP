@@ -62,6 +62,18 @@ const TYPES = [
     blurb: 'Connect to a reporting DB / replica when the vendor will not ship an API.',
   },
   {
+    id: 'sqlserver',
+    title: 'SQL Server (read-only)',
+    tag: 'No API needed',
+    blurb: 'T-SQL reporting DB for on-prem ERPs and HIS backends.',
+  },
+  {
+    id: 'mysql',
+    title: 'MySQL (read-only)',
+    tag: 'No API needed',
+    blurb: 'MySQL reporting DB when the vendor will not ship an API.',
+  },
+  {
     id: 'csv-file',
     title: 'CSV / File export',
     tag: 'No API needed',
@@ -230,7 +242,7 @@ export default function ConnectorsPage() {
     }
     if (catalogId === 'rest-api') config.endpoint = endpoint.trim();
     if (catalogId === 'csv-file') config.csvText = csvText;
-    if (catalogId === 'postgres') {
+    if (catalogId === 'postgres' || catalogId === 'sqlserver' || catalogId === 'mysql') {
       if (connectionString && connectionString !== '***') {
         config.connectionString = connectionString;
       }
@@ -719,14 +731,22 @@ export default function ConnectorsPage() {
                   </label>
                 ) : null}
 
-                {catalogId === 'postgres' ? (
+                {catalogId === 'postgres' ||
+                catalogId === 'sqlserver' ||
+                catalogId === 'mysql' ? (
                   <>
                     <label style={{ gridColumn: '1 / -1' }}>
                       Connection string (read-only role)
                       <input
                         value={connectionString}
                         onChange={(e) => setConnectionString(e.target.value)}
-                        placeholder="postgresql://reader:…@host:5432/dbname"
+                        placeholder={
+                          catalogId === 'sqlserver'
+                            ? 'Server=host,1433;Database=dbname;User Id=reader;Password=…;Encrypt=true'
+                            : catalogId === 'mysql'
+                              ? 'mysql://reader:…@host:3306/dbname'
+                              : 'postgresql://reader:…@host:5432/dbname'
+                        }
                       />
                     </label>
                     <label style={{ gridColumn: '1 / -1' }}>
@@ -734,8 +754,8 @@ export default function ConnectorsPage() {
                       <textarea value={sql} onChange={(e) => setSql(e.target.value)} rows={6} />
                     </label>
                     <p className={styles.lede}>
-                      Postgres / IMAP / SFTP sync runs on the Identity API (TCP). On Pages-only
-                      deploys, save config here and sync via Nest Identity.
+                      Postgres / SQL Server / MySQL / IMAP / SFTP sync runs on the Identity API
+                      (TCP). On Pages-only deploys, save config here and sync via Nest Identity.
                     </p>
                   </>
                 ) : null}

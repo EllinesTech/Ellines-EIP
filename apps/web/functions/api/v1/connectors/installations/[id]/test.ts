@@ -62,11 +62,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const res = await fetch(base, { method: 'GET', headers: buildAuthHeaders(config) });
         ok = res.ok || [401, 403, 404].includes(res.status);
       }
-    } else if (catalogId === 'postgres') {
+    } else if (catalogId === 'postgres' || catalogId === 'sqlserver' || catalogId === 'mysql') {
       if (!config.connectionString?.trim()) throw new Error('connectionString is required');
       if (!config.sql?.trim()) throw new Error('SQL query is required');
-      message =
-        'Config saved. PostgreSQL TCP test requires the Identity API (Nest). Format looks ready.';
+      const label =
+        catalogId === 'postgres'
+          ? 'PostgreSQL'
+          : catalogId === 'sqlserver'
+            ? 'SQL Server'
+            : 'MySQL';
+      message = `Config saved. ${label} TCP test requires the Identity API (Nest). Format looks ready.`;
       ok = true;
     } else if (catalogId === 'email-imap') {
       if (!config.imapHost?.trim() || !config.imapUser?.trim()) {

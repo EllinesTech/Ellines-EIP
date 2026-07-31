@@ -304,6 +304,8 @@ export default function PlatformAdminPage() {
               <option value="openapi">openapi</option>
               <option value="rest-api">rest-api</option>
               <option value="postgres">postgres</option>
+              <option value="sqlserver">sqlserver</option>
+              <option value="mysql">mysql</option>
               <option value="csv-file">csv-file</option>
               <option value="email-imap">email-imap</option>
               <option value="sftp">sftp</option>

@@ -16,9 +16,11 @@ import {
   createCsvFileConnector,
   createDemoJsonConnector,
   createImapConnector,
+  createMysqlConnector,
   createPostgresConnector,
   createRestApiConnector,
   createSftpConnector,
+  createSqlServerConnector,
   normalizeEnterprisePayload,
   parseCsvToEnterprisePayload,
   parseOpenApiDocument,
@@ -29,6 +31,8 @@ import {
   type ImapMessageSummary,
 } from '@ellines-eip/connectors-sdk';
 import { ImapFlow } from 'imapflow';
+import * as mssql from 'mssql';
+import mysql from 'mysql2/promise';
 import { Client } from 'pg';
 import SftpClient from 'ssh2-sftp-client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -58,6 +62,8 @@ const ALLOWED_CATALOG = [
   'openapi',
   'csv-file',
   'postgres',
+  'sqlserver',
+  'mysql',
   'demo-json',
   'email-imap',
   'sftp',
@@ -199,6 +205,28 @@ export class EnterpriseService {
           activeId === 'postgres'
             ? 'Last sync OK'
             : 'Reporting DB / replica when vendors will not ship an API',
+      },
+      {
+        id: 'sqlserver',
+        name: 'SQL Server (read-only)',
+        type: 'database',
+        status: activeId === 'sqlserver' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'sqlserver' ? lastAt : null,
+        message:
+          activeId === 'sqlserver'
+            ? 'Last sync OK'
+            : 'T-SQL reporting DB for on-prem ERP / HIS backends',
+      },
+      {
+        id: 'mysql',
+        name: 'MySQL (read-only)',
+        type: 'database',
+        status: activeId === 'mysql' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'mysql' ? lastAt : null,
+        message:
+          activeId === 'mysql'
+            ? 'Last sync OK'
+            : 'MySQL reporting DB when vendors will not ship an API',
       },
       {
         id: 'email-imap',
@@ -497,6 +525,22 @@ export class EnterpriseService {
       await this.pgQuery(config.connectionString, 'SELECT 1 AS ok');
       return true;
     }
+    if (catalogId === 'sqlserver') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
+      }
+      assertReadOnlySql(config.sql || 'SELECT 1');
+      await this.mssqlQuery(config.connectionString, 'SELECT 1 AS ok');
+      return true;
+    }
+    if (catalogId === 'mysql') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
+      }
+      assertReadOnlySql(config.sql || 'SELECT 1');
+      await this.mysqlQuery(config.connectionString, 'SELECT 1 AS ok');
+      return true;
+    }
     if (catalogId === 'email-imap') {
       const connector = createImapConnector({
         config: {
@@ -633,6 +677,38 @@ export class EnterpriseService {
       });
       const result = await connector.sync();
       if (!result.ok) throw new ServiceUnavailableException(result.message || 'Postgres sync failed');
+      return result.summary;
+    }
+
+    if (catalogId === 'sqlserver') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
+      }
+      const sql = config.sql?.trim() || 'SELECT 1 AS healthScore, 1 AS connectedSystems';
+      const connector = createSqlServerConnector({
+        sql,
+        connectorName: displayName || config.systemName || 'SQL Server (read-only)',
+        runQuery: (q) => this.mssqlQuery(config.connectionString!, q),
+      });
+      const result = await connector.sync();
+      if (!result.ok) {
+        throw new ServiceUnavailableException(result.message || 'SQL Server sync failed');
+      }
+      return result.summary;
+    }
+
+    if (catalogId === 'mysql') {
+      if (!config.connectionString?.trim()) {
+        throw new BadRequestException('connectionString is required');
+      }
+      const sql = config.sql?.trim() || 'SELECT 1 AS healthScore, 1 AS connectedSystems';
+      const connector = createMysqlConnector({
+        sql,
+        connectorName: displayName || config.systemName || 'MySQL (read-only)',
+        runQuery: (q) => this.mysqlQuery(config.connectionString!, q),
+      });
+      const result = await connector.sync();
+      if (!result.ok) throw new ServiceUnavailableException(result.message || 'MySQL sync failed');
       return result.summary;
     }
 
@@ -789,6 +865,37 @@ export class EnterpriseService {
       throw err;
     } finally {
       await client.end().catch(() => undefined);
+    }
+  }
+
+  private async mssqlQuery(
+    connectionString: string,
+    sql: string,
+  ): Promise<Record<string, unknown>[]> {
+    const pool = new mssql.ConnectionPool(connectionString);
+    await pool.connect();
+    try {
+      const result = await pool.request().query(sql);
+      const rows = (result.recordset || []) as Record<string, unknown>[];
+      return Array.isArray(rows) ? rows : [];
+    } finally {
+      await pool.close().catch(() => undefined);
+    }
+  }
+
+  private async mysqlQuery(
+    connectionString: string,
+    sql: string,
+  ): Promise<Record<string, unknown>[]> {
+    const conn = await mysql.createConnection(connectionString);
+    try {
+      await conn.query('SET SESSION TRANSACTION READ ONLY');
+      await conn.query('SET SESSION MAX_EXECUTION_TIME = 8000');
+      const [rows] = await conn.query(sql);
+      if (!Array.isArray(rows)) return [];
+      return rows as Record<string, unknown>[];
+    } finally {
+      await conn.end().catch(() => undefined);
     }
   }
 

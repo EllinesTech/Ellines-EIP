@@ -30,6 +30,8 @@ export class HubController {
         'rest-api',
         'openapi',
         'postgres',
+        'sqlserver',
+        'mysql',
         'csv-file',
         'email-imap',
         'sftp',

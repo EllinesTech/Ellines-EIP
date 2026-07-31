@@ -221,7 +221,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         displayName || 'CSV / File Import',
         parseCsvToEnterprisePayload(csvText),
       );
-    } else if (catalogId === 'postgres' || catalogId === 'email-imap' || catalogId === 'sftp') {
+    } else if (
+      catalogId === 'postgres' ||
+      catalogId === 'sqlserver' ||
+      catalogId === 'mysql' ||
+      catalogId === 'email-imap' ||
+      catalogId === 'sftp'
+    ) {
       return json(
         {
           statusCode: 501,

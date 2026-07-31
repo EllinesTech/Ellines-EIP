@@ -31,7 +31,7 @@ while queue has next/in_progress and not blocked:
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
-| **2 — Integration Hub** | ~100% | Webhooks / events + hub stub done |
+| **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
 | **5 — Workflow & Automation** | ~55% | Approvals, rules, reports, event bus done |
@@ -41,11 +41,11 @@ while queue has next/in_progress and not blocked:
 
 ### Priority order (first → next → later)
 
-1. **Now —** remaining Phase 2 depth (SQL Server / MySQL when HIS needs it).
+1. **Now —** Platform Super Admin: suspend / disable org.
 2. **Later —** workflow depth, email SMTP worker, **Mobile Work Companion** (v1.1).
 3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** Webhooks done → SQL when needed → Mobile Companion in v1.1 (wraps SoR; Ellinea central).
+**Critical path:** SQL connectors done → Platform suspend/disable → Mobile Companion in v1.1 (wraps SoR; Ellinea central).
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -88,7 +88,7 @@ while queue has next/in_progress and not blocked:
 | 2.8 | Connector health on Owner/IT Overview | `done` | Install status chips on admin Overview |
 | 2.x | `services/integration-hub` | `done` | Optional microservice |
 | 2.x | Webhooks / events | `done` | `POST /api/v1/webhooks/enterprise` + secret rotate on Connectors |
-| 2.x | SQL Server / MySQL | `next` | When HIS needs it |
+| 2.x | SQL Server / MySQL | `done` | Read-only `sqlserver` + `mysql` catalog; Identity TCP via `mssql` / `mysql2` |
 
 ---
 
@@ -201,7 +201,8 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 1.3 | API Gateway | `done` | Nest/Fastify edge; route /auth /enterprise /ellinea |
 | 2.x | `services/integration-hub` | `done` | Nest stub :3003 |
 | 2.x | Webhooks / events | `done` | System B push endpoint + Owner/IT secret |
-| 2.x | SQL Server / MySQL | `next` | When HIS needs it |
+| 2.x | SQL Server / MySQL | `done` | Read-only connectors; TCP on Identity |
+| 1.5b | Platform suspend / disable org | `next` | Super Admin: suspend tenant; block login + sync |
 
 ---
 
@@ -223,6 +224,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **SQL Server / MySQL connectors:** read-only catalog + Identity TCP drivers (`mssql`, `mysql2`); Pages soft-test / 501 sync like Postgres
 - **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab via Settings link only (no side-nav Ask/Console). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
 - Audit Center (`/app/audit`), change password on Profile, connector health chips on Overview
 - Org structure (branches/departments) on Org Admin + Pages APIs

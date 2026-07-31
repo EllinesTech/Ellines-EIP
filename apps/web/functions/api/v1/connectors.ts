@@ -58,6 +58,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       'Reporting DB / replica when vendors will not ship an API',
     ),
     item(
+      'sqlserver',
+      'SQL Server (read-only)',
+      'database',
+      'T-SQL reporting DB for on-prem ERP / HIS backends',
+    ),
+    item(
+      'mysql',
+      'MySQL (read-only)',
+      'database',
+      'MySQL reporting DB when vendors will not ship an API',
+    ),
+    item(
       'email-imap',
       'Email (IMAP)',
       'email',

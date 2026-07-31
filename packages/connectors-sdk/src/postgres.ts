@@ -56,7 +56,7 @@ export function rowsToEnterprisePayload(
       openAlerts: 0,
       openDecisions: 0,
       briefHighlight: `${systemName}: query returned no rows.`,
-      timeline: [{ title: 'PostgreSQL sync', detail: 'Empty result set' }],
+      timeline: [{ title: `${systemName} sync`, detail: 'Empty result set' }],
       model: inferUemFromMetrics({
         connectedSystems: 1,
         sourceSystem: systemName,
@@ -105,7 +105,7 @@ export function rowsToEnterprisePayload(
     ),
     timeline: [
       {
-        title: 'PostgreSQL read-only sync',
+        title: `${systemName} read-only sync`,
         detail: `${rows.length} row(s) from reporting query — no vendor API required.`,
       },
     ],
