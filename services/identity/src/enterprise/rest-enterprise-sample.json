@@ -1,0 +1,21 @@
+{
+  "healthScore": 84,
+  "connectedSystems": 5,
+  "openAlerts": 2,
+  "openDecisions": 4,
+  "briefHighlight": "REST feed healthy — five systems online; two alerts need ops review before end of day.",
+  "timeline": [
+    {
+      "title": "REST connector sample online",
+      "detail": "This JSON endpoint is the default target for the REST API connector."
+    },
+    {
+      "title": "Inventory risk eased",
+      "detail": "Two branches cleared overdue stock alerts after morning sync."
+    },
+    {
+      "title": "Approvals still open",
+      "detail": "Four decisions remain in finance and branch ops queues."
+    }
+  ]
+}

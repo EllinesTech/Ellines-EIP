@@ -1,8 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { createDemoJsonConnector } from '@ellines-eip/connectors-sdk';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import {
+  createDemoJsonConnector,
+  createRestApiConnector,
+  normalizeEnterprisePayload,
+} from '@ellines-eip/connectors-sdk';
 import type { ConnectorStatus, EnterpriseSummary } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import seed from './demo-enterprise.json';
+import demoSeed from './demo-enterprise.json';
+import restSample from './rest-enterprise-sample.json';
 
 @Injectable()
 export class EnterpriseService {
@@ -46,28 +56,111 @@ export class EnterpriseService {
     const snap = await this.prisma.enterpriseSnapshot.findUnique({
       where: { organizationId },
     });
+    const lastAt = snap?.syncedAt.toISOString() ?? null;
+    const activeId = snap?.connectorId ?? null;
     return [
       {
         id: 'demo-json',
         name: 'Demo JSON Systems',
         type: 'file',
-        status: snap ? 'synced' : 'idle',
-        lastSyncedAt: snap?.syncedAt.toISOString() ?? null,
-        message: snap ? 'Last sync OK' : 'Not synced yet',
+        status: activeId === 'demo-json' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'demo-json' ? lastAt : null,
+        message:
+          activeId === 'demo-json'
+            ? 'Last sync OK'
+            : 'Built-in seed — Sync now for live KPIs',
+      },
+      {
+        id: 'rest-api',
+        name: 'REST API Systems',
+        type: 'api',
+        status: activeId === 'rest-api' ? 'synced' : 'idle',
+        lastSyncedAt: activeId === 'rest-api' ? lastAt : null,
+        message:
+          activeId === 'rest-api'
+            ? 'Last sync OK'
+            : 'Point at any JSON REST URL (sample included)',
       },
     ];
   }
 
-  async syncConnector(organizationId: string, actorUserId: string, connectorId: string) {
-    if (connectorId !== 'demo-json') {
-      throw new NotFoundException('Unknown connector');
+  async syncConnector(
+    organizationId: string,
+    actorUserId: string,
+    connectorId: string,
+    options?: { endpoint?: string; headers?: Record<string, string> },
+  ) {
+    if (connectorId === 'demo-json') {
+      const connector = createDemoJsonConnector(demoSeed);
+      const result = await connector.sync();
+      if (!result.ok) {
+        throw new ServiceUnavailableException(result.message || 'Sync failed');
+      }
+      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
     }
-    const connector = createDemoJsonConnector(seed);
-    const result = await connector.sync();
-    if (!result.ok) {
-      throw new NotFoundException(result.message || 'Sync failed');
+
+    if (connectorId === 'rest-api') {
+      const endpoint = (options?.endpoint || '').trim();
+      const useSample =
+        !endpoint ||
+        endpoint.includes('/api/v1/connectors/rest-sample') ||
+        endpoint === 'sample';
+
+      if (useSample) {
+        const payload = normalizeEnterprisePayload(restSample);
+        return this.persistSync(
+          organizationId,
+          actorUserId,
+          {
+            connectorId: 'rest-api',
+            connectorName: 'REST API Systems',
+            ...payload,
+            syncedAt: new Date().toISOString(),
+          },
+          connectorId,
+        );
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(endpoint);
+      } catch {
+        throw new BadRequestException('Invalid REST endpoint URL');
+      }
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new BadRequestException('REST endpoint must be http(s)');
+      }
+
+      const connector = createRestApiConnector({
+        endpoint: parsed.toString(),
+        headers: options?.headers,
+      });
+      const result = await connector.sync();
+      if (!result.ok) {
+        throw new ServiceUnavailableException(result.message || 'REST sync failed');
+      }
+      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
     }
-    const s = result.summary;
+
+    throw new NotFoundException('Unknown connector');
+  }
+
+  private async persistSync(
+    organizationId: string,
+    actorUserId: string,
+    s: {
+      connectorId: string;
+      connectorName: string;
+      healthScore: number;
+      connectedSystems: number;
+      openAlerts: number;
+      openDecisions: number;
+      briefHighlight: string;
+      timeline: { title: string; detail: string }[];
+      syncedAt?: string;
+    },
+    connectorId: string,
+  ) {
     const syncedAt = new Date(s.syncedAt || Date.now());
     const snap = await this.prisma.enterpriseSnapshot.upsert({
       where: { organizationId },

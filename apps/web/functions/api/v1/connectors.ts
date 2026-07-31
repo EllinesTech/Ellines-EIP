@@ -18,20 +18,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
   const { data: snap } = await supabase
     .from('enterprise_snapshots')
-    .select('synced_at')
+    .select('synced_at, connector_id')
     .eq('organization_id', auth.organizationId)
     .maybeSingle();
+
+  const lastAt = snap?.synced_at
+    ? new Date(snap.synced_at as string).toISOString()
+    : null;
+  const activeId = (snap?.connector_id as string | undefined) || null;
 
   return json([
     {
       id: 'demo-json',
       name: 'Demo JSON Systems',
       type: 'file',
-      status: snap ? 'synced' : 'idle',
-      lastSyncedAt: snap?.synced_at
-        ? new Date(snap.synced_at as string).toISOString()
-        : null,
-      message: snap ? 'Last sync OK' : 'Not synced yet',
+      status: activeId === 'demo-json' ? 'synced' : 'idle',
+      lastSyncedAt: activeId === 'demo-json' ? lastAt : null,
+      message:
+        activeId === 'demo-json'
+          ? 'Last sync OK'
+          : 'Built-in seed — Sync now for live KPIs',
+    },
+    {
+      id: 'rest-api',
+      name: 'REST API Systems',
+      type: 'api',
+      status: activeId === 'rest-api' ? 'synced' : 'idle',
+      lastSyncedAt: activeId === 'rest-api' ? lastAt : null,
+      message:
+        activeId === 'rest-api'
+          ? 'Last sync OK'
+          : 'Point at any JSON REST URL (sample included)',
     },
   ]);
 };

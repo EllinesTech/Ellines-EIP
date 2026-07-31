@@ -248,8 +248,12 @@ export function listConnectors() {
   return request<ConnectorStatusDto[]>('/api/v1/connectors');
 }
 
-export function syncConnector(connectorId: string) {
+export function syncConnector(
+  connectorId: string,
+  options?: { endpoint?: string; headers?: Record<string, string> },
+) {
   return request<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
     method: 'POST',
+    body: options ? JSON.stringify(options) : undefined,
   });
 }

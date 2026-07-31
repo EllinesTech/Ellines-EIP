@@ -13,7 +13,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~90% | Access layers landed; Gateway deferred while Integration Hub unlocks live KPIs |
-| **2 — Integration Hub** | ~25% | Demo JSON connector + enterprise snapshot API |
+| **2 — Integration Hub** | ~40% | Demo JSON + REST API connector (URL sync into snapshot) |
 | **3 — Executive Command Center** | ~55% | Work Console KPIs + timeline from connector sync |
 | **4 — Ellinea AI** | ~15% | Thin brief + template Q&A from snapshot (no LLM yet) |
 | **5 — Workflow & Automation** | 0% | Not started |
@@ -31,7 +31,7 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | 1.2 | Identity Core | `done` | NestJS: register/login JWT, orgs, branches, depts, invite, roles, AuditLog model |
 | 1.2a | Harden Identity (tests, password reset, role guards on all routes) | `done` | RolesGuard on org writes; forgot/reset password + PasswordResetToken; Jest unit tests |
 | 1.2b | Auth UX complete (register/login/forgot/SSO on live Pages) | `done` | Fixed register `updated_at`; Pages forgot/reset + work-email SSO; login/register UI wired |
-| 1.3 | API Gateway | `next` | Deferred earlier for Hub; resume after live KPIs landed |
+| 1.3 | API Gateway | `todo` | Deferred — Hub connectors unlock more value first; resume when multi-service needs it |
 | 1.4 | Audit Trail | `in_progress` | Prisma model exists; invite/update user audited on Pages + Nest |
 | 1.5 | Admin Console | `done` | `/app/admin` + `/app/platform`; see [09_Access_Layers.md](./09_Access_Layers.md) |
 
@@ -42,8 +42,8 @@ Cloud Agents and Automations **must pick the first `next` item** (or continue an
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | 2.1 | Connector Framework + SDK | `done` | SDK + Demo JSON connector; snapshot via Pages/Nest; Connectors Sync UI |
-| 2.2 | REST API Connector | `todo` | |
-| 2.3 | PostgreSQL Connector | `todo` | |
+| 2.2 | REST API Connector | `done` | SDK `createRestApiConnector` + Connectors UI endpoint + sample JSON sync |
+| 2.3 | PostgreSQL Connector | `next` | |
 | 2.4 | CSV/File Connector | `todo` | P1 — demo JSON covers file-style path for now |
 | 2.5 | Email Connector | `todo` | P1 |
 | 2.6 | Universal Enterprise Model | `todo` | Snapshot fields are a thin start |
