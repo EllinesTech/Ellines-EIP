@@ -41,11 +41,12 @@ while queue has next/in_progress and not blocked:
 
 ### Priority order (first → next → later)
 
-1. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
-2. **Later —** **Mobile Work Companion** (v1.1).
-3. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
+1. **Done —** Owner/IT side-nav rearrange (drag + localStorage per user+org).
+2. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
+3. **Later —** **Mobile Work Companion** (v1.1).
+4. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
 
-**Critical path:** SQL + Platform suspend + notification delivery (email + push) done → Mobile Companion in v1.1 (no further v1.0 `next` until queued).
+**Critical path:** v1.0 Foundation web path complete for queued items. Remaining: human Pages secrets for live mail/push; Mobile Companion in v1.1 (no further v1.0 `next` until queued).
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -129,6 +130,7 @@ while queue has next/in_progress and not blocked:
 | 1.3 | API Gateway | `done` | Edge routing service |
 | 2.x | Integration hub service | `done` | `services/integration-hub` |
 | 2.x | Webhooks / events | `done` | Pages webhook + org secret; catalog available |
+| 3.x | Side nav rearrange (Owner/IT) | `done` | Edit nav + drag; `eip_nav_order:{orgId}:{userId}`; Ellinea Console stays above Settings by default |
 
 ---
 
@@ -226,6 +228,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Owner/IT side-nav rearrange:** Edit nav + drag reorder; order persisted in `eip_nav_order:{orgId}:{userId}`; non-admins keep fixed default; new items merge at default relative position (Ellinea Console above Settings by default).
 - **Web Push / VAPID:** subscription API + `/sw-push.js`; deliver attempts push when VAPID secrets + browser sub exist; else simulated/failed with clear message. Human Pages secrets required for live push.
 - **Notification SMTP / Resend slice:** `POST /api/v1/notifications/deliver` attempts real email when `RESEND_API_KEY` or `SMTP_*` / `ELLINEA_SMTP_*` are on Pages; otherwise keeps `simulated` (CI-safe). Human must set Pages secrets for live mail.
 - **Platform suspend/disable org:** Super Admin Suspend/Resume on `/app/platform`; blocks login + connector sync
@@ -238,6 +241,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
+**v1.0 status:** Queued Foundation web work is complete. No `next` / `in_progress` items remain. Blocked only on human secrets (live SMTP/push) and Phase 7 Mobile (v1.1 roadmap).
 ---
 
 ## Agent run protocol

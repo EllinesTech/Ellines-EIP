@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, type DragEvent } from 'react';
 import { isOrgAdminRole, isOrgOwnerRole, formatOrgDateTime } from '@ellines-eip/shared';
 import EllineaChatPanel from '@/components/ellinea-chat';
 import {
@@ -23,6 +23,12 @@ import {
   UI_PREFS_EVENT,
   type UiPrefs,
 } from '@/lib/ui-prefs';
+import {
+  mergeNavOrder,
+  readNavOrder,
+  reorderNavHrefs,
+  writeNavOrder,
+} from '@/lib/nav-order';
 import styles from './shell.module.css';
 
 type NavItem = {
@@ -149,6 +155,14 @@ function IconSettings() {
   );
 }
 
+function IconDragHandle() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M8 7h8M8 12h8M8 17h8" />
+    </svg>
+  );
+}
+
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
@@ -185,6 +199,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     dateStyle: 'short',
   });
   const [clock, setClock] = useState<{ day: string; time: string; iso: string } | null>(null);
+  const [navOrder, setNavOrder] = useState<string[] | null>(null);
+  const [editingNav, setEditingNav] = useState(false);
+  const [dragHref, setDragHref] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -204,6 +221,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       setCollapsed(stored === '1');
     } else {
       setCollapsed(!isAdminShell);
+    }
+    if (orgAdmin) {
+      setNavOrder(readNavOrder(s.organization.id, s.user.id));
     }
     setReady(true);
     refreshSessionFlags()
@@ -282,7 +302,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const orgAdmin = isOrgAdminRole(session.user.role);
   const platformAdmin = Boolean(session.isPlatformAdmin);
   const isClientShell = !orgAdmin && !platformAdmin;
-  const visibleNav = NAV.filter((item) => {
+  const filteredNav = NAV.filter((item) => {
     if (item.adminOnly && !orgAdmin) return false;
     if (item.platformOnly && !platformAdmin) return false;
     if (item.href === '/app/approvals' && !uiPrefs.showApprovalsNav) return false;
@@ -295,6 +315,48 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         }
       : item,
   );
+  const defaultHrefs = filteredNav.map((item) => item.href);
+  const orderedHrefs = orgAdmin
+    ? mergeNavOrder(defaultHrefs, navOrder)
+    : defaultHrefs;
+  const byHref = new Map(filteredNav.map((item) => [item.href, item]));
+  const visibleNav = orderedHrefs
+    .map((href) => byHref.get(href))
+    .filter((item): item is NavItem => Boolean(item));
+
+  function persistNavOrder(hrefs: string[]) {
+    setNavOrder(hrefs);
+    writeNavOrder(session.organization.id, session.user.id, hrefs);
+  }
+
+  function onNavDragStart(href: string, e: DragEvent) {
+    if (!editingNav) return;
+    setDragHref(href);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', href);
+  }
+
+  function onNavDragOver(href: string, e: DragEvent) {
+    if (!editingNav) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragHref && dragHref !== href) {
+      /* allow drop target highlight via CSS :hover / drag state */
+    }
+  }
+
+  function onNavDrop(href: string, e: DragEvent) {
+    if (!editingNav) return;
+    e.preventDefault();
+    const from = dragHref || e.dataTransfer.getData('text/plain');
+    setDragHref(null);
+    if (!from || from === href) return;
+    persistNavOrder(reorderNavHrefs(orderedHrefs, from, href));
+  }
+
+  function onNavDragEnd() {
+    setDragHref(null);
+  }
   const pageTitle =
     pathname.startsWith('/app/ellinea-console')
       ? 'Ellinea Console'
@@ -367,12 +429,60 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           </svg>
         </button>
 
-        <nav className={styles.nav} aria-label="Workspace">
+        <nav
+          className={`${styles.nav} ${editingNav ? styles.navEditing : ''}`}
+          aria-label="Workspace"
+        >
+          {orgAdmin && !collapsed ? (
+            <div className={styles.navEditBar}>
+              <button
+                type="button"
+                className={styles.navEditBtn}
+                onClick={() => {
+                  setEditingNav((v) => !v);
+                  setDragHref(null);
+                }}
+                aria-pressed={editingNav}
+              >
+                {editingNav ? 'Done' : 'Edit nav'}
+              </button>
+            </div>
+          ) : null}
           {visibleNav.map((item) => {
             const active =
               item.href === '/app'
                 ? pathname === '/app' || pathname === '/app/'
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const dragging = dragHref === item.href;
+            if (editingNav) {
+              return (
+                <div
+                  key={item.href}
+                  className={
+                    dragging
+                      ? `${styles.navRow} ${styles.navRowDragging}`
+                      : styles.navRow
+                  }
+                  draggable
+                  onDragStart={(e) => onNavDragStart(item.href, e)}
+                  onDragOver={(e) => onNavDragOver(item.href, e)}
+                  onDrop={(e) => onNavDrop(item.href, e)}
+                  onDragEnd={onNavDragEnd}
+                >
+                  <span className={styles.navHandle} aria-hidden title="Drag to reorder">
+                    <IconDragHandle />
+                  </span>
+                  <span
+                    className={
+                      active ? `${styles.navLink} ${styles.navActive}` : styles.navLink
+                    }
+                  >
+                    <span className={styles.navIcon}>{item.icon}</span>
+                    <span className={styles.navLabel}>{item.label}</span>
+                  </span>
+                </div>
+              );
+            }
             return (
               <Link
                 key={item.href}

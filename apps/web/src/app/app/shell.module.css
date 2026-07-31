@@ -238,6 +238,86 @@
   color: #fff;
 }
 
+.navEditBar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.2rem;
+  flex-shrink: 0;
+}
+
+.navEditBtn {
+  appearance: none;
+  border: 1px solid var(--dash-line);
+  background: transparent;
+  color: var(--dash-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.navEditBtn:hover,
+.navEditBtn[aria-pressed='true'] {
+  color: #fff;
+  border-color: var(--dash-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.navEditing {
+  gap: 0.18rem;
+}
+
+.navRow {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  border-radius: 10px;
+  cursor: grab;
+  user-select: none;
+}
+
+.navRow:active {
+  cursor: grabbing;
+}
+
+.navRowDragging {
+  opacity: 0.55;
+  outline: 1px dashed rgba(139, 92, 246, 0.55);
+  outline-offset: -1px;
+}
+
+.navHandle {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  flex-shrink: 0;
+  color: var(--dash-muted);
+  opacity: 0.7;
+}
+
+.navHandle svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.navRow .navLink {
+  flex: 1;
+  min-width: 0;
+  pointer-events: none;
+  padding-left: 0.45rem;
+}
+
 .navIcon {
   width: 20px;
   height: 20px;
