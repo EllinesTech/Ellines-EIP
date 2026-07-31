@@ -5,8 +5,8 @@ import {
   requireAuth,
   requireOrgAdmin,
   type Env,
-} from '../../shared/auth';
-import { toInstallationDto, type InstallConfig } from '../../shared/connectors';
+} from '../../../shared/auth';
+import { toInstallationDto, type InstallConfig } from '../../../shared/connectors';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
