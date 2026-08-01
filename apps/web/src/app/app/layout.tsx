@@ -168,11 +168,35 @@ function IconDragHandle() {
   );
 }
 
+function IconFleet() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M3 16h13V8H3z" />
+      <path d="M16 10h3l2 3v3h-5v-6z" />
+      <circle cx="7" cy="17.5" r="1.5" />
+      <circle cx="17" cy="17.5" r="1.5" />
+    </svg>
+  );
+}
+
+function IconPeople() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 19c1.2-2.8 3.2-4.2 6-4.2S16.8 16.2 18 19" />
+      <circle cx="17" cy="9" r="2.2" />
+      <path d="M19.5 19c.7-1.6 1.5-2.6 2.5-3.2" />
+    </svg>
+  );
+}
+
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
   { href: '/app/notifications', label: 'Notifications', icon: <IconNotifications /> },
   { href: '/app/approvals', label: 'Approvals', icon: <IconApprovals /> },
+  { href: '/app/fleet', label: 'Fleet', icon: <IconFleet /> },
+  { href: '/app/people', label: 'People', icon: <IconPeople /> },
   { href: '/app/rules', label: 'Rules', icon: <IconRules />, adminOnly: true },
   { href: '/app/reports', label: 'Reports', icon: <IconReports />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
@@ -401,6 +425,10 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Scheduled Reports'
                 : pathname.startsWith('/app/notify-policy')
                   ? 'Delivery policy'
+                : pathname.startsWith('/app/fleet')
+                  ? 'Fleet'
+                : pathname.startsWith('/app/people')
+                  ? 'People'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')
@@ -418,10 +446,16 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const phoneNav = [
     { href: '/app', label: 'Home', icon: <IconOverview />, match: (p: string) => p === '/app' || p === '/app/' },
     {
-      href: '/app/timeline',
-      label: 'Timeline',
-      icon: <IconTimeline />,
-      match: (p: string) => p.startsWith('/app/timeline'),
+      href: '/app/fleet',
+      label: 'Fleet',
+      icon: <IconFleet />,
+      match: (p: string) => p.startsWith('/app/fleet'),
+    },
+    {
+      href: '/app/people',
+      label: 'People',
+      icon: <IconPeople />,
+      match: (p: string) => p.startsWith('/app/people'),
     },
     {
       href: '/app/notifications',
@@ -429,16 +463,6 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       icon: <IconNotifications />,
       match: (p: string) => p.startsWith('/app/notifications'),
     },
-    ...(uiPrefs.showApprovalsNav
-      ? [
-          {
-            href: '/app/approvals',
-            label: 'Approvals',
-            icon: <IconApprovals />,
-            match: (p: string) => p.startsWith('/app/approvals'),
-          },
-        ]
-      : []),
     {
       href: '/app/settings',
       label: 'More',

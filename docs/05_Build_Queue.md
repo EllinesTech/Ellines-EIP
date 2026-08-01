@@ -36,7 +36,7 @@ while queue has next/in_progress and not blocked:
 | **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
 | **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
-| **7 — Mobile Work Companion** | 7.1–7.2 `done`; 7.3–7.8 `todo` | PWA phone shell shipped; fleet/people/native remain v1.1+ |
+| **7 — Mobile Work Companion** | 7.1–7.4 `done`; 7.5–7.8 `todo`/`next` | PWA + fleet/people UEM stubs; reports/Ellinea mobile next |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
@@ -45,10 +45,11 @@ while queue has next/in_progress and not blocked:
 2. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
 3. **Done —** Mobile Work Companion **vision brief** ([13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md)).
 4. **Done —** Responsive phone shell / PWA stub (7.2): installable manifest, viewport, bottom nav, Ask float prefs.
-5. **Next —** Phase 7.3 Fleet / company car tracking (connector-backed; v1.1 when GPS/SoR ready) — or continue polish if blocked on connectors.
-6. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly.
+5. **Done —** Fleet + People companion stubs (7.3–7.4): UEM-backed lists with empty-state degrade (no invented GPS/HR).
+6. **Next —** 7.5 Pull live data + summary reports on phone (reuse Overview KPIs + `/app/reports` previews).
+7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly.
 
-**Critical path:** Keep landing queue items. Do not stop with “no next” while Phase 7.3+ remain `todo` unless each is honestly `blocked` (missing secrets / external SoR). Prefer thin web stubs over abandoning the mobile roadmap.
+**Critical path:** Keep landing queue items. Do not stop with “no next” while Phase 7.5+ remain `todo` unless each is honestly `blocked` (missing secrets / external SoR). Prefer thin web stubs over abandoning the mobile roadmap.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -221,9 +222,9 @@ Simplified **phone companion** so Owner and permitted employees can track day-to
 |----|------|--------|-------|
 | 7.1 | Mobile Work Companion vision | `done` | [13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md) |
 | 7.2 | Responsive phone shell / PWA stub | `done` | `manifest.webmanifest`, viewport/theme, phone bottom nav, Ask float prefs; installable web |
-| 7.3 | Fleet / company car tracking | `next` | Via connectors / GPS later — surface status + Ellinea alerts (blocked on connector until SoR/GPS) |
-| 7.4 | Employee register (people directory) | `todo` | Read from SoR / UEM people; Owner-scoped actions |
-| 7.5 | Pull live data + summary reports | `todo` | Sync-backed KPIs and scheduled report previews on phone |
+| 7.3 | Fleet / company car tracking | `done` | `/app/fleet` — UEM `asset` (+ name hints); empty-state until GPS/SoR; Ellinea link |
+| 7.4 | Employee register (people directory) | `done` | `/app/people` — UEM person/user read-only; Owner actions stay on Org Admin |
+| 7.5 | Pull live data + summary reports | `next` | Sync-backed KPIs and scheduled report previews on phone |
 | 7.6 | Ellinea suggestions on mobile | `todo` | Ask Ellinea + recommendations everywhere (float + bottom Ask) |
 | 7.7 | Work email summarization | `todo` | Build on email connector; Ellinea summarize for work inbox |
 | 7.8 | Access: Owner + permitted employees | `todo` | Same role model; hide-Ask-from-work-users pref shipped; no SoR bypass |
@@ -232,7 +233,8 @@ Do **not** implement full native iOS/Android in Foundation runs. Ship installabl
 
 ## Recently landed on main (through 2026-08-01)
 
-- **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Timeline / Alerts / Approvals / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
+- **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Fleet / People / Alerts / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
+- **Fleet + People stubs (7.3–7.4):** `/app/fleet` and `/app/people` read UEM assets/people with honest empty states (no invented GPS/HR).
 - **Ellinea contract auth stub:** Nest `EllineaAuthStubGuard` (open by default; `ELLINEA_REQUIRE_AUTH=1` requires Bearer); docs/11 aligned with Nest + SDK `getAccessToken`.
 - **Ellinea Console nav fix:** Owner/IT side nav → `/app/ellinea-console` (not Ask); Ask title stays “Ask Ellinea”; saved `/app/ellinea` nav slots remap to console.
 - **TS hygiene (~89 PagesFunction noise):** exclude `functions/` from Next `tsconfig`; add `functions/tsconfig.json` + ambient `cloudflare:sockets`; fix UEM/autofit/layout/notifications page exports.
@@ -252,7 +254,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Ship installabl
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Foundation web complete. Phase **7.2 PWA shell done**; **7.3 Fleet is `next`** (thin stub when possible; full GPS/SoR `blocked` until connector). Human secrets: live SMTP/push + `FLY_API_TOKEN`.
+**v1.0 status:** Foundation web complete. Phase **7.2–7.4 done**; **7.5 reports-on-phone is `next`**. Human secrets: live SMTP/push + `FLY_API_TOKEN`.
 ---
 
 ## Agent run protocol
