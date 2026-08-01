@@ -245,7 +245,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | E.6 | Public org SSO provider fetch endpoint | `done` | GET /api/v1/orgs/{slug}/sso-providers for login page |
 | E.7 | Build verification | `done` | All TypeScript builds pass; 73 Pages Functions verified |
 | E.8 | Settings UI: SSO provider configuration | `done` | OAuth2/SAML forms, provider list, test/delete, help text |
-| E.9 | Testing: Real Azure AD + Okta | `blocked` | Human: requires real IdP test tenants (out of agent scope) |
+| E.9 | Testing: Mock IdP + real Azure AD / Okta | `in_progress` | Mock IdP server for local testing (OAuth2 + SAML2 flows); real IdP testing next |
 | E.10 | Documentation: User guide + API spec | `next` | Deployment runbook for SSO setup |
 
 ---
@@ -299,7 +299,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–4 (supreme upgrades + security hardening). **Track E (OAuth2/SAML SSO)**: 80% complete — backend APIs + frontend Settings UI deployed; blocked on real IdP testing. All major features shipped, tested, and deployed to production. Remaining v1.1 human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN` + IdP test tenants for SSO. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue: Track E near-complete (E.9 blocked on external IdP); ready to start Track D (Advanced RBAC) or other parallel tracks.
+**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–4 (supreme upgrades + security hardening). **Track E (OAuth2/SAML SSO)**: 90% complete — backend APIs + frontend Settings UI + Mock IdP for local testing deployed; E.9 now in_progress (can test locally without external IdPs; real IdP testing next). All major features shipped, tested, and deployed to production. Remaining v1.1 human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue: Track E near-complete (E.9 testing, E.10 docs); ready to start Track D (Advanced RBAC) or other parallel tracks.
 ---
 
 ## Agent run protocol
