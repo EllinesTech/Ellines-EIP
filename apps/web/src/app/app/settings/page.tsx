@@ -8,13 +8,19 @@ import {
 } from '@ellines-eip/shared';
 import {
   cacheOrgDateTimeSettings,
+  changePassword,
   fetchOrgDateTimeSettings,
   fetchOrgProfile,
+  fetchWebhookSecret,
   getSession,
+  listOrgAuditLogs,
+  rotateWebhookSecret,
   setSession,
   updateOrgDateTimeSettings,
   updateOrgProfile,
+  type AuditLogDto,
   type OrgDateTimeSettingsDto,
+  type WebhookSecretDto,
 } from '@/lib/api';
 import {
   DEFAULT_UI_PREFS,
@@ -80,6 +86,17 @@ export default function SystemSettingsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  // Security section state
+  const [secBusy, setSecBusy] = useState(false);
+  const [secError, setSecError] = useState('');
+  const [secNotice, setSecNotice] = useState('');
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [webhook, setWebhook] = useState<WebhookSecretDto | null>(null);
+  const [webhookBusy, setWebhookBusy] = useState(false);
+  const [recentAudit, setRecentAudit] = useState<AuditLogDto[]>([]);
+
   useEffect(() => {
     const s = getSession();
     if (!s) return;
@@ -107,6 +124,9 @@ export default function SystemSettingsPage() {
       .catch(() => {
         /* keep session values */
       });
+    // Security section: load webhook + recent audit
+    fetchWebhookSecret().then(setWebhook).catch(() => {/* ignore */});
+    listOrgAuditLogs(8).then(setRecentAudit).catch(() => {/* ignore */});
   }, []);
 
   useEffect(() => {
@@ -748,6 +768,171 @@ export default function SystemSettingsPage() {
               Connectors →
             </Link>
           ) : null}
+        </div>
+      </section>
+
+      {/* Security section */}
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>Account security</p>
+          <h2 className={settingsStyles.cardTitle}>Password &amp; security</h2>
+          <p className={settingsStyles.cardHint}>
+            Change your password. If you're a demo account, create a unique password before
+            sharing access.
+          </p>
+        </div>
+        {secError ? <p className={adminStyles.error}>{secError}</p> : null}
+        {secNotice ? <p className={adminStyles.notice}>{secNotice}</p> : null}
+        <form
+          className={settingsStyles.form}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (newPw !== confirmPw) { setSecError('New passwords do not match'); return; }
+            if (newPw.length < 8) { setSecError('Password must be at least 8 characters'); return; }
+            setSecBusy(true); setSecError(''); setSecNotice('');
+            try {
+              await changePassword({ currentPassword: currentPw, newPassword: newPw });
+              setSecNotice('Password changed successfully.');
+              setCurrentPw(''); setNewPw(''); setConfirmPw('');
+            } catch (err) {
+              setSecError(err instanceof Error ? err.message : 'Password change failed');
+            } finally { setSecBusy(false); }
+          }}
+        >
+          <label>
+            Current password
+            <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} required autoComplete="current-password" />
+          </label>
+          <label>
+            New password
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={8} autoComplete="new-password" />
+          </label>
+          <label>
+            Confirm new password
+            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} required autoComplete="new-password" />
+          </label>
+          <div className={settingsStyles.actions}>
+            <button type="submit" className={adminStyles.primary} disabled={secBusy}>
+              {secBusy ? 'Changing…' : 'Change password'}
+            </button>
+          </div>
+        </form>
+
+        {/* Recent login activity */}
+        {recentAudit.length > 0 ? (
+          <div style={{ marginTop: '1.25rem' }}>
+            <div className={settingsStyles.fieldLabel} style={{ marginBottom: '0.5rem' }}>Recent account activity</div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {recentAudit.map((log) => (
+                <li key={log.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', fontSize: '0.8rem' }}>
+                  <span style={{
+                    padding: '0.1rem 0.4rem', borderRadius: 99, fontSize: '0.65rem', fontWeight: 700,
+                    background: log.action.startsWith('auth') ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.06)',
+                    color: log.action.startsWith('auth') ? '#93c5fd' : 'var(--c-muted)',
+                    border: `1px solid ${log.action.startsWith('auth') ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                    flexShrink: 0,
+                  }}>{log.action}</span>
+                  <span style={{ color: 'var(--c-muted)', fontSize: '0.72rem' }}>
+                    {new Date(log.createdAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/app/audit" className={styles.primaryLink} style={{ fontSize: '0.78rem', display: 'inline-block', marginTop: '0.5rem' }}>
+              Full audit log →
+            </Link>
+          </div>
+        ) : null}
+      </section>
+
+      {/* Webhook & API section — Owner/IT only */}
+      {orgAdmin ? (
+        <section className={settingsStyles.card}>
+          <div className={settingsStyles.cardHead}>
+            <p className={settingsStyles.cardEyebrow}>Integration</p>
+            <h2 className={settingsStyles.cardTitle}>Webhooks &amp; API access</h2>
+            <p className={settingsStyles.cardHint}>
+              Webhook endpoint for System B to push enterprise events directly into EIP. Rotate the
+              secret if it is compromised. The full secret is shown only once after rotation.
+            </p>
+          </div>
+
+          {webhook ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                <div>
+                  <div className={settingsStyles.fieldLabel}>Endpoint</div>
+                  <code style={{ background: 'rgba(255,255,255,0.06)', padding: '0.25rem 0.5rem', borderRadius: 5, fontSize: '0.8rem', userSelect: 'all' }}>
+                    {webhook.endpoint}
+                  </code>
+                </div>
+                <div>
+                  <div className={settingsStyles.fieldLabel}>Secret</div>
+                  <code style={{ background: 'rgba(255,255,255,0.06)', padding: '0.25rem 0.5rem', borderRadius: 5, fontSize: '0.8rem', userSelect: 'all' }}>
+                    {webhook.secret || webhook.secretPreview || (webhook.configured ? '••••••••' : 'Not configured')}
+                  </code>
+                </div>
+                <div>
+                  <div className={settingsStyles.fieldLabel}>Status</div>
+                  <span style={{
+                    padding: '0.1rem 0.45rem', borderRadius: 99, fontSize: '0.7rem', fontWeight: 600,
+                    background: webhook.configured ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)',
+                    color: webhook.configured ? '#6ee7b7' : '#94a3b8',
+                    border: `1px solid ${webhook.configured ? 'rgba(16,185,129,0.3)' : 'rgba(100,116,139,0.3)'}`,
+                  }}>
+                    {webhook.configured ? 'Configured' : 'Not configured'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={adminStyles.primary}
+                  disabled={webhookBusy}
+                  onClick={async () => {
+                    if (!confirm('Rotate webhook secret? The old secret will stop working immediately.')) return;
+                    setWebhookBusy(true);
+                    try {
+                      const updated = await rotateWebhookSecret();
+                      setWebhook(updated);
+                      setSecNotice('Webhook secret rotated. Save the new secret — it is shown only once.');
+                    } catch (err) {
+                      setSecError(err instanceof Error ? err.message : 'Rotation failed');
+                    } finally { setWebhookBusy(false); }
+                  }}
+                >
+                  {webhookBusy ? 'Rotating…' : 'Rotate secret'}
+                </button>
+                <Link href="/app/connectors" className={styles.ghostBtn} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  Connectors →
+                </Link>
+              </div>
+              {webhook.headers ? (
+                <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)' }}>
+                  Required header: <code>X-EIP-Webhook-Secret: {'{your-secret}'}</code>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className={styles.lede}>Loading webhook config…</p>
+          )}
+        </section>
+      ) : null}
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>Account</p>
+          <h2 className={settingsStyles.cardTitle}>Related</h2>
+          <p className={settingsStyles.cardHint}>
+            Profile and admin tools live on their own screens.
+          </p>
+        </div>
+        <div className={settingsStyles.linkRow}>
+          <Link href="/app/profile" className={styles.primaryLink}>Edit profile →</Link>
+          <Link href="/app/documents" className={styles.primaryLink}>Document Hub →</Link>
+          {orgAdmin ? <Link href="/app/admin" className={styles.primaryLink}>Org Admin →</Link> : null}
+          {orgAdmin ? <Link href="/app/connectors" className={styles.primaryLink}>Connectors →</Link> : null}
+          {orgAdmin ? <Link href="/app/audit" className={styles.primaryLink}>Audit Center →</Link> : null}
         </div>
       </section>
     </div>

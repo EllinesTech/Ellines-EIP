@@ -7,12 +7,14 @@ import {
   createPlatformConnectorPack,
   FeatureFlag,
   fetchPlatformOrgDateTimeSettings,
+  fetchPlatformOrgStats,
   getSession,
   listInstallations,
   listPlatformConnectorPacks,
   listPlatformFlags,
   listPlatformOrgs,
   PlatformOrg,
+  PlatformOrgStatsDto,
   updatePlatformOrgDateTimeSettings,
   updatePlatformOrgStatus,
   type ConnectorInstallationDto,
@@ -44,6 +46,9 @@ export default function PlatformAdminPage() {
   const [timeFormat, setTimeFormat] = useState<OrgDateTimeSettingsDto['timeFormat']>('12h');
   const [dateStyle, setDateStyle] = useState<OrgDateTimeSettingsDto['dateStyle']>('short');
   const [settingsBusy, setSettingsBusy] = useState(false);
+  const [selectedOrgId, setSelectedOrgId] = useState('');
+  const [orgStats, setOrgStats] = useState<PlatformOrgStatsDto | null>(null);
+  const [statsBusy, setStatsBusy] = useState(false);
 
   useEffect(() => {
     const s = getSession();
@@ -157,6 +162,20 @@ export default function PlatformAdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to update organization status');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function loadOrgStats(orgId: string) {
+    if (!orgId) return;
+    setStatsBusy(true);
+    setOrgStats(null);
+    try {
+      const stats = await fetchPlatformOrgStats(orgId);
+      setOrgStats(stats);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load org stats');
+    } finally {
+      setStatsBusy(false);
     }
   }
 
@@ -412,6 +431,68 @@ export default function PlatformAdminPage() {
         )}
       </section>
 
+      {/* Per-org detailed stats */}
+      <section className={adminStyles.tableWrap}>
+        <div className={styles.panelLabel}>Tenant deep stats</div>
+        <p className={styles.lede}>Select an org to view usage: users, connectors, approvals, last activity.</p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <select
+            value={selectedOrgId}
+            onChange={(e) => { setSelectedOrgId(e.target.value); setOrgStats(null); }}
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit', padding: '0.4rem 0.7rem', fontSize: '0.85rem', minWidth: 200 }}
+          >
+            <option value="">— Select org —</option>
+            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.status})</option>)}
+          </select>
+          <button
+            type="button"
+            className={adminStyles.primary}
+            disabled={!selectedOrgId || statsBusy}
+            onClick={() => void loadOrgStats(selectedOrgId)}
+          >
+            {statsBusy ? 'Loading…' : 'Load stats'}
+          </button>
+        </div>
+
+        {orgStats ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.65rem', marginBottom: '0.75rem' }}>
+            {[
+              { label: 'Total users', value: orgStats.stats.totalUsers },
+              { label: 'Active users', value: orgStats.stats.activeUsers },
+              { label: 'Connectors', value: orgStats.stats.totalConnectors },
+              { label: 'Synced connectors', value: orgStats.stats.syncedConnectors },
+              { label: 'Total approvals', value: orgStats.stats.totalApprovals },
+              { label: 'Pending approvals', value: orgStats.stats.pendingApprovals },
+              { label: 'Events logged', value: orgStats.stats.totalEvents },
+            ].map((stat) => (
+              <div key={stat.label} className={styles.kpi} style={{ margin: 0 }}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
+            <div className={styles.kpi} style={{ margin: 0 }}>
+              <span>Last activity</span>
+              <strong style={{ fontSize: '0.78rem' }}>{orgStats.lastActivityAt ? new Date(orgStats.lastActivityAt).toLocaleDateString() : '—'}</strong>
+            </div>
+            <div className={styles.kpi} style={{ margin: 0 }}>
+              <span>Last sync</span>
+              <strong style={{ fontSize: '0.78rem' }}>{orgStats.lastSyncedAt ? new Date(orgStats.lastSyncedAt).toLocaleDateString() : '—'}</strong>
+            </div>
+          </div>
+        ) : null}
+
+        {orgStats?.stats.roleBreakdown && Object.keys(orgStats.stats.roleBreakdown).length > 0 ? (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--c-muted)', alignSelf: 'center' }}>Roles:</span>
+            {Object.entries(orgStats.stats.roleBreakdown).map(([role, count]) => (
+              <span key={role} style={{ padding: '0.15rem 0.5rem', borderRadius: 99, fontSize: '0.72rem', background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.3)' }}>
+                {role}: {count}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       <section className={adminStyles.tableWrap}>
         <div className={styles.panelLabel}>Tenants</div>
         <p className={styles.lede}>
@@ -435,12 +516,24 @@ export default function PlatformAdminPage() {
             <tbody>
               {orgs.map((o) => (
                 <tr key={o.id}>
-                  <td>{o.name}</td>
+                  <td>
+                    <div>{o.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)' }}>{o.slug}</div>
+                  </td>
                   <td>{o.slug}</td>
                   <td>{o.userCount}</td>
-                  <td>{o.status === 'suspended' ? 'Suspended' : 'Active'}</td>
-                  <td>{new Date(o.createdAt).toLocaleDateString()}</td>
                   <td>
+                    <span style={{
+                      padding: '0.1rem 0.45rem', borderRadius: 99, fontSize: '0.7rem', fontWeight: 600,
+                      background: o.status === 'suspended' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
+                      color: o.status === 'suspended' ? '#fca5a5' : '#6ee7b7',
+                      border: `1px solid ${o.status === 'suspended' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                    }}>
+                      {o.status === 'suspended' ? 'Suspended' : 'Active'}
+                    </span>
+                  </td>
+                  <td>{new Date(o.createdAt).toLocaleDateString()}</td>
+                  <td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className={adminStyles.ghost}
@@ -448,6 +541,13 @@ export default function PlatformAdminPage() {
                       onClick={() => void onToggleOrgStatus(o)}
                     >
                       {o.status === 'suspended' ? 'Resume' : 'Suspend'}
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      onClick={() => { setSelectedOrgId(o.id); void loadOrgStats(o.id); }}
+                    >
+                      Stats
                     </button>
                   </td>
                 </tr>

@@ -48,6 +48,8 @@ while queue has next/in_progress and not blocked:
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | 7.1–7.8 `done` | Web PWA companion complete; native apps remain future |
 | **v1.1 — Multi-company** | `done` | OrganizationMembership + parentOrgId; my-orgs, switch, create-child APIs; OrgSwitcher UI; child-org in Admin |
+| **Sprint 1 — Supreme upgrade** | `done` | Document Hub, real People+Fleet+Search+Inbox, invite email, approval email, report email, live notification badge |
+| **Sprint 2 — Supreme upgrade** | `done` | Approval detail modal, combined Timeline, Platform per-org stats, Settings security+webhook sections |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)

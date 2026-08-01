@@ -1095,3 +1095,28 @@ export function runReportFullApi(id: string) {
     body: '{}',
   });
 }
+
+// ─── Platform per-org stats ──────────────────────────────────────────────────
+
+export type PlatformOrgStatsDto = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  lastActivityAt: string | null;
+  lastSyncedAt: string | null;
+  stats: {
+    totalUsers: number;
+    activeUsers: number;
+    roleBreakdown: Record<string, number>;
+    totalConnectors: number;
+    syncedConnectors: number;
+    totalApprovals: number;
+    pendingApprovals: number;
+    totalEvents: number;
+  };
+};
+
+export function fetchPlatformOrgStats(orgId: string) {
+  return request<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
+}
