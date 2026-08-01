@@ -44,7 +44,7 @@ while queue has next/in_progress and not blocked:
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~99% | Owner/IT path solid; Organization System capability catalog |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
-| **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
+| **5 — Workflow & Automation** | ~100% | Approvals, rules, reports, event bus — all server-persisted (Pages Functions + Prisma/Nest); localStorage fallback |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | 7.1–7.8 `done` | Web PWA companion complete; native apps remain future |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
@@ -178,11 +178,11 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 5.1 | Approval Workflows | `done` | Local queue + multi-step templates |
+| 5.1 | Approval Workflows | `done` | Multi-step templates; server-persisted via Pages Functions + Nest identity; localStorage fallback |
 | 5.1a | Multi-step approval templates | `done` | IT→Owner, Manager→Exec→Owner, single |
-| 5.2 | Business Rules Engine | `done` | `/app/rules` + Overview flag hits (local) |
-| 5.3 | Scheduled Reports | `done` | `/app/reports` local schedules + preview |
-| 5.4 | Event Bus | `done` | Browser event bus + log |
+| 5.2 | Business Rules Engine | `done` | `/app/rules` server-persisted; Pages Function + Nest; localStorage fallback |
+| 5.3 | Scheduled Reports | `done` | `/app/reports` server-persisted; Pages Function + Nest; run-now; localStorage fallback |
+| 5.4 | Event Bus | `done` | Server-drained via POST /api/v1/orgs/me/events; localStorage + CustomEvent mirror for instant UI |
 | 4.4a | Server Enterprise Memory | `done` | Persist policies/decisions per org |
 | 4.10 | LLM / RAG | `done` | Grounded provider path |
 | 3.x | Other-role Overview polish | `done` | Exec/manager/member CTAs + empty state |
@@ -247,6 +247,8 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
+- **Phase 5 server-side workflow:** Prisma models (`ApprovalRequest`, `ApprovalStep`, `BusinessRule`, `ScheduledReport`, `EnterpriseEvent`) added to schema + `db:push` synced. NestJS `WorkflowModule` (controller + service + DTOs) in `services/identity` — REST endpoints for approvals, rules, reports, events under `/api/v1/orgs/me/`. Matching Cloudflare Pages Functions for same-origin static site (approvals GET/POST, decide, rules CRUD, reports CRUD + run, events GET/POST). Frontend pages (Approvals, Rules, Reports) call server first with localStorage fallback. Event bus drains to server on every publish. Phase 5 now 100%.
+
 - **Auto-scan generic SoR fix:** Exact URL IT enters is primary (any path); REST/OpenAPI wizard prefill from app base; Hospidia/HIS/ERP/CRM are optional keyword bonuses only; DB ports opt-in collapsed hints; scan ≠ connect UX + troubleshooting.
 - **Organization System deepen:** Live UEM pages for branches, departments, tasks, assets, documents, alerts digest, finance glance; appointments/inventory as objects when kinds exist (attendance stays stub); companion deep links (Glance/People/Fleet/Inbox); Settings toggle **Allow work roles to open Organization System** (default off) + `canAccessOrgSystem` route/nav guard; empty/sync CTAs → Connectors + Auto-scan; product EIP-above-SoR + Ellinea reminder on hub.
 - **Organization System capability catalog:** Data-driven domains (Intelligence → Connectors) in `org-system-catalog.ts`; hub badges live / no data yet / sync to unlock from `model.counts`, objects, timeline, openAlerts/openDecisions; Ellinea brief + recommendations pages; dynamic `/app/org-system/[capability]`.
@@ -273,7 +275,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Foundation web + Phase 7 web companion (7.1–7.8) + Organization System capability catalog (work-role authorize toggle) complete. No queued `next` / `in_progress` / implementable `todo`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
+**v1.0 status:** Foundation web + Phase 5 server-side workflow (approvals/rules/reports/events fully persisted) + Phase 7 web companion (7.1–7.8) + Organization System capability catalog complete. No queued `next` / `in_progress` / implementable `todo`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
 ---
 
 ## Agent run protocol

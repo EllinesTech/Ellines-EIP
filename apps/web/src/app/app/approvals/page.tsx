@@ -14,12 +14,45 @@ import {
   type ApprovalRequest,
   type ApprovalTemplateId,
 } from '@/lib/approvals';
-import { fetchEnterpriseSummary, getSession, deliverNotification } from '@/lib/api';
+import {
+  fetchEnterpriseSummary,
+  getSession,
+  deliverNotification,
+  listApprovals,
+  createApprovalApi,
+  decideApprovalApi,
+  type ApprovalRequestDto,
+} from '@/lib/api';
 import { publishEnterpriseEvent } from '@/lib/event-bus';
 import { readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import localStyles from './approvals.module.css';
+
+/** Bridge API DTO to local ApprovalRequest shape. */
+function fromDto(dto: ApprovalRequestDto): ApprovalRequest {
+  return {
+    id: dto.id,
+    title: dto.title,
+    detail: dto.detail,
+    requester: dto.requester,
+    status: dto.status as ApprovalRequest['status'],
+    createdAt: dto.createdAt,
+    decidedAt: dto.decidedAt ?? undefined,
+    decidedBy: dto.decidedBy ?? undefined,
+    source: (dto.source as ApprovalRequest['source']) || 'manual',
+    templateId: (dto.templateId as ApprovalTemplateId) || 'simple',
+    currentStepIndex: dto.currentStepIndex,
+    steps: dto.steps.map((s) => ({
+      key: s.key as ApprovalRequest['steps'][0]['key'],
+      label: s.label,
+      status: s.status as ApprovalRequest['steps'][0]['status'],
+      actorRole: s.actorRole,
+      decidedBy: s.decidedBy ?? undefined,
+      decidedAt: s.decidedAt ?? undefined,
+    })),
+  };
+}
 
 export default function ApprovalsPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -31,6 +64,7 @@ export default function ApprovalsPage() {
   const [detail, setDetail] = useState('');
   const [templateId, setTemplateId] = useState<ApprovalTemplateId>('it_then_owner');
   const [busy, setBusy] = useState(false);
+  const [serverSync, setServerSync] = useState(false);
 
   useEffect(() => {
     const session = getSession();
@@ -41,27 +75,76 @@ export default function ApprovalsPage() {
     setRole(session.user.role);
     setActorName(session.user.fullName);
 
-    let list = readApprovals(session.organization.id);
-    fetchEnterpriseSummary()
-      .then((summary) => {
-        if (ui.approvalsSeedFromDecisions) {
-          list = seedApprovalsFromSummary(session.organization.id, summary, list);
-          writeApprovals(session.organization.id, list);
-        }
-        setItems(list);
+    // Try server first, fall back to localStorage
+    listApprovals()
+      .then((dtos) => {
+        const serverItems = dtos.map(fromDto);
+        setItems(serverItems);
+        setServerSync(true);
+        // Sync server state into localStorage as cache
+        writeApprovals(session.organization.id, serverItems);
       })
-      .catch(() => setItems(list));
+      .catch(() => {
+        // Offline / no Supabase — use localStorage
+        let list = readApprovals(session.organization.id);
+        fetchEnterpriseSummary()
+          .then((summary) => {
+            if (ui.approvalsSeedFromDecisions) {
+              list = seedApprovalsFromSummary(session.organization.id, summary, list);
+              writeApprovals(session.organization.id, list);
+            }
+            setItems(list);
+          })
+          .catch(() => setItems(list));
+      });
   }, []);
 
   function persist(next: ApprovalRequest[]) {
     if (!orgId) return;
     setItems(next);
-    writeApprovals(orgId, next);
+    if (!serverSync) writeApprovals(orgId, next);
   }
 
   function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+
+    if (serverSync) {
+      setBusy(true);
+      createApprovalApi({
+        title: title.trim(),
+        detail: detail.trim() || 'Manual approval request',
+        templateId,
+        source: 'manual',
+      })
+        .then((dto) => {
+          const newItem = fromDto(dto);
+          setItems((prev) => [newItem, ...prev]);
+          publishEnterpriseEvent('approval.created', {
+            approvalId: newItem.id,
+            title: newItem.title,
+            templateId: newItem.templateId,
+          });
+          setTitle('');
+          setDetail('');
+        })
+        .catch(() => {
+          // Fall back to local
+          const newItem = createApprovalRequest({
+            title: title.trim(),
+            detail: detail.trim() || 'Manual approval request',
+            requester: actorName || 'You',
+            templateId,
+            source: 'manual',
+          });
+          persist([newItem, ...items]);
+          setTitle('');
+          setDetail('');
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+
     const next = createApprovalRequest({
       title: title.trim(),
       detail: detail.trim() || 'Manual approval request',
@@ -81,6 +164,35 @@ export default function ApprovalsPage() {
 
   function decide(id: string, status: 'approved' | 'rejected') {
     setBusy(true);
+
+    if (serverSync) {
+      decideApprovalApi(id, { decision: status, actorName: actorName || role })
+        .then((dto) => {
+          const updated = fromDto(dto);
+          setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+          publishEnterpriseEvent(`approval.${status}`, {
+            approvalId: id,
+            title: updated.title,
+            overall: updated.status,
+          });
+          void deliverNotification({
+            channel: 'email',
+            subject: `Approval ${status}: ${updated.title}`,
+            body: `${updated.title} is now ${updated.status}.`,
+            eventType: `approval.${status}`,
+          }).catch(() => undefined);
+        })
+        .catch(() => {
+          // Fall back to local decision
+          const next = items.map((item) =>
+            item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
+          );
+          persist(next);
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+
     const next = items.map((item) =>
       item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
     );
@@ -90,14 +202,12 @@ export default function ApprovalsPage() {
       publishEnterpriseEvent(`approval.${status}`, {
         approvalId: id,
         title: updated.title,
-        templateId: updated.templateId,
-        step: updated.currentStepIndex,
         overall: updated.status,
       });
       void deliverNotification({
         channel: 'email',
         subject: `Approval ${status}: ${updated.title}`,
-        body: `${updated.title} is now ${updated.status} (step ${updated.currentStepIndex + 1}).`,
+        body: `${updated.title} is now ${updated.status}.`,
         eventType: `approval.${status}`,
       }).catch(() => undefined);
     }
@@ -118,6 +228,7 @@ export default function ApprovalsPage() {
             {prefs?.approvalsSeedFromDecisions
               ? '. Snapshot seeds use IT → Owner.'
               : '.'}
+            {serverSync ? ' · server-synced' : ' · local'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -167,7 +278,7 @@ export default function ApprovalsPage() {
           <p className={styles.lede} style={{ gridColumn: '1 / -1', margin: 0 }}>
             {APPROVAL_TEMPLATES.find((t) => t.id === templateId)?.description}
           </p>
-          <button type="submit" className={adminStyles.primary}>
+          <button type="submit" className={adminStyles.primary} disabled={busy}>
             Submit
           </button>
         </form>

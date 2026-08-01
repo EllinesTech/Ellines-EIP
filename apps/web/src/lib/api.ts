@@ -811,3 +811,156 @@ export function createPlatformConnectorPack(body: {
     body: JSON.stringify(body),
   });
 }
+
+// ─── Phase 5 — Workflow & Automation API ─────────────────────────────────────
+
+export type ApprovalStepDto = {
+  key: string;
+  label: string;
+  status: 'pending' | 'approved' | 'rejected';
+  actorRole: string;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+};
+
+export type ApprovalRequestDto = {
+  id: string;
+  title: string;
+  detail: string;
+  requester: string;
+  status: 'pending' | 'approved' | 'rejected';
+  templateId: string;
+  currentStepIndex: number;
+  source: string;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  createdAt: string;
+  steps: ApprovalStepDto[];
+};
+
+export function listApprovals() {
+  return request<ApprovalRequestDto[]>('/api/v1/orgs/me/approvals');
+}
+
+export function createApprovalApi(payload: {
+  title: string;
+  detail?: string;
+  templateId: string;
+  source?: string;
+}) {
+  return request<ApprovalRequestDto>('/api/v1/orgs/me/approvals', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function decideApprovalApi(
+  approvalId: string,
+  payload: { decision: 'approved' | 'rejected'; actorName?: string },
+) {
+  return request<ApprovalRequestDto>(`/api/v1/orgs/me/approvals/${approvalId}/decide`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type BusinessRuleDto = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  when: 'open_alerts_gte' | 'open_decisions_gte' | 'health_lt';
+  threshold: number;
+  then: 'seed_approval' | 'flag_overview';
+  createdAt: string;
+};
+
+export function listRules() {
+  return request<BusinessRuleDto[]>('/api/v1/orgs/me/rules');
+}
+
+export function createRuleApi(payload: {
+  name: string;
+  when: string;
+  threshold: number;
+  then: string;
+}) {
+  return request<BusinessRuleDto>('/api/v1/orgs/me/rules', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function toggleRuleApi(id: string, enabled: boolean) {
+  return request<BusinessRuleDto>(`/api/v1/orgs/me/rules/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function deleteRuleApi(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/orgs/me/rules/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export type ScheduledReportDto = {
+  id: string;
+  title: string;
+  cadence: 'daily' | 'weekly';
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunHint: string;
+  createdAt: string;
+};
+
+export function listReportsApi() {
+  return request<ScheduledReportDto[]>('/api/v1/orgs/me/reports');
+}
+
+export function createReportApi(payload: { title: string; cadence: 'daily' | 'weekly' }) {
+  return request<ScheduledReportDto>('/api/v1/orgs/me/reports', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function runReportApi(id: string) {
+  return request<ScheduledReportDto>(`/api/v1/orgs/me/reports/${id}/run`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export function toggleReportApi(id: string, enabled: boolean) {
+  return request<ScheduledReportDto>(`/api/v1/orgs/me/reports/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function deleteReportApi(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/orgs/me/reports/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export type EnterpriseEventDto = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  at: string;
+};
+
+export function listEnterpriseEvents(limit = 100) {
+  return request<EnterpriseEventDto[]>(`/api/v1/orgs/me/events?limit=${limit}`);
+}
+
+export function publishEnterpriseEventApi(payload: {
+  type: string;
+  payload?: Record<string, unknown>;
+}) {
+  return request<EnterpriseEventDto>('/api/v1/orgs/me/events', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

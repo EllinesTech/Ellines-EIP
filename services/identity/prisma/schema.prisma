@@ -33,6 +33,10 @@ model Organization {
   passwordResetTokens    PasswordResetToken[]
   enterpriseSnapshot     EnterpriseSnapshot?
   connectorInstallations ConnectorInstallation[]
+  approvalRequests       ApprovalRequest[]
+  businessRules          BusinessRule[]
+  scheduledReports       ScheduledReport[]
+  enterpriseEvents       EnterpriseEvent[]
 
   @@map("organizations")
 }
@@ -184,4 +188,98 @@ model ConnectorPack {
   installations ConnectorInstallation[]
 
   @@map("connector_packs")
+}
+
+// ─── Phase 5 — Workflow & Automation ────────────────────────────────────────
+
+/** Multi-step approval request (Phase 5.1). */
+model ApprovalRequest {
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  title             String
+  detail            String    @default("")
+  requester         String
+  status            String    @default("pending")   // pending | approved | rejected
+  templateId        String    @default("simple") @map("template_id")
+  currentStepIndex  Int       @default(0) @map("current_step_index")
+  source            String    @default("manual")    // manual | template | decision-seed
+  decidedAt         DateTime? @map("decided_at")
+  decidedBy         String?   @map("decided_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        ApprovalStep[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("approval_requests")
+}
+
+/** Individual step within an ApprovalRequest (Phase 5.1). */
+model ApprovalStep {
+  id                String    @id @default(cuid())
+  approvalRequestId String    @map("approval_request_id")
+  stepOrder         Int       @map("step_order")
+  key               String
+  label             String
+  status            String    @default("pending")   // pending | approved | rejected
+  actorRole         String    @map("actor_role")
+  decidedBy         String?   @map("decided_by")
+  decidedAt         DateTime? @map("decided_at")
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([approvalRequestId])
+  @@map("approval_steps")
+}
+
+/** If/then business rule on enterprise snapshot metrics (Phase 5.2). */
+model BusinessRule {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  enabled        Boolean  @default(true)
+  when           String                           // open_alerts_gte | open_decisions_gte | health_lt
+  threshold      Int
+  then           String                           // seed_approval | flag_overview
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("business_rules")
+}
+
+/** Scheduled report definition (Phase 5.3). */
+model ScheduledReport {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  title          String
+  cadence        String    @default("daily")      // daily | weekly
+  enabled        Boolean   @default(true)
+  lastRunAt      DateTime? @map("last_run_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("scheduled_reports")
+}
+
+/** Enterprise event bus log (Phase 5.4). */
+model EnterpriseEvent {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  type           String
+  payload        Json     @default("{}")
+  at             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([at])
+  @@map("enterprise_events")
 }

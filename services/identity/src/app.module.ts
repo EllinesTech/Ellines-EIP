@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { OrgsModule } from './orgs/orgs.module';
 import { PlatformModule } from './platform/platform.module';
 import { EnterpriseModule } from './enterprise/enterprise.module';
+import { WorkflowModule } from './workflow/workflow.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -23,6 +24,7 @@ import { HealthController } from './health.controller';
     OrgsModule,
     PlatformModule,
     EnterpriseModule,
+    WorkflowModule,
   ],
   controllers: [HealthController],
 })
