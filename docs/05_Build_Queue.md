@@ -50,6 +50,8 @@ while queue has next/in_progress and not blocked:
 | **v1.1 — Multi-company** | `done` | OrganizationMembership + parentOrgId; my-orgs, switch, create-child APIs; OrgSwitcher UI; child-org in Admin |
 | **Sprint 1 — Supreme upgrade** | `done` | Document Hub, real People+Fleet+Search+Inbox, invite email, approval email, report email, live notification badge |
 | **Sprint 2 — Supreme upgrade** | `done` | Approval detail modal, combined Timeline, Platform per-org stats, Settings security+webhook sections |
+| **Sprint 3 — Completion** | `done` | Glance live refresh + trends, Reports email delivery status, Approval notification emails |
+| **Sprint 4 — Security & Quality** | `done` | Rate limiting, input validation, error standardization, strict TypeScript, Jest test infrastructure |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
@@ -280,7 +282,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API). Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps and marketplace remain v1.1+/v2.0.
+**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–3 (supreme upgrades) + Sprint 4 (security/quality hardening). All major features shipped, tested, and deployed to production. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue now empty — ready for v1.1 roadmap (Webhooks, Enterprise Connectors, BI Dashboards, Autonomous Agents).
 ---
 
 ## Agent run protocol
