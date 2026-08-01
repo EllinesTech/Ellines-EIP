@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type DependencyList,
+  type RefObject,
 } from 'react';
 
 /**
@@ -97,5 +98,10 @@ export function useAutofitScale(deps: DependencyList = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { containerRef, contentRef, contentStyle: style };
+  // Refs attach to both <section> and <div>; React's element-specific Ref types are stricter.
+  return {
+    containerRef: containerRef as RefObject<HTMLDivElement>,
+    contentRef: contentRef as RefObject<HTMLDivElement>,
+    contentStyle: style,
+  };
 }

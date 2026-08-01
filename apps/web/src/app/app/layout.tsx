@@ -174,7 +174,7 @@ const NAV: NavItem[] = [
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
-  { href: '/app/ellinea', label: 'Ellinea Console', icon: <IconEllinea />, adminOnly: true },
+  { href: '/app/ellinea-console', label: 'Ellinea Console', icon: <IconEllinea />, adminOnly: true },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
 ];
 
@@ -325,6 +325,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     .filter((item): item is NavItem => Boolean(item));
 
   function persistNavOrder(hrefs: string[]) {
+    if (!session) return;
     setNavOrder(hrefs);
     writeNavOrder(session.organization.id, session.user.id, hrefs);
   }
@@ -361,9 +362,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     pathname.startsWith('/app/ellinea-console')
       ? 'Ellinea Console'
       : pathname.startsWith('/app/ellinea')
-      ? orgAdmin
-        ? 'Ellinea Console'
-        : 'Ask Ellinea'
+      ? 'Ask Ellinea'
       : pathname.startsWith('/app/connectors')
         ? 'Connectors'
         : pathname.startsWith('/app/admin')

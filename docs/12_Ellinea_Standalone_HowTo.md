@@ -86,5 +86,5 @@ All org-scoped routes bind to the JWT `organizationId`. Never accept a client-su
 ## What’s deferred
 
 - Full Nest auth on `services/ellinea-ai` (open on localhost for MVP).
-- SMTP/Web Push providers (notification outbox sends via Resend/SMTP when Pages secrets are set; otherwise simulated).
+- **Live** SMTP/Web Push delivery — code path is shipped; human must set Cloudflare Pages env (`RESEND_API_KEY` or `SMTP_*`, plus `VAPID_*`). Without them the outbox stays `simulated`. See [10_Cloudflare_Pages_GitHub.md](./10_Cloudflare_Pages_GitHub.md).
 - Marketplace packaging of the SDK under a public npm scope.

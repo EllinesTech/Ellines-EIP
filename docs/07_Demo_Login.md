@@ -47,6 +47,8 @@ Cloudflare Pages project `ellines-eip` needs:
 powershell -File scripts/set-pages-auth-secrets.ps1
 ```
 
+**Optional (live mail / push):** `RESEND_API_KEY` or `SMTP_*`, and `VAPID_*` — see [10_Cloudflare_Pages_GitHub.md](./10_Cloudflare_Pages_GitHub.md). Without them notifications stay `simulated`.
+
 ## Security
 
 This is a **shared pilot** account. Change `DEMO_PASSWORD` and re-seed before any external launch.

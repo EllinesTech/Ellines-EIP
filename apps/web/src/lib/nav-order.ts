@@ -26,6 +26,11 @@ export function writeNavOrder(orgId: string, userId: string, hrefs: string[]): v
   }
 }
 
+/** Older builds put Ask (`/app/ellinea`) in the Owner/IT nav as “Console”. */
+const NAV_HREF_ALIASES: Record<string, string> = {
+  '/app/ellinea': '/app/ellinea-console',
+};
+
 /**
  * Apply a saved href order onto the current default (visible) list.
  * Unknown saved hrefs are dropped; new default items insert at their
@@ -34,7 +39,12 @@ export function writeNavOrder(orgId: string, userId: string, hrefs: string[]): v
 export function mergeNavOrder(defaultHrefs: string[], saved: string[] | null): string[] {
   if (!saved?.length) return [...defaultHrefs];
   const visible = new Set(defaultHrefs);
-  const result = saved.filter((h) => visible.has(h));
+  const remapped = saved.map((h) => NAV_HREF_ALIASES[h] ?? h);
+  const result: string[] = [];
+  for (const href of remapped) {
+    if (!visible.has(href) || result.includes(href)) continue;
+    result.push(href);
+  }
   for (const href of defaultHrefs) {
     if (result.includes(href)) continue;
     const idxInDefault = defaultHrefs.indexOf(href);

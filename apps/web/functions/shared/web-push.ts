@@ -127,7 +127,8 @@ export async function sendWebPush(
       .setAudience(audience)
       .setExpirationTime('12h')
       .setIssuedAt()
-      .sign(key);
+      // jose KeyInput vs Workers CryptoKey `type: string` mismatch
+      .sign(key as never);
 
     const res = await fetch(subscription.endpoint, {
       method: 'POST',

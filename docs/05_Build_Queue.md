@@ -26,27 +26,27 @@ while queue has next/in_progress and not blocked:
 
 ---
 
-## Where we are (2026-07-31)
+## Where we are (2026-08-01)
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
-| **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~100% | Standalone package + guide shipped; enterprise reasoning upgrade |
+| **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid; Console nav href fixed |
+| **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
 | **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
-| **7 — Mobile Work Companion** | `todo` | v1.1+ simplified phone app (roadmap) |
+| **7 — Mobile Work Companion** | vision `done`; rest `todo` | Brief shipped; apps remain v1.1+ |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
 
-1. **Done —** Owner/IT side-nav rearrange (drag + localStorage per user+org).
+1. **Done —** Owner/IT side-nav rearrange; Console href = `/app/ellinea-console` (Ask stays float/workspace).
 2. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
-3. **Later —** **Mobile Work Companion** (v1.1).
-4. **Do not build mobile in v1.0** unless a tiny stub is explicitly queued.
+3. **Done —** Mobile Work Companion **vision brief** ([13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md)).
+4. **Later —** Mobile Companion implementation (7.2–7.7) in v1.1 — no native apps in v1.0.
 
-**Critical path:** v1.0 Foundation web path complete for queued items. Remaining: human Pages secrets for live mail/push; Mobile Companion in v1.1 (no further v1.0 `next` until queued).
+**Critical path:** v1.0 Foundation web path complete. Remaining human blockers: Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. No further v1.0 `next` until queued.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -152,7 +152,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
 | 4.10 | LLM / RAG | `done` | Local RAG + optional OpenAI-compatible Ask; settings toggle |
 | 4.11 | Ellinea enterprise reasoning upgrade | `done` | Multi-hop answers (situation→evidence→risk→action→confidence); smarter RAG boosts; denser Owner brief (watch/decide/delegate); SoR-safe LLM prompt |
-| 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
+| 4.S | Ellinea AI standalone | `done` | Phase 6 complete (package + contract + SDK + console + guide) |
 | 4.H | **How to use Ellinea brain (standalone)** | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 
 ---
@@ -217,7 +217,7 @@ Simplified **phone app** so Owner and permitted employees can track day-to-day o
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| 7.1 | Mobile Work Companion vision | `todo` | Product brief: phone-first Work Console slice |
+| 7.1 | Mobile Work Companion vision | `done` | [13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md) |
 | 7.2 | Fleet / company car tracking | `todo` | Via connectors / GPS later — surface status + Ellinea alerts |
 | 7.3 | Employee register (people directory) | `todo` | Read from SoR / UEM people; Owner-scoped actions |
 | 7.4 | Pull live data + summary reports | `todo` | Sync-backed KPIs and scheduled report previews on phone |
@@ -225,17 +225,21 @@ Simplified **phone app** so Owner and permitted employees can track day-to-day o
 | 7.6 | Work email summarization | `todo` | Build on email connector; Ellinea summarize for work inbox |
 | 7.7 | Access: Owner + permitted employees | `todo` | Same role model; no bypass of SoR authority |
 
-Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `todo` until MVP web path is stable.
+Do **not** implement full native apps in v1.0 Foundation runs. Vision brief (7.1) is done; keep 7.2–7.7 `todo` for v1.1.
 
-## Recently landed on main (through 2026-07-31)
+## Recently landed on main (through 2026-08-01)
 
-- **Ellinea enterprise reasoning upgrade (4.11):** Multi-hop Ask answers; smarter RAG (Memory/alerts/decisions/attention boosts); denser Watch/Decide/Delegate briefs; SoR-safe LLM system prompt; sharper Owner/IT role lenses.
+- **Ellinea Console nav fix:** Owner/IT side nav → `/app/ellinea-console` (not Ask); Ask title stays “Ask Ellinea”; saved `/app/ellinea` nav slots remap to console.
+- **TS hygiene (~89 PagesFunction noise):** exclude `functions/` from Next `tsconfig`; add `functions/tsconfig.json` + ambient `cloudflare:sockets`; fix UEM/autofit/layout/notifications page exports.
+- **Mobile vision brief (7.1):** [13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md).
+- **Secrets docs:** Pages mail/push env + Fly `FLY_API_TOKEN` clarified in docs/10, 07, 12 (and 08 for Fly).
+- **Ellinea enterprise reasoning upgrade (4.11):** Multi-hop Ask answers; smarter RAG (Memory/alerts/decisions/attention boosts); denser Watch/Decide/Delegate briefs; SoR-safe LLM system prompt; sharper Owner/IT role lenses. (`745445c` — do not regress.)
 - **Owner/IT side-nav rearrange:** Edit nav + drag reorder; order persisted in `eip_nav_order:{orgId}:{userId}`; non-admins keep fixed default; new items merge at default relative position (Ellinea Console above Settings by default).
 - **Web Push / VAPID:** subscription API + `/sw-push.js`; deliver attempts push when VAPID secrets + browser sub exist; else simulated/failed with clear message. Human Pages secrets required for live push.
 - **Notification SMTP / Resend slice:** `POST /api/v1/notifications/deliver` attempts real email when `RESEND_API_KEY` or `SMTP_*` / `ELLINEA_SMTP_*` are on Pages; otherwise keeps `simulated` (CI-safe). Human must set Pages secrets for live mail.
 - **Platform suspend/disable org:** Super Admin Suspend/Resume on `/app/platform`; blocks login + connector sync
 - **SQL Server / MySQL connectors:** read-only catalog + Identity TCP drivers (`mssql`, `mysql2`); Pages soft-test / 501 sync like Postgres
-- **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab at `/app/ellinea-console` (side nav above Settings). Mobile Work Companion remains Phase 7 `todo` (v1.1+).
+- **Ellinea placement:** Ask = float (+ full workspace `/app/ellinea`); prefs = System Settings **Ellinea AI** card; console = Owner/IT operator/API lab at `/app/ellinea-console` (side nav above Settings). Mobile vision brief done; 7.2–7.7 remain v1.1+.
 - Audit Center (`/app/audit`), change password on Profile, connector health chips on Overview
 - Org structure (branches/departments) on Org Admin + Pages APIs
 - Owner/IT Overview ops rail + empty states; roadmap keep-going
@@ -243,7 +247,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Queued Foundation web work is complete. No `next` / `in_progress` items remain. Blocked only on human secrets (live SMTP/push) and Phase 7 Mobile (v1.1 roadmap).
+**v1.0 status:** Queued Foundation web work is complete. No `next` / `in_progress` items remain. Blocked only on human secrets (live SMTP/push + `FLY_API_TOKEN`) and Phase 7.2–7.7 Mobile implementation (v1.1).
 ---
 
 ## Agent run protocol
@@ -264,4 +268,4 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 
 ---
 
-*Last status review: 2026-07-31*
+*Last status review: 2026-08-01*

@@ -53,9 +53,25 @@ Pages **Functions** live under `apps/web/functions/` and deploy with the `out/` 
 4. Merge or push to `main` → Actions run **Deploy Cloudflare Pages**.
 5. Optional: `workflow_dispatch` on that workflow for a manual redeploy.
 
+## Optional Pages env — live email / Web Push
+
+Notification outbox (`POST /api/v1/notifications/deliver`) is **implemented**. Without these Cloudflare Pages **environment variables**, delivery stays `simulated` (safe for CI). Agents cannot invent these secrets.
+
+Set on Cloudflare Dashboard → Workers & Pages → `ellines-eip` → Settings → Environment variables (Production), **or** via Wrangler/`scripts` — never commit values:
+
+| Variable | Purpose |
+|----------|---------|
+| `RESEND_API_KEY` (or `ELLINEA_SMTP_API_KEY`) | Preferred HTTPS email via Resend |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Optional SMTP (also `ELLINEA_SMTP_*` aliases) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push (`ELLINEA_VAPID_*` aliases ok) |
+
+Generate VAPID: `npx web-push generate-vapid-keys`. Template: root `.env.example`.
+
 ## Identity (Fly) — separate from Pages
 
-Identity Nest API deploys via [`.github/workflows/deploy-identity.yml`](../.github/workflows/deploy-identity.yml) when identity paths change. Local/dev: `NEXT_PUBLIC_API_URL=http://localhost:3001`. Production Pages can use same-origin Functions or point at Fly.
+Identity Nest API deploys via [`.github/workflows/deploy-identity.yml`](../.github/workflows/deploy-identity.yml) when identity paths change. That workflow needs GitHub Actions secret **`FLY_API_TOKEN`** (human-only — see [08_Live_Identity_Setup.md](./08_Live_Identity_Setup.md)). Pages deploy does **not** use Fly.
+
+Local/dev: `NEXT_PUBLIC_API_URL=http://localhost:3001`. Production Pages can use same-origin Functions or point at Fly.
 
 ## After landing connector / access changes
 

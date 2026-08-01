@@ -20,7 +20,7 @@ import {
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 
-export type AppNotification = {
+type AppNotification = {
   id: string;
   kind: 'alert' | 'decision' | 'sync' | 'system';
   title: string;
@@ -31,7 +31,7 @@ export type AppNotification = {
 
 const READ_KEY = 'eip_notifications_read';
 const DELETED_KEY = 'eip_notifications_deleted';
-export const NOTIFICATIONS_CHANGED_EVENT = 'eip-notifications-changed';
+const NOTIFICATIONS_CHANGED_EVENT = 'eip-notifications-changed';
 
 function readIdSet(key: string): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -50,11 +50,11 @@ function writeIdSet(key: string, ids: Set<string>) {
   window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
 }
 
-export function readDeletedNotificationIds(): Set<string> {
+function readDeletedNotificationIds(): Set<string> {
   return readIdSet(DELETED_KEY);
 }
 
-export function buildNotifications(
+function buildNotifications(
   summary: EnterpriseSummaryDto | null,
   prefs: UiPrefs,
 ): AppNotification[] {

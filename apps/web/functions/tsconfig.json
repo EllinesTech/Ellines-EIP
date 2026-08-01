@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["@cloudflare/workers-types"],
+    "paths": {
+      "@ellines-eip/shared": ["../../packages/shared/src/index.ts"],
+      "@ellines-eip/connectors-sdk": ["../../packages/connectors-sdk/src/index.ts"],
+      "@ellines-eip/ellinea-ai": ["../../packages/ellinea-ai/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./cloudflare-ambient.d.ts"],
+  "exclude": ["node_modules"]
+}

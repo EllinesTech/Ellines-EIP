@@ -107,24 +107,25 @@ export function normalizeUemModel(
   const objectsRaw = modelRoot.objects ?? root.objects ?? [];
   const objects: UemObject[] = Array.isArray(objectsRaw)
     ? objectsRaw
-        .map((item, index) => {
-          if (!item || typeof item !== 'object') return null;
+        .flatMap((item, index): UemObject[] => {
+          if (!item || typeof item !== 'object') return [];
           const row = item as Record<string, unknown>;
           const kindRaw = String(row.kind ?? row.type ?? 'event');
           const kind = (KINDS.includes(kindRaw as UemObjectKind)
             ? kindRaw
             : 'event') as UemObjectKind;
           const name = asString(row.name ?? row.title, '');
-          if (!name) return null;
-          return {
-            id: asString(row.id, `${kind}-${index + 1}`),
-            kind,
-            name,
-            status: asString(row.status, '') || undefined,
-            branchId: asString(row.branchId ?? row.branch_id, '') || undefined,
-          };
+          if (!name) return [];
+          return [
+            {
+              id: asString(row.id, `${kind}-${index + 1}`),
+              kind,
+              name,
+              status: asString(row.status, '') || undefined,
+              branchId: asString(row.branchId ?? row.branch_id, '') || undefined,
+            },
+          ];
         })
-        .filter((x): x is UemObject => Boolean(x))
         .slice(0, 40)
     : [];
 
