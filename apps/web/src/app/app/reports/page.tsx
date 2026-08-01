@@ -17,6 +17,7 @@ import {
   listReportsApi,
   createReportApi,
   runReportApi,
+  runReportFullApi,
   toggleReportApi,
   deleteReportApi,
   type ScheduledReportDto,
@@ -47,6 +48,7 @@ export default function ReportsPage() {
   const [preview, setPreview] = useState('');
   const [serverSync, setServerSync] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [runNotice, setRunNotice] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const s = getSession();
@@ -138,8 +140,22 @@ export default function ReportsPage() {
     setBusy(true);
 
     if (serverSync) {
-      runReportApi(id)
-        .then((dto) => setItems((prev) => prev.map((r) => r.id === id ? fromDto(dto) : r)))
+      runReportFullApi(id)
+        .then((dto) => {
+          setItems((prev) => prev.map((r) => r.id === id ? fromDto(dto) : r));
+          // Show email delivery status
+          const emailStatus = dto.emailStatus || dto.lastEmailStatus || '';
+          const chars = dto.reportChars ? ` (${dto.reportChars} chars)` : '';
+          const msg = emailStatus.startsWith('delivered')
+            ? `✓ Report sent to your email${chars}`
+            : emailStatus === 'not_configured'
+              ? `Report generated${chars} — no email configured (set RESEND_API_KEY on Pages)`
+              : emailStatus.startsWith('failed')
+                ? `Report generated${chars} — email failed: ${emailStatus.replace('failed: ', '')}`
+                : `Report run${chars}`;
+          setRunNotice((prev) => ({ ...prev, [id]: msg }));
+          setTimeout(() => setRunNotice((prev) => { const n = { ...prev }; delete n[id]; return n; }), 8000);
+        })
         .catch(() => {
           const now = new Date().toISOString();
           localPersist(items.map((r) =>
@@ -244,16 +260,23 @@ export default function ReportsPage() {
                   <td>{r.enabled ? r.nextRunHint : 'Paused'}</td>
                   <td>{r.lastRunAt ? new Date(r.lastRunAt).toLocaleString() : '—'}</td>
                   <td>
-                    <button
-                      type="button" className={adminStyles.primary}
-                      onClick={() => runNow(r.id)} disabled={!r.enabled || busy}
-                    >Run now</button>{' '}
-                    <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => toggle(r.id)}>
-                      {r.enabled ? 'Pause' : 'Resume'}
-                    </button>{' '}
-                    <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => remove(r.id)}>
-                      Remove
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        type="button" className={adminStyles.primary}
+                        onClick={() => runNow(r.id)} disabled={!r.enabled || busy}
+                      >Run now</button>
+                      <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => toggle(r.id)}>
+                        {r.enabled ? 'Pause' : 'Resume'}
+                      </button>
+                      <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => remove(r.id)}>
+                        Remove
+                      </button>
+                      {runNotice[r.id] ? (
+                        <span style={{ fontSize: '0.75rem', color: runNotice[r.id].startsWith('✓') ? '#6ee7b7' : '#94a3b8', whiteSpace: 'nowrap' }}>
+                          {runNotice[r.id]}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
