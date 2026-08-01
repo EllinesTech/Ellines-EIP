@@ -208,6 +208,15 @@ function IconInbox() {
   );
 }
 
+function IconOrgSystem() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M9 9v11M14 13h4M14 16h4" />
+    </svg>
+  );
+}
+
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/glance', label: 'Glance', icon: <IconGlance /> },
@@ -220,6 +229,12 @@ const NAV: NavItem[] = [
   { href: '/app/rules', label: 'Rules', icon: <IconRules />, adminOnly: true },
   { href: '/app/reports', label: 'Reports', icon: <IconReports />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
+  {
+    href: '/app/org-system',
+    label: 'Organization System',
+    icon: <IconOrgSystem />,
+    adminOnly: true,
+  },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
@@ -453,6 +468,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Live glance'
                 : pathname.startsWith('/app/inbox')
                   ? 'Work email'
+                : pathname.startsWith('/app/org-system')
+                  ? 'Organization System'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')

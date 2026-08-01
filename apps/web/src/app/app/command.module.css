@@ -897,6 +897,105 @@
   line-height: 1.4;
 }
 
+.taskGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.35rem;
+}
+
+.taskCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 8.5rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid var(--c-line);
+  background: var(--c-card);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+a.taskCard:hover {
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.taskCard[data-soon='true'] {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.taskCardLabel {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-violet);
+}
+
+.taskCardTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.taskCardPurpose {
+  margin: 0;
+  flex: 1;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--c-muted);
+}
+
+.taskCardCta {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.reportBody {
+  margin: 0.75rem 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #c5cddb;
+}
+
+.periodTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.periodTab {
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 650;
+  min-height: 30px;
+  padding: 0.28rem 0.65rem;
+  border-radius: 7px;
+  border: 1px solid var(--c-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: #c5cddb;
+  cursor: pointer;
+}
+
+.periodTab[data-active='true'] {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: rgba(124, 58, 237, 0.18);
+  color: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kpi,
   .aiBtn,

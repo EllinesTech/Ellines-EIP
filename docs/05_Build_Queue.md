@@ -49,6 +49,7 @@ while queue has next/in_progress and not blocked:
 6. **Done —** Access prefs for Ask float / hide-from-work-users (7.8).
 7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. Native iOS/Android still out of scope.
 8. **Done —** Connector auto-scan / Ellinea detect (IT): Owner/IT Auto-scan on Connectors (+ Console/Settings links); online edge probe + local browser ports; Hospidia catalog hint; Connect → wizard prefill. Access: `isOrgAdminRole` only; Settings notes later authorize-others.
+9. **Done —** Organization System hub (Owner/IT): `/app/org-system` catalog + report / employees / clients-today tasks over UEM; stubs for alerts digest / branch health / inventory. Access: `isOrgAdminRole`; Settings notes later authorize-others.
 
 **Critical path:** Queued web companion work is complete. Stop only for human secrets or unfixable builds — not for “no next” while inventing outside the queue.
 
@@ -136,6 +137,7 @@ while queue has next/in_progress and not blocked:
 | 2.x | Integration hub service | `done` | `services/integration-hub` |
 | 2.x | Webhooks / events | `done` | Pages webhook + org secret; catalog available |
 | 3.x | Side nav rearrange (Owner/IT) | `done` | Edit nav + drag; `eip_nav_order:{orgId}:{userId}`; Ellinea Console stays above Settings by default |
+| 3.x | Organization System hub | `done` | `/app/org-system` Owner/IT catalog; report (period + Ellinea narrative), employees (UEM people/staff), clients-today (patients|clients heuristic + toggle); stubs for alerts digest / branch health / inventory; Connectors CTA when unsynced. Later: authorize non-admin roles (Settings note). |
 
 ---
 
@@ -235,6 +237,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
+- **Organization System hub:** Owner/IT side-nav **Organization System** → `/app/org-system` task catalog; `/report` period summary (today/7d/30d/custom + Ellinea narrative); `/employees` UEM people register; `/clients-today` patients|clients with healthcare heuristic + toggle; coming-soon stubs (alerts digest, branch health, inventory). Observe-only; needs connector sync. Settings notes later authorize-others.
 - **Connector auto-scan / Ellinea detect (IT):** Connectors “Auto-scan for systems” (Online / Local / Hybrid); Pages `POST /api/v1/connectors/autoscan/probe` for public URLs; browser local/LAN port probes IT starts; Hospidia heuristics + Connect → install wizard prefill; Settings + Console links. No silent PC harvest.
 - **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Glance / Fleet / People / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
 - **Companion surfaces (7.3–7.8):** `/app/fleet`, `/app/people`, `/app/glance`, `/app/inbox` — UEM/snapshot-backed with honest empty states; Ellinea recs on Glance; Ask access prefs.

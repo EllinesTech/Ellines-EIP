@@ -533,6 +533,21 @@ export default function SystemSettingsPage() {
             </Link>
           </div>
         ) : null}
+        {orgAdmin ? (
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>Organization System</strong>
+              <p>
+                Owner / IT Admin hub for org tasks (reports, employee register, patients/clients
+                today) over synced Systems of Record. Access is org-admin only for now; later
+                authorize executives / managers / other roles from here.
+              </p>
+            </div>
+            <Link href="/app/org-system" className={styles.primaryLink}>
+              Open Organization System →
+            </Link>
+          </div>
+        ) : null}
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open full Ask workspace →
