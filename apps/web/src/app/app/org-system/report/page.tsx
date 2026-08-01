@@ -75,11 +75,11 @@ export default function OrgSystemReportPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Organization System</p>
+          <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
           <h1>Generate report</h1>
           <p className={styles.lede}>
-            Period summary from enterprise health, UEM counts, timeline, and an Ellinea-style
-            narrative. Observe-only — no write-back to the System of Record.
+            Period summary from enterprise health, UEM counts, timeline, and Ellinea narrative.
+            Observe-only — EIP does not write back to the System of Record.
           </p>
         </div>
         <div className={styles.headerActions}>

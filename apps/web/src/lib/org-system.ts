@@ -2,9 +2,16 @@
 
 import type { EnterpriseSummaryDto } from '@/lib/api';
 import { buildDailyBriefText } from '@/lib/ellinea-engine';
+import {
+  ORG_SYSTEM_CAPABILITIES,
+  detectHealthcareLabel as detectHealthcareLabelFromCatalog,
+  isClientOrPatientKind as isClientOrPatientKindFromCatalog,
+  isPeopleKind as isPeopleKindFromCatalog,
+} from '@/lib/org-system-catalog';
 
 export type OrgSystemPeriod = 'today' | '7d' | '30d' | 'custom';
 
+/** @deprecated Prefer ORG_SYSTEM_CAPABILITIES from org-system-catalog. */
 export type OrgSystemTask = {
   id: string;
   title: string;
@@ -13,85 +20,17 @@ export type OrgSystemTask = {
   comingSoon?: boolean;
 };
 
-export const ORG_SYSTEM_TASKS: OrgSystemTask[] = [
-  {
-    id: 'report',
-    title: 'Generate report',
-    purpose: 'Pick a period and summarize health, alerts, and timeline from connected systems.',
-    href: '/app/org-system/report',
-  },
-  {
-    id: 'employees',
-    title: 'Employee register',
-    purpose: 'People / staff directory from UEM objects synced out of HR or SoR connectors.',
-    href: '/app/org-system/employees',
-  },
-  {
-    id: 'clients-today',
-    title: 'Patients / clients today',
-    purpose: 'Today’s patients or clients from timeline and objects — label follows industry.',
-    href: '/app/org-system/clients-today',
-  },
-  {
-    id: 'alerts-digest',
-    title: 'Open alerts digest',
-    purpose: 'Prioritized open alerts across connected systems with Ellinea framing.',
-    comingSoon: true,
-  },
-  {
-    id: 'branch-health',
-    title: 'Branch health',
-    purpose: 'Per-site health and pressure from UEM branches once multi-site sync is live.',
-    comingSoon: true,
-  },
-  {
-    id: 'inventory',
-    title: 'Inventory snapshot',
-    purpose: 'Assets and stock-style objects from SoR — read-only observe, not write-back.',
-    comingSoon: true,
-  },
-];
+/** @deprecated Prefer ORG_SYSTEM_CAPABILITIES from org-system-catalog. */
+export const ORG_SYSTEM_TASKS: OrgSystemTask[] = ORG_SYSTEM_CAPABILITIES.map((c) => ({
+  id: c.id,
+  title: c.title,
+  purpose: c.purpose,
+  href: c.href,
+}));
 
-const HEALTHCARE_RE =
-  /hospidia|hospital|clinic|health|patient|medical|his|ehr|emr|pharmacy|care\b/i;
-
-export function detectHealthcareLabel(summary: EnterpriseSummaryDto | null): 'patients' | 'clients' {
-  if (!summary) return 'clients';
-  const hay = [
-    summary.connectorName,
-    summary.briefHighlight,
-    summary.model?.sourceSystem || '',
-    ...(summary.model?.capabilities || []),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return HEALTHCARE_RE.test(hay) ? 'patients' : 'clients';
-}
-
-export function isPeopleKind(kind: string): boolean {
-  const k = kind.toLowerCase();
-  return (
-    k === 'person' ||
-    k === 'people' ||
-    k === 'user' ||
-    k === 'staff' ||
-    k === 'employee' ||
-    k === 'worker'
-  );
-}
-
-export function isClientOrPatientKind(kind: string): boolean {
-  const k = kind.toLowerCase();
-  return (
-    k === 'patient' ||
-    k === 'client' ||
-    k === 'customer' ||
-    k === 'guest' ||
-    k === 'appointment' ||
-    k === 'visit' ||
-    k === 'encounter'
-  );
-}
+export const detectHealthcareLabel = detectHealthcareLabelFromCatalog;
+export const isPeopleKind = isPeopleKindFromCatalog;
+export const isClientOrPatientKind = isClientOrPatientKindFromCatalog;
 
 function startOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());

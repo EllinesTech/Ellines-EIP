@@ -28,11 +28,21 @@ while queue has next/in_progress and not blocked:
 
 ## Where we are (2026-08-01)
 
+### What we are building (do not drift)
+
+**Ellines EIP** = Enterprise Intelligence Platform **above** existing Systems of Record (ERP, CRM, HIS like Hospidia, HR, etc.).
+
+- **Tagline:** Where Enterprise Systems Think Together.
+- **AI:** **Ellinea AI** — always in the loop (brief, recommend, memory, DNA, detect connectors, summarize org tasks).
+- EIP **connects and observes**; it does **not** replace or become the SoR.
+- After connect/sync, EIP surfaces **everything connected org systems can expose** (via UEM / connectors) in **Organization System** as actionable capabilities for Owner/IT (later authorized roles) — reports, people, patients/clients, inventory, finance glance, branches, alerts, documents, tasks, etc.
+- **Access layers:** Work Console roles; Owner/IT regulate; Platform Super Admin regulates orgs (suspend/rights). See [09_Access_Layers.md](./09_Access_Layers.md).
+
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
-| **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid; Console nav href fixed |
+| **3 — Owner / Admin Command Center** | ~99% | Owner/IT path solid; Organization System capability catalog |
 | **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
 | **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
@@ -49,9 +59,9 @@ while queue has next/in_progress and not blocked:
 6. **Done —** Access prefs for Ask float / hide-from-work-users (7.8).
 7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. Native iOS/Android still out of scope.
 8. **Done —** Connector auto-scan / Ellinea detect (IT): Owner/IT Auto-scan on Connectors (+ Console/Settings links); online edge probe + local browser ports; Hospidia catalog hint; Connect → wizard prefill. Access: `isOrgAdminRole` only; Settings notes later authorize-others.
-9. **Done —** Organization System hub (Owner/IT): `/app/org-system` catalog + report / employees / clients-today tasks over UEM; stubs for alerts digest / branch health / inventory. Access: `isOrgAdminRole`; Settings notes later authorize-others.
+9. **Done —** Organization System hub + **capability catalog** (Owner/IT): data-driven domains (Intelligence, People, Customers/Patients, Operations, Clinical, Finance, Documents, Alerts, Reports, Connectors); live / no-data / sync-to-unlock badges from UEM counts + objects + timeline + alerts/decisions; Ellinea brief & recommendations pages. Access: `isOrgAdminRole`; Settings notes later authorize-others.
 
-**Critical path:** Queued web companion work is complete. Stop only for human secrets or unfixable builds — not for “no next” while inventing outside the queue.
+**Critical path:** Queued web companion + Organization System catalog are complete. Stop only for human secrets or unfixable builds — not for inventing outside the queue.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -137,7 +147,7 @@ while queue has next/in_progress and not blocked:
 | 2.x | Integration hub service | `done` | `services/integration-hub` |
 | 2.x | Webhooks / events | `done` | Pages webhook + org secret; catalog available |
 | 3.x | Side nav rearrange (Owner/IT) | `done` | Edit nav + drag; `eip_nav_order:{orgId}:{userId}`; Ellinea Console stays above Settings by default |
-| 3.x | Organization System hub | `done` | `/app/org-system` Owner/IT catalog; report (period + Ellinea narrative), employees (UEM people/staff), clients-today (patients|clients heuristic + toggle); stubs for alerts digest / branch health / inventory; Connectors CTA when unsynced. Later: authorize non-admin roles (Settings note). |
+| 3.x | Organization System hub | `done` | `/app/org-system` Owner/IT **capability catalog** (`org-system-catalog.ts`) by domain; live/no-data/sync badges from UEM; Ellinea brief + recommendations; employees, clients-today, report + dynamic `[capability]` pages (branches, tasks, assets, documents, alerts, finance, stubs). Later: authorize non-admin roles (Settings note). |
 
 ---
 
@@ -237,7 +247,8 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
-- **Organization System hub:** Owner/IT side-nav **Organization System** → `/app/org-system` task catalog; `/report` period summary (today/7d/30d/custom + Ellinea narrative); `/employees` UEM people register; `/clients-today` patients|clients with healthcare heuristic + toggle; coming-soon stubs (alerts digest, branch health, inventory). Observe-only; needs connector sync. Settings notes later authorize-others.
+- **Organization System capability catalog:** Data-driven domains (Intelligence → Connectors) in `org-system-catalog.ts`; hub badges live / no data yet / sync to unlock from `model.counts`, objects, timeline, openAlerts/openDecisions; Ellinea brief + recommendations pages; dynamic `/app/org-system/[capability]` for branches, tasks, assets, documents, alerts, finance, stubs; product “EIP above SoR” eyebrow/lede. Owner/IT only.
+- **Organization System hub (initial):** Owner/IT side-nav **Organization System** → `/app/org-system`; `/report`, `/employees`, `/clients-today` over UEM.
 - **Connector auto-scan / Ellinea detect (IT):** Connectors “Auto-scan for systems” (Online / Local / Hybrid); Pages `POST /api/v1/connectors/autoscan/probe` for public URLs; browser local/LAN port probes IT starts; Hospidia heuristics + Connect → install wizard prefill; Settings + Console links. No silent PC harvest.
 - **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Glance / Fleet / People / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
 - **Companion surfaces (7.3–7.8):** `/app/fleet`, `/app/people`, `/app/glance`, `/app/inbox` — UEM/snapshot-backed with honest empty states; Ellinea recs on Glance; Ask access prefs.
@@ -260,7 +271,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Foundation web + Phase 7 web companion (7.1–7.8) complete. No queued `next` / `in_progress`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
+**v1.0 status:** Foundation web + Phase 7 web companion (7.1–7.8) + Organization System capability catalog complete. No queued `next` / `in_progress`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
 ---
 
 ## Agent run protocol

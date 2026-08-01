@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isOrgAdminRole } from '@ellines-eip/shared';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
-import { ORG_SYSTEM_TASKS } from '@/lib/org-system';
+import {
+  detectHealthcareLabel,
+  groupCapabilitiesByDomain,
+} from '@/lib/org-system-catalog';
 import styles from '../command.module.css';
+
+const PRODUCT_LEDE =
+  'Ellines EIP sits above your Systems of Record (ERP, CRM, HIS like Hospidia, HR). It connects and observes — it does not replace them. After sync, Organization System surfaces everything connected systems expose for Owner / IT (later: authorized roles). Ellinea AI stays in the loop.';
 
 export default function OrgSystemHubPage() {
   const router = useRouter();
@@ -32,6 +38,10 @@ export default function OrgSystemHubPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load snapshot'));
   }, [router]);
 
+  const groups = useMemo(() => groupCapabilitiesByDomain(summary), [summary]);
+  const synced = summary?.status === 'synced';
+  const label = detectHealthcareLabel(summary);
+
   if (!allowed) {
     return (
       <div className={styles.page}>
@@ -40,25 +50,23 @@ export default function OrgSystemHubPage() {
     );
   }
 
-  const synced = summary?.status === 'synced';
-
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Organization System</p>
-          <h1>Tasks on your connected systems</h1>
+          <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
+          <h1>Capabilities from connected systems</h1>
           <p className={styles.lede}>
-            EIP wraps {orgName || 'your org'} Systems of Record — pick a service to observe and
-            summarize. Owner / IT Admin only for now; other roles can be authorized later.
+            {PRODUCT_LEDE} Viewing {orgName || 'your org'}
+            {synced ? ` · ${label === 'patients' ? 'healthcare' : 'commercial'} lens` : ''}.
           </p>
         </div>
         <div className={styles.headerActions}>
           <Link href="/app/connectors" className={styles.ghostBtn}>
             Connectors
           </Link>
-          <Link href="/app/ellinea-console" className={styles.ghostBtn}>
-            Ellinea Console
+          <Link href="/app/connectors#eip-autoscan" className={styles.ghostBtn}>
+            Auto-scan
           </Link>
           <Link href="/app/ellinea" className={styles.ghostBtn}>
             Ask Ellinea
@@ -73,8 +81,9 @@ export default function OrgSystemHubPage() {
           <div>
             <strong>No live sync yet</strong>
             <p>
-              Tasks need a connector snapshot. Install and Sync under Connectors — EIP observes; it
-              does not replace Hospidia / ERP.
+              Sync a connector (or run Auto-scan) so EIP can observe UEM counts, objects, timeline,
+              alerts, and decisions. Until then capabilities stay ready with unlock CTAs — EIP will
+              not invent SoR data.
             </p>
           </div>
           <Link href="/app/connectors" className={styles.primaryLink}>
@@ -86,6 +95,10 @@ export default function OrgSystemHubPage() {
           <span className={styles.opsLink} style={{ cursor: 'default' }}>
             Live · {summary!.connectorName}
           </span>
+          <span className={styles.opsLink} style={{ cursor: 'default' }}>
+            Health {summary!.healthScore} · alerts {summary!.openAlerts} · decisions{' '}
+            {summary!.openDecisions}
+          </span>
           <Link href="/app/timeline" className={styles.opsLink}>
             Timeline
           </Link>
@@ -95,33 +108,40 @@ export default function OrgSystemHubPage() {
         </div>
       )}
 
-      <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <div>
-            <div className={styles.panelLabel}>Catalog</div>
-            <h2 className={styles.cardTitle}>Organization services &amp; tasks</h2>
+      {groups.map(({ domain, items }) => (
+        <section key={domain.id} className={styles.card} style={{ marginTop: '0.85rem' }}>
+          <div className={styles.cardHead}>
+            <div>
+              <div className={styles.panelLabel}>{domain.label}</div>
+              <h2 className={styles.cardTitle}>{domain.blurb}</h2>
+            </div>
           </div>
-        </div>
-        <div className={styles.taskGrid}>
-          {ORG_SYSTEM_TASKS.map((task) =>
-            task.comingSoon || !task.href ? (
-              <div key={task.id} className={styles.taskCard} data-soon="true">
-                <p className={styles.taskCardLabel}>Coming soon</p>
-                <h3 className={styles.taskCardTitle}>{task.title}</h3>
-                <p className={styles.taskCardPurpose}>{task.purpose}</p>
-                <p className={styles.taskCardCta}>Stub — not wired yet</p>
-              </div>
-            ) : (
-              <Link key={task.id} href={task.href} className={styles.taskCard}>
-                <p className={styles.taskCardLabel}>Ready</p>
-                <h3 className={styles.taskCardTitle}>{task.title}</h3>
-                <p className={styles.taskCardPurpose}>{task.purpose}</p>
-                <p className={styles.taskCardCta}>Open task →</p>
-              </Link>
-            ),
-          )}
-        </div>
-      </section>
+          <div className={styles.taskGrid}>
+            {items.map(({ cap, availability: av }) => {
+              const muted = av.status === 'needs-sync' || av.status === 'no-data';
+              return (
+                <Link
+                  key={cap.id}
+                  href={cap.href}
+                  className={styles.taskCard}
+                  data-soon={muted ? 'true' : undefined}
+                >
+                  <p className={styles.taskCardLabel}>{av.badge}</p>
+                  <h3 className={styles.taskCardTitle}>{cap.title}</h3>
+                  <p className={styles.taskCardPurpose}>{cap.purpose}</p>
+                  <p className={styles.taskCardCta}>
+                    {av.status === 'needs-sync'
+                      ? 'Sync connector to unlock →'
+                      : av.status === 'no-data'
+                        ? 'Open · no data yet →'
+                        : 'Open →'}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -538,8 +538,9 @@ export default function SystemSettingsPage() {
             <div className={settingsStyles.toggleCopy}>
               <strong>Organization System</strong>
               <p>
-                Owner / IT Admin hub for org tasks (reports, employee register, patients/clients
-                today) over synced Systems of Record. Access is org-admin only for now; later
+                Owner / IT Admin capability catalog over synced Systems of Record (reports, people,
+                clients/patients, branches, alerts, Ellinea brief, connectors). EIP connects and
+                observes — it does not replace ERP/CRM/HIS. Access is org-admin only for now; later
                 authorize executives / managers / other roles from here.
               </p>
             </div>

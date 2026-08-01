@@ -64,11 +64,12 @@ export default function OrgSystemClientsTodayPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Organization System</p>
+          <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
           <h1>{noun} today</h1>
           <p className={styles.lede}>
-            Today’s {nounLower} summarized from UEM objects and timeline heuristics. Label defaults
-            from connector / brief keywords (healthcare → patients); override with the toggle.
+            EIP sits above HIS / CRM Systems of Record. Today’s {nounLower} are summarized from UEM
+            objects and timeline heuristics — label defaults from connector keywords (healthcare →
+            patients); override with the toggle.
           </p>
         </div>
         <div className={styles.headerActions}>

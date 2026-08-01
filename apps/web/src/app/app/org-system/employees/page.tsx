@@ -49,11 +49,11 @@ export default function OrgSystemEmployeesPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Organization System</p>
+          <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
           <h1>Employee register</h1>
           <p className={styles.lede}>
-            Read-only people / staff / users from UEM after connector sync. Owner actions stay on Org
-            Admin — EIP does not write back to HR Systems of Record.
+            Ellines EIP connects and observes — it does not replace HR Systems of Record. Read-only
+            people / staff / users from UEM after connector sync. Owner actions stay on Org Admin.
           </p>
         </div>
         <div className={styles.headerActions}>

@@ -71,6 +71,14 @@ Response: `{ feedback: FeedbackMap; recommendations: Recommendation[] }`
 
 Production EIP Ask uses Pages Functions with the signed-in org JWT. Standalone Nest is for SDK / operator console smoke tests.
 
+## EIP surfaces that consume this contract
+
+| Surface | How |
+|---------|-----|
+| **Ask Ellinea** (`/app/ellinea` + float) | Pages Ask / local engine (brief, recommend, memory, DNA) |
+| **Ellinea Console** (`/app/ellinea-console`) | Owner/IT operator lab against Nest + SDK |
+| **Organization System** (`/app/org-system`) | Owner/IT capability catalog embeds local `buildDailyBriefText` / `buildEllineaRecommendations` over the enterprise snapshot — same engine semantics; not a second API |
+
 ## Client SDK
 
 `@ellines-eip/ellinea-sdk` — `createEllineaClient({ baseUrl, getAccessToken? })` wraps health / ask / brief / recommend / memorySearch / feedback. Pass `getAccessToken` when calling a locked Nest instance or any JWT-gated proxy.
