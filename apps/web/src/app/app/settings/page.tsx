@@ -65,6 +65,7 @@ export default function SystemSettingsPage() {
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
   const [orgUiPolicy, setOrgUiPolicy] = useState<OrgUiPolicy>({
     hideAskFromWorkUsers: false,
+    allowWorkRolesOrgSystem: false,
   });
   const [orgName, setOrgName] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
@@ -536,12 +537,35 @@ export default function SystemSettingsPage() {
         {orgAdmin ? (
           <div className={settingsStyles.toggleRow}>
             <div className={settingsStyles.toggleCopy}>
+              <strong>Allow work roles to open Organization System</strong>
+              <p>
+                Owner/IT policy (default off): when on, executives / managers / members / viewers
+                on this device may open the Organization System catalog and its live UEM views.
+                Owner/IT always retain access. EIP still observes Systems of Record — it does not
+                replace them.
+              </p>
+            </div>
+            <Toggle
+              on={orgUiPolicy.allowWorkRolesOrgSystem}
+              label="Toggle allow work roles Organization System"
+              onClick={() =>
+                persistOrgPolicy({
+                  ...orgUiPolicy,
+                  allowWorkRolesOrgSystem: !orgUiPolicy.allowWorkRolesOrgSystem,
+                })
+              }
+            />
+          </div>
+        ) : null}
+        {orgAdmin ? (
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
               <strong>Organization System</strong>
               <p>
-                Owner / IT Admin capability catalog over synced Systems of Record (reports, people,
-                clients/patients, branches, alerts, Ellinea brief, connectors). EIP connects and
-                observes — it does not replace ERP/CRM/HIS. Access is org-admin only for now; later
-                authorize executives / managers / other roles from here.
+                Capability catalog over synced Systems of Record (reports, people, clients/patients,
+                branches, alerts, Ellinea brief, companion deep links, connectors). EIP connects and
+                observes — it does not replace ERP/CRM/HIS. Authorize work roles with the toggle
+                above.
               </p>
             </div>
             <Link href="/app/org-system" className={styles.primaryLink}>

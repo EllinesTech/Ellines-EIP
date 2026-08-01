@@ -3,16 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isOrgAdminRole } from '@ellines-eip/shared';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
 import {
   detectHealthcareLabel,
   groupCapabilitiesByDomain,
 } from '@/lib/org-system-catalog';
+import { canAccessOrgSystem } from '@/lib/org-ui-policy';
 import styles from '../command.module.css';
 
 const PRODUCT_LEDE =
-  'Ellines EIP sits above your Systems of Record (ERP, CRM, HIS like Hospidia, HR). It connects and observes — it does not replace them. After sync, Organization System surfaces everything connected systems expose for Owner / IT (later: authorized roles). Ellinea AI stays in the loop.';
+  'Ellines EIP sits above your Systems of Record (ERP, CRM, HIS like Hospidia, HR). It connects and observes — it does not replace them. After sync, Organization System surfaces everything connected systems expose for Owner / IT (and work roles when authorized in Settings). Ellinea AI stays in the loop.';
 
 export default function OrgSystemHubPage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function OrgSystemHubPage() {
       router.replace('/login');
       return;
     }
-    if (!isOrgAdminRole(s.user.role)) {
+    if (!canAccessOrgSystem(s.user.role, s.organization.id)) {
       router.replace('/app');
       return;
     }
@@ -54,7 +54,7 @@ export default function OrgSystemHubPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
+          <p className={styles.eyebrow}>Organization System · EIP above SoR · Ellinea in the loop</p>
           <h1>Capabilities from connected systems</h1>
           <p className={styles.lede}>
             {PRODUCT_LEDE} Viewing {orgName || 'your org'}
@@ -86,9 +86,14 @@ export default function OrgSystemHubPage() {
               not invent SoR data.
             </p>
           </div>
-          <Link href="/app/connectors" className={styles.primaryLink}>
-            Open Connectors →
-          </Link>
+          <div className={styles.headerActions} style={{ justifyContent: 'flex-start', gap: '0.65rem' }}>
+            <Link href="/app/connectors" className={styles.primaryLink}>
+              Open Connectors →
+            </Link>
+            <Link href="/app/connectors#eip-autoscan" className={styles.primaryLink}>
+              Auto-scan →
+            </Link>
+          </div>
         </div>
       ) : (
         <div className={styles.opsRail}>
@@ -104,6 +109,15 @@ export default function OrgSystemHubPage() {
           </Link>
           <Link href="/app/glance" className={styles.opsLink}>
             Glance
+          </Link>
+          <Link href="/app/people" className={styles.opsLink}>
+            People
+          </Link>
+          <Link href="/app/fleet" className={styles.opsLink}>
+            Fleet
+          </Link>
+          <Link href="/app/inbox" className={styles.opsLink}>
+            Inbox
           </Link>
         </div>
       )}
@@ -131,7 +145,7 @@ export default function OrgSystemHubPage() {
                   <p className={styles.taskCardPurpose}>{cap.purpose}</p>
                   <p className={styles.taskCardCta}>
                     {av.status === 'needs-sync'
-                      ? 'Sync connector to unlock →'
+                      ? 'Sync or Auto-scan to unlock →'
                       : av.status === 'no-data'
                         ? 'Open · no data yet →'
                         : 'Open →'}

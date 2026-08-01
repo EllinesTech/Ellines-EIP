@@ -180,6 +180,15 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     view: 'recommendations',
   },
   {
+    id: 'companion-glance',
+    domain: 'intelligence',
+    title: 'Companion · Glance',
+    purpose: 'Phone companion live KPIs + Ellinea suggestions over the same enterprise snapshot.',
+    href: '/app/glance',
+    liveWhen: ['always'],
+    view: 'link',
+  },
+  {
     id: 'employees',
     domain: 'people',
     title: 'Employee register',
@@ -188,6 +197,16 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     liveWhen: ['people'],
     view: 'objects',
     objectKinds: ['person', 'user', 'staff', 'employee'],
+    emptyHint: 'Sync an HR-capable connector so people objects appear, or open Companion People.',
+  },
+  {
+    id: 'companion-people',
+    domain: 'people',
+    title: 'Companion · People',
+    purpose: 'Phone-friendly people directory — same UEM people as Employee register.',
+    href: '/app/people',
+    liveWhen: ['always'],
+    view: 'link',
   },
   {
     id: 'attendance',
@@ -202,12 +221,14 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
   {
     id: 'org-chart',
     domain: 'people',
-    title: 'Org chart / departments',
-    purpose: 'Department and branch structure from UEM — observe-only hierarchy.',
+    title: 'Departments & org chart',
+    purpose: 'Department objects from UEM — observe-only hierarchy (branches listed under Operations).',
     href: '/app/org-system/org-chart',
     liveWhen: ['departments', 'branches'],
     view: 'objects',
-    objectKinds: ['department', 'branch'],
+    objectKinds: ['department'],
+    nameHints: ['department', 'dept', 'division', 'team'],
+    emptyHint: 'Sync an HR / org-structure connector so department objects appear here.',
   },
   {
     id: 'clients-today',
@@ -232,12 +253,14 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     id: 'appointments',
     domain: 'customers',
     title: 'Appointments',
-    purpose: 'Appointment / visit / encounter stubs from clinical or CRM connectors.',
+    purpose: 'Appointment / visit / encounter objects from clinical or CRM connectors when published.',
     href: '/app/org-system/appointments',
     liveWhen: ['clients', 'timeline', 'events'],
-    view: 'stub',
-    nameHints: ['appointment', 'visit', 'encounter', 'booking'],
-    emptyHint: 'Sync a connector that publishes appointments or visits to unlock this list.',
+    view: 'objects',
+    objectKinds: ['appointment', 'visit', 'encounter', 'booking'],
+    nameHints: ['appointment', 'visit', 'encounter', 'booking', 'schedule'],
+    emptyHint:
+      'No appointment-style UEM objects yet — sync a HIS / CRM that publishes visits, or keep this as a stub until they appear.',
   },
   {
     id: 'branches',
@@ -247,7 +270,9 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     href: '/app/org-system/branches',
     liveWhen: ['branches'],
     view: 'objects',
-    objectKinds: ['branch'],
+    objectKinds: ['branch', 'site', 'location'],
+    nameHints: ['branch', 'site', 'location', 'campus'],
+    emptyHint: 'Sync a multi-site connector so branch / site objects appear here.',
   },
   {
     id: 'tasks',
@@ -257,7 +282,9 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     href: '/app/org-system/tasks',
     liveWhen: ['tasks'],
     view: 'objects',
-    objectKinds: ['task'],
+    objectKinds: ['task', 'workitem', 'ticket'],
+    nameHints: ['task', 'work item', 'ticket', 'todo'],
+    emptyHint: 'Sync a connector that publishes tasks / work items into UEM.',
   },
   {
     id: 'assets',
@@ -269,17 +296,29 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     view: 'objects',
     objectKinds: ['asset'],
     nameHints: ['fleet', 'vehicle', 'car', 'truck', 'van'],
+    emptyHint: 'Sync an assets / fleet-capable connector, or open Companion Fleet after sync.',
+  },
+  {
+    id: 'companion-fleet',
+    domain: 'operations',
+    title: 'Companion · Fleet',
+    purpose: 'Phone companion for vehicles / assets — deep link into the Work Companion surface.',
+    href: '/app/fleet',
+    liveWhen: ['always'],
+    view: 'link',
   },
   {
     id: 'inventory',
     domain: 'operations',
     title: 'Inventory snapshot',
-    purpose: 'Stock-style assets and inventory objects — read-only observe, not write-back.',
+    purpose: 'Stock-style inventory objects when the SoR publishes them — otherwise empty until sync.',
     href: '/app/org-system/inventory',
     liveWhen: ['assets'],
-    view: 'stub',
-    nameHints: ['inventory', 'stock', 'sku', 'warehouse'],
-    emptyHint: 'Sync an inventory-capable connector to unlock stock-style objects.',
+    view: 'objects',
+    objectKinds: ['inventory', 'stock', 'sku', 'warehouse'],
+    nameHints: ['inventory', 'stock', 'sku', 'warehouse', 'item'],
+    emptyHint:
+      'No inventory-style UEM objects yet — sync an inventory-capable connector. Until then this stays an observe stub.',
   },
   {
     id: 'clinical-today',
@@ -311,6 +350,8 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     liveWhen: ['documents'],
     view: 'objects',
     objectKinds: ['document'],
+    nameHints: ['document', 'file', 'pdf', 'record'],
+    emptyHint: 'Sync a DMS / file-capable connector so document objects appear here.',
   },
   {
     id: 'alerts',
@@ -320,6 +361,7 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     href: '/app/org-system/alerts',
     liveWhen: ['openAlerts', 'notifications'],
     view: 'metrics',
+    emptyHint: 'No open alerts or notification objects yet — Notification Center stays available.',
   },
   {
     id: 'decisions',
@@ -328,6 +370,15 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     purpose: 'Open decisions from the snapshot plus the local Approvals queue.',
     href: '/app/org-system/decisions',
     liveWhen: ['openDecisions'],
+    view: 'link',
+  },
+  {
+    id: 'companion-inbox',
+    domain: 'alerts',
+    title: 'Companion · Inbox',
+    purpose: 'Work email summarization companion — needs an email connector for live digest.',
+    href: '/app/inbox',
+    liveWhen: ['always'],
     view: 'link',
   },
   {
@@ -404,6 +455,21 @@ function countClients(summary: EnterpriseSummaryDto): number {
   ).length;
 }
 
+function countObjectsByKind(
+  summary: EnterpriseSummaryDto,
+  kinds: string[],
+  nameHints: string[] = [],
+): number {
+  const kindSet = new Set(kinds.map((k) => k.toLowerCase()));
+  const objects = summary.model?.objects || [];
+  const byKind = objects.filter((o) => kindSet.has(o.kind.toLowerCase())).length;
+  if (byKind) return byKind;
+  if (!nameHints.length) return 0;
+  return objects.filter((o) =>
+    nameHints.some((h) => `${o.name} ${o.status || ''} ${o.kind}`.toLowerCase().includes(h)),
+  ).length;
+}
+
 function signalValue(signal: LiveSignal, summary: EnterpriseSummaryDto | null): number {
   if (!summary || summary.status !== 'synced') return 0;
   const counts = summary.model?.counts;
@@ -413,21 +479,30 @@ function signalValue(signal: LiveSignal, summary: EnterpriseSummaryDto | null): 
     case 'synced':
       return 1;
     case 'people':
-      return counts?.people ?? (summary.model?.objects || []).filter((o) => isPeopleKind(o.kind)).length;
+      return (
+        counts?.people ||
+        countObjectsByKind(summary, ['person', 'people', 'user', 'staff', 'employee', 'worker'])
+      );
     case 'branches':
-      return counts?.branches ?? 0;
+      return counts?.branches || countObjectsByKind(summary, ['branch', 'site', 'location'], ['branch', 'site']);
     case 'departments':
-      return counts?.departments ?? 0;
+      return (
+        counts?.departments ||
+        countObjectsByKind(summary, ['department'], ['department', 'dept', 'division'])
+      );
     case 'documents':
-      return counts?.documents ?? 0;
+      return counts?.documents || countObjectsByKind(summary, ['document'], ['document', 'file']);
     case 'assets':
-      return counts?.assets ?? 0;
+      return (
+        counts?.assets ||
+        countObjectsByKind(summary, ['asset', 'inventory', 'stock'], ['fleet', 'vehicle', 'inventory', 'stock'])
+      );
     case 'tasks':
-      return counts?.tasks ?? 0;
+      return counts?.tasks || countObjectsByKind(summary, ['task', 'workitem', 'ticket'], ['task', 'ticket']);
     case 'notifications':
-      return counts?.notifications ?? 0;
+      return counts?.notifications || countObjectsByKind(summary, ['notification'], ['alert', 'notification']);
     case 'events':
-      return counts?.events ?? 0;
+      return counts?.events || (summary.timeline?.length ?? 0);
     case 'openAlerts':
       return summary.openAlerts || 0;
     case 'openDecisions':

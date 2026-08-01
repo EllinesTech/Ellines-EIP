@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { isOrgAdminRole } from '@ellines-eip/shared';
 import {
   fetchEnterpriseSummary,
   getSession,
@@ -21,6 +20,7 @@ import {
   type OrgSystemCapability,
 } from '@/lib/org-system-catalog';
 import { filterTodayTimelineEvents } from '@/lib/org-system';
+import { canAccessOrgSystem } from '@/lib/org-ui-policy';
 import styles from '../../command.module.css';
 
 function UnlockCta({ hint }: { hint?: string }) {
@@ -88,6 +88,13 @@ function CapabilityBody({
     () => filterTodayTimelineEvents(summary?.timeline || []),
     [summary],
   );
+  const alertishTimeline = useMemo(() => {
+    const all = summary?.timeline || [];
+    const hit = all.filter((e) =>
+      /alert|warn|critical|risk|pressure|incident/i.test(`${e.title} ${e.detail}`),
+    );
+    return hit.length ? hit : all.slice(0, 6);
+  }, [summary]);
   const brief = useMemo(() => {
     if (!synced || !summary) return '';
     return buildDailyBriefText(summary, {
@@ -188,38 +195,83 @@ function CapabilityBody({
           </div>
         </div>
         {cap.id === 'alerts' ? (
-          <section className={styles.card} style={{ marginTop: '0.75rem' }}>
-            <div className={styles.cardHead}>
-              <div>
-                <div className={styles.panelLabel}>Notifications · UEM</div>
-                <h2 className={styles.cardTitle}>
-                  {(summary!.model?.counts?.notifications ?? 0) > 0
-                    ? `${summary!.model!.counts.notifications} notification count(s)`
-                    : 'No notification objects in snapshot'}
-                </h2>
+          <>
+            <section className={styles.card} style={{ marginTop: '0.75rem' }}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.panelLabel}>Alerts digest</div>
+                  <h2 className={styles.cardTitle}>
+                    {summary!.openAlerts
+                      ? `${summary!.openAlerts} open alert(s) in snapshot`
+                      : 'No open alert count — timeline pressure below'}
+                  </h2>
+                </div>
+                <Link href="/app/notifications" className={styles.primaryLink}>
+                  Notification Center →
+                </Link>
               </div>
-              <Link href="/app/notifications" className={styles.primaryLink}>
-                Notification Center →
-              </Link>
-            </div>
-            <ObjectList
-              items={(summary!.model?.objects || []).filter((o) => o.kind === 'notification')}
-            />
-            {av.status === 'no-data' ? (
-              <p className={styles.lede} style={{ marginTop: '0.55rem' }}>
-                Alert pressure is zero and no notification objects yet — still observe-only.
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-        {cap.id === 'finance' && av.status === 'no-data' ? (
-          <UnlockCta hint={cap.emptyHint} />
+              {alertishTimeline.length ? (
+                <ul className={styles.list} style={{ marginTop: '0.85rem' }}>
+                  {alertishTimeline.map((event, i) => (
+                    <li key={`${event.title}-${i}`}>
+                      <span className={styles.dot} />
+                      <div>
+                        <strong>{event.title}</strong>
+                        <p>{event.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <UnlockCta hint={cap.emptyHint} />
+              )}
+            </section>
+            <section className={styles.card} style={{ marginTop: '0.75rem' }}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.panelLabel}>Notifications · UEM</div>
+                  <h2 className={styles.cardTitle}>
+                    {(summary!.model?.counts?.notifications ?? 0) > 0
+                      ? `${summary!.model!.counts.notifications} notification count(s)`
+                      : 'No notification objects in snapshot'}
+                  </h2>
+                </div>
+                <Link href="/app/inbox" className={styles.primaryLink}>
+                  Companion Inbox →
+                </Link>
+              </div>
+              <ObjectList
+                items={(summary!.model?.objects || []).filter(
+                  (o) =>
+                    o.kind.toLowerCase() === 'notification' ||
+                    /alert|notification/i.test(`${o.name} ${o.status || ''}`),
+                )}
+              />
+            </section>
+          </>
         ) : null}
         {cap.id === 'finance' ? (
-          <p className={styles.lede} style={{ marginTop: '0.75rem' }}>
-            Finance-specific GL / AP metrics appear when a finance SoR publishes them into UEM.
-            Until then EIP surfaces health and decision pressure only.
-          </p>
+          <>
+            <section className={styles.card} style={{ marginTop: '0.75rem' }}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.panelLabel}>Finance glance</div>
+                  <h2 className={styles.cardTitle}>
+                    Health {summary!.healthScore} · decisions {summary!.openDecisions}
+                  </h2>
+                </div>
+                <Link href="/app/glance" className={styles.primaryLink}>
+                  Companion Glance →
+                </Link>
+              </div>
+              <p className={styles.lede} style={{ marginTop: '0.55rem' }}>
+                Finance-specific GL / AP metrics appear when a finance SoR publishes them into UEM.
+                Until then EIP surfaces health and decision pressure only — observe, do not replace
+                the ledger.
+              </p>
+            </section>
+            {av.status === 'no-data' ? <UnlockCta hint={cap.emptyHint} /> : null}
+          </>
         ) : null}
       </>
     );
@@ -330,6 +382,16 @@ function CapabilityBody({
             Companion People →
           </Link>
         ) : null}
+        {cap.id === 'branches' ? (
+          <Link href="/app/admin" className={styles.primaryLink}>
+            Org Admin branches →
+          </Link>
+        ) : null}
+        {cap.id === 'org-chart' ? (
+          <Link href="/app/admin" className={styles.primaryLink}>
+            Org Admin depts →
+          </Link>
+        ) : null}
       </div>
       {objects.length ? (
         <ObjectList items={objects} />
@@ -358,7 +420,7 @@ export default function OrgSystemCapabilityClient() {
       router.replace('/login');
       return;
     }
-    if (!isOrgAdminRole(s.user.role)) {
+    if (!canAccessOrgSystem(s.user.role, s.organization.id)) {
       router.replace('/app');
       return;
     }
@@ -391,7 +453,8 @@ export default function OrgSystemCapabilityClient() {
           <p className={styles.eyebrow}>Organization System · EIP above SoR</p>
           <h1>{cap.title}</h1>
           <p className={styles.lede}>
-            {cap.purpose} Observe-only — Ellines EIP does not replace the System of Record.
+            {cap.purpose} Observe-only — Ellines EIP does not replace the System of Record. Ellinea
+            AI stays in the loop.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -403,6 +466,9 @@ export default function OrgSystemCapabilityClient() {
           </Link>
           <Link href="/app/connectors" className={styles.ghostBtn}>
             Connectors
+          </Link>
+          <Link href="/app/connectors#eip-autoscan" className={styles.ghostBtn}>
+            Auto-scan
           </Link>
         </div>
       </header>
@@ -418,6 +484,9 @@ export default function OrgSystemCapabilityClient() {
             {summary.connectorName}
           </span>
         ) : null}
+        <Link href="/app/glance" className={styles.opsLink}>
+          Glance
+        </Link>
       </div>
 
       <CapabilityBody cap={cap} summary={summary} orgName={orgName} role={role} />

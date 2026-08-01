@@ -41,6 +41,8 @@ type NavItem = {
   label: string;
   adminOnly?: boolean;
   platformOnly?: boolean;
+  /** Shown for Owner/IT, or work roles when Settings allowWorkRolesOrgSystem is on. */
+  orgSystemAccess?: boolean;
   icon: ReactNode;
 };
 
@@ -233,7 +235,7 @@ const NAV: NavItem[] = [
     href: '/app/org-system',
     label: 'Organization System',
     icon: <IconOrgSystem />,
-    adminOnly: true,
+    orgSystemAccess: true,
   },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
@@ -269,6 +271,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [dropTargetHref, setDropTargetHref] = useState<string | null>(null);
   const [orgUiPolicy, setOrgUiPolicy] = useState<OrgUiPolicy>({
     hideAskFromWorkUsers: false,
+    allowWorkRolesOrgSystem: false,
   });
 
   useEffect(() => {
@@ -379,7 +382,9 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const orgAdmin = isOrgAdminRole(session.user.role);
   const platformAdmin = Boolean(session.isPlatformAdmin);
   const isClientShell = !orgAdmin && !platformAdmin;
+  const orgSystemAllowed = orgAdmin || orgUiPolicy.allowWorkRolesOrgSystem;
   const filteredNav = NAV.filter((item) => {
+    if (item.orgSystemAccess && !orgSystemAllowed) return false;
     if (item.adminOnly && !orgAdmin) return false;
     if (item.platformOnly && !platformAdmin) return false;
     if (item.href === '/app/approvals' && !uiPrefs.showApprovalsNav) return false;

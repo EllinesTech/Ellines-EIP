@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isOrgAdminRole } from '@ellines-eip/shared';
 import { fetchEnterpriseSummary, getSession, type EnterpriseSummaryDto } from '@/lib/api';
 import {
   detectHealthcareLabel,
   filterTodayClientObjects,
   filterTodayTimelineEvents,
 } from '@/lib/org-system';
+import { canAccessOrgSystem } from '@/lib/org-ui-policy';
 import styles from '../../command.module.css';
 
 type LabelMode = 'auto' | 'patients' | 'clients';
@@ -27,7 +27,7 @@ export default function OrgSystemClientsTodayPage() {
       router.replace('/login');
       return;
     }
-    if (!isOrgAdminRole(s.user.role)) {
+    if (!canAccessOrgSystem(s.user.role, s.organization.id)) {
       router.replace('/app');
       return;
     }
@@ -116,9 +116,14 @@ export default function OrgSystemClientsTodayPage() {
               from the System of Record.
             </p>
           </div>
-          <Link href="/app/connectors" className={styles.primaryLink}>
-            Open Connectors →
-          </Link>
+          <div className={styles.headerActions} style={{ justifyContent: 'flex-start', gap: '0.65rem' }}>
+            <Link href="/app/connectors" className={styles.primaryLink}>
+              Open Connectors →
+            </Link>
+            <Link href="/app/connectors#eip-autoscan" className={styles.primaryLink}>
+              Auto-scan →
+            </Link>
+          </div>
         </div>
       ) : null}
 
