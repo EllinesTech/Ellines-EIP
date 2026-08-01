@@ -338,3 +338,62 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 ---
 
 *Last status review: 2026-08-01*
+
+
+---
+
+## v1.1 Tracks D, A, B, C — Ready to Start (Parallel Execution)
+
+**Status:** ✅ Track E complete; D/A/B/C ready to kickoff  
+**Timeline:** 4–5 weeks total (3 weeks dev + 1 week QA + 1 week deploy)  
+**Team:** 5 engineers (1 on D, 1 on A, 1.5 on B, 1 on C, 0.5 QA)  
+**Execution:** All 4 tracks in parallel (no inter-dependencies; all depend on Track D)
+
+### Track D: Advanced RBAC (Custom Roles & Permissions)
+**Lead:** Backend engineer (RBAC expert)  
+**What:** 50+ permissions, custom roles, elevation, delegation  
+**Deliverables:** Permission evaluator, role CRUD APIs, Settings UI  
+**Effort:** 2–3 weeks  
+**Docs:** `docs/29_Track_D_RBAC_Implementation.md`
+
+### Track A: Enterprise Connectors (System-Agnostic Templates)
+**Lead:** Backend engineer  
+**What:** Pre-built templates for 20+ systems (Salesforce, SAP, Workday, etc.)  
+**Deliverables:** Template library, gallery UI, installer wizard  
+**Effort:** 2–3 weeks  
+**Docs:** `docs/19_v1.1_Enterprise_Connectors_Framework.md`
+
+### Track B: BI Dashboards (Custom KPI Builder)
+**Lead:** Frontend engineer (UI/Designer)  
+**What:** Drag-drop dashboard builder, widgets, alerts, export  
+**Deliverables:** Dashboard CRUD, editor UI, 5 widget types, alerts  
+**Effort:** 2–3 weeks  
+**Docs:** `docs/20_v1.1_BI_Dashboards.md`
+
+### Track C: Autonomous Workflows (AI Agent Rules)
+**Lead:** Backend engineer (scheduler/rules)  
+**What:** 3 autonomy levels, rule evaluator, cron scheduler  
+**Deliverables:** Rule CRUD, execution history, workflow UI, cron jobs  
+**Effort:** 2–3 weeks  
+**Docs:** `docs/21_v1.1_Autonomous_Workflows.md`
+
+### Quick Start Guide
+See `docs/30_Tracks_A_B_C_Overview.md` for parallel execution strategy.
+
+---
+
+## Overall v1.1 Status
+
+```
+✅ Track E (OAuth2/SAML):     100% — Deployed to production
+🚀 Track D (RBAC):           0% — Ready to start
+🚀 Track A (Connectors):     0% — Ready to start
+🚀 Track B (Dashboards):     0% — Ready to start
+🚀 Track C (Workflows):      0% — Ready to start
+
+Total v1.1 Progress: 20% (E done, D/A/B/C queued)
+```
+
+---
+
+## Phase 7 — Mobile Work Companion (web PWA now; native v1.1+)
