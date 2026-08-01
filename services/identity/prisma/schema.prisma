@@ -21,6 +21,8 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  /** Optional parent org for multi-company groups (v1.1). Null = top-level org. */
+  parentOrgId String? @map("parent_org_id")
   /** Display prefs e.g. { timeFormat, dateStyle } — org/platform admin editable. */
   settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
@@ -37,7 +39,11 @@ model Organization {
   businessRules          BusinessRule[]
   scheduledReports       ScheduledReport[]
   enterpriseEvents       EnterpriseEvent[]
+  memberships            OrganizationMembership[]
+  childOrgs              Organization[]           @relation("OrgParent")
+  parentOrg              Organization?            @relation("OrgParent", fields: [parentOrgId], references: [id], onDelete: SetNull)
 
+  @@index([parentOrgId])
   @@map("organizations")
 }
 
@@ -89,9 +95,33 @@ model User {
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  memberships         OrganizationMembership[]
 
   @@index([organizationId])
   @@map("users")
+}
+
+/**
+ * v1.1 — Multi-company membership.
+ * A User can belong to multiple Organizations with different roles.
+ * The primary org remains User.organizationId (backward compat).
+ */
+model OrganizationMembership {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  organizationId String   @map("organization_id")
+  role           UserRole @default(member)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("organization_memberships")
 }
 
 model PasswordResetToken {

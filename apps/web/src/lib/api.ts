@@ -29,12 +29,23 @@ export interface AuthOrganization {
   slug: string;
 }
 
+export interface OrgMembership {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+  isPrimary: boolean;
+  parentOrgId: string | null;
+}
+
 export interface AuthSession {
   accessToken: string;
   expiresIn: string;
   user: AuthUser;
   organization: AuthOrganization;
   isPlatformAdmin?: boolean;
+  /** v1.1 — all orgs this user belongs to; populated after listMyOrgs() */
+  orgs?: OrgMembership[];
 }
 
 export interface OrgMember {
@@ -963,4 +974,36 @@ export function publishEnterpriseEventApi(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// ─── v1.1 — Multi-company / Multi-org ────────────────────────────────────────
+
+/** List all organizations the current user belongs to. */
+export function listMyOrgs() {
+  return request<OrgMembership[]>('/api/v1/orgs/my-orgs');
+}
+
+/**
+ * Switch active organization.
+ * Returns a fresh AuthSession with a new JWT scoped to the target org.
+ */
+export function switchOrg(organizationId: string) {
+  return request<AuthSession>('/api/v1/orgs/switch', {
+    method: 'POST',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+/**
+ * Owner: create a new child organization linked to the current one.
+ * The owner automatically gets an owner membership in the child.
+ */
+export function createChildOrg(name: string) {
+  return request<{ id: string; name: string; slug: string; parentOrgId: string; createdAt: string }>(
+    '/api/v1/orgs/me/create-child',
+    {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    },
+  );
 }

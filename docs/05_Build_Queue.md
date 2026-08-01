@@ -43,10 +43,11 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~99% | Owner/IT path solid; Organization System capability catalog |
-| **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
-| **5 — Workflow & Automation** | ~100% | Approvals, rules, reports, event bus — all server-persisted (Pages Functions + Prisma/Nest); localStorage fallback |
+| **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade |
+| **5 — Workflow & Automation** | ~100% | Approvals, rules, reports, event bus — all server-persisted |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | 7.1–7.8 `done` | Web PWA companion complete; native apps remain future |
+| **v1.1 — Multi-company** | `done` | OrganizationMembership + parentOrgId; my-orgs, switch, create-child APIs; OrgSwitcher UI; child-org in Admin |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
@@ -247,6 +248,8 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
+- **v1.1 Multi-company consolidation:** `OrganizationMembership` join table + `Organization.parentOrgId` self-FK added to Prisma schema (db:push synced). NestJS `MultiOrgService` in identity: `GET /api/v1/orgs/my-orgs`, `POST /api/v1/orgs/switch` (new JWT for target org), `POST /api/v1/orgs/me/create-child` (Owner only). Matching Cloudflare Pages Functions for all three endpoints. `AuthSession.orgs[]` field in `api.ts`. `OrgSwitcher` dropdown component (lazy-loads org list, zero-regression on single-org). "Create linked org" section in `/app/admin` (Owner only). Org name in topbar now shows the switcher + role pill.
+
 - **Phase 5 server-side workflow:** Prisma models (`ApprovalRequest`, `ApprovalStep`, `BusinessRule`, `ScheduledReport`, `EnterpriseEvent`) added to schema + `db:push` synced. NestJS `WorkflowModule` (controller + service + DTOs) in `services/identity` — REST endpoints for approvals, rules, reports, events under `/api/v1/orgs/me/`. Matching Cloudflare Pages Functions for same-origin static site (approvals GET/POST, decide, rules CRUD, reports CRUD + run, events GET/POST). Frontend pages (Approvals, Rules, Reports) call server first with localStorage fallback. Event bus drains to server on every publish. Phase 5 now 100%.
 
 - **Auto-scan generic SoR fix:** Exact URL IT enters is primary (any path); REST/OpenAPI wizard prefill from app base; Hospidia/HIS/ERP/CRM are optional keyword bonuses only; DB ports opt-in collapsed hints; scan ≠ connect UX + troubleshooting.
@@ -275,7 +278,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Foundation web + Phase 5 server-side workflow (approvals/rules/reports/events fully persisted) + Phase 7 web companion (7.1–7.8) + Organization System capability catalog complete. No queued `next` / `in_progress` / implementable `todo`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
+**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API). Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps and marketplace remain v1.1+/v2.0.
 ---
 
 ## Agent run protocol

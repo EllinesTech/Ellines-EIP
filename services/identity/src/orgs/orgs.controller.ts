@@ -19,6 +19,7 @@ import {
   type OrgDateTimeSettings,
 } from '@ellines-eip/shared';
 import { OrgsService } from './orgs.service';
+import { MultiOrgService } from './multi-org.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -32,6 +33,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class OrgsController {
   constructor(
     private readonly orgs: OrgsService,
+    private readonly multiOrg: MultiOrgService,
     private readonly config: ConfigService,
   ) {}
 
@@ -133,5 +135,37 @@ export class OrgsController {
     @Body() dto: CreateDepartmentDto,
   ) {
     return this.orgs.createDepartment(req.user.organizationId, dto);
+  }
+
+  // ── Multi-org (v1.1) ────────────────────────────────────────────────────
+
+  /** GET /api/v1/orgs/my-orgs — list all orgs this user belongs to */
+  @Get('my-orgs')
+  listMyOrgs(@Request() req: { user: { userId: string } }) {
+    return this.multiOrg.listMyOrgs(req.user.userId);
+  }
+
+  /** POST /api/v1/orgs/switch — issue a new token for a different org */
+  @Post('switch')
+  switchOrg(
+    @Request() req: { user: { userId: string } },
+    @Body() body: { organizationId: string },
+  ) {
+    return this.multiOrg.switchOrg(req.user.userId, body.organizationId);
+  }
+
+  /** POST /api/v1/orgs/me/create-child — Owner creates a linked child org */
+  @Post('me/create-child')
+  @Roles('owner')
+  createChildOrg(
+    @Request() req: { user: { userId: string; organizationId: string; role: string } },
+    @Body() body: { name: string },
+  ) {
+    return this.multiOrg.createChildOrg(
+      req.user.userId,
+      req.user.role,
+      req.user.organizationId,
+      body.name,
+    );
   }
 }

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState, type DragEvent } from 'react';
 import { isOrgAdminRole, isOrgOwnerRole, formatOrgDateTime } from '@ellines-eip/shared';
 import EllineaChatPanel from '@/components/ellinea-chat';
+import { OrgSwitcher } from '@/components/org-switcher';
 import {
   AuthSession,
   cacheOrgDateTimeSettings,
@@ -15,6 +16,7 @@ import {
   PROFILE_UPDATED_EVENT,
   readCachedOrgDateTimeSettings,
   refreshSessionFlags,
+  setSession,
   type OrgDateTimeSettingsDto,
 } from '@/lib/api';
 import {
@@ -679,8 +681,16 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
             ) : (
               <div className={styles.orgBlock}>
                 <div className={styles.orgName}>{pageTitle}</div>
-                <div className={styles.roleLabel}>
-                  {session.organization.name} · {session.user.role}
+                <div className={styles.roleLabel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <OrgSwitcher
+                    session={session}
+                    onSwitch={(next) => {
+                      setSessionState(next);
+                      setSession(next);
+                    }}
+                  />
+                  <span style={{ opacity: 0.5 }}>·</span>
+                  {session.user.role}
                   {platformAdmin ? ' · platform' : ''}
                 </div>
               </div>

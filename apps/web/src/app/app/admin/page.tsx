@@ -44,6 +44,8 @@ export default function AdminPage() {
   const [branchCode, setBranchCode] = useState('');
   const [deptName, setDeptName] = useState('');
   const [deptBranchId, setDeptBranchId] = useState('');
+  const [childOrgName, setChildOrgName] = useState('');
+  const [childOrgNotice, setChildOrgNotice] = useState('');
 
   useEffect(() => {
     const s = getSession();
@@ -424,6 +426,51 @@ export default function AdminPage() {
           </table>
         )}
       </section>
+
+      {/* v1.1 — Multi-company: Owner can create a linked child org */}
+      {isOwner && (
+        <section className={styles.brief} style={{ marginTop: '0.85rem' }}>
+          <div className={styles.panelLabel}>Linked organizations (v1.1)</div>
+          <p className={styles.lede}>
+            Create a child organization inside this group. You become its Owner and can switch to it
+            from the org switcher in the top bar.
+          </p>
+          <form
+            className={adminStyles.form}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              setBusy(true);
+              setError('');
+              try {
+                const { createChildOrg } = await import('@/lib/api');
+                await createChildOrg(childOrgName.trim());
+                setChildOrgName('');
+                setChildOrgNotice(`Linked org "${childOrgName.trim()}" created. Use the org switcher in the top bar to switch into it.`);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to create linked org');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <label>
+              Organization name
+              <input
+                value={childOrgName}
+                onChange={(e) => setChildOrgName(e.target.value)}
+                placeholder="Nairobi Branch Co."
+                required
+                minLength={2}
+              />
+            </label>
+            <button type="submit" className={adminStyles.primary} disabled={busy || !childOrgName.trim()}>
+              {busy ? 'Creating…' : 'Create linked org'}
+            </button>
+          </form>
+          {childOrgNotice ? <p className={adminStyles.notice}>{childOrgNotice}</p> : null}
+        </section>
+      )}
     </div>
   );
 }
