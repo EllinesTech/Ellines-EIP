@@ -28,8 +28,9 @@ EIP sits **above** existing systems (ERP, CRM, etc.). It connects and observes; 
 
 - **Live web:** Cloudflare Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (static UI + same-origin `/api/v1` auth Functions)
 - **Identity (Nest / Fly):** optional full microservice — see `docs/08_Live_Identity_Setup.md`
-- **Working:** Identity schema + auth (Pages Functions + Nest), access layers (Work Console / IT Admin / Platform), role-adaptive Command Center
-- **Not built yet:** API gateway, integration-hub, ellinea-ai, workflow, notification; real connectors; live KPIs; Ellinea chat
+- **Working:** Identity + auth, access layers, role-adaptive Command Center, connectors (incl. SQL), Ellinea Ask/Console/SDK, workflow stubs (approvals/rules/reports), notification outbox (SMTP/VAPID when secrets set), Phase 7 **web** companion (PWA shell, fleet/people/glance/inbox)
+- **Human blockers:** Pages secrets for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly
+- **Not in queue:** Native iOS/Android apps; marketplace / digital twin / multi-company
 
 Full checklist: `docs/05_Build_Queue.md`.
 
