@@ -244,9 +244,9 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | E.5 | Pages Functions: SSO provider management | `done` | 7 endpoints: GET/POST providers, GET/PATCH/DELETE by ID, test connectivity, linked users |
 | E.6 | Public org SSO provider fetch endpoint | `done` | GET /api/v1/orgs/{slug}/sso-providers for login page |
 | E.7 | Build verification | `done` | All TypeScript builds pass; 73 Pages Functions verified |
-| E.8 | Settings UI: SSO provider configuration | `next` | Build form in `/app/settings/sso` for Owner/Admin |
-| E.9 | Testing: Real Azure AD + Okta | `todo` | Requires real IdP tenants |
-| E.10 | Documentation: User guide + API spec | `todo` | Deployment runbook for SSO setup |
+| E.8 | Settings UI: SSO provider configuration | `done` | OAuth2/SAML forms, provider list, test/delete, help text |
+| E.9 | Testing: Real Azure AD + Okta | `blocked` | Human: requires real IdP test tenants (out of agent scope) |
+| E.10 | Documentation: User guide + API spec | `next` | Deployment runbook for SSO setup |
 
 ---
 
@@ -299,7 +299,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–3 (supreme upgrades) + Sprint 4 (security/quality hardening). All major features shipped, tested, and deployed to production. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue now empty — ready for v1.1 roadmap (Webhooks, Enterprise Connectors, BI Dashboards, Autonomous Agents).
+**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–4 (supreme upgrades + security hardening). **Track E (OAuth2/SAML SSO)**: 80% complete — backend APIs + frontend Settings UI deployed; blocked on real IdP testing. All major features shipped, tested, and deployed to production. Remaining v1.1 human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN` + IdP test tenants for SSO. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue: Track E near-complete (E.9 blocked on external IdP); ready to start Track D (Advanced RBAC) or other parallel tracks.
 ---
 
 ## Agent run protocol
