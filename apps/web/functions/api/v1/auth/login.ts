@@ -1,4 +1,4 @@
-import { getAdminClient, json, options, signAccessToken, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, signAccessToken, getClientIp, auditRow, type Env } from '../../../shared/auth';
 import {
   isOrganizationSuspended,
   isPlatformAdminEmail,
@@ -57,13 +57,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       );
     }
 
-    await supabase.from('audit_logs').insert({
-      id: crypto.randomUUID(),
-      organization_id: user.organization_id,
-      user_id: user.id,
-      action: 'auth.login',
-      resource: 'user',
-    });
+    const ip = getClientIp(context.request);
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: user.organization_id as string,
+        userId: user.id as string,
+        action: 'auth.login',
+        resource: 'user',
+        ip,
+      })
+    );
 
     const tokens = await signAccessToken(context.env, {
       sub: user.id as string,

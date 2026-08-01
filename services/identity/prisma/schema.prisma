@@ -198,6 +198,7 @@ model ConnectorInstallation {
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   pack         ConnectorPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
+  @@unique([organizationId, packId])
   @@index([organizationId])
   @@map("connector_installations")
 }

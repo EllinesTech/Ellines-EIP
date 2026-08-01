@@ -9,8 +9,15 @@ import {
   options,
   requireAuth,
   signAccessToken,
+  getClientIp,
+  auditRow,
   type Env,
 } from '../../../shared/auth';
+import {
+  isOrganizationSuspended,
+  parsePlatformAdminEmails,
+  isPlatformAdminEmail,
+} from '@ellines-eip/shared';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -71,12 +78,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Load target org
   const { data: org, error: orgErr } = await supabase
     .from('organizations')
-    .select('id, name, slug')
+    .select('id, name, slug, settings')
     .eq('id', targetOrgId)
     .maybeSingle();
 
   if (orgErr) return json({ statusCode: 500, message: orgErr.message }, 500);
   if (!org) return json({ statusCode: 404, message: 'Organization not found' }, 404);
+
+  // Check suspension status (platform admins bypass)
+  const allowlist = parsePlatformAdminEmails(context.env.PLATFORM_ADMIN_EMAILS);
+  if (isOrganizationSuspended(org.settings) && !isPlatformAdminEmail(auth.email, allowlist)) {
+    return json(
+      { statusCode: 403, message: 'Cannot switch to a suspended organization. Contact Ellines support.' },
+      403,
+    );
+  }
 
   // Issue new token
   const tokens = await signAccessToken(context.env, {
@@ -86,13 +102,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     role: roleInTargetOrg,
   });
 
-  await supabase.from('audit_logs').insert({
-    organization_id: targetOrgId,
-    user_id: auth.sub,
-    action: 'auth.switch_org',
-    resource: 'organization',
-    metadata: { fromOrgId: user.organization_id, toOrgId: targetOrgId },
-  });
+  const ip = getClientIp(context.request);
+  await supabase.from('audit_logs').insert(
+    auditRow({
+      organizationId: targetOrgId,
+      userId: auth.sub,
+      action: 'auth.switch_org',
+      resource: 'organization',
+      metadata: { fromOrgId: user.organization_id, toOrgId: targetOrgId },
+      ip,
+    })
+  );
 
   return json({
     ...tokens,

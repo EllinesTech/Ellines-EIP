@@ -1,4 +1,4 @@
-import { getAdminClient, json, options, signAccessToken, BCRYPT_ROUNDS, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, signAccessToken, BCRYPT_ROUNDS, getClientIp, auditRow, type Env } from '../../../shared/auth';
 
 function slugify(name: string): string {
   return name
@@ -94,14 +94,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: userErr.message }, 500);
     }
 
-    await supabase.from('audit_logs').insert({
-      id: crypto.randomUUID(),
-      organization_id: orgId,
-      user_id: userId,
-      action: 'auth.register',
-      resource: 'organization',
-      created_at: now,
-    });
+    const ip = getClientIp(context.request);
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: orgId,
+        userId: userId,
+        action: 'auth.register',
+        resource: 'organization',
+        ip,
+      })
+    );
 
     const tokens = await signAccessToken(context.env, {
       sub: userId,

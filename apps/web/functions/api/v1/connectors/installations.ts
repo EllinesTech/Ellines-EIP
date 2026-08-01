@@ -4,6 +4,8 @@ import {
   options,
   requireAuth,
   requireOrgAdmin,
+  getClientIp,
+  auditRow,
   type Env,
 } from '../../../shared/auth';
 import { toInstallationDto, type InstallConfig } from '../../../shared/connectors';
@@ -69,6 +71,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         .eq('published', true)
         .maybeSingle();
       if (!pack) return json({ statusCode: 404, message: 'Connector pack not found' }, 404);
+
+      // Check uniqueness: one installation per (org, pack) pair
+      const { data: existing } = await supabase
+        .from('connector_installations')
+        .select('id')
+        .eq('organization_id', auth.organizationId)
+        .eq('pack_id', packId)
+        .maybeSingle();
+      if (existing) {
+        return json(
+          { statusCode: 409, message: 'This connector pack is already installed in your organization' },
+          409,
+        );
+      }
+
       config = {
         ...((pack.template_config || {}) as InstallConfig),
         ...config,
@@ -96,14 +113,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .single();
     if (error) return json({ statusCode: 500, message: error.message }, 500);
 
-    await supabase.from('audit_logs').insert({
-      id: crypto.randomUUID(),
-      organization_id: auth.organizationId,
-      user_id: auth.sub,
-      action: 'connector.install.create',
-      resource: 'connector_installation',
-      metadata: { id: row.id, catalogId },
-    });
+    const ip = getClientIp(context.request);
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'connector.install.create',
+        resource: 'connector_installation',
+        metadata: { id: row.id, catalogId },
+        ip,
+      })
+    );
 
     return json(toInstallationDto(data as Record<string, unknown>));
   }

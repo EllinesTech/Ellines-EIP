@@ -130,13 +130,19 @@ export async function verifyAccessToken(
 export async function requireAuth(
   env: Env,
   request: Request,
-): Promise<{ sub: string; email: string; organizationId: string; role: string } | Response> {
+): Promise<{ sub: string; email: string; organizationId: string; role: string; ip: string } | Response> {
   const token = bearerToken(request);
   if (!token) {
     return json({ statusCode: 401, message: 'Unauthorized' }, 401);
   }
   try {
-    return await verifyAccessToken(env, token);
+    const claims = await verifyAccessToken(env, token);
+    // Capture IP from Cloudflare header for audit logs
+    const ip =
+      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      '';
+    return { ...claims, ip };
   } catch {
     return json({ statusCode: 401, message: 'Unauthorized' }, 401);
   }
@@ -245,4 +251,39 @@ export async function verifySsoChallenge(
     throw new Error('Invalid SSO token payload');
   }
   return { sub, email, organizationId, role };
+}
+
+/**
+ * Extract client IP from Cloudflare headers.
+ * cf-connecting-ip is the most reliable on Cloudflare Workers/Pages.
+ */
+export function getClientIp(request: Request): string {
+  return (
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    ''
+  );
+}
+
+/**
+ * Build an audit log row with optional IP.
+ * Centralises the audit_logs insert shape so all call sites stay consistent.
+ */
+export function auditRow(params: {
+  organizationId: string;
+  userId?: string | null;
+  action: string;
+  resource?: string;
+  metadata?: Record<string, unknown>;
+  ip?: string;
+}) {
+  return {
+    id: crypto.randomUUID(),
+    organization_id: params.organizationId,
+    user_id: params.userId ?? null,
+    action: params.action,
+    resource: params.resource ?? null,
+    metadata: params.metadata ?? null,
+    ip_address: params.ip ?? null,
+  };
 }

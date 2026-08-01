@@ -7,6 +7,8 @@ import {
   options,
   requireAuth,
   requireOrgAdmin,
+  getClientIp,
+  auditRow,
   type Env,
   type UserRole,
 } from '../../../../../shared/auth';
@@ -66,6 +68,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (assignErr) {
         return json({ statusCode: 403, message: assignErr }, 403);
       }
+      
+      // Enforce: only 1 owner per org
+      if (body.role === 'owner' && target.role !== 'owner') {
+        const { data: existingOwners } = await supabase
+          .from('users')
+          .select('id')
+          .eq('organization_id', auth.organizationId)
+          .eq('role', 'owner')
+          .eq('is_active', true);
+        if (existingOwners && existingOwners.length > 0) {
+          return json(
+            { statusCode: 403, message: 'An organization can have only one owner. Demote the existing owner first.' },
+            403,
+          );
+        }
+      }
+
       if (target.role === 'owner' && body.role !== 'owner') {
         const lastOwner = await isLastActiveOwner(
           supabase,
@@ -120,18 +139,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: error.message }, 500);
     }
 
-    await supabase.from('audit_logs').insert({
-      id: crypto.randomUUID(),
-      organization_id: auth.organizationId,
-      user_id: auth.sub,
-      action: 'org.update_user',
-      resource: 'user',
-      metadata: {
-        targetUserId: updated.id,
-        role: updated.role,
-        isActive: updated.is_active,
-      },
-    });
+    const ip = getClientIp(context.request);
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'org.update_user',
+        resource: 'user',
+        metadata: {
+          targetUserId: updated.id,
+          role: updated.role,
+          isActive: updated.is_active,
+        },
+        ip,
+      })
+    );
 
     return json({
       id: updated.id,

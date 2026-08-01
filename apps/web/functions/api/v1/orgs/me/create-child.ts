@@ -9,8 +9,13 @@ import {
   options,
   requireAuth,
   requireOrgAdmin,
+  getClientIp,
+  auditRow,
   type Env,
 } from '../../../../shared/auth';
+import {
+  isOrganizationSuspended,
+} from '@ellines-eip/shared';
 
 function slugify(name: string): string {
   return name
@@ -68,6 +73,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
   // If no membership row (legacy single-org), auth.role check above suffices
+
+  // Check parent org suspension status
+  const { data: parentOrg, error: parentOrgErr } = await supabase
+    .from('organizations')
+    .select('id, settings')
+    .eq('id', auth.organizationId)
+    .maybeSingle();
+
+  if (parentOrgErr) {
+    return json({ statusCode: 500, message: parentOrgErr.message }, 500);
+  }
+
+  if (parentOrg && isOrganizationSuspended(parentOrg.settings)) {
+    return json(
+      { statusCode: 403, message: 'Cannot create child organizations while parent is suspended' },
+      403,
+    );
+  }
 
   let body: { name?: string };
   try {
@@ -132,14 +155,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 500, message: memberErr.message }, 500);
   }
 
-  await supabase.from('audit_logs').insert({
-    organization_id: auth.organizationId,
-    user_id: auth.sub,
-    action: 'org.create_child',
-    resource: 'organization',
-    metadata: { childOrgId, childOrgName: name },
-    created_at: now,
-  });
+  const ip = getClientIp(context.request);
+  await supabase.from('audit_logs').insert(
+    auditRow({
+      organizationId: auth.organizationId,
+      userId: auth.sub,
+      action: 'org.create_child',
+      resource: 'organization',
+      metadata: { childOrgId, childOrgName: name },
+      ip,
+    })
+  );
 
   return json({
     id: childOrgId,
