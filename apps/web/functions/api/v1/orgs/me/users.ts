@@ -10,6 +10,7 @@ import {
   type Env,
   type UserRole,
 } from '../../../../shared/auth';
+import { sendOutboundEmail, resolveMailConfig } from '../../../../shared/mail';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -113,6 +114,40 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         metadata: { email, role },
       });
 
+      // ── Send welcome/invite email if mail is configured ───────────────────
+      let inviteEmailSent = false;
+      const mailConfig = resolveMailConfig(context.env);
+      if (mailConfig) {
+        const orgData = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', auth.organizationId)
+          .maybeSingle();
+        const orgName = orgData.data?.name || 'your organization';
+        const siteUrl = context.request.headers.get('origin') || 'https://eip.ellines.co.ke';
+        const emailResult = await sendOutboundEmail(context.env, {
+          to: email,
+          subject: `You've been invited to ${orgName} on Ellines EIP`,
+          text: [
+            `Hello ${fullName},`,
+            '',
+            `${auth.email} has invited you to join ${orgName} on Ellines EIP as ${role}.`,
+            '',
+            `To get started, visit:`,
+            `${siteUrl}/login`,
+            '',
+            `Your login details:`,
+            `Email: ${email}`,
+            `Temporary password: ${tempPassword}`,
+            '',
+            `Please change your password after your first login.`,
+            '',
+            `— The Ellines EIP Team`,
+          ].join('\n'),
+        });
+        inviteEmailSent = emailResult.ok;
+      }
+
       return json({
         user: {
           id: user.id,
@@ -121,6 +156,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           role: user.role,
         },
         temporaryPassword: tempPassword,
+        inviteEmailSent,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Invite failed';

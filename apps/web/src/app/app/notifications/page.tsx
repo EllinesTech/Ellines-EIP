@@ -7,7 +7,10 @@ import {
   DATETIME_PREFS_EVENT,
   fetchEnterpriseSummary,
   getSession,
+  listApprovals,
+  listEnterpriseEvents,
   readCachedOrgDateTimeSettings,
+  type ApprovalRequestDto,
   type EnterpriseSummaryDto,
   type OrgDateTimeSettingsDto,
 } from '@/lib/api';
@@ -57,19 +60,51 @@ function readDeletedNotificationIds(): Set<string> {
 function buildNotifications(
   summary: EnterpriseSummaryDto | null,
   prefs: UiPrefs,
+  approvals: ApprovalRequestDto[],
 ): AppNotification[] {
   const items: AppNotification[] = [];
   const syncedAt = summary?.syncedAt || null;
 
-  if (!summary || summary.status !== 'synced') {
+  // Pending approvals — always show (highest priority)
+  const pending = approvals.filter((a) => a.status === 'pending');
+  if (pending.length > 0) {
     items.push({
-      id: 'system-awaiting-sync',
-      kind: 'system',
-      title: 'No live snapshot yet',
-      detail: 'Open Connectors and run Sync now to populate alerts and decisions.',
-      at: null,
-      href: '/app/connectors',
+      id: `approvals-pending-${pending.length}`,
+      kind: 'decision',
+      title: `${pending.length} approval${pending.length === 1 ? '' : 's'} waiting`,
+      detail: pending.slice(0, 3).map((a) => a.title).join(' · '),
+      at: pending[0]?.createdAt || null,
+      href: '/app/approvals',
     });
+  }
+
+  // Recently decided approvals
+  const recentDecisions = approvals
+    .filter((a) => a.status !== 'pending' && a.decidedAt)
+    .sort((a, b) => (b.decidedAt! > a.decidedAt! ? 1 : -1))
+    .slice(0, 3);
+  for (const appr of recentDecisions) {
+    items.push({
+      id: `appr-decided-${appr.id}`,
+      kind: 'decision',
+      title: `Approval ${appr.status}: ${appr.title}`,
+      detail: `by ${appr.decidedBy || 'unknown'} · ${appr.requester}`,
+      at: appr.decidedAt || null,
+      href: '/app/approvals',
+    });
+  }
+
+  if (!summary || summary.status !== 'synced') {
+    if (!items.length) {
+      items.push({
+        id: 'system-awaiting-sync',
+        kind: 'system',
+        title: 'No live snapshot yet',
+        detail: 'Open Connectors and run Sync now to populate alerts and decisions.',
+        at: null,
+        href: '/app/connectors',
+      });
+    }
     return items;
   }
 
@@ -84,17 +119,6 @@ function buildNotifications(
     });
   }
 
-  if (summary.openDecisions > 0) {
-    items.push({
-      id: `decisions-${summary.syncedAt}-${summary.openDecisions}`,
-      kind: 'decision',
-      title: `${summary.openDecisions} open decision${summary.openDecisions === 1 ? '' : 's'}`,
-      detail: 'Approvals and actions waiting in the enterprise queue.',
-      at: syncedAt,
-      href: '/app/approvals',
-    });
-  }
-
   if (prefs.notifySyncEvents) {
     items.push({
       id: `sync-${summary.connectorId}-${summary.syncedAt}`,
@@ -106,7 +130,7 @@ function buildNotifications(
     });
   }
 
-  for (const [i, event] of (summary.timeline || []).slice(0, 8).entries()) {
+  for (const [i, event] of (summary.timeline || []).slice(0, 6).entries()) {
     items.push({
       id: `timeline-${i}-${event.title}`,
       kind: 'system',
@@ -124,6 +148,7 @@ function buildNotifications(
 
 export default function NotificationsPage() {
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
+  const [approvals, setApprovals] = useState<ApprovalRequestDto[]>([]);
   const [prefs, setPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
   const [datePrefs, setDatePrefs] = useState<OrgDateTimeSettingsDto>({
     timeFormat: '12h',
@@ -151,16 +176,20 @@ export default function NotificationsPage() {
     };
     window.addEventListener(UI_PREFS_EVENT, onUi);
     window.addEventListener(DATETIME_PREFS_EVENT, onDate);
-    fetchEnterpriseSummary()
-      .then(setSummary)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
+    Promise.all([
+      fetchEnterpriseSummary().catch(() => null),
+      listApprovals().catch(() => [] as ApprovalRequestDto[]),
+    ]).then(([snap, appr]) => {
+      setSummary(snap);
+      setApprovals(appr);
+    }).catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
     return () => {
       window.removeEventListener(UI_PREFS_EVENT, onUi);
       window.removeEventListener(DATETIME_PREFS_EVENT, onDate);
     };
   }, []);
 
-  const allItems = useMemo(() => buildNotifications(summary, prefs), [summary, prefs]);
+  const allItems = useMemo(() => buildNotifications(summary, prefs, approvals), [summary, prefs, approvals]);
   const items = useMemo(
     () => allItems.filter((n) => !deleted.has(n.id)),
     [allItems, deleted],

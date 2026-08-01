@@ -1,6 +1,7 @@
 /**
  * Pages Function: POST /api/v1/orgs/me/approvals/:id/decide
  * Approve or reject the current step of an approval request.
+ * Sends email notification to requester when decision is final.
  */
 import {
   getAdminClient,
@@ -9,6 +10,7 @@ import {
   requireAuth,
   type Env,
 } from '../../../../../../shared/auth';
+import { sendOutboundEmail, resolveMailConfig } from '../../../../../../shared/mail';
 
 type ApprovalStep = {
   key: string; label: string; status: string; actorRole: string;
@@ -159,6 +161,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       overall: updatedItem.status,
     },
   });
+
+  // ── Send email notification when final decision is made ───────────────────
+  const isFinalDecision = updatedItem.status === 'approved' || updatedItem.status === 'rejected';
+  if (isFinalDecision) {
+    const mailConfig = resolveMailConfig(context.env);
+    if (mailConfig && item.requester && item.requester.includes('@')) {
+      const siteUrl = context.request.headers.get('origin') || 'https://eip.ellines.co.ke';
+      const statusLabel = updatedItem.status === 'approved' ? 'APPROVED ✓' : 'REJECTED ✗';
+      await sendOutboundEmail(context.env, {
+        to: item.requester,
+        subject: `Approval ${updatedItem.status === 'approved' ? 'approved' : 'rejected'}: ${item.title}`,
+        text: [
+          `Hello,`,
+          '',
+          `Your approval request has been ${updatedItem.status.toUpperCase()}.`,
+          '',
+          `Request: ${item.title}`,
+          `Status: ${statusLabel}`,
+          `Decided by: ${actorName}`,
+          `At: ${new Date(now).toLocaleString()}`,
+          item.detail ? `\nDetails: ${item.detail}` : '',
+          '',
+          `View in Ellines EIP: ${siteUrl}/app/approvals`,
+          '',
+          `— Ellines EIP Workflow`,
+        ]
+          .filter((l) => l !== undefined)
+          .join('\n'),
+      }).catch(() => {/* fire-and-forget */});
+    }
+  }
 
   return json(updatedItem);
 };

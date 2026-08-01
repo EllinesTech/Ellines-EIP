@@ -13,6 +13,7 @@ import {
   DATETIME_PREFS_EVENT,
   fetchOrgDateTimeSettings,
   getSession,
+  listApprovals,
   PROFILE_UPDATED_EVENT,
   readCachedOrgDateTimeSettings,
   refreshSessionFlags,
@@ -221,6 +222,15 @@ function IconOrgSystem() {
   );
 }
 
+function IconDocuments() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+    </svg>
+  );
+}
+
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
   { href: '/app/glance', label: 'Glance', icon: <IconGlance /> },
@@ -233,6 +243,7 @@ const NAV: NavItem[] = [
   { href: '/app/rules', label: 'Rules', icon: <IconRules />, adminOnly: true },
   { href: '/app/reports', label: 'Reports', icon: <IconReports />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
+  { href: '/app/documents', label: 'Documents', icon: <IconDocuments /> },
   {
     href: '/app/org-system',
     label: 'Organization System',
@@ -275,6 +286,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     hideAskFromWorkUsers: false,
     allowWorkRolesOrgSystem: false,
   });
+  const [notifyUnread, setNotifyUnread] = useState(0);
 
   useEffect(() => {
     const s = getSession();
@@ -315,6 +327,18 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       .catch(() => {
         /* keep defaults / cache if settings endpoint is briefly unavailable */
       });
+    // Poll notification unread count every 30s
+    function pollNotifyCount() {
+      listApprovals()
+        .then((appr) => {
+          const pending = appr.filter((a) => a.status === 'pending').length;
+          setNotifyUnread(pending);
+        })
+        .catch(() => {/* ignore */});
+    }
+    pollNotifyCount();
+    const pollId = window.setInterval(pollNotifyCount, 30_000);
+    return () => window.clearInterval(pollId);
   }, [router]);
 
   useEffect(() => {
@@ -479,6 +503,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Organization System'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
+                  : pathname.startsWith('/app/documents')
+                    ? 'Document Hub'
                   : pathname.startsWith('/app/timeline')
                     ? 'Enterprise Timeline'
                     : pathname.startsWith('/app/profile')
@@ -724,14 +750,18 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
             <Link
               href="/app/notifications"
               className={styles.iconBtn}
-              aria-label="Notifications"
-              title="Notifications"
+              aria-label={notifyUnread ? `Notifications (${notifyUnread} unread)` : 'Notifications'}
+              title={notifyUnread ? `${notifyUnread} pending approval${notifyUnread > 1 ? 's' : ''}` : 'Notifications'}
             >
               <svg viewBox="0 0 24 24" aria-hidden>
                 <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
                 <path d="M10 19a2 2 0 004 0" />
               </svg>
-              {uiPrefs.notifyBadge ? <span className={styles.badge} /> : null}
+              {notifyUnread > 0 ? (
+                <span className={styles.badge} style={{ background: '#ef4444', minWidth: 16, height: 16, borderRadius: 99, fontSize: '0.65rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', padding: '0 3px' }}>
+                  {notifyUnread > 9 ? '9+' : notifyUnread}
+                </span>
+              ) : null}
             </Link>
             <Link
               href="/app/profile"

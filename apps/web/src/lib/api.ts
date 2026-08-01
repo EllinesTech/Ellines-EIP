@@ -1007,3 +1007,91 @@ export function createChildOrg(name: string) {
     },
   );
 }
+
+// ─── Document Hub API ─────────────────────────────────────────────────────────
+
+export type DocumentRecordDto = {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  tags: string[];
+  branch?: string;
+  department?: string;
+  summary?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  content?: string; // only present on single-document GET
+};
+
+export function listDocuments() {
+  return request<DocumentRecordDto[]>('/api/v1/orgs/me/documents');
+}
+
+export function uploadDocument(payload: {
+  name: string;
+  mimeType: string;
+  content: string; // base64
+  tags?: string[];
+  branch?: string;
+  department?: string;
+  summary?: string;
+}) {
+  return request<DocumentRecordDto>('/api/v1/orgs/me/documents', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function downloadDocument(id: string) {
+  return request<DocumentRecordDto>(`/api/v1/orgs/me/documents?id=${id}`);
+}
+
+export function deleteDocument(id: string) {
+  return request<{ ok: boolean }>('/api/v1/orgs/me/documents', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  });
+}
+
+// ─── Notification unread count ───────────────────────────────────────────────
+
+export type NotifyUnreadDto = {
+  unread: number;
+  total: number;
+};
+
+/** Lightweight unread count — polls outbox for unread in-app items. */
+export function fetchNotifyUnreadCount() {
+  return request<NotifyUnreadDto>('/api/v1/notifications/deliver').then((items) => {
+    // items is OutboxItem[] from the GET endpoint
+    const arr = items as unknown as { status: string; channel: string }[];
+    const total = arr.length;
+    const unread = arr.filter(
+      (i) => i.channel === 'in_app' && i.status !== 'skipped',
+    ).length;
+    return { unread, total } as NotifyUnreadDto;
+  });
+}
+
+// ─── Reports with email status ────────────────────────────────────────────────
+
+export type ScheduledReportRunDto = {
+  id: string;
+  title: string;
+  cadence: 'daily' | 'weekly';
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunHint: string;
+  createdAt: string;
+  lastEmailStatus?: string;
+  emailStatus?: string;
+  reportChars?: number;
+};
+
+export function runReportFullApi(id: string) {
+  return request<ScheduledReportRunDto>(`/api/v1/orgs/me/reports/${id}/run`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
