@@ -10,7 +10,9 @@ import {
 import {
   buildEllineaAnswer,
   readEllineaMemory,
+  readEnterpriseDna,
 } from '@/lib/ellinea-engine';
+import { formatRagGrounding, retrieveEllineaContext } from '@/lib/ellinea-rag';
 import { readUiPrefs } from '@/lib/ui-prefs';
 import styles from './ellinea-chat.module.css';
 
@@ -70,14 +72,29 @@ export default function EllineaChatPanel({ open, onClose }: Props) {
       const orgId = session?.organization.id;
       const memory =
         prefs.ellineaUseMemory && orgId ? readEllineaMemory(orgId) : [];
-      const answer = buildEllineaAnswer(q, summary, {
+      const dna =
+        prefs.ellineaUseDna && orgId ? readEnterpriseDna(orgId) : null;
+      const template = buildEllineaAnswer(q, summary, {
         memory,
         useMemory: prefs.ellineaUseMemory,
         useRoleContext: prefs.ellineaRoleContext,
+        useDna: prefs.ellineaUseDna,
+        dna,
         role: session?.user.role,
         fullName: session?.user.fullName,
         organizationName: session?.organization.name,
       });
+      const chunks = retrieveEllineaContext({
+        question: q,
+        summary,
+        memory,
+        dna,
+        limit: 4,
+      });
+      const answer =
+        chunks.length > 0
+          ? `${template}\n\nSources:\n${formatRagGrounding(chunks)}`
+          : template;
       setMessages((prev) => [...prev, { role: 'assistant', text: answer }]);
       setBusy(false);
     }, 280);

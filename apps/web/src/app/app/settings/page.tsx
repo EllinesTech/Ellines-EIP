@@ -411,7 +411,10 @@ export default function SystemSettingsPage() {
         <div className={settingsStyles.toggleRow}>
           <div className={settingsStyles.toggleCopy}>
             <strong>Role context</strong>
-            <p>Frame briefs and recommendations for your signed-in role (Owner, IT, exec…).</p>
+            <p>
+              Sharper Owner/IT vs exec/manager lenses for briefs, recommendations, and Ask actions
+              (authority to decide vs escalate).
+            </p>
           </div>
           <Toggle
             on={uiPrefs.ellineaRoleContext}
@@ -449,8 +452,9 @@ export default function SystemSettingsPage() {
           <div className={settingsStyles.toggleCopy}>
             <strong>LLM + RAG</strong>
             <p>
-              Prefer the server Ask path (OpenAI-compatible when a key is set). Always grounds on
-              sync + Memory; falls back to template+RAG.
+              Prefer the server Ask path (OpenAI-compatible when a key is set). Grounds on sync,
+              Memory, DNA, and alerts; answers stay SoR-safe (observe/wrap, never invent writes).
+              Falls back to multi-hop template+RAG offline.
             </p>
           </div>
           <Toggle

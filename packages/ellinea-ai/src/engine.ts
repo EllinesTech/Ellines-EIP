@@ -301,56 +301,92 @@ export type EllineaContext = {
   useRoleContext?: boolean;
   dna?: EnterpriseDnaSnapshot | null;
   useDna?: boolean;
+  /** Optional continuous-learning signals to weight multi-hop answers. */
+  learningSignals?: LearningSignal[];
 };
 
-function roleLens(role: string | undefined): {
+type RoleLens = {
   audience: string;
   focus: string;
+  actionVerb: string;
+  authority: 'owner' | 'it' | 'exec' | 'manager' | 'member' | 'viewer';
   recFilter?: (id: string) => boolean;
-} {
+};
+
+function roleLens(role: string | undefined): RoleLens {
   switch (role) {
     case 'owner':
       return {
         audience: 'as Organization Owner',
-        focus: 'authority, risk, and org-wide decisions',
+        focus: 'org-wide risk, IT grants, Approvals, and authority to decide — not day-to-day ticket churn',
+        actionVerb: 'Decide or escalate to IT with a clear owner call',
+        authority: 'owner',
         recFilter: () => true,
       };
     case 'admin':
       return {
         audience: 'as IT Admin',
-        focus: 'connectors, sync health, and access hygiene',
+        focus: 'connector sync health, access hygiene, and systems that wrap SoR without replacing them',
+        actionVerb: 'Fix sync/access, then brief Owner on residual risk',
+        authority: 'it',
         recFilter: (id) => id !== 'steady',
       };
     case 'executive':
       return {
         audience: 'for the executive view',
-        focus: 'health score, alerts, and cross-branch performance',
+        focus: 'health score, cross-branch alerts, and decisions that need Owner/IT air cover',
+        actionVerb: 'Watch KPIs and delegate ops follow-through',
+        authority: 'exec',
         recFilter: (id) => id !== 'baseline',
       };
     case 'manager':
       return {
         audience: 'for your management lane',
-        focus: 'tasks, branch attention, and open decisions',
-        recFilter: (id) => id === 'decisions' || id === 'attention-objects' || id === 'alerts' || id === 'health',
+        focus: 'branch attention objects, open tasks, and decisions in your span of control',
+        actionVerb: 'Clear lane tasks; escalate org-wide risk to Owner/IT',
+        authority: 'manager',
+        recFilter: (id) =>
+          id === 'decisions' || id === 'attention-objects' || id === 'alerts' || id === 'health',
       };
     case 'viewer':
       return {
         audience: 'in read-only mode',
-        focus: 'status and brief highlights (no write actions)',
+        focus: 'status and brief highlights (no write actions; no Approvals)',
+        actionVerb: 'Observe and route findings to an authorized role',
+        authority: 'viewer',
         recFilter: (id) => id === 'steady' || id === 'health' || id === 'alerts',
       };
     default:
       return {
         audience: 'for your work role',
-        focus: 'open alerts, tasks, and the daily brief',
+        focus: 'open alerts, assigned tasks, and the daily brief — escalate authority issues to Owner/IT',
+        actionVerb: 'Act in-lane; escalate SoR or access changes to IT',
+        authority: 'member',
         recFilter: (id) => id !== 'baseline',
       };
   }
 }
 
+function dnaAvoidLabels(dna?: EnterpriseDnaSnapshot | null): string[] {
+  return (dna?.traits || [])
+    .filter((t) => t.source === 'approval' && t.label.toLowerCase().startsWith('avoids:'))
+    .map((t) => t.label.replace(/^Avoids:\s*/i, ''));
+}
+
+function dnaPreferLabels(dna?: EnterpriseDnaSnapshot | null): string[] {
+  return (dna?.traits || [])
+    .filter(
+      (t) =>
+        t.source === 'feedback' ||
+        (t.source === 'approval' && t.label.toLowerCase().startsWith('approves:')),
+    )
+    .map((t) => t.label)
+    .slice(0, 3);
+}
+
 export function buildEllineaRecommendations(
   summary: EllineaEnterpriseSnapshot | null,
-  context?: Pick<EllineaContext, 'role' | 'useRoleContext'>,
+  context?: Pick<EllineaContext, 'role' | 'useRoleContext' | 'dna' | 'useDna' | 'memory' | 'learningSignals'>,
 ): EllineaRecommendation[] {
   if (!summary || summary.status !== 'synced') return [];
 
@@ -361,43 +397,71 @@ export function buildEllineaRecommendations(
     (o.status || '').toLowerCase().includes('attention'),
   );
   const branches = objects.filter((o) => o.kind === 'branch');
+  const timeline = (summary.timeline || []).slice(0, 3);
+  const useDna = context?.useDna !== false;
+  const dna = useDna ? context?.dna : null;
+  const avoid = dnaAvoidLabels(dna);
+  const prefer = dnaPreferLabels(dna);
+  const memory = context?.memory || [];
+  const pressure =
+    context?.learningSignals?.find((s) => s.kind === 'alert_pressure')?.weight ??
+    summary.openAlerts + summary.openDecisions;
+  const approvalRate = context?.learningSignals?.find((s) => s.kind === 'approval_rate')?.weight;
+
+  const dnaEvidence: string[] = [];
+  if (prefer[0]) dnaEvidence.push(`DNA prefers: ${prefer[0]}`);
+  if (avoid[0]) dnaEvidence.push(`DNA caution: avoid “${avoid[0]}” paths`);
+  if (memory[0]) dnaEvidence.push(`Memory: “${memory[0].title}”`);
+  if (timeline[0]) dnaEvidence.push(`Recent: ${timeline[0].title}`);
 
   if (summary.openAlerts > 0) {
+    const pri: EllineaRecommendation['priority'] =
+      summary.openAlerts >= 3 || pressure >= 5 ? 'high' : 'medium';
     out.push({
       id: 'alerts',
       title: 'Triage open alerts before the next sync',
-      rationale: `${summary.openAlerts} alert(s) remain open in the latest snapshot.`,
+      rationale: `${summary.openAlerts} alert(s) remain open — EIP observes SoR health; clear noise so Owner/IT see true risk.`,
       evidence: [
         `Source: ${summary.connectorName}`,
         summary.briefHighlight,
-        ...(attention.slice(0, 2).map((o) => `Flagged: ${o.name}`)),
-      ],
-      confidence: Math.min(92, 70 + summary.openAlerts * 4),
-      priority: summary.openAlerts >= 3 ? 'high' : 'medium',
+        ...attention.slice(0, 2).map((o) => `Flagged: ${o.name}`),
+        ...dnaEvidence.slice(0, 2),
+      ].filter(Boolean),
+      confidence: Math.min(94, 72 + summary.openAlerts * 4 + (attention.length ? 4 : 0)),
+      priority: pri,
     });
   }
 
   if (summary.openDecisions > 0) {
+    const cautious =
+      typeof approvalRate === 'number' && approvalRate < 55
+        ? ' Org approval rate is selective — brief Owner before auto-pushing.'
+        : '';
     out.push({
       id: 'decisions',
-      title: 'Clear pending decisions',
-      rationale: `${summary.openDecisions} open decision(s) / task(s) are blocking flow.`,
+      title: 'Clear pending decisions in Approvals',
+      rationale: `${summary.openDecisions} open decision(s) / task(s) are blocking flow.${cautious}`,
       evidence: [
         `Model tasks: ${counts?.tasks ?? summary.openDecisions}`,
         `Health score: ${summary.healthScore}/100`,
-      ],
-      confidence: Math.min(88, 65 + summary.openDecisions * 5),
-      priority: summary.openDecisions >= 2 ? 'high' : 'medium',
+        ...dnaEvidence.filter((e) => e.startsWith('DNA')).slice(0, 2),
+        timeline[0] ? `Timeline: ${timeline[0].title}` : '',
+      ].filter(Boolean),
+      confidence: Math.min(90, 68 + summary.openDecisions * 5),
+      priority: summary.openDecisions >= 2 || pressure >= 4 ? 'high' : 'medium',
     });
   }
 
   if (attention.length > 0) {
     out.push({
       id: 'attention-objects',
-      title: 'Review objects marked for attention',
-      rationale: `${attention.length} UEM object(s) carry an attention status.`,
-      evidence: attention.slice(0, 4).map((o) => `${o.kind}: ${o.name}`),
-      confidence: 80,
+      title: 'Review UEM objects marked for attention',
+      rationale: `${attention.length} Universal Enterprise Model object(s) carry attention status — inspect before the next brief.`,
+      evidence: [
+        ...attention.slice(0, 4).map((o) => `${o.kind}: ${o.name}`),
+        ...dnaEvidence.slice(0, 1),
+      ],
+      confidence: Math.min(92, 78 + attention.length * 3),
       priority: 'high',
     });
   }
@@ -406,28 +470,35 @@ export function buildEllineaRecommendations(
     out.push({
       id: 'health',
       title: 'Investigate enterprise health dip',
-      rationale: `Health is ${summary.healthScore}/100 across ${summary.connectedSystems} system(s).`,
+      rationale: `Health is ${summary.healthScore}/100 across ${summary.connectedSystems} wrapped system(s). Diagnose connector/sync before changing SoR data.`,
       evidence: [
         summary.briefHighlight,
         counts
           ? `UEM: ${counts.branches} branches, ${counts.people} people, ${counts.notifications} notifications`
           : 'No UEM counts yet',
+        `Pressure score: ${pressure}`,
+        ...dnaEvidence.slice(0, 1),
       ],
-      confidence: 75,
+      confidence: Math.min(88, 70 + (70 - summary.healthScore)),
       priority: summary.healthScore < 50 ? 'high' : 'medium',
     });
   }
 
-  if (branches.length > 0 && attention.length === 0 && summary.openAlerts === 0) {
+  const hasPressure =
+    summary.openAlerts > 0 || summary.openDecisions > 0 || attention.length > 0 || summary.healthScore < 70;
+
+  if (!hasPressure && branches.length > 0) {
     out.push({
       id: 'steady',
       title: 'Keep the morning brief cadence',
-      rationale: 'No high-severity flags in the model — use the brief to stay ahead of drift.',
+      rationale:
+        'No high-severity flags in the model — use Watch / Decide / Delegate in the brief to stay ahead of drift.',
       evidence: [
         `${branches.length} named branch object(s)`,
         `Last sync: ${summary.syncedAt ? new Date(summary.syncedAt).toLocaleString() : 'recent'}`,
+        memory[0] ? `Memory anchor: “${memory[0].title}”` : 'Add Memory notes to deepen DNA',
       ],
-      confidence: 62,
+      confidence: 64,
       priority: 'low',
     });
   }
@@ -436,16 +507,33 @@ export function buildEllineaRecommendations(
     out.push({
       id: 'baseline',
       title: 'Expand connector coverage',
-      rationale: 'Snapshot is synced but light on actionable signals.',
+      rationale:
+        'Snapshot is synced but light on actionable signals. Add a read-only connector so Ellinea can wrap more SoR surface.',
       evidence: [
         `Connector: ${summary.connectorName}`,
         counts
           ? `${counts.branches} branches · ${counts.people} people`
           : 'UEM counts unavailable',
+        dna?.summary || 'DNA still forming',
       ],
-      confidence: 55,
+      confidence: 58,
       priority: 'low',
     });
+  }
+
+  // Tighten priority when DNA feedback values this insight type
+  const preferredIds = new Set(
+    (dna?.traits || [])
+      .filter((t) => t.source === 'feedback')
+      .map((t) => t.label.match(/“([^”]+)”/)?.[1])
+      .filter(Boolean) as string[],
+  );
+  for (const r of out) {
+    if (preferredIds.has(r.id) && r.priority !== 'high') {
+      r.priority = r.priority === 'low' ? 'medium' : 'high';
+      r.confidence = Math.min(96, r.confidence + 6);
+      r.evidence = [...r.evidence, 'Prioritized from helpful feedback pattern'];
+    }
   }
 
   const lens = roleLens(context?.role);
@@ -459,7 +547,7 @@ export function buildEllineaRecommendations(
 
 export function buildRankedRecommendations(
   summary: EllineaEnterpriseSnapshot | null,
-  context?: Pick<EllineaContext, 'role' | 'useRoleContext'> & {
+  context?: Pick<EllineaContext, 'role' | 'useRoleContext' | 'dna' | 'useDna' | 'memory' | 'learningSignals'> & {
     organizationId?: string;
     useFeedback?: boolean;
   },
@@ -467,6 +555,79 @@ export function buildRankedRecommendations(
   const base = buildEllineaRecommendations(summary, context);
   if (!context?.organizationId || context.useFeedback === false) return base;
   return rankRecommendations(base, readRecFeedback(context.organizationId));
+}
+
+function briefBuckets(
+  summary: EllineaEnterpriseSnapshot,
+  context?: EllineaContext,
+): { watch: string[]; decide: string[]; delegate: string[] } {
+  const lens = roleLens(context?.role);
+  const objects = summary.model?.objects || [];
+  const attention = objects.filter((o) =>
+    (o.status || '').toLowerCase().includes('attention'),
+  );
+  const watch: string[] = [];
+  const decide: string[] = [];
+  const delegate: string[] = [];
+
+  if (summary.healthScore < 70) {
+    watch.push(`Health ${summary.healthScore}/100 via ${summary.connectorName}`);
+  } else {
+    watch.push(`Health steady at ${summary.healthScore}/100`);
+  }
+  if (summary.openAlerts > 0) {
+    watch.push(`${summary.openAlerts} open alert(s)`);
+  }
+  if (attention.length) {
+    watch.push(
+      `${attention.length} attention object(s): ${attention
+        .slice(0, 2)
+        .map((o) => o.name)
+        .join(', ')}`,
+    );
+  }
+  const tl = (summary.timeline || [])[0];
+  if (tl) watch.push(`Latest event: ${tl.title}`);
+
+  if (summary.openDecisions > 0) {
+    if (lens.authority === 'owner' || lens.authority === 'it' || lens.authority === 'exec') {
+      decide.push(`${summary.openDecisions} open decision(s) need an authority call`);
+    } else {
+      delegate.push(`${summary.openDecisions} open decision(s) — route to Owner/IT Approvals`);
+    }
+  }
+  if (context?.useDna !== false && context?.dna?.traits.some((t) => t.label.startsWith('Avoids:'))) {
+    const avoid = context.dna!.traits.find((t) => t.label.startsWith('Avoids:'));
+    if (avoid) decide.push(`DNA caution: ${avoid.label}`);
+  }
+  if (summary.healthScore < 50 && (lens.authority === 'owner' || lens.authority === 'it')) {
+    decide.push('Health critically low — decide whether to pause non-essential syncs');
+  }
+
+  if (lens.authority === 'owner') {
+    if (summary.openAlerts > 0) delegate.push('IT: triage alerts and connector hygiene');
+    if (attention.length) delegate.push('Managers: clear attention objects in-lane');
+  } else if (lens.authority === 'it') {
+    if (summary.openAlerts > 0) delegate.push('Ops owners: confirm SoR-side fixes after sync');
+    if (summary.openDecisions > 0) delegate.push('Owner: Approvals that need org authority');
+  } else if (lens.authority === 'exec') {
+    delegate.push('IT/Owner: residual sync and Approvals risk');
+  } else if (lens.authority === 'manager') {
+    if (attention.length) decide.push('Clear attention objects in your branch/lane');
+    delegate.push('Escalate org-wide connector or access issues to IT');
+  } else {
+    delegate.push('Escalate write/authority requests to Owner or IT — EIP does not invent SoR writes');
+  }
+
+  if (context?.useMemory !== false && context?.memory?.[0]) {
+    watch.push(`Memory: “${context.memory[0].title}”`);
+  }
+
+  return {
+    watch: watch.slice(0, 4),
+    decide: decide.slice(0, 3),
+    delegate: delegate.slice(0, 3),
+  };
 }
 
 export function buildDailyBriefText(
@@ -492,7 +653,216 @@ export function buildDailyBriefText(
     context?.organizationName && context.useRoleContext !== false
       ? ` ${context.organizationName}:`
       : '';
-  return `Daily brief${org} (${synced} via ${summary.connectorName}): health ${summary.healthScore}/100, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}${framed}`;
+
+  const buckets = briefBuckets(summary, context);
+  const watch = buckets.watch.length ? ` Watch: ${buckets.watch.join('; ')}.` : '';
+  const decide = buckets.decide.length ? ` Decide: ${buckets.decide.join('; ')}.` : '';
+  const delegate = buckets.delegate.length ? ` Delegate: ${buckets.delegate.join('; ')}.` : '';
+
+  return `Daily brief${org} (${synced} via ${summary.connectorName}): health ${summary.healthScore}/100, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}${framed}${watch}${decide}${delegate}`;
+}
+
+type Intent =
+  | 'dna'
+  | 'memory'
+  | 'recommend'
+  | 'role'
+  | 'branch'
+  | 'people'
+  | 'timeline'
+  | 'health'
+  | 'alert'
+  | 'decision'
+  | 'brief'
+  | 'connector'
+  | 'general';
+
+function detectIntents(q: string): Set<Intent> {
+  const intents = new Set<Intent>();
+  if (/dna|how we work|our culture|enterprise dna/.test(q)) intents.add('dna');
+  if (/memory|policy|policies|note\b|notes\b|decision we/.test(q)) intents.add('memory');
+  if (/recommend|should i|next step|insight|what do i|action/.test(q)) intents.add('recommend');
+  if (/who am|my role|context/.test(q)) intents.add('role');
+  if (/branch|site|location/.test(q)) intents.add('branch');
+  if (/people|person|staff|employee|workforce/.test(q)) intents.add('people');
+  if (/timeline|what happened|recent/.test(q)) intents.add('timeline');
+  if (/health|performing|how are|business|score/.test(q)) intents.add('health');
+  if (/alert|risk|attention|incident/.test(q)) intents.add('alert');
+  if (/decision|approval|task/.test(q)) intents.add('decision');
+  if (/brief|today|morning|summarize|summary/.test(q)) intents.add('brief');
+  if (/connector|system|source|integration/.test(q)) intents.add('connector');
+  if (!intents.size) intents.add('general');
+  return intents;
+}
+
+function confidenceFromSignals(
+  summary: EllineaEnterpriseSnapshot,
+  intents: Set<Intent>,
+  memoryHits: number,
+  dnaUsed: boolean,
+): number {
+  let c = 58;
+  if (summary.status === 'synced') c += 12;
+  if (summary.openAlerts > 0 && (intents.has('alert') || intents.has('general') || intents.has('recommend')))
+    c += 8;
+  if (summary.openDecisions > 0 && (intents.has('decision') || intents.has('recommend'))) c += 6;
+  if (memoryHits) c += Math.min(10, memoryHits * 4);
+  if (dnaUsed) c += 4;
+  if (summary.healthScore < 70 && intents.has('health')) c += 5;
+  if ((summary.timeline || []).length) c += 3;
+  return Math.max(40, Math.min(94, c));
+}
+
+function memoryHitsForQuestion(q: string, memory: EllineaMemoryNote[]): EllineaMemoryNote[] {
+  const words = q.split(/\s+/).filter((w) => w.length > 3);
+  return memory.filter((n) => {
+    const hay = `${n.title} ${n.body}`.toLowerCase();
+    return words.some((w) => hay.includes(w));
+  });
+}
+
+/** Multi-hop enterprise answer: situation → evidence → risk → action → confidence. */
+function synthesizeEnterpriseAnswer(
+  question: string,
+  summary: EllineaEnterpriseSnapshot,
+  options: EllineaContext | undefined,
+  intents: Set<Intent>,
+): string {
+  const useMemory = options?.useMemory !== false;
+  const useRole = options?.useRoleContext !== false;
+  const useDna = options?.useDna !== false;
+  const memory = useMemory ? options?.memory || [] : [];
+  const dna = useDna ? options?.dna : null;
+  const lens = roleLens(options?.role);
+  const prefix =
+    useRole && options?.role
+      ? `[${options.organizationName || 'Org'} · ${options.role}] `
+      : '';
+
+  const counts = summary.model?.counts;
+  const objects = summary.model?.objects || [];
+  const attention = objects.filter((o) =>
+    (o.status || '').toLowerCase().includes('attention'),
+  );
+  const branches = objects.filter((o) => o.kind === 'branch');
+  const memHits = memoryHitsForQuestion(question, memory);
+  const signals = options?.learningSignals || [];
+  const pressure = signals.find((s) => s.kind === 'alert_pressure');
+
+  // Situation
+  const situationParts: string[] = [
+    `Health ${summary.healthScore}/100 across ${summary.connectedSystems} connected system(s) (${summary.connectorName})`,
+  ];
+  if (intents.has('branch') && branches.length) {
+    situationParts.push(
+      `${counts?.branches ?? branches.length} branch object(s): ${branches
+        .slice(0, 4)
+        .map((b) => b.name)
+        .join('; ')}`,
+    );
+  } else if (intents.has('people')) {
+    situationParts.push(
+      `UEM people ${counts?.people ?? 0}, tasks ${counts?.tasks ?? 0}, documents ${counts?.documents ?? 0}`,
+    );
+  } else if (intents.has('connector')) {
+    situationParts.push(
+      `Source ${summary.connectorId}; capabilities ${(summary.model?.capabilities || ['read', 'sync']).join(', ')}`,
+    );
+  } else {
+    situationParts.push(
+      `${summary.openAlerts} open alerts · ${summary.openDecisions} open decisions`,
+    );
+  }
+  if (useRole) situationParts.push(`Lens: ${lens.focus}`);
+
+  // Evidence (multi-hop: sync + UEM + timeline + memory + DNA + learning)
+  const evidence: string[] = [];
+  evidence.push(summary.briefHighlight);
+  if (counts) {
+    evidence.push(
+      `UEM counts — branches ${counts.branches}, people ${counts.people}, tasks ${counts.tasks}, notifications ${counts.notifications}`,
+    );
+  }
+  if (attention.length) {
+    evidence.push(
+      `Attention: ${attention
+        .slice(0, 3)
+        .map((o) => `${o.kind} ${o.name}`)
+        .join('; ')}`,
+    );
+  }
+  for (const ev of (summary.timeline || []).slice(0, 2)) {
+    evidence.push(`Timeline: ${ev.title}${ev.detail ? ` — ${ev.detail}` : ''}`);
+  }
+  for (const n of (memHits.length ? memHits : memory).slice(0, 2)) {
+    evidence.push(`Memory “${n.title}”: ${n.body.slice(0, 140)}${n.body.length > 140 ? '…' : ''}`);
+  }
+  if (dna?.traits?.length) {
+    evidence.push(
+      `DNA: ${dna.traits
+        .slice(0, 2)
+        .map((t) => t.label)
+        .join('; ')}`,
+    );
+  }
+  for (const s of signals.slice(0, 2)) {
+    evidence.push(`Learning: ${s.label} — ${s.detail}`);
+  }
+
+  // Risk
+  const risks: string[] = [];
+  if (summary.openAlerts > 0) {
+    risks.push(`${summary.openAlerts} unresolved alert(s) may hide SoR drift`);
+  }
+  if (summary.openDecisions > 0) {
+    risks.push(`${summary.openDecisions} open decision(s) stall operational flow`);
+  }
+  if (summary.healthScore < 70) {
+    risks.push(`Health below 70 — treat connector/sync before changing Systems of Record`);
+  }
+  if (attention.length) {
+    risks.push(`${attention.length} UEM object(s) flagged for attention`);
+  }
+  const avoid = dnaAvoidLabels(dna);
+  if (avoid[0]) risks.push(`DNA marks “${avoid[0]}” as sensitive`);
+  if (pressure && pressure.weight >= 4) {
+    risks.push(`Elevated pressure score (${pressure.weight})`);
+  }
+  if (!risks.length) risks.push('No high-severity flags in the latest sync');
+
+  // Recommended action (role-aware, SoR-safe)
+  const recs = buildEllineaRecommendations(summary, options);
+  let action: string;
+  if (intents.has('recommend') && recs[0]) {
+    action = `${recs[0].title} — ${recs[0].rationale}`;
+  } else if (lens.authority === 'owner') {
+    action =
+      summary.openDecisions > 0
+        ? `Decide open Approvals (${summary.openDecisions}), then have IT clear alert noise. ${lens.actionVerb}.`
+        : `${lens.actionVerb}. ${recs[0]?.title || 'Review the daily brief Watch / Decide / Delegate sections.'}`;
+  } else if (lens.authority === 'it') {
+    action =
+      summary.openAlerts > 0 || summary.healthScore < 70
+        ? `Verify connector sync and access hygiene first; do not invent SoR writes. ${lens.actionVerb}.`
+        : `${lens.actionVerb}. Confirm read-only connectors stay healthy for the next brief.`;
+  } else if (lens.authority === 'viewer') {
+    action = `${lens.actionVerb}. Share this brief with Owner/IT if risk rises.`;
+  } else {
+    action = recs[0]
+      ? `${recs[0].title}. ${lens.actionVerb}.`
+      : `${lens.actionVerb}. Use Approvals only within your authority.`;
+  }
+
+  const conf = confidenceFromSignals(summary, intents, memHits.length, Boolean(dna?.traits?.length));
+
+  return (
+    `${prefix}` +
+    `Situation: ${situationParts.join('. ')}. ` +
+    `Evidence: ${evidence.filter(Boolean).slice(0, 6).join(' · ')}. ` +
+    `Risk: ${risks.slice(0, 4).join('; ')}. ` +
+    `Recommended action: ${action} ` +
+    `Confidence: ${conf}%.`
+  );
 }
 
 export function buildEllineaAnswer(
@@ -511,53 +881,37 @@ export function buildEllineaAnswer(
     useRole && options?.role
       ? `[${options.organizationName || 'Org'} · ${options.role}] `
       : '';
+  const intents = detectIntents(q);
 
-  if (useDna && dna && (q.includes('dna') || q.includes('how we work') || q.includes('our culture') || q.includes('enterprise dna'))) {
+  // DNA-primary short answer still available, then hop into full synthesis if synced
+  if (useDna && dna && intents.has('dna') && intents.size === 1) {
     return `${prefix}${dna.summary} Traits: ${dna.traits
       .slice(0, 5)
       .map((t) => t.label)
-      .join('; ')}.`;
+      .join('; ')}. Ellinea uses DNA to bias Approvals caution and recommendation priority — it does not write to Systems of Record.`;
   }
 
-  if (useMemory && memory.length && (q.includes('memory') || q.includes('policy') || q.includes('note') || q.includes('decision we'))) {
+  if (
+    useMemory &&
+    memory.length &&
+    intents.has('memory') &&
+    !intents.has('general') &&
+    intents.size <= 2
+  ) {
     const hit =
-      memory.find((n) => q.includes(n.title.toLowerCase().slice(0, 12))) || memory[0];
-    return `${prefix}From Enterprise Memory — “${hit.title}”: ${hit.body}`;
+      memory.find((n) => q.includes(n.title.toLowerCase().slice(0, 12))) ||
+      memoryHitsForQuestion(q, memory)[0] ||
+      memory[0];
+    if (!summary || summary.status !== 'synced') {
+      return `${prefix}From Enterprise Memory — “${hit.title}”: ${hit.body}`;
+    }
   }
 
   if (!summary || summary.status !== 'synced') {
-    return 'I do not have a live enterprise snapshot yet. Ask IT to open Connectors and sync a system, then ask again.';
+    return 'I do not have a live enterprise snapshot yet. Ask IT to open Connectors and sync a system, then ask again. Ellinea observes and wraps Systems of Record — it cannot invent live SoR data.';
   }
 
-  const model = summary.model;
-  const counts = model?.counts;
-  const objects = model?.objects || [];
-  const branches = objects.filter((o) => o.kind === 'branch');
-  const attention = objects.filter((o) =>
-    (o.status || '').toLowerCase().includes('attention'),
-  );
-
-  if (q.includes('recommend') || q.includes('should i') || q.includes('next step') || q.includes('insight')) {
-    const recs = buildEllineaRecommendations(summary, options);
-    if (!recs.length) return `${prefix}No recommendations yet — sync richer data first.`;
-    const dnaHint =
-      useDna && dna?.traits[0]
-        ? ` Aligned with DNA “${dna.traits[0].label}”.`
-        : '';
-    return (
-      prefix +
-      recs
-        .slice(0, 3)
-        .map(
-          (r) =>
-            `${r.title} (${r.confidence}% confidence, ${r.priority}): ${r.rationale} Evidence: ${r.evidence.join('; ')}`,
-        )
-        .join(' · ') +
-      dnaHint
-    );
-  }
-
-  if (q.includes('who am') || q.includes('my role') || q.includes('context')) {
+  if (intents.has('role') && intents.size === 1) {
     const dnaBit =
       useDna && dna?.traits.length
         ? ` Enterprise DNA: ${dna.traits
@@ -565,70 +919,13 @@ export function buildEllineaAnswer(
             .map((t) => t.label)
             .join('; ')}.`
         : '';
-    return `${prefix}You are signed in ${lens.audience}. I prioritize ${lens.focus}.${dnaBit} Ask about health, alerts, recommendations, DNA, or memory.`;
+    return `${prefix}You are signed in ${lens.audience}. I prioritize ${lens.focus}. Action stance: ${lens.actionVerb}.${dnaBit} Ask about health, alerts, recommendations, DNA, memory, or the daily brief.`;
   }
 
-  if (q.includes('branch') || q.includes('site') || q.includes('location')) {
-    if (branches.length) {
-      const list = branches
-        .slice(0, 6)
-        .map((b) => `${b.name}${b.status ? ` (${b.status})` : ''}`)
-        .join('; ');
-      return `${prefix}I see ${counts?.branches ?? branches.length} branch object(s) in the Universal Enterprise Model: ${list}. ${attention.length ? `${attention.length} need attention.` : 'None flagged for attention.'}`;
-    }
-    return `${prefix}Branch count in the model is ${counts?.branches ?? 0}. Sync a richer System B feed to list named branches.`;
-  }
-
-  if (q.includes('people') || q.includes('person') || q.includes('staff') || q.includes('employee')) {
-    return `${prefix}People count in the Universal Enterprise Model is ${counts?.people ?? 0}. Tasks ${counts?.tasks ?? 0}, documents ${counts?.documents ?? 0}, assets ${counts?.assets ?? 0}.`;
-  }
-
-  if (q.includes('timeline') || q.includes('what happened') || q.includes('recent')) {
-    const events = (summary.timeline || []).slice(0, 4);
-    if (!events.length) {
-      return `${prefix}No timeline events in the latest snapshot yet.`;
-    }
-    return `${prefix}Recent enterprise events: ${events.map((e) => e.title).join(' · ')}. Open Timeline for the full feed.`;
-  }
-
-  if (q.includes('health') || q.includes('performing') || q.includes('how are') || q.includes('business')) {
-    const uem = counts
-      ? ` UEM: ${counts.branches} branches, ${counts.people} people, ${counts.tasks} tasks, ${counts.notifications} notifications.`
-      : '';
-    return `${prefix}Enterprise health is ${summary.healthScore}/100 across ${summary.connectedSystems} connected systems.${uem} ${summary.briefHighlight}`;
-  }
-
-  if (q.includes('alert') || q.includes('risk') || q.includes('attention')) {
-    const named = attention.length
-      ? ` Flagged objects: ${attention
-          .slice(0, 4)
-          .map((o) => o.name)
-          .join(', ')}.`
-      : '';
-    return `${prefix}There are ${summary.openAlerts} open alerts in the latest sync.${named} ${summary.briefHighlight}`;
-  }
-
-  if (q.includes('decision') || q.includes('approval') || q.includes('task')) {
-    return `${prefix}There are ${summary.openDecisions} open decisions and ${counts?.tasks ?? summary.openDecisions} tasks in the model. Prioritize them before the next brief cycle.`;
-  }
-
-  if (q.includes('brief') || q.includes('today') || q.includes('morning') || q.includes('summarize')) {
+  if (intents.has('brief') && !intents.has('recommend')) {
     return buildDailyBriefText(summary, options);
   }
 
-  if (q.includes('connector') || q.includes('system') || q.includes('source')) {
-    return `${prefix}Latest source is ${summary.connectorName} (${summary.connectorId}), health ${summary.healthScore}, capabilities ${(model?.capabilities || ['read', 'sync']).join(', ')}.`;
-  }
-
-  if (useMemory && memory.length && q.length > 8) {
-    const soft = memory.find((n) => {
-      const hay = `${n.title} ${n.body}`.toLowerCase();
-      return q.split(/\s+/).some((w) => w.length > 4 && hay.includes(w));
-    });
-    if (soft) {
-      return `${prefix}From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts. Related memory “${soft.title}”: ${soft.body}`;
-    }
-  }
-
-  return `${prefix}From ${summary.connectorName}: health ${summary.healthScore}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions${counts ? `, ${counts.branches} branches / ${counts.people} people` : ''}. ${summary.briefHighlight}`;
+  // Multi-hop default (and for recommend / health / alert / decision / general / mixed intents)
+  return synthesizeEnterpriseAnswer(question, summary, options, intents);
 }

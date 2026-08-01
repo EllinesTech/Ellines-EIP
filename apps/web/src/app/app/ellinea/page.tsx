@@ -193,24 +193,46 @@ export default function EllineaPage() {
               useRoleContext: ui.ellineaRoleContext,
               organizationId: session?.organization.id,
               useFeedback: ui.ellineaRecFeedback,
+              useDna: ui.ellineaUseDna,
+              dna:
+                session?.organization.id && ui.ellineaUseDna
+                  ? refreshDna(
+                      session.organization.id,
+                      session.organization.name,
+                      session.user.role,
+                      localMem,
+                    )
+                  : null,
+              memory: localMem,
             }),
           );
           if (ui.ellineaAutoBrief) {
+            const briefDna =
+              session?.organization.id && ui.ellineaUseDna
+                ? refreshDna(
+                    session.organization.id,
+                    session.organization.name,
+                    session.user.role,
+                    localMem,
+                  )
+                : null;
             setAnswer(
               buildEllineaAnswer('brief today', s, {
                 memory: localMem,
                 useMemory: ui.ellineaUseMemory,
                 useRoleContext: ui.ellineaRoleContext,
                 useDna: ui.ellineaUseDna,
-                dna:
-                  session?.organization.id && ui.ellineaUseDna
-                    ? refreshDna(
-                        session.organization.id,
-                        session.organization.name,
-                        session.user.role,
-                        localMem,
-                      )
-                    : null,
+                dna: briefDna,
+                learningSignals: buildLearningSignals({
+                  summary: s,
+                  approvals: session?.organization.id
+                    ? readApprovals(session.organization.id)
+                    : [],
+                  feedback: session?.organization.id
+                    ? readRecFeedback(session.organization.id)
+                    : {},
+                  memoryCount: localMem.length,
+                }),
                 role: session?.user.role,
                 fullName: session?.user.fullName,
                 organizationName: session?.organization.name,
@@ -270,6 +292,7 @@ export default function EllineaPage() {
       useRoleContext: ui.ellineaRoleContext,
       useDna: ui.ellineaUseDna,
       dna: ui.ellineaUseDna ? dna : null,
+      learningSignals: signals,
       role: session?.user.role,
       fullName: session?.user.fullName,
       organizationName: session?.organization.name,
@@ -280,9 +303,10 @@ export default function EllineaPage() {
       memory: ui.ellineaUseMemory ? memory : [],
       dna: ui.ellineaUseDna ? dna : null,
     });
+    // Always attach ranked citations when synced RAG returns chunks.
     const grounded =
       chunks.length > 0
-        ? `${template}\n\nSources:\n${formatRagGrounding(chunks.slice(0, 4))}`
+        ? `${template}\n\nSources:\n${formatRagGrounding(chunks.slice(0, 6))}`
         : template;
 
     if (ui.ellineaUseLlm === false) {
@@ -298,6 +322,9 @@ export default function EllineaPage() {
       summary,
       memory,
       templateAnswer: grounded,
+      dna: ui.ellineaUseDna ? dna : null,
+      role: session?.user.role,
+      organizationName: session?.organization.name,
     })
       .then((res) => {
         setAnswer(res.answer);
@@ -333,6 +360,10 @@ export default function EllineaPage() {
         useRoleContext: prefs?.ellineaRoleContext !== false,
         organizationId: orgId,
         useFeedback: true,
+        useDna: prefs?.ellineaUseDna !== false,
+        dna: nextDna ?? dna,
+        memory,
+        learningSignals: signals,
       }),
     );
   }
@@ -403,6 +434,10 @@ export default function EllineaPage() {
           role: getSession()?.user.role,
           organizationName: getSession()?.organization.name,
           useRoleContext: prefs?.ellineaRoleContext !== false,
+          useMemory: prefs?.ellineaUseMemory !== false,
+          memory: prefs?.ellineaUseMemory !== false ? memory : [],
+          useDna: prefs?.ellineaUseDna !== false,
+          dna: prefs?.ellineaUseDna !== false ? dna : null,
         }) : 'Sync a connector to unlock a grounded morning brief.'}</p>
         {synced && counts ? (
           <p>

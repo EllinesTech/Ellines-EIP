@@ -33,7 +33,7 @@ while queue has next/in_progress and not blocked:
 | **1 — Platform Foundation** | ~99% | Audit, password, org rename done |
 | **2 — Integration Hub** | ~100% | SQL Server + MySQL read-only connectors shipped |
 | **3 — Owner / Admin Command Center** | ~98% | Owner/Admin path solid |
-| **4 — Ellinea AI** | ~100% | Standalone package + guide shipped |
+| **4 — Ellinea AI** | ~100% | Standalone package + guide shipped; enterprise reasoning upgrade |
 | **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
 | **7 — Mobile Work Companion** | `todo` | v1.1+ simplified phone app (roadmap) |
@@ -151,6 +151,7 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 | 4.8 | Enterprise DNA capture | `done` | From Memory + Approvals + feedback; Ask Ellinea + settings |
 | 4.9 | Continuous learning signals | `done` | Approval rate, alert pressure, feedback bias, memory depth on Ask Ellinea |
 | 4.10 | LLM / RAG | `done` | Local RAG + optional OpenAI-compatible Ask; settings toggle |
+| 4.11 | Ellinea enterprise reasoning upgrade | `done` | Multi-hop answers (situation→evidence→risk→action→confidence); smarter RAG boosts; denser Owner brief (watch/decide/delegate); SoR-safe LLM prompt |
 | 4.S | Ellinea AI standalone | `todo` | Phase 6 — productize engine |
 | 4.H | **How to use Ellinea brain (standalone)** | `done` | [12_Ellinea_Standalone_HowTo.md](./12_Ellinea_Standalone_HowTo.md) |
 
@@ -228,6 +229,7 @@ Do **not** implement full native apps in v1.0 Foundation runs. Keep this phase `
 
 ## Recently landed on main (through 2026-07-31)
 
+- **Ellinea enterprise reasoning upgrade (4.11):** Multi-hop Ask answers; smarter RAG (Memory/alerts/decisions/attention boosts); denser Watch/Decide/Delegate briefs; SoR-safe LLM system prompt; sharper Owner/IT role lenses.
 - **Owner/IT side-nav rearrange:** Edit nav + drag reorder; order persisted in `eip_nav_order:{orgId}:{userId}`; non-admins keep fixed default; new items merge at default relative position (Ellinea Console above Settings by default).
 - **Web Push / VAPID:** subscription API + `/sw-push.js`; deliver attempts push when VAPID secrets + browser sub exist; else simulated/failed with clear message. Human Pages secrets required for live push.
 - **Notification SMTP / Resend slice:** `POST /api/v1/notifications/deliver` attempts real email when `RESEND_API_KEY` or `SMTP_*` / `ELLINEA_SMTP_*` are on Pages; otherwise keeps `simulated` (CI-safe). Human must set Pages secrets for live mail.

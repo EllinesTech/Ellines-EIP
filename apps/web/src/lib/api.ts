@@ -389,6 +389,9 @@ export function askEllineaApi(payload: {
   summary: EnterpriseSummaryDto | null;
   memory: EllineaMemoryNoteDto[];
   templateAnswer: string;
+  dna?: { summary?: string; traits?: { label?: string; detail?: string; source?: string }[] } | null;
+  role?: string;
+  organizationName?: string;
 }) {
   return request<EllineaAskResponse>('/api/v1/ellinea/ask', {
     method: 'POST',
