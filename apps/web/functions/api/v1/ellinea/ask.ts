@@ -158,7 +158,7 @@ async function callLlm(
         },
         {
           role: 'user',
-          content: `Grounding (cite source tags):\n${grounding}\n\nQuestion: ${question}\n\nRespond with Situation → Evidence → Risk → Recommended action → Confidence. Grounding-only.`,
+          content: `Grounding (cite source tags):\n${grounding}\n\nQuestion: ${question.slice(0, 500)}\n\nRespond with Situation → Evidence → Risk → Recommended action → Confidence. Grounding-only.`,
         },
       ],
     }),

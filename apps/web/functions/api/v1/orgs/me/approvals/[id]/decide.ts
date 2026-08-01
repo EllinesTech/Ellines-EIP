@@ -37,7 +37,9 @@ function normalize(raw: unknown): ApprovalRecord[] {
 }
 
 function roleCanActOnStep(role: string, actorRole: string): boolean {
-  if (actorRole === 'decider') return ['owner', 'admin', 'executive', 'manager'].includes(role);
+  // actorRole is the role required to act on this step
+  // role is the user's actual role
+  if (actorRole === 'decider') return ['owner', 'admin', 'executive'].includes(role);
   if (actorRole === 'admin') return role === 'admin' || role === 'owner';
   if (actorRole === 'owner') return role === 'owner';
   if (actorRole === 'executive') return role === 'executive' || role === 'owner';

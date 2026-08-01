@@ -208,11 +208,18 @@ export function parseCsvToEnterprisePayload(csvText: string) {
     }
   }
 
+  // Validate and parse numeric fields
+  const parseNumericField = (value: string | undefined): number | undefined => {
+    if (!value) return undefined;
+    const num = parseFloat(value);
+    return Number.isFinite(num) ? num : undefined;
+  };
+
   return normalizeEnterprisePayload({
-    healthScore: map.healthscore ?? map.health ?? map.score,
-    connectedSystems: map.connectedsystems ?? map.systems ?? map.connected_systems,
-    openAlerts: map.openalerts ?? map.alerts ?? map.open_alerts,
-    openDecisions: map.opendecisions ?? map.decisions ?? map.open_decisions,
+    healthScore: parseNumericField(map.healthscore ?? map.health ?? map.score),
+    connectedSystems: parseNumericField(map.connectedsystems ?? map.systems ?? map.connected_systems),
+    openAlerts: parseNumericField(map.openalerts ?? map.alerts ?? map.open_alerts),
+    openDecisions: parseNumericField(map.opendecisions ?? map.decisions ?? map.open_decisions),
     briefHighlight:
       map.briefhighlight ??
       map.brief ??
@@ -314,13 +321,22 @@ export async function syncOpenApiRoutes(options: {
   let best = normalizeEnterprisePayload({});
   let okCount = 0;
 
+  // Per-route timeout: 4 seconds per endpoint to avoid Cloudflare Worker CPU timeout (10s total)
+  const ROUTE_TIMEOUT_MS = 4000;
+
   for (const route of gets.slice(0, 12)) {
     const url = `${base}${route.path.startsWith('/') ? route.path : `/${route.path}`}`;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), ROUTE_TIMEOUT_MS);
+
       const res = await fetch(url, {
         method: 'GET',
         headers: { Accept: 'application/json', ...(options.headers || {}) },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
         timeline.push({ title: route.capability || route.path, detail: `HTTP ${res.status}` });
         continue;
@@ -334,9 +350,15 @@ export async function syncOpenApiRoutes(options: {
         detail: Array.isArray(raw) ? `${raw.length} records` : `OK from ${route.path}`,
       });
     } catch (err) {
+      const errMsg =
+        err instanceof Error
+          ? err.name === 'AbortError'
+            ? 'Request timeout'
+            : err.message
+          : 'Request failed';
       timeline.push({
         title: route.capability || route.path,
-        detail: err instanceof Error ? err.message : 'Request failed',
+        detail: errMsg,
       });
     }
   }

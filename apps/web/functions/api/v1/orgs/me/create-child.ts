@@ -37,6 +37,38 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     );
   }
 
+  // IMPORTANT: With v1.1 multi-org support, verify the user is an active owner
+  // in the CURRENT org (auth.organizationId) by checking organization_memberships.
+  // The JWT claims contain role in the primary org; this is a security-in-depth check.
+  const supabase = getAdminClient(context.env);
+  const { data: currentOrgMem, error: memErr } = await supabase
+    .from('organization_memberships')
+    .select('role, is_active')
+    .eq('user_id', auth.sub)
+    .eq('organization_id', auth.organizationId)
+    .maybeSingle();
+
+  if (memErr) {
+    return json({ statusCode: 500, message: memErr.message }, 500);
+  }
+
+  // If membership row exists (v1.1+), verify active + owner role
+  if (currentOrgMem) {
+    if (!currentOrgMem.is_active) {
+      return json(
+        { statusCode: 403, message: 'Your membership in this org is inactive' },
+        403,
+      );
+    }
+    if (currentOrgMem.role !== 'owner') {
+      return json(
+        { statusCode: 403, message: 'Only the Organization Owner can create linked organizations' },
+        403,
+      );
+    }
+  }
+  // If no membership row (legacy single-org), auth.role check above suffices
+
   let body: { name?: string };
   try {
     body = (await context.request.json()) as typeof body;
@@ -54,7 +86,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 400, message: 'Organization name is invalid' }, 400);
   }
 
-  const supabase = getAdminClient(context.env);
   const now = new Date().toISOString();
 
   // Check slug uniqueness

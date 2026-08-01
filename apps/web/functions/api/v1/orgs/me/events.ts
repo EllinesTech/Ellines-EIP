@@ -65,6 +65,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const type =
     typeof body.type === 'string' ? body.type.trim().slice(0, 80) : 'unknown';
 
+  // Validate payload size to prevent settings bloat (10KB limit per event)
+  const MAX_EVENT_PAYLOAD_BYTES = 10 * 1024;
+  const payloadStr = JSON.stringify(body.payload || {});
+  if (payloadStr.length > MAX_EVENT_PAYLOAD_BYTES) {
+    return json(
+      {
+        statusCode: 413,
+        message: `Event payload exceeds ${MAX_EVENT_PAYLOAD_BYTES} bytes (got ${payloadStr.length}). Reduce or split the event.`,
+      },
+      413,
+    );
+  }
+
   const event: EnterpriseEvent = {
     id: cuid(),
     type,
