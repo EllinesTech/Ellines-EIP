@@ -43,6 +43,8 @@ model Organization {
   childOrgs              Organization[]           @relation("OrgParent")
   parentOrg              Organization?            @relation("OrgParent", fields: [parentOrgId], references: [id], onDelete: SetNull)
   ssoProviders           SsoProvider[]
+  customRoles            CustomRole[]
+  roleAuditLogs          RoleAuditLog[]
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -107,22 +109,28 @@ model User {
  * v1.1 — Multi-company membership.
  * A User can belong to multiple Organizations with different roles.
  * The primary org remains User.organizationId (backward compat).
+ * 
+ * v1.1 Track D — Custom roles.
+ * If customRoleId is set, it overrides the fixed `role` field.
  */
 model OrganizationMembership {
   id             String   @id @default(cuid())
   userId         String   @map("user_id")
   organizationId String   @map("organization_id")
-  role           UserRole @default(member)
+  role           UserRole @default(member)       // Fallback if customRoleId not set
+  customRoleId   String?  @map("custom_role_id") // If set, use this custom role instead
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
 
   @@unique([userId, organizationId])
   @@index([userId])
   @@index([organizationId])
+  @@index([customRoleId])
   @@map("organization_memberships")
 }
 
@@ -391,4 +399,71 @@ model SsoProviderUser {
   @@index([ssoProviderId])
   @@index([userId])
   @@map("sso_provider_users")
+}
+
+// v1.1 Track D — Advanced RBAC (Custom Roles)
+
+/**
+ * Custom Role — allows Owner to create roles beyond the 6 fixed roles.
+ * 
+ * Permissions are stored as JSON array of resource permissions.
+ * Example:
+ * {
+ *   "permissions": [
+ *     { "permission": "connector:read" },
+ *     { "permission": "connector:install", "attributes": { "department": "IT" } },
+ *     { "permission": "approval:decide", "resources": ["approval-1", "approval-2"] }
+ *   ]
+ * }
+ */
+model CustomRole {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String                           // "Finance Manager", "Analyst", etc.
+  description    String   @default("")
+  color          String   @default("#6F2D8D")     // UI badge color
+  
+  // Base role this is derived from (optional; helps with UI hints)
+  baseRole       String?  @map("base_role")       // null | 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
+  
+  // Permissions array: [ { permission: string, resources?: string[], attributes?: {}, conditions?: {} } ]
+  permissions    Json     @default("[]")
+  
+  // Metadata
+  isSystem       Boolean  @default(false) @map("is_system")  // System roles cannot be modified
+  isActive       Boolean  @default(true) @map("is_active")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships    OrganizationMembership[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("custom_roles")
+}
+
+/**
+ * Role Audit Log — tracks all role changes (creation, modification, assignment, deletion).
+ * Enables compliance tracking and role history.
+ */
+model RoleAuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  roleId         String?  @map("role_id")         // Role that was changed (null if deleted)
+  userId         String   @map("user_id")         // User who made the change
+  action         String                           // 'role.created' | 'role.updated' | 'role.assigned' | 'role.deleted'
+  details        Json?                            // Previous role data, permissions diff, etc.
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([roleId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("role_audit_logs")
 }
