@@ -9,10 +9,11 @@ import {
   type ScanMode,
   type WizardPrefill,
   analyzeProbePayload,
-  buildLocalTargets,
+  buildDbPortHints,
+  buildLocalHttpTargets,
   buildOnlineTargets,
   candidateToWizardPrefill,
-  isDbPort,
+  parseScanTarget,
   probeUrlInBrowser,
   toCandidate,
 } from '@/lib/system-autoscan';
@@ -27,15 +28,42 @@ type Props = {
   openSignal?: number;
 };
 
+function dedupeCandidates(found: AutoscanCandidate[]): AutoscanCandidate[] {
+  const uniq = new Map<string, AutoscanCandidate>();
+  for (const c of found) {
+    let key = c.url;
+    try {
+      const u = new URL(c.url);
+      key = `${u.protocol}//${u.host}${u.pathname}|${c.recommendedCatalogId}|${c.isDbHint ? 'db' : 'http'}`;
+    } catch {
+      /* keep */
+    }
+    const prev = uniq.get(key);
+    const prefer =
+      !prev ||
+      (c.exactPrefer && !prev.exactPrefer) ||
+      (c.status && c.status < 400 && (!prev.status || prev.status >= 400));
+    if (prefer) uniq.set(key, c);
+  }
+  // Exact URL IT entered first among HTTP candidates
+  return [...uniq.values()].sort((a, b) => {
+    if (a.exactPrefer && !b.exactPrefer) return -1;
+    if (!a.exactPrefer && b.exactPrefer) return 1;
+    return 0;
+  });
+}
+
 export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSignal }: Props) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<ScanMode>('online');
+  const [mode, setMode] = useState<ScanMode>('local');
   const [baseUrl, setBaseUrl] = useState('');
-  const [localHost, setLocalHost] = useState('localhost');
+  const [localHost, setLocalHost] = useState('');
   const [catalogForce, setCatalogForce] = useState('');
+  const [includeDbHints, setIncludeDbHints] = useState(false);
   const [error, setError] = useState('');
   const [statusLine, setStatusLine] = useState('');
   const [candidates, setCandidates] = useState<AutoscanCandidate[]>([]);
+  const [dbHints, setDbHints] = useState<AutoscanCandidate[]>([]);
   const [misses, setMisses] = useState<string[]>([]);
   const [guidance, setGuidance] = useState('');
 
@@ -52,114 +80,142 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
     setError('');
     setStatusLine('');
     setCandidates([]);
+    setDbHints([]);
     setMisses([]);
     setGuidance('');
     setBusy(true);
 
     const forced = catalogForce || undefined;
     const found: AutoscanCandidate[] = [];
+    const hintList: AutoscanCandidate[] = [];
     const failed: string[] = [];
 
     try {
       if (mode === 'online' || mode === 'hybrid') {
         if (!baseUrl.trim()) {
-          throw new Error('Enter a public base URL for Online / Hybrid (e.g. https://his.example.com).');
+          throw new Error(
+            'Enter a public base URL for Online / Hybrid (e.g. https://erp.example.com). For private LAN SoRs use Local mode with the full URL.',
+          );
         }
-        const targets = buildOnlineTargets(baseUrl, forced);
-        if (!targets.length) throw new Error('Base URL is invalid.');
-        setStatusLine(`Ellinea probing ${targets.length} online path(s) via edge…`);
-        const edge = await probeAutoscanTargets({
-          targets,
-          catalogId: forced,
-          timeoutMs: 2500,
-        });
-        for (const r of edge.results) {
-          const analyzed = analyzeProbePayload({
-            ...r,
-            forcedCatalogId: forced,
+        const parsed = parseScanTarget(baseUrl, true);
+        if (!parsed) throw new Error('Base URL is invalid.');
+
+        // Private LAN cannot use edge — probe from this browser instead.
+        if (parsed.isPrivateLan) {
+          setStatusLine(
+            'Private / LAN URL — Online edge cannot reach it. Probing the exact URL from this browser…',
+          );
+          const locals = buildLocalHttpTargets(baseUrl.trim());
+          for (const t of locals.slice(0, 8)) {
+            const probed = await probeUrlInBrowser(t.url, {
+              timeoutMs: 2500,
+              portHint: t.hint,
+              forcedCatalogId: forced,
+            });
+            const c = toCandidate(probed, forced);
+            if (c) {
+              if (t.exact) c.exactPrefer = true;
+              found.push(c);
+            } else failed.push(`${t.url} — ${probed.error || 'no response'}`);
+          }
+        } else {
+          const targets = buildOnlineTargets(baseUrl, forced);
+          if (!targets.length) throw new Error('Base URL is invalid.');
+          setStatusLine(`Ellinea probing ${targets.length} path(s) via edge (exact URL first)…`);
+          const edge = await probeAutoscanTargets({
+            targets,
+            catalogId: forced,
+            timeoutMs: 2500,
           });
-          const c = toCandidate(analyzed, forced);
-          if (c) found.push(c);
-          else failed.push(`${r.url} — ${r.error || 'no response'}`);
+          for (const r of edge.results) {
+            const analyzed = analyzeProbePayload({
+              ...r,
+              forcedCatalogId: forced,
+            });
+            const c = toCandidate(analyzed, forced);
+            if (c) {
+              if (parsed.fullUrl === r.url) c.exactPrefer = true;
+              found.push(c);
+            } else failed.push(`${r.url} — ${r.error || 'no response'}`);
+          }
         }
       }
 
       if (mode === 'local' || mode === 'hybrid') {
-        const locals = buildLocalTargets(localHost.trim() || 'localhost');
+        const hostInput = localHost.trim() || (mode === 'hybrid' ? baseUrl.trim() : '');
+        if (!hostInput) {
+          throw new Error(
+            'Enter a local/LAN host or full SoR URL (e.g. http://192.168.0.6/erp/login or …/api).',
+          );
+        }
+        const locals = buildLocalHttpTargets(hostInput);
+        if (!locals.length) throw new Error('Local / LAN host or URL is invalid.');
+
         setStatusLine(
-          `Ellinea probing ${locals.length} local/LAN port(s) from this browser (IT-started only)…`,
+          `Ellinea probing ${locals.length} local/LAN URL(s) from this browser (exact path first)…`,
         );
         for (const t of locals) {
-          if (isDbPort(t.port)) {
+          const probed = await probeUrlInBrowser(t.url, {
+            timeoutMs: 2000,
+            portHint: t.hint,
+            forcedCatalogId: forced,
+          });
+          const c = toCandidate(probed, forced);
+          if (c) {
+            if (t.exact) c.exactPrefer = true;
+            found.push(c);
+          } else failed.push(`${t.url} — ${probed.error || 'closed / filtered'}`);
+        }
+
+        if (includeDbHints) {
+          for (const t of buildDbPortHints(hostInput)) {
             const analyzed = analyzeProbePayload({
               url: t.url,
               reachable: true,
               opaque: true,
+              isDbHint: true,
               portHint: `${t.hint} — catalog hint only (not HTTP-probed)`,
               catalogHint: t.catalogHint,
               forcedCatalogId: forced,
               snippet:
-                'DB port listed for IT awareness. Ellinea did not open a database session or scan the disk.',
+                'Common reporting-DB port listed because IT opted in. Ellinea did not open a database session or scan the disk.',
             });
-            analyzed.ellineaNote = `Port ${t.port} (${t.hint}) is a common reporting-DB port. Ellinea did not connect — use the read-only ${t.catalogHint || 'SQL'} connector with credentials IT controls. EIP observes; it does not replace the SoR.`;
             const c = toCandidate(analyzed, forced);
             if (c) {
               c.systemName = `${t.hint} · :${t.port}`;
-              found.push(c);
+              c.isDbHint = true;
+              hintList.push(c);
             }
-            continue;
           }
-          const probed = await probeUrlInBrowser(t.url, {
-            timeoutMs: 2000,
-            portHint: t.hint,
-            catalogHint: t.catalogHint,
-            forcedCatalogId: forced,
-          });
-          const c = toCandidate(probed, forced);
-          if (c) found.push(c);
-          else failed.push(`${t.url} — ${probed.error || 'closed / filtered'}`);
         }
       }
 
-      // Deduplicate by host+recommendedCatalogId+path root
-      const uniq = new Map<string, AutoscanCandidate>();
-      for (const c of found) {
-        let key = c.url;
-        try {
-          const u = new URL(c.url);
-          key = `${u.protocol}//${u.host}|${c.recommendedCatalogId}|${c.catalogEntryId || ''}`;
-        } catch {
-          /* keep */
-        }
-        const prev = uniq.get(key);
-        if (!prev || (c.status && c.status < 400 && (!prev.status || prev.status >= 400))) {
-          uniq.set(key, c);
-        }
-      }
-      const list = [...uniq.values()];
+      const list = dedupeCandidates(found).filter((c) => !c.isDbHint);
       setCandidates(list);
+      setDbHints(hintList);
       setMisses(failed.slice(0, 12));
 
+      const bonus = list.find((c) => c.catalogEntryId);
       const cat = forced
         ? SYSTEM_CATALOG.find((x) => x.id === forced)
-        : list.find((c) => c.catalogEntryId)
-          ? SYSTEM_CATALOG.find(
-              (x) => x.id === list.find((c) => c.catalogEntryId)?.catalogEntryId,
-            )
+        : bonus
+          ? SYSTEM_CATALOG.find((x) => x.id === bonus.catalogEntryId)
           : undefined;
 
       if (list.length) {
         setGuidance(
           cat
-            ? `Ellinea: ${list.length} reachable candidate(s). ${cat.blurb} ${cat.nextSteps}`
-            : `Ellinea: ${list.length} reachable candidate(s). Pick Connect to open the install wizard with endpoint / catalog prefilled. Use read-only credentials — EIP observes, it does not replace the System of Record.`,
+            ? `Scan complete — reachability only (scan ≠ connect). ${list.length} candidate(s). Primary = the URL you entered. Optional hint: ${cat.name}. Click Connect to open the wizard with that base URL prefilled, then Test & Sync.`
+            : `Scan complete — reachability only (scan ≠ connect). ${list.length} candidate(s) for any System of Record URL you entered. Click Connect → credentials → Test & Sync. EIP observes — it does not replace the SoR.`,
         );
-        setStatusLine(`Scan complete · ${list.length} candidate(s).`);
+        setStatusLine(
+          `Scan complete · ${list.length} HTTP candidate(s)${hintList.length ? ` · ${hintList.length} DB hint(s)` : ''}.`,
+        );
       } else {
         setGuidance(
-          'Ellinea found no reachable HTTP surfaces. Confirm the URL/host, firewall, or select Hospidia from the catalog and try again. For on-prem DB-only sites, use Local mode and the SQL connector hints.',
+          'Ellinea found no reachable HTTP surfaces. Paste the full SoR URL (any path) in Local mode for LAN systems, or a public HTTPS URL in Online mode. Confirm host/firewall. DB ports are opt-in hints only — not detections.',
         );
-        setStatusLine('Scan complete · no candidates.');
+        setStatusLine('Scan complete · no HTTP candidates.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed');
@@ -174,8 +230,9 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
         <div>
           <div className={styles.panelLabel}>Ellinea · Auto-scan for systems</div>
           <p className={styles.lede} style={{ marginBottom: 0 }}>
-            Owner/IT only. Probe a URL or local host IT enters — no silent PC harvest, no disk
-            crawl. Suggests connector type + install draft; you still supply credentials.
+            Owner/IT only. Works for any System of Record URL you enter. Scan checks reachability —
+            it does not connect. Connect opens the install wizard; you still enter credentials and
+            run Test & Sync.
           </p>
         </div>
         <button
@@ -191,9 +248,8 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
       {open ? (
         <div style={{ marginTop: '0.75rem' }}>
           <p className={styles.lede}>
-            Modes: <strong>Online</strong> (public HTTPS paths via Pages edge) ·{' '}
-            <strong>Local</strong> (browser → localhost/LAN ports you start) ·{' '}
-            <strong>Hybrid</strong> (both).{' '}
+            Modes: <strong>Local</strong> (browser → LAN/localhost; paste the full SoR URL) ·{' '}
+            <strong>Online</strong> (public HTTPS via Pages edge) · <strong>Hybrid</strong>.{' '}
             <Link href="/app/ellinea-console" className={styles.primaryLink}>
               Ellinea console
             </Link>
@@ -207,41 +263,41 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
                 onChange={(e) => setMode(e.target.value as ScanMode)}
                 disabled={busy}
               >
+                <option value="local">Local / LAN URL</option>
                 <option value="online">Online URL</option>
-                <option value="local">Local host</option>
                 <option value="hybrid">Hybrid</option>
               </select>
             </label>
             {(mode === 'online' || mode === 'hybrid') && (
               <label>
-                Base URL (IT-entered)
+                Public base URL (exact path honored)
                 <input
                   value={baseUrl}
                   onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://his.example.com"
+                  placeholder="https://erp.example.com/api or https://his.example.com"
                   disabled={busy}
                 />
               </label>
             )}
             {(mode === 'local' || mode === 'hybrid') && (
               <label>
-                Local / LAN host
+                Local / LAN host or full SoR URL
                 <input
                   value={localHost}
                   onChange={(e) => setLocalHost(e.target.value)}
-                  placeholder="localhost or 192.168.x.x"
+                  placeholder="http://192.168.0.6/app/login or http://host/api"
                   disabled={busy}
                 />
               </label>
             )}
             <label>
-              Catalog hint (optional)
+              Catalog hint (optional bonus)
               <select
                 value={catalogForce}
                 onChange={(e) => setCatalogForce(e.target.value)}
                 disabled={busy}
               >
-                <option value="">Auto-detect</option>
+                <option value="">None — generic REST/OpenAPI from URL</option>
                 {SYSTEM_CATALOG.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -249,6 +305,27 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
                 ))}
               </select>
             </label>
+            {(mode === 'local' || mode === 'hybrid') && (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  flexDirection: 'row',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={includeDbHints}
+                  onChange={(e) => setIncludeDbHints(e.target.checked)}
+                  disabled={busy}
+                />
+                <span>
+                  Include DB port hints (5432 / 1433 / 3306) — catalog suggestions only, not
+                  detections
+                </span>
+              </label>
+            )}
           </div>
 
           <div className={adminStyles.wizardActions}>
@@ -268,7 +345,9 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
 
           {candidates.length ? (
             <div className={adminStyles.tableWrap} style={{ marginTop: '0.65rem' }}>
-              <div className={styles.panelLabel}>Detected candidates · {candidates.length}</div>
+              <div className={styles.panelLabel}>
+                Reachable HTTP candidates · {candidates.length} (not connected yet)
+              </div>
               <ul className={adminStyles.structList}>
                 {candidates.map((c) => (
                   <li key={`${c.url}-${c.recommendedCatalogId}`}>
@@ -282,14 +361,23 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
                       }}
                     >
                       <div style={{ flex: '1 1 220px' }}>
-                        <strong>{c.systemName}</strong>
+                        <strong>
+                          {c.exactPrefer ? 'Primary · ' : ''}
+                          {c.systemName}
+                        </strong>
                         <p className={styles.lede} style={{ margin: '0.2rem 0' }}>
                           {c.url}
                           {c.status != null ? ` · HTTP ${c.status}` : ''}
-                          {c.opaque ? ' · reachability only' : ''}
+                          {c.opaque ? ' · reachability only (CORS / body unread)' : ''}
                           {c.portHint ? ` · ${c.portHint}` : ''}
                           {' · '}
                           suggest <code>{c.recommendedCatalogId}</code>
+                          {c.catalogEntryId ? (
+                            <>
+                              {' '}
+                              · optional hint <code>{c.catalogEntryId}</code>
+                            </>
+                          ) : null}
                         </p>
                         <p className={styles.lede} style={{ margin: 0 }}>
                           {c.ellineaNote}
@@ -297,7 +385,7 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
                       </div>
                       <button
                         type="button"
-                        className={adminStyles.ghost}
+                        className={adminStyles.primary}
                         disabled={busy}
                         onClick={() =>
                           onConnect(candidateToWizardPrefill(c), c.ellineaNote)
@@ -312,6 +400,53 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
             </div>
           ) : null}
 
+          {dbHints.length ? (
+            <details style={{ marginTop: '0.55rem' }}>
+              <summary className={styles.panelLabel}>
+                Possible reporting DBs · {dbHints.length} (hints only — not detected)
+              </summary>
+              <p className={styles.lede}>
+                These ports are common for reporting replicas. Ellinea did not connect or prove a
+                database is listening. Use only if IT knows a read-only SQL endpoint exists.
+              </p>
+              <ul className={adminStyles.structList}>
+                {dbHints.map((c) => (
+                  <li key={`db-${c.url}-${c.recommendedCatalogId}`}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <div style={{ flex: '1 1 220px' }}>
+                        <strong>{c.systemName}</strong>
+                        <p className={styles.lede} style={{ margin: '0.2rem 0' }}>
+                          {c.url} · suggest <code>{c.recommendedCatalogId}</code>
+                        </p>
+                        <p className={styles.lede} style={{ margin: 0 }}>
+                          {c.ellineaNote}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={adminStyles.ghost}
+                        disabled={busy}
+                        onClick={() =>
+                          onConnect(candidateToWizardPrefill(c), c.ellineaNote)
+                        }
+                      >
+                        Connect SQL
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           {misses.length ? (
             <details style={{ marginTop: '0.55rem' }}>
               <summary className={styles.panelLabel}>Unreachable probes · {misses.length}</summary>
@@ -324,6 +459,44 @@ export default function SystemAutoscanPanel({ busy, setBusy, onConnect, openSign
               </ul>
             </details>
           ) : null}
+
+          <details style={{ marginTop: '0.75rem' }}>
+            <summary className={styles.panelLabel}>Why didn&apos;t Ellinea connect?</summary>
+            <ul className={adminStyles.structList}>
+              <li>
+                <span className={styles.lede}>
+                  <strong>Scan ≠ connect.</strong> Auto-scan only checks whether a URL answers. It
+                  never logs in, never stores credentials, and never syncs UEM data — for any SoR.
+                </span>
+              </li>
+              <li>
+                <span className={styles.lede}>
+                  <strong>Next step:</strong> click <strong>Connect</strong> on the primary
+                  candidate → install wizard (display name + endpoint prefilled from your URL) →
+                  enter read-only credentials → <strong>Test</strong> → <strong>Sync</strong>.
+                </span>
+              </li>
+              <li>
+                <span className={styles.lede}>
+                  <strong>Any path:</strong> paste the full SoR URL (
+                  <code>/erp/login</code>, <code>/api</code>, <code>/App/Welcome.aspx</code>, …).
+                  Exact URL is probed first; catalog names (HIS/ERP/CRM) are optional bonuses.
+                </span>
+              </li>
+              <li>
+                <span className={styles.lede}>
+                  <strong>CORS / LAN:</strong> reachability-only (body unread) is expected when the
+                  EIP site cannot read a cross-origin or http LAN page — not a failed connect.
+                </span>
+              </li>
+              <li>
+                <span className={styles.lede}>
+                  <strong>DB ports</strong> (5432 / 1433 / 3306) are opt-in catalog hints, not live
+                  detections.
+                </span>
+              </li>
+            </ul>
+          </details>
         </div>
       ) : null}
     </section>

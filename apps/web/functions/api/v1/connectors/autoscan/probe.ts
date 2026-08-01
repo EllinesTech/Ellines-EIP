@@ -71,7 +71,7 @@ async function probeOne(urlStr: string, timeoutMs: number): Promise<ProbeItem> {
       url: urlStr,
       reachable: false,
       error:
-        'Edge probe skips localhost / private LAN — use Local or Hybrid mode so your browser probes the host IT entered.',
+        'Edge probe skips localhost / private LAN. Use Local mode with the full SoR URL (any path — exact URL is probed first). Scan ≠ connect — after reachability, click Connect → credentials → Test & Sync.',
     };
   }
 

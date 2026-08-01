@@ -105,7 +105,7 @@ while queue has next/in_progress and not blocked:
 | 2.x | `services/integration-hub` | `done` | Optional microservice |
 | 2.x | Webhooks / events | `done` | `POST /api/v1/webhooks/enterprise` + secret rotate on Connectors |
 | 2.x | SQL Server / MySQL | `done` | Read-only `sqlserver` + `mysql` catalog; Identity TCP via `mssql` / `mysql2` |
-| 2.x | Connector auto-scan / Ellinea detect (IT) | `done` | Owner/IT Auto-scan on Connectors; online edge probe + browser local ports; Hospidia heuristics; wizard prefill. Later: authorize non-admin roles. |
+| 2.x | Connector auto-scan / Ellinea detect (IT) | `done` | Generic-first: exact SoR URL any path; REST/OpenAPI prefill; optional HIS/ERP/CRM/Hospidia keyword bonuses; DB ports opt-in; scan≠connect UX. Later: authorize non-admin roles. |
 
 ---
 
@@ -247,6 +247,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
+- **Auto-scan generic SoR fix:** Exact URL IT enters is primary (any path); REST/OpenAPI wizard prefill from app base; Hospidia/HIS/ERP/CRM are optional keyword bonuses only; DB ports opt-in collapsed hints; scan ≠ connect UX + troubleshooting.
 - **Organization System deepen:** Live UEM pages for branches, departments, tasks, assets, documents, alerts digest, finance glance; appointments/inventory as objects when kinds exist (attendance stays stub); companion deep links (Glance/People/Fleet/Inbox); Settings toggle **Allow work roles to open Organization System** (default off) + `canAccessOrgSystem` route/nav guard; empty/sync CTAs → Connectors + Auto-scan; product EIP-above-SoR + Ellinea reminder on hub.
 - **Organization System capability catalog:** Data-driven domains (Intelligence → Connectors) in `org-system-catalog.ts`; hub badges live / no data yet / sync to unlock from `model.counts`, objects, timeline, openAlerts/openDecisions; Ellinea brief + recommendations pages; dynamic `/app/org-system/[capability]`.
 - **Organization System hub (initial):** Owner/IT side-nav **Organization System** → `/app/org-system`; `/report`, `/employees`, `/clients-today` over UEM.

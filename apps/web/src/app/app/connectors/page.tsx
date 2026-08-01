@@ -239,7 +239,9 @@ export default function ConnectorsPage() {
     if (prefill.connectionStringHint) setConnectionString(prefill.connectionStringHint);
     setStep(2);
     setWizardOpen(true);
-    setNotice(ellineaNote);
+    setNotice(
+      `Scan ≠ connect — wizard opened with a draft. Enter read-only credentials, then Test & Sync. ${ellineaNote}`,
+    );
   }
 
   function buildConfig(): ConnectorInstallConfigDto {

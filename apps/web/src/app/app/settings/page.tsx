@@ -523,10 +523,10 @@ export default function SystemSettingsPage() {
             <div className={settingsStyles.toggleCopy}>
               <strong>Connector auto-scan</strong>
               <p>
-                Owner / IT Admin can run Ellinea-assisted Auto-scan on Connectors (online URL,
-                local host, or hybrid). Access is org-admin only for now; Owner/IT can later
-                authorize other roles. Auto-scan never harvests the PC disk — only probes hosts
-                and ports IT starts.
+                Owner / IT Admin: paste any System of Record URL — scan checks reachability only
+                (scan ≠ connect). Connect opens the wizard with that base URL; then Test &amp;
+                Sync with credentials. Catalog names and DB ports are optional hints. Org-admin
+                only for now.
               </p>
             </div>
             <Link href="/app/connectors#eip-autoscan" className={styles.primaryLink}>
