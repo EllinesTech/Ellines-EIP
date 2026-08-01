@@ -267,6 +267,23 @@ Simplified **phone companion** so Owner and permitted employees can track day-to
 
 Do **not** implement full native iOS/Android in Foundation runs. Web companion slices 7.2–7.8 are shipped; deeper GPS/mail intelligence waits on live connectors + human secrets.
 
+---
+
+## v1.1 Track D — Advanced RBAC (Custom Roles & Attribute-Based Access)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| D.1 | Prisma schema: CustomRole + ResourcePermission | `next` | Models for custom roles, permissions, attributes, audit log |
+| D.2 | NestJS permission evaluator engine | `todo` | Evaluate permission checks against resource/attribute/context |
+| D.3 | Pages Functions: Custom role CRUD | `todo` | 5 endpoints: GET/POST roles, GET/PATCH/DELETE by ID, role validation |
+| D.4 | Pages Functions: Permission checks on all 50+ operations | `todo` | Inject permission guards into all existing endpoints (connectors, approvals, rules, reports, data access) |
+| D.5 | Frontend: Custom role builder UI | `todo` | Drag-drop permission mapper, attribute/condition config, audit trail |
+| D.6 | Build verification | `todo` | All TypeScript builds pass; all Pages Functions import check |
+| D.7 | Testing: Create 5+ custom roles, verify enforcement | `todo` | Test RBAC across all feature areas (connectors, workflows, dashboards) |
+| D.8 | Documentation: RBAC guide + API reference | `todo` | Setup guide, permission matrix, troubleshooting |
+
+---
+
 ## Recently landed on main (through 2026-08-01)
 
 - **v1.1 Multi-company consolidation:** `OrganizationMembership` join table + `Organization.parentOrgId` self-FK added to Prisma schema (db:push synced). NestJS `MultiOrgService` in identity: `GET /api/v1/orgs/my-orgs`, `POST /api/v1/orgs/switch` (new JWT for target org), `POST /api/v1/orgs/me/create-child` (Owner only). Matching Cloudflare Pages Functions for all three endpoints. `AuthSession.orgs[]` field in `api.ts`. `OrgSwitcher` dropdown component (lazy-loads org list, zero-regression on single-org). "Create linked org" section in `/app/admin` (Owner only). Org name in topbar now shows the switcher + role pill.
