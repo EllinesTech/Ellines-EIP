@@ -190,13 +190,33 @@ function IconPeople() {
   );
 }
 
+function IconGlance() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 19V5M4 19h16" />
+      <path d="M8 15v-4M12 15V8M16 15v-6" />
+    </svg>
+  );
+}
+
+function IconInbox() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 8l8-4 8 4v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" />
+      <path d="M4 12h4l2 3h4l2-3h4" />
+    </svg>
+  );
+}
+
 const NAV: NavItem[] = [
   { href: '/app', label: 'Overview', icon: <IconOverview /> },
+  { href: '/app/glance', label: 'Glance', icon: <IconGlance /> },
   { href: '/app/timeline', label: 'Timeline', icon: <IconTimeline /> },
   { href: '/app/notifications', label: 'Notifications', icon: <IconNotifications /> },
   { href: '/app/approvals', label: 'Approvals', icon: <IconApprovals /> },
   { href: '/app/fleet', label: 'Fleet', icon: <IconFleet /> },
   { href: '/app/people', label: 'People', icon: <IconPeople /> },
+  { href: '/app/inbox', label: 'Inbox', icon: <IconInbox /> },
   { href: '/app/rules', label: 'Rules', icon: <IconRules />, adminOnly: true },
   { href: '/app/reports', label: 'Reports', icon: <IconReports />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
@@ -429,6 +449,10 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Fleet'
                 : pathname.startsWith('/app/people')
                   ? 'People'
+                : pathname.startsWith('/app/glance')
+                  ? 'Live glance'
+                : pathname.startsWith('/app/inbox')
+                  ? 'Work email'
                 : pathname.startsWith('/app/search')
                   ? 'Enterprise Search'
                   : pathname.startsWith('/app/timeline')
@@ -446,6 +470,12 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const phoneNav = [
     { href: '/app', label: 'Home', icon: <IconOverview />, match: (p: string) => p === '/app' || p === '/app/' },
     {
+      href: '/app/glance',
+      label: 'Glance',
+      icon: <IconGlance />,
+      match: (p: string) => p.startsWith('/app/glance'),
+    },
+    {
       href: '/app/fleet',
       label: 'Fleet',
       icon: <IconFleet />,
@@ -458,17 +488,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       match: (p: string) => p.startsWith('/app/people'),
     },
     {
-      href: '/app/notifications',
-      label: 'Alerts',
-      icon: <IconNotifications />,
-      match: (p: string) => p.startsWith('/app/notifications'),
-    },
-    {
       href: '/app/settings',
       label: 'More',
       icon: <IconSettings />,
       match: (p: string) =>
-        p.startsWith('/app/settings') || p.startsWith('/app/profile'),
+        p.startsWith('/app/settings') ||
+        p.startsWith('/app/profile') ||
+        p.startsWith('/app/inbox') ||
+        p.startsWith('/app/notifications'),
     },
   ];
 

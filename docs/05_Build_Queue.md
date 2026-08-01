@@ -36,7 +36,7 @@ while queue has next/in_progress and not blocked:
 | **4 — Ellinea AI** | ~100% | Standalone package + guide; enterprise reasoning upgrade (`745445c`) |
 | **5 — Workflow & Automation** | ~65% | Approvals, rules, reports, event bus, SMTP/Resend + VAPID outbox |
 | **6 — Ellinea product** | ~100% | 6.1–6.7 done |
-| **7 — Mobile Work Companion** | 7.1–7.4 `done`; 7.5–7.8 `todo`/`next` | PWA + fleet/people UEM stubs; reports/Ellinea mobile next |
+| **7 — Mobile Work Companion** | 7.1–7.8 `done` | Web PWA companion complete; native apps remain future |
 | **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
 
 ### Priority order (first → next → later)
@@ -45,11 +45,11 @@ while queue has next/in_progress and not blocked:
 2. **Done —** notification SMTP/Resend + Web Push/VAPID outbox (secrets optional; simulated without them).
 3. **Done —** Mobile Work Companion **vision brief** ([13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md)).
 4. **Done —** Responsive phone shell / PWA stub (7.2): installable manifest, viewport, bottom nav, Ask float prefs.
-5. **Done —** Fleet + People companion stubs (7.3–7.4): UEM-backed lists with empty-state degrade (no invented GPS/HR).
-6. **Next —** 7.5 Pull live data + summary reports on phone (reuse Overview KPIs + `/app/reports` previews).
-7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly.
+5. **Done —** Fleet + People + Glance + Inbox companion stubs (7.3–7.7) with empty-state degrade.
+6. **Done —** Access prefs for Ask float / hide-from-work-users (7.8).
+7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. Native iOS/Android still out of scope.
 
-**Critical path:** Keep landing queue items. Do not stop with “no next” while Phase 7.5+ remain `todo` unless each is honestly `blocked` (missing secrets / external SoR). Prefer thin web stubs over abandoning the mobile roadmap.
+**Critical path:** Queued web companion work is complete. Stop only for human secrets or unfixable builds — not for “no next” while inventing outside the queue.
 
 **Feature settings rule:** preference-shaped features ship a System Settings control + a queue note.
 
@@ -224,17 +224,17 @@ Simplified **phone companion** so Owner and permitted employees can track day-to
 | 7.2 | Responsive phone shell / PWA stub | `done` | `manifest.webmanifest`, viewport/theme, phone bottom nav, Ask float prefs; installable web |
 | 7.3 | Fleet / company car tracking | `done` | `/app/fleet` — UEM `asset` (+ name hints); empty-state until GPS/SoR; Ellinea link |
 | 7.4 | Employee register (people directory) | `done` | `/app/people` — UEM person/user read-only; Owner actions stay on Org Admin |
-| 7.5 | Pull live data + summary reports | `next` | Sync-backed KPIs and scheduled report previews on phone |
-| 7.6 | Ellinea suggestions on mobile | `todo` | Ask Ellinea + recommendations everywhere (float + bottom Ask) |
-| 7.7 | Work email summarization | `todo` | Build on email connector; Ellinea summarize for work inbox |
-| 7.8 | Access: Owner + permitted employees | `todo` | Same role model; hide-Ask-from-work-users pref shipped; no SoR bypass |
+| 7.5 | Pull live data + summary reports | `done` | `/app/glance` — sync KPIs + local report preview + schedule list |
+| 7.6 | Ellinea suggestions on mobile | `done` | Glance recs strip + phone bottom Ask + float; full Ask at `/app/ellinea` |
+| 7.7 | Work email summarization | `done` | `/app/inbox` — email install detect + Ask CTA; empty without connector |
+| 7.8 | Access: Owner + permitted employees | `done` | Same roles; Settings hide-Ask-from-work-users; Console Owner/IT only |
 
-Do **not** implement full native iOS/Android in Foundation runs. Ship installable **web** companion slices (7.2+) when queueable; keep GPS/fleet/people as `next`/`todo` until connectors exist — mark `blocked` only for missing secrets, not for “v1.1 later.”
+Do **not** implement full native iOS/Android in Foundation runs. Web companion slices 7.2–7.8 are shipped; deeper GPS/mail intelligence waits on live connectors + human secrets.
 
 ## Recently landed on main (through 2026-08-01)
 
-- **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Fleet / People / Alerts / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
-- **Fleet + People stubs (7.3–7.4):** `/app/fleet` and `/app/people` read UEM assets/people with honest empty states (no invented GPS/HR).
+- **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Glance / Fleet / People / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
+- **Companion surfaces (7.3–7.8):** `/app/fleet`, `/app/people`, `/app/glance`, `/app/inbox` — UEM/snapshot-backed with honest empty states; Ellinea recs on Glance; Ask access prefs.
 - **Ellinea contract auth stub:** Nest `EllineaAuthStubGuard` (open by default; `ELLINEA_REQUIRE_AUTH=1` requires Bearer); docs/11 aligned with Nest + SDK `getAccessToken`.
 - **Ellinea Console nav fix:** Owner/IT side nav → `/app/ellinea-console` (not Ask); Ask title stays “Ask Ellinea”; saved `/app/ellinea` nav slots remap to console.
 - **TS hygiene (~89 PagesFunction noise):** exclude `functions/` from Next `tsconfig`; add `functions/tsconfig.json` + ambient `cloudflare:sockets`; fix UEM/autofit/layout/notifications page exports.
@@ -254,7 +254,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Ship installabl
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 status:** Foundation web complete. Phase **7.2–7.4 done**; **7.5 reports-on-phone is `next`**. Human secrets: live SMTP/push + `FLY_API_TOKEN`.
+**v1.0 status:** Foundation web + Phase 7 web companion (7.1–7.8) complete. No queued `next` / `in_progress`. Remaining human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN`. Native mobile apps not in queue.
 ---
 
 ## Agent run protocol

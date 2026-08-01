@@ -1,6 +1,6 @@
 # Ellines EIP — Mobile Work Companion (Phase 7 vision)
 
-**Status:** Vision brief done; **7.2 phone shell / PWA stub** is the v1.0-adjacent web deliverable. Native apps remain v1.1+.  
+**Status:** Vision + web companion slices (7.1–7.8) shipped as installable PWA Work Console. Native apps remain future.  
 **Stance:** EIP wraps Systems of Record (HIS / ERP / CRM). The phone companion is a **Work Companion**, not a replacement SoR.
 
 ## Problem
@@ -19,9 +19,11 @@ A **phone-first slice** of the Work Console:
 | Ellinea Ask + recommendations | Same Ellinea APIs as web | Always available on phone |
 | Work email summarization | Email connector | Ellinea summarize inbox highlights |
 
-## Access
+## Auth
 
-Same EIP role model: **Owner** plus employees the org permits. No bypass of SoR authority. JWT + org isolation unchanged.
+- Work Console routes use the signed-in org JWT (same role model as desktop).
+- Owner/IT may hide the Ask float from work roles via System Settings (`eip_org_ui_policy`).
+- Ellinea Console remains Owner/IT only.
 
 ## Out of scope for this brief
 
@@ -32,10 +34,10 @@ Same EIP role model: **Owner** plus employees the org permits. No bypass of SoR 
 
 ## Suggested delivery order
 
-1. **Done / shipping:** Responsive PWA shell of Overview + Ask Ellinea (installable web — Phase 7.2)
-2. Push notifications (needs VAPID Pages secrets — same as web outbox)
-3. People + fleet read surfaces when connectors exist
-4. Email summarization on top of the email connector
+1. **Done:** Responsive PWA shell + Ask Ellinea (7.2)
+2. **Done (web stubs):** Fleet, People, Glance KPIs/reports, Ellinea mobile recs, Inbox summary CTA (7.3–7.7)
+3. Push notifications go live when VAPID Pages secrets are set (same as web outbox)
+4. Deeper GPS / mail intelligence when connectors publish richer UEM
 
 ## Related
 

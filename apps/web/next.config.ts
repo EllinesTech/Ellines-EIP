@@ -14,7 +14,7 @@ const distDir = process.env.NEXT_DIST_DIR || '.next';
 const staticExport = process.env.EIP_STATIC_EXPORT === '1';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@ellines-eip/shared'],
+  transpilePackages: ['@ellines-eip/shared', '@ellines-eip/ellinea-ai'],
   distDir,
   ...(staticExport ? { output: 'export' as const } : {}),
   images: { unoptimized: true },
