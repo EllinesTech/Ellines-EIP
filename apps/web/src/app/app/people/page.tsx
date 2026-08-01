@@ -205,7 +205,7 @@ export default function PeopleCompanionPage() {
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit', padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
         >
           {allRoles.map((r) => (
-            <option key={r} value={r}>{r === 'all' ? 'All roles' : r}</option>
+            <option key={r} value={r} style={{ background: '#1e293b', color: '#f1f5f9' }}>{r === 'all' ? 'All roles' : r}</option>
           ))}
         </select>
         <select
@@ -215,7 +215,7 @@ export default function PeopleCompanionPage() {
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit', padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
         >
           {allStatuses.map((s) => (
-            <option key={s} value={s}>{s === 'all' ? 'All statuses' : s}</option>
+            <option key={s} value={s} style={{ background: '#1e293b', color: '#f1f5f9' }}>{s === 'all' ? 'All statuses' : s}</option>
           ))}
         </select>
         <select
@@ -224,9 +224,9 @@ export default function PeopleCompanionPage() {
           aria-label="Filter by source"
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit', padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
         >
-          <option value="all">All sources</option>
-          <option value="org">EIP org users</option>
-          <option value="uem">SoR / UEM</option>
+          <option value="all" style={{ background: '#1e293b', color: '#f1f5f9' }}>All sources</option>
+          <option value="org" style={{ background: '#1e293b', color: '#f1f5f9' }}>EIP org users</option>
+          <option value="uem" style={{ background: '#1e293b', color: '#f1f5f9' }}>SoR / UEM</option>
         </select>
         <span style={{ color: 'var(--c-muted)', fontSize: '0.8rem', alignSelf: 'center' }}>
           {filtered.length} of {people.length}

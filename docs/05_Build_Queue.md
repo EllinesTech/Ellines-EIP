@@ -233,6 +233,23 @@ Blueprint: *“Continuously learn from enterprise knowledge through Ellinea AI.�
 
 ---
 
+## v1.1 Track E — OAuth2 / SAML Enterprise SSO
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| E.1 | Prisma schema: SsoProvider + SsoProviderUser | `done` | Added to schema; db:push complete |
+| E.2 | NestJS OAuth2 service | `done` | services/identity/src/sso/oauth2.service.ts (300 LOC) |
+| E.3 | NestJS SAML2 service | `done` | services/identity/src/sso/saml2.service.ts (300 LOC) |
+| E.4 | Pages Functions: OAuth2/SAML authorize + callback | `done` | 4 endpoints: authorize, callback (OAuth2); authorize, ACS (SAML2) |
+| E.5 | Pages Functions: SSO provider management | `done` | 7 endpoints: GET/POST providers, GET/PATCH/DELETE by ID, test connectivity, linked users |
+| E.6 | Public org SSO provider fetch endpoint | `done` | GET /api/v1/orgs/{slug}/sso-providers for login page |
+| E.7 | Build verification | `done` | All TypeScript builds pass; 73 Pages Functions verified |
+| E.8 | Settings UI: SSO provider configuration | `next` | Build form in `/app/settings/sso` for Owner/Admin |
+| E.9 | Testing: Real Azure AD + Okta | `todo` | Requires real IdP tenants |
+| E.10 | Documentation: User guide + API spec | `todo` | Deployment runbook for SSO setup |
+
+---
+
 ## Phase 7 — Mobile Work Companion (web PWA now; native v1.1+)
 
 Simplified **phone companion** so Owner and permitted employees can track day-to-day ops with **Ellinea AI** in the loop. EIP remains an intelligence layer **above** Systems of Record — it wraps and enhances HIS/ERP/CRM; it does **not** replace them (“god mode” ops view, not a new SoR).

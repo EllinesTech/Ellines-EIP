@@ -42,6 +42,7 @@ model Organization {
   memberships            OrganizationMembership[]
   childOrgs              Organization[]           @relation("OrgParent")
   parentOrg              Organization?            @relation("OrgParent", fields: [parentOrgId], references: [id], onDelete: SetNull)
+  ssoProviders           SsoProvider[]
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -96,6 +97,7 @@ model User {
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
   memberships         OrganizationMembership[]
+  ssoProviderUsers    SsoProviderUser[]
 
   @@index([organizationId])
   @@map("users")
@@ -313,4 +315,80 @@ model EnterpriseEvent {
   @@index([organizationId])
   @@index([at])
   @@map("enterprise_events")
+}
+
+// v1.1: OAuth2 / SAML SSO
+model SsoProvider {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  
+  // Provider Type
+  type           String   // 'oauth2' | 'saml2' | 'openid'
+  name           String   // Display name: "Azure AD", "Okta", "Google"
+  
+  // OAuth2 / OIDC Config
+  clientId       String?  @map("client_id")
+  clientSecret   String?  @map("client_secret")  // Encrypted in production
+  discoveryUrl   String?  @map("discovery_url")  // OIDC Discovery endpoint
+  authzUrl       String?  @map("authz_url")      // OAuth2 authorization endpoint
+  tokenUrl       String?  @map("token_url")      // Token endpoint
+  userinfoUrl    String?  @map("userinfo_url")   // UserInfo endpoint
+  
+  // SAML2 Config
+  entityId       String?  @map("entity_id")      // EIP's SAML entity ID
+  idpEntityId    String?  @map("idp_entity_id")  // IdP entity ID
+  idpSsoUrl      String?  @map("idp_sso_url")    // Single Sign-On Service URL
+  idpSloUrl      String?  @map("idp_slo_url")    // Single Logout Service URL
+  idpCertificate String?  @map("idp_certificate") @db.Text  // Base64-encoded cert
+  acsUrl         String?  @map("acs_url")        // Assertion Consumer Service URL
+  
+  // Attribute Mapping (JSON)
+  attributeMap   Json?    @map("attribute_map")  // { "email": "...", "name": "..." }
+  
+  // Auto-provisioning
+  autoProvision  Boolean  @default(true) @map("auto_provision")
+  defaultRole    String   @default("member") @map("default_role")
+  
+  // Group → Role Mapping
+  groupRoleMap   Json?    @map("group_role_map")  // { "admin-group": "admin" }
+  
+  // Settings
+  isActive       Boolean  @default(true) @map("is_active")
+  enforced       Boolean  @default(false)  // Disable email/password login?
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users          SsoProviderUser[]
+
+  @@unique([organizationId, type])
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("sso_providers")
+}
+
+model SsoProviderUser {
+  id             String   @id @default(cuid())
+  ssoProviderId  String   @map("sso_provider_id")
+  userId         String   @map("user_id")
+  
+  // External identifier (IdP user ID)
+  externalId     String   @map("external_id")  // SAML NameID or OIDC sub
+  externalEmail  String   @map("external_email")
+  
+  // Attributes from IdP
+  attributes     Json?    // Last sync of user attributes
+  
+  // Linking state
+  linkedAt       DateTime @default(now()) @map("linked_at")
+  lastLoginAt    DateTime? @map("last_login_at")
+
+  ssoProvider    SsoProvider @relation(fields: [ssoProviderId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ssoProviderId, externalId])
+  @@index([ssoProviderId])
+  @@index([userId])
+  @@map("sso_provider_users")
 }
