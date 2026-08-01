@@ -20,9 +20,9 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
   allowedDevOrigins: ['192.168.100.147', '100.110.20.83', '192.168.43.46'],
-  // Windows static-export builds race on generated .next/types; ship UI while CI typechecks later.
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  // TypeScript errors now caught early; separate CI step for full typecheck if needed
+  typescript: { ignoreBuildErrors: false },
+  eslint: { ignoreDuringBuilds: false },
 };
 
 export default nextConfig;

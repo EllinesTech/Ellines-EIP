@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import type { JSX } from 'react';
 import { formatOrgDateTime } from '@ellines-eip/shared';
 import {
   DATETIME_PREFS_EVENT,

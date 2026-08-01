@@ -1,4 +1,6 @@
 import { getAdminClient, json, options, signAccessToken, getClientIp, auditRow, type Env } from '../../../shared/auth';
+import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
+import { validateEmail, validatePassword, checkContentLength } from '../../../shared/validation';
 import {
   isOrganizationSuspended,
   isPlatformAdminEmail,
@@ -7,14 +9,40 @@ import {
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
-  if (context.request.method !== 'POST') return json({ message: 'Method not allowed' }, 405);
+  if (context.request.method !== 'POST') return json({ statusCode: 405, message: 'Method not allowed' }, 405);
 
   try {
-    const body = (await context.request.json()) as { email?: string; password?: string };
-    const email = (body.email || '').toLowerCase().trim();
-    const password = body.password || '';
-    if (!email || !password) {
-      return json({ statusCode: 400, message: 'Email and password are required' }, 400);
+    // Check payload size
+    checkContentLength(context.request, 1_000_000);
+
+    // Rate limit by IP: 10 attempts per minute
+    const ip = getClientIp(context.request);
+    const limiter = await checkRateLimit(context, {
+      maxRequests: 10,
+      windowMs: 60000,
+      keyPrefix: 'ratelimit:auth:login',
+    }, ip);
+
+    if (!limiter.allowed) {
+      return rateLimitResponse(limiter.remaining, limiter.resetAt);
+    }
+
+    // Validate input
+    let body: Record<string, unknown>;
+    try {
+      body = (await context.request.json()) as Record<string, unknown>;
+    } catch {
+      return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
+    }
+
+    let email: string;
+    let password: string;
+    try {
+      email = validateEmail(body.email);
+      password = validatePassword(body.password, 8);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid email or password';
+      return json({ statusCode: 400, message: msg }, 400);
     }
 
     const supabase = getAdminClient(context.env);
