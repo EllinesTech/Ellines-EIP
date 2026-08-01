@@ -80,6 +80,7 @@ function AdminOverview({
     { href: '/app/admin', label: isOwner ? 'People & authority' : 'Users & access' },
     { href: '/app/audit', label: 'Audit Center' },
     { href: '/app/connectors', label: 'Connectors' },
+    { href: '/app/org-system', label: 'Organization System' },
     { href: '/app/approvals', label: 'Approvals' },
     { href: '/app/rules', label: 'Rules' },
     { href: '/app/notifications', label: 'Notifications' },
@@ -111,6 +112,9 @@ function AdminOverview({
           </Link>
           <Link href="/app/connectors" className={styles.ghostBtn}>
             Connectors
+          </Link>
+          <Link href="/app/org-system" className={styles.ghostBtn}>
+            Org System
           </Link>
           <Link href="/app/approvals" className={styles.ghostBtn}>
             Approvals
