@@ -113,6 +113,9 @@ export default function EllineaConsolePage() {
           <Link href="/app/connectors" className={styles.ghostBtn}>
             Connectors
           </Link>
+          <Link href="/app/connectors#eip-autoscan" className={styles.ghostBtn}>
+            Auto-scan systems
+          </Link>
         </div>
       </header>
 

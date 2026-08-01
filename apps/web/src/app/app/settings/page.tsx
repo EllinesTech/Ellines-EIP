@@ -517,6 +517,22 @@ export default function SystemSettingsPage() {
             />
           </div>
         ) : null}
+        {orgAdmin ? (
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>Connector auto-scan</strong>
+              <p>
+                Owner / IT Admin can run Ellinea-assisted Auto-scan on Connectors (online URL,
+                local host, or hybrid). Access is org-admin only for now; Owner/IT can later
+                authorize other roles. Auto-scan never harvests the PC disk — only probes hosts
+                and ports IT starts.
+              </p>
+            </div>
+            <Link href="/app/connectors#eip-autoscan" className={styles.primaryLink}>
+              Open Auto-scan →
+            </Link>
+          </div>
+        ) : null}
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open full Ask workspace →

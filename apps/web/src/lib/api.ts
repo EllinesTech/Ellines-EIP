@@ -760,6 +760,35 @@ export function parseOpenApi(document: unknown) {
   });
 }
 
+export type AutoscanProbeItemDto = {
+  url: string;
+  reachable: boolean;
+  status?: number;
+  title?: string;
+  contentType?: string;
+  server?: string;
+  snippet?: string;
+  error?: string;
+  latencyMs?: number;
+};
+
+/** Owner/IT edge probe for public URLs IT entered (no localhost / private LAN). */
+export function probeAutoscanTargets(body: {
+  targets: string[];
+  catalogId?: string;
+  timeoutMs?: number;
+}) {
+  return request<{
+    mode: string;
+    catalogId: string | null;
+    limits: { maxTargets: number; timeoutMs: number; note: string };
+    results: AutoscanProbeItemDto[];
+  }>('/api/v1/connectors/autoscan/probe', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export function listPublishedPacks() {
   return request<ConnectorPackDto[]>('/api/v1/connectors/packs');
 }

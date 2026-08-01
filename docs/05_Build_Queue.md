@@ -48,6 +48,7 @@ while queue has next/in_progress and not blocked:
 5. **Done —** Fleet + People + Glance + Inbox companion stubs (7.3–7.7) with empty-state degrade.
 6. **Done —** Access prefs for Ask float / hide-from-work-users (7.8).
 7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. Native iOS/Android still out of scope.
+8. **Done —** Connector auto-scan / Ellinea detect (IT): Owner/IT Auto-scan on Connectors (+ Console/Settings links); online edge probe + local browser ports; Hospidia catalog hint; Connect → wizard prefill. Access: `isOrgAdminRole` only; Settings notes later authorize-others.
 
 **Critical path:** Queued web companion work is complete. Stop only for human secrets or unfixable builds — not for “no next” while inventing outside the queue.
 
@@ -93,6 +94,7 @@ while queue has next/in_progress and not blocked:
 | 2.x | `services/integration-hub` | `done` | Optional microservice |
 | 2.x | Webhooks / events | `done` | `POST /api/v1/webhooks/enterprise` + secret rotate on Connectors |
 | 2.x | SQL Server / MySQL | `done` | Read-only `sqlserver` + `mysql` catalog; Identity TCP via `mssql` / `mysql2` |
+| 2.x | Connector auto-scan / Ellinea detect (IT) | `done` | Owner/IT Auto-scan on Connectors; online edge probe + browser local ports; Hospidia heuristics; wizard prefill. Later: authorize non-admin roles. |
 
 ---
 
@@ -233,6 +235,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ## Recently landed on main (through 2026-08-01)
 
+- **Connector auto-scan / Ellinea detect (IT):** Connectors “Auto-scan for systems” (Online / Local / Hybrid); Pages `POST /api/v1/connectors/autoscan/probe` for public URLs; browser local/LAN port probes IT starts; Hospidia heuristics + Connect → install wizard prefill; Settings + Console links. No silent PC harvest.
 - **Phone shell / PWA (7.2):** installable `manifest.webmanifest`, theme-color / apple-web-app meta, phone bottom nav (Home / Glance / Fleet / People / Ask / More), safe-area FAB offset; Settings: Show Ask float + Owner/IT “Hide Ask from work users”; drag-nav drop-target highlight.
 - **Companion surfaces (7.3–7.8):** `/app/fleet`, `/app/people`, `/app/glance`, `/app/inbox` — UEM/snapshot-backed with honest empty states; Ellinea recs on Glance; Ask access prefs.
 - **Ellinea contract auth stub:** Nest `EllineaAuthStubGuard` (open by default; `ELLINEA_REQUIRE_AUTH=1` requires Bearer); docs/11 aligned with Nest + SDK `getAccessToken`.

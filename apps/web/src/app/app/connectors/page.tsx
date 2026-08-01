@@ -24,6 +24,8 @@ import {
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
+import SystemAutoscanPanel from './SystemAutoscanPanel';
+import type { WizardPrefill } from '@/lib/system-autoscan';
 
 const DEFAULT_CSV = `metric,value
 healthScore,81
@@ -147,6 +149,7 @@ export default function ConnectorsPage() {
   const [webhookPreview, setWebhookPreview] = useState<string | null>(null);
   const [webhookOrgId, setWebhookOrgId] = useState('');
   const [webhookSecretOnce, setWebhookSecretOnce] = useState<string | null>(null);
+  const [autoscanOpenSignal, setAutoscanOpenSignal] = useState(0);
 
   useEffect(() => {
     const s = getSession();
@@ -225,6 +228,18 @@ export default function ConnectorsPage() {
   function openWizard() {
     resetWizard();
     setWizardOpen(true);
+  }
+
+  function openWizardFromScan(prefill: WizardPrefill, ellineaNote: string) {
+    resetWizard();
+    setCatalogId(prefill.catalogId);
+    setDisplayName(prefill.displayName);
+    if (prefill.endpoint) setEndpoint(prefill.endpoint);
+    if (prefill.openApiBaseUrl) setOpenApiBaseUrl(prefill.openApiBaseUrl);
+    if (prefill.connectionStringHint) setConnectionString(prefill.connectionStringHint);
+    setStep(2);
+    setWizardOpen(true);
+    setNotice(ellineaNote);
   }
 
   function buildConfig(): ConnectorInstallConfigDto {
@@ -438,13 +453,40 @@ export default function ConnectorsPage() {
             system can do. Set sync schedules per install; due syncs run when IT opens this page.
           </p>
         </div>
-        <button type="button" className={adminStyles.primary} onClick={openWizard} disabled={busy}>
-          Install connector
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={adminStyles.ghost}
+            onClick={() => {
+              setAutoscanOpenSignal((n) => n + 1);
+              requestAnimationFrame(() => {
+                document.getElementById('eip-autoscan')?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              });
+            }}
+            disabled={busy}
+          >
+            Auto-scan for systems
+          </button>
+          <button type="button" className={adminStyles.primary} onClick={openWizard} disabled={busy}>
+            Install connector
+          </button>
+        </div>
       </header>
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
+
+      <div id="eip-autoscan">
+        <SystemAutoscanPanel
+          busy={busy}
+          setBusy={setBusy}
+          onConnect={openWizardFromScan}
+          openSignal={autoscanOpenSignal}
+        />
+      </div>
 
       <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
         <div className={styles.panelLabel}>Bring-your-own System B</div>
