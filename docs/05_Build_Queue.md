@@ -273,7 +273,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| D.1 | Prisma schema: CustomRole + ResourcePermission | `done` | Models for custom roles, permissions, attributes, audit log; relationships updated |
+| D.1 | Prisma schema: CustomRole + ResourcePermission | `done` | CustomRole model with permissions JSON array; RoleAuditLog for compliance tracking; OrganizationMembership.customRoleId field; relationships; db:push synced; see TRACK_D_IMPLEMENTATION_NOTES.md |
 | D.2 | NestJS permission evaluator engine | `next` | Evaluate permission checks against resource/attribute/context |
 | D.3 | Pages Functions: Custom role CRUD | `todo` | 5 endpoints: GET/POST roles, GET/PATCH/DELETE by ID, role validation |
 | D.4 | Pages Functions: Permission checks on all 50+ operations | `todo` | Inject permission guards into all existing endpoints (connectors, approvals, rules, reports, data access) |
