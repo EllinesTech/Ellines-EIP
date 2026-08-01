@@ -1,18 +1,21 @@
 # Ellinea AI API contract (v0.1)
 
 Base path: `/api/v1`  
-Service: `@ellines-eip/ellinea-service` (Nest) · Live web also exposes Memory / Ask via Pages Functions.
+Service: `@ellines-eip/ellinea-service` (Nest on `:3002`) · Live web also exposes Memory / Ask via Pages Functions.  
+Package engine: `@ellines-eip/ellinea-ai` · Client: `@ellines-eip/ellinea-sdk`.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/health` | Liveness |
-| `POST` | `/ellinea/ask` | Grounded Q&A (template + RAG) |
+| `GET` | `/health` | Liveness (`{ status, service, version, contract }`) |
+| `POST` | `/ellinea/ask` | Grounded Q&A (template + RAG; multi-hop enterprise reasoning) |
 | `POST` | `/ellinea/brief` | CEO / role daily brief |
 | `POST` | `/ellinea/recommend` | Explainable recommendations |
 | `POST` | `/ellinea/memory/search` | Rank Memory notes for a query |
 | `POST` | `/ellinea/feedback` | Record helpful/dismiss (stateless echo + ranked list) |
+
+EIP Pages also serve org-scoped Memory / Learning under `/api/v1/orgs/me/ellinea-*` (JWT via Identity) — those are not duplicated on the Nest stub.
 
 ## Shared payload types
 
@@ -56,13 +59,18 @@ Response: `{ chunks: RagChunk[] }`
 
 ### POST `/ellinea/feedback`
 
-Request: `{ organizationId: string; recId: string; vote: 'helpful' | 'dismiss'; recommendations?: Recommendation[]; feedback?: FeedbackMap }`  
+Request: `{ organizationId: string; recId: string; vote: 'helpful' | 'dismiss'; recommendations?: Recommendation[]; feedback?: FeedbackMap; summary?: EllineaEnterpriseSnapshot | null; role?: string }`  
 Response: `{ feedback: FeedbackMap; recommendations: Recommendation[] }`
 
-## Auth (later)
+## Auth
 
-MVP stub is open on localhost. Production will require JWT (same as Identity) and tenant isolation (6.5).
+| Mode | Behavior |
+|------|----------|
+| **MVP default** | Nest stub is open (localhost). `Authorization: Bearer …` is accepted by the SDK/`EllineaAuthStubGuard` but not required. Health is always open. |
+| **`ELLINEA_REQUIRE_AUTH=1`** | Guard requires a Bearer token (presence check). Full JWT verify + tenant isolation remain Identity-backed (see 6.5 on Pages / Nest Identity). |
+
+Production EIP Ask uses Pages Functions with the signed-in org JWT. Standalone Nest is for SDK / operator console smoke tests.
 
 ## Client SDK
 
-`@ellines-eip/ellinea-sdk` — `createEllineaClient({ baseUrl })` wraps health / ask / brief / recommend / memorySearch / feedback.
+`@ellines-eip/ellinea-sdk` — `createEllineaClient({ baseUrl, getAccessToken? })` wraps health / ask / brief / recommend / memorySearch / feedback. Pass `getAccessToken` when calling a locked Nest instance or any JWT-gated proxy.
