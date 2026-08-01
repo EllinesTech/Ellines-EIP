@@ -29,6 +29,11 @@ import {
   reorderNavHrefs,
   writeNavOrder,
 } from '@/lib/nav-order';
+import {
+  ORG_UI_POLICY_EVENT,
+  readOrgUiPolicy,
+  type OrgUiPolicy,
+} from '@/lib/org-ui-policy';
 import styles from './shell.module.css';
 
 type NavItem = {
@@ -202,6 +207,10 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const [navOrder, setNavOrder] = useState<string[] | null>(null);
   const [editingNav, setEditingNav] = useState(false);
   const [dragHref, setDragHref] = useState<string | null>(null);
+  const [dropTargetHref, setDropTargetHref] = useState<string | null>(null);
+  const [orgUiPolicy, setOrgUiPolicy] = useState<OrgUiPolicy>({
+    hideAskFromWorkUsers: false,
+  });
 
   useEffect(() => {
     const s = getSession();
@@ -225,6 +234,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     if (orgAdmin) {
       setNavOrder(readNavOrder(s.organization.id, s.user.id));
     }
+    setOrgUiPolicy(readOrgUiPolicy(s.organization.id));
     setReady(true);
     refreshSessionFlags()
       .then((next) => {
@@ -258,13 +268,21 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       const detail = (e as CustomEvent<UiPrefs>).detail;
       if (detail) setUiPrefs(detail);
     }
+    function onOrgPolicy(e: Event) {
+      const detail = (e as CustomEvent<{ orgId: string; policy: OrgUiPolicy }>).detail;
+      const s = getSession();
+      if (!detail || !s || detail.orgId !== s.organization.id) return;
+      setOrgUiPolicy(detail.policy);
+    }
     window.addEventListener(DATETIME_PREFS_EVENT, onPrefs);
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfile);
     window.addEventListener(UI_PREFS_EVENT, onUiPrefs);
+    window.addEventListener(ORG_UI_POLICY_EVENT, onOrgPolicy);
     return () => {
       window.removeEventListener(DATETIME_PREFS_EVENT, onPrefs);
       window.removeEventListener(PROFILE_UPDATED_EVENT, onProfile);
       window.removeEventListener(UI_PREFS_EVENT, onUiPrefs);
+      window.removeEventListener(ORG_UI_POLICY_EVENT, onOrgPolicy);
     };
   }, []);
 
@@ -342,7 +360,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragHref && dragHref !== href) {
-      /* allow drop target highlight via CSS :hover / drag state */
+      setDropTargetHref(href);
     }
   }
 
@@ -351,12 +369,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
     e.preventDefault();
     const from = dragHref || e.dataTransfer.getData('text/plain');
     setDragHref(null);
+    setDropTargetHref(null);
     if (!from || from === href) return;
     persistNavOrder(reorderNavHrefs(orderedHrefs, from, href));
   }
 
   function onNavDragEnd() {
     setDragHref(null);
+    setDropTargetHref(null);
   }
   const pageTitle =
     pathname.startsWith('/app/ellinea-console')
@@ -392,6 +412,41 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                         : 'EIP Dashboard — Overview';
 
   const profileActive = pathname.startsWith('/app/profile');
+  const showAskFloat =
+    uiPrefs.ellineaShowAskFloat !== false &&
+    (orgAdmin || !orgUiPolicy.hideAskFromWorkUsers);
+  const phoneNav = [
+    { href: '/app', label: 'Home', icon: <IconOverview />, match: (p: string) => p === '/app' || p === '/app/' },
+    {
+      href: '/app/timeline',
+      label: 'Timeline',
+      icon: <IconTimeline />,
+      match: (p: string) => p.startsWith('/app/timeline'),
+    },
+    {
+      href: '/app/notifications',
+      label: 'Alerts',
+      icon: <IconNotifications />,
+      match: (p: string) => p.startsWith('/app/notifications'),
+    },
+    ...(uiPrefs.showApprovalsNav
+      ? [
+          {
+            href: '/app/approvals',
+            label: 'Approvals',
+            icon: <IconApprovals />,
+            match: (p: string) => p.startsWith('/app/approvals'),
+          },
+        ]
+      : []),
+    {
+      href: '/app/settings',
+      label: 'More',
+      icon: <IconSettings />,
+      match: (p: string) =>
+        p.startsWith('/app/settings') || p.startsWith('/app/profile'),
+    },
+  ];
 
   return (
     <div
@@ -453,15 +508,18 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                 ? pathname === '/app' || pathname === '/app/'
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const dragging = dragHref === item.href;
+            const dropTarget = dropTargetHref === item.href && dragHref !== item.href;
             if (editingNav) {
               return (
                 <div
                   key={item.href}
-                  className={
-                    dragging
-                      ? `${styles.navRow} ${styles.navRowDragging}`
-                      : styles.navRow
-                  }
+                  className={[
+                    styles.navRow,
+                    dragging ? styles.navRowDragging : '',
+                    dropTarget ? styles.navRowDropTarget : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   draggable
                   onDragStart={(e) => onNavDragStart(item.href, e)}
                   onDragOver={(e) => onNavDragOver(item.href, e)}
@@ -626,7 +684,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         </footer>
       </div>
 
-      {!chatOpen ? (
+      {!chatOpen && showAskFloat ? (
         <button type="button" className={styles.fab} onClick={() => setChatOpen(true)}>
           <svg viewBox="0 0 24 24" aria-hidden>
             <path d="M21 12a8.5 8.5 0 01-8.5 8.5H7l-4 3V12A8.5 8.5 0 0112.5 3.5 8.5 8.5 0 0121 12z" />
@@ -634,6 +692,39 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
           Ask Ellinea AI
         </button>
       ) : null}
+
+      <nav className={styles.phoneBottomNav} aria-label="Phone companion">
+        {phoneNav.map((item) => {
+          const active = item.match(pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={active ? `${styles.phoneNavLink} ${styles.phoneNavActive}` : styles.phoneNavLink}
+            >
+              <span className={styles.phoneNavIcon}>{item.icon}</span>
+              <span className={styles.phoneNavLabel}>{item.label}</span>
+            </Link>
+          );
+        })}
+        {showAskFloat ? (
+          <button
+            type="button"
+            className={
+              chatOpen || pathname.startsWith('/app/ellinea')
+                ? `${styles.phoneNavLink} ${styles.phoneNavActive}`
+                : styles.phoneNavLink
+            }
+            onClick={() => setChatOpen(true)}
+            aria-label="Ask Ellinea AI"
+          >
+            <span className={styles.phoneNavIcon}>
+              <IconEllinea />
+            </span>
+            <span className={styles.phoneNavLabel}>Ask</span>
+          </button>
+        ) : null}
+      </nav>
 
       <EllineaChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>

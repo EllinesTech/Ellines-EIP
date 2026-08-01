@@ -1,7 +1,7 @@
 # Ellines EIP — Mobile Work Companion (Phase 7 vision)
 
-**Status:** Product brief only (v1.1+) — not in v1.0 Foundation build scope.  
-**Stance:** EIP wraps Systems of Record (HIS / ERP / CRM). The phone app is a **Work Companion**, not a replacement SoR.
+**Status:** Vision brief done; **7.2 phone shell / PWA stub** is the v1.0-adjacent web deliverable. Native apps remain v1.1+.  
+**Stance:** EIP wraps Systems of Record (HIS / ERP / CRM). The phone companion is a **Work Companion**, not a replacement SoR.
 
 ## Problem
 
@@ -30,9 +30,9 @@ Same EIP role model: **Owner** plus employees the org permits. No bypass of SoR 
 - Multi-company consolidation
 - Replacing payroll / fleet / HR systems of record
 
-## Suggested v1.1 delivery order
+## Suggested delivery order
 
-1. Responsive PWA shell of Overview + Ask Ellinea (installable web)
+1. **Done / shipping:** Responsive PWA shell of Overview + Ask Ellinea (installable web — Phase 7.2)
 2. Push notifications (needs VAPID Pages secrets — same as web outbox)
 3. People + fleet read surfaces when connectors exist
 4. Email summarization on top of the email connector

@@ -25,6 +25,11 @@ import {
   type UiPrefs,
   type UiTheme,
 } from '@/lib/ui-prefs';
+import {
+  readOrgUiPolicy,
+  writeOrgUiPolicy,
+  type OrgUiPolicy,
+} from '@/lib/org-ui-policy';
 import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -58,6 +63,9 @@ export default function SystemSettingsPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
+  const [orgUiPolicy, setOrgUiPolicy] = useState<OrgUiPolicy>({
+    hideAskFromWorkUsers: false,
+  });
   const [orgName, setOrgName] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
 
@@ -80,6 +88,7 @@ export default function SystemSettingsPage() {
     setOrgName(s.organization.name);
     setOrgSlug(s.organization.slug);
     setUiPrefs(readUiPrefs());
+    setOrgUiPolicy(readOrgUiPolicy(s.organization.id));
     fetchOrgDateTimeSettings()
       .then((prefs) => {
         setTimeFormat(prefs.timeFormat);
@@ -107,6 +116,14 @@ export default function SystemSettingsPage() {
     setUiPrefs(next);
     writeUiPrefs(next);
     setNotice('Display preferences updated on this device.');
+    setError('');
+  }
+
+  function persistOrgPolicy(next: OrgUiPolicy) {
+    if (!orgId) return;
+    setOrgUiPolicy(next);
+    writeOrgUiPolicy(orgId, next);
+    setNotice('Org access preference updated on this device.');
     setError('');
   }
 
@@ -463,6 +480,43 @@ export default function SystemSettingsPage() {
             onClick={() => persistUi({ ...uiPrefs, ellineaUseLlm: !uiPrefs.ellineaUseLlm })}
           />
         </div>
+        <div className={settingsStyles.toggleRow}>
+          <div className={settingsStyles.toggleCopy}>
+            <strong>Show Ask float</strong>
+            <p>
+              Personal control for the floating “Ask Ellinea AI” button. Full Ask workspace stays
+              at /app/ellinea; Owner/IT Console stays at /app/ellinea-console.
+            </p>
+          </div>
+          <Toggle
+            on={uiPrefs.ellineaShowAskFloat}
+            label="Toggle Ask Ellinea float"
+            onClick={() =>
+              persistUi({ ...uiPrefs, ellineaShowAskFloat: !uiPrefs.ellineaShowAskFloat })
+            }
+          />
+        </div>
+        {orgAdmin ? (
+          <div className={settingsStyles.toggleRow}>
+            <div className={settingsStyles.toggleCopy}>
+              <strong>Hide Ask from work users</strong>
+              <p>
+                Owner/IT policy: hide the Ask float for executive / manager / member / viewer on
+                this device. Console remains Owner/IT only.
+              </p>
+            </div>
+            <Toggle
+              on={orgUiPolicy.hideAskFromWorkUsers}
+              label="Toggle hide Ask from work users"
+              onClick={() =>
+                persistOrgPolicy({
+                  ...orgUiPolicy,
+                  hideAskFromWorkUsers: !orgUiPolicy.hideAskFromWorkUsers,
+                })
+              }
+            />
+          </div>
+        ) : null}
         <div className={settingsStyles.linkRow} style={{ marginTop: '0.65rem' }}>
           <Link href="/app/ellinea" className={styles.primaryLink}>
             Open full Ask workspace →

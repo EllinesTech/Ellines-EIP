@@ -36,6 +36,8 @@ export type UiPrefs = {
   ellineaUseDna: boolean;
   /** Prefer LLM+RAG path when provider is configured (falls back to template). */
   ellineaUseLlm: boolean;
+  /** Show the floating Ask Ellinea AI button (personal). */
+  ellineaShowAskFloat: boolean;
 };
 
 const STORAGE_KEY = 'eip_ui_prefs';
@@ -60,6 +62,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   ellineaRecFeedback: true,
   ellineaUseDna: true,
   ellineaUseLlm: true,
+  ellineaShowAskFloat: true,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -88,6 +91,7 @@ export function readUiPrefs(): UiPrefs {
       ellineaRecFeedback: parsed.ellineaRecFeedback !== false,
       ellineaUseDna: parsed.ellineaUseDna !== false,
       ellineaUseLlm: parsed.ellineaUseLlm !== false,
+      ellineaShowAskFloat: parsed.ellineaShowAskFloat !== false,
     };
   } catch {
     return DEFAULT_UI_PREFS;

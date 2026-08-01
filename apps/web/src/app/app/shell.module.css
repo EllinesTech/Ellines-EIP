@@ -293,6 +293,12 @@
   outline-offset: -1px;
 }
 
+.navRowDropTarget {
+  outline: 1px solid rgba(37, 99, 235, 0.75);
+  outline-offset: -1px;
+  background: rgba(37, 99, 235, 0.12);
+}
+
 .navHandle {
   display: grid;
   place-items: center;
@@ -1009,14 +1015,105 @@
 
   .content {
     overflow: visible;
-    padding: 1.1rem 1rem 5rem;
+    padding: 1.1rem 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .fab {
     right: 1rem;
-    bottom: 1rem;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
     padding: 0.75rem 1rem;
     font-size: 0.82rem;
+  }
+
+  .appFooter {
+    display: none;
+  }
+
+  .sidebar .nav {
+    display: none;
+  }
+
+  .navEditBar {
+    display: none;
+  }
+}
+
+/* Phone companion chrome — hidden on desktop; enabled in 860px media above */
+.phoneBottomNav {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0.15rem;
+  padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--dash-panel, #0f172a) 92%, transparent);
+  border-top: 1px solid var(--dash-line, rgba(148, 163, 184, 0.22));
+  backdrop-filter: blur(10px);
+}
+
+.phoneNavLink {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.35rem 0.2rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dash-muted, #94a3b8);
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.phoneNavLink:hover,
+.phoneNavLink:focus-visible {
+  color: var(--dash-text, #e2e8f0);
+  background: rgba(148, 163, 184, 0.1);
+  outline: none;
+}
+
+.phoneNavActive {
+  color: #fff;
+  background: color-mix(in srgb, var(--dash-accent, #6f2d8d) 55%, transparent);
+}
+
+.phoneNavIcon {
+  display: flex;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.phoneNavIcon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.phoneNavLabel {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .phoneBottomNav {
+    display: flex;
   }
 }
 
