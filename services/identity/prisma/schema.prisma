@@ -45,6 +45,8 @@ model Organization {
   ssoProviders           SsoProvider[]
   customRoles            CustomRole[]
   roleAuditLogs          RoleAuditLog[]
+  dashboards             Dashboard[]             // Track B: BI Dashboards
+  workflowRules          WorkflowRule[]          // Track C: Autonomous Workflows
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -192,24 +194,31 @@ model EnterpriseSnapshot {
 
 /** Per-org connector wizard install — config persists server-side (not localStorage). */
 model ConnectorInstallation {
-  id             String    @id @default(cuid())
-  organizationId String    @map("organization_id")
-  catalogId      String    @map("catalog_id")
-  displayName    String    @map("display_name")
-  config         Json
-  status         String    @default("draft")
-  lastTestAt     DateTime? @map("last_test_at")
-  lastSyncedAt   DateTime? @map("last_synced_at")
-  lastMessage    String?   @map("last_message")
-  packId         String?   @map("pack_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default(cuid())
+  organizationId      String    @map("organization_id")
+  catalogId           String    @map("catalog_id")
+  displayName         String    @map("display_name")
+  config              Json
+  status              String    @default("draft")
+  lastTestAt          DateTime? @map("last_test_at")
+  lastSyncedAt        DateTime? @map("last_synced_at")
+  lastMessage         String?   @map("last_message")
+  packId              String?   @map("pack_id")
+  templateId          String?   @map("template_id")      // Track A: reference to ConnectorTemplate
+  templateConfig      Json?     @map("template_config")  // Track A: user config merged with template defaults
+  oauthRefreshToken   String?   @map("oauth_refresh_token") // Track A: OAuth token storage
+  lastError           String?   @map("last_error")       // Track A: last sync error message
+  errorCount          Int       @default(0) @map("error_count") // Track A: consecutive error count
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  pack         ConnectorPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pack         ConnectorPack?        @relation(fields: [packId], references: [id], onDelete: SetNull)
+  template     ConnectorTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, packId])
   @@index([organizationId])
+  @@index([templateId])
   @@map("connector_installations")
 }
 
@@ -229,6 +238,212 @@ model ConnectorPack {
   installations ConnectorInstallation[]
 
   @@map("connector_packs")
+}
+
+// ─── Track A — Enterprise Connectors Framework ─────────────────────────────────
+
+/**
+ * ConnectorTemplate — Pre-built system-specific connector templates.
+ * Platform Super Admin publishes templates; Org IT uses them to install connectors.
+ * Templates define configuration schema, normalization rules, OAuth requirements, etc.
+ */
+model ConnectorTemplate {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  name                String
+  category            String                     // "ERP" | "CRM" | "HIS" | "HR" | "Database" | "REST" | "Email" | "File"
+  description         String   @default("")
+  configSchema        Json     @default("{}")    // JSON Schema for UI form generation
+  normalizationRules  Json     @default("[]")    // Array of UEM normalization rules
+  oauthRequired       Boolean  @default(false) @map("oauth_required")
+  oauthScopes         Json?    @map("oauth_scopes")     // Optional: required OAuth scopes
+  apiDocsUrl          String?  @map("api_docs_url")
+  examples            Json?    @default("[]")   // Array of example configs
+  published           Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  installations ConnectorInstallation[]
+
+  @@index([category])
+  @@index([published])
+  @@map("connector_templates")
+}
+
+// ─── Track B — BI Dashboards (Custom KPI Builder) ──────────────────────────────
+
+/**
+ * Dashboard — Custom KPI dashboard with drag-drop widgets.
+ * Org IT / Owner creates dashboards; supports layout, refresh rate, and permissions.
+ */
+model Dashboard {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  name            String
+  description     String   @default("")
+  layout          Json     @default("[]")    // Array of { id, x, y, w, h, ... }
+  refreshRate     Int      @default(300)    @map("refresh_rate")  // Seconds between refreshes
+  isPublic        Boolean  @default(false) @map("is_public")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  widgets      Widget[]
+  exports      DashboardExport[]
+
+  @@index([organizationId])
+  @@map("dashboards")
+}
+
+/**
+ * Widget — Individual widget (gauge, line, bar, table, KPI) on a dashboard.
+ */
+model Widget {
+  id              String   @id @default(cuid())
+  dashboardId     String   @map("dashboard_id")
+  type            String                  // "gauge" | "line" | "bar" | "table" | "kpi"
+  title           String
+  config          Json     @default("{}")    // Widget-specific config
+  position        Int                    // Grid position / order
+  size            Json     @default("{\"w\":2,\"h\":2}") // Width and height in grid units
+  dataSourceId    String?  @map("data_source_id") // Optional reference to data source
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  dashboard Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  alerts    Alert[]
+
+  @@index([dashboardId])
+  @@map("widgets")
+}
+
+/**
+ * Alert — Alert threshold on a widget (e.g., if KPI > 100, trigger action).
+ */
+model Alert {
+  id              String   @id @default(cuid())
+  widgetId        String   @map("widget_id")
+  condition       String                  // "gt" | "lt" | "eq" | "gte" | "lte"
+  threshold       Float
+  actions         Json     @default("[]")    // Array of { type: "email" | "webhook" | "notification", recipient: "..." }
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  widget Widget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@index([widgetId])
+  @@map("alerts")
+}
+
+/**
+ * DashboardExport — Scheduled dashboard exports (PDF, CSV).
+ */
+model DashboardExport {
+  id              String    @id @default(cuid())
+  dashboardId     String    @map("dashboard_id")
+  format          String                 // "pdf" | "csv" | "excel"
+  schedule        String?              // Cron expression for email scheduling (null = manual only)
+  lastRun         DateTime? @map("last_run")
+  nextRun         DateTime? @map("next_run")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  dashboard Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardId])
+  @@map("dashboard_exports")
+}
+
+// ─── Track C — Autonomous Workflows (AI Agent Rules) ─────────────────────────────
+
+/**
+ * WorkflowRule — Autonomous rule with trigger, condition, action, and autonomy level.
+ * Autonomy levels: 1 = Deterministic, 2 = AI-assisted (requires approval), 3 = Scheduled (auto-execute).
+ */
+model WorkflowRule {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  name            String
+  description     String   @default("")
+  autonomyLevel   Int      @default(1) @map("autonomy_level") // 1 | 2 | 3
+  trigger         String                  // Event type: "approval_created" | "alert_threshold" | "schedule" | "manual"
+  condition       Json     @default("{}")    // Condition logic (e.g., { "field": "status", "op": "eq", "value": "pending" })
+  action          Json     @default("{}")    // Action to execute (e.g., { "type": "approve", "escalate": true })
+  isActive        Boolean  @default(true) @map("is_active")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   RuleExecution[]
+  schedules    RuleSchedule[]
+
+  @@index([organizationId])
+  @@index([autonomyLevel])
+  @@map("workflow_rules")
+}
+
+/**
+ * RuleExecution — Log of rule execution with status, recommendations, and approval state.
+ */
+model RuleExecution {
+  id                  String    @id @default(cuid())
+  ruleId              String    @map("rule_id")
+  triggeredAt         DateTime  @map("triggered_at")
+  status              String                  // "pending" | "approved" | "rejected" | "executed" | "failed"
+  aiRecommendation    Json?     @map("ai_recommendation") // AI reasoning and confidence
+  humanApprovalBy     String?   @map("human_approval_by")
+  humanApprovalAt     DateTime? @map("human_approval_at")
+  executedAt          DateTime? @map("executed_at")
+  executionError      String?   @map("execution_error")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  rule WorkflowRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([status])
+  @@index([triggeredAt])
+  @@map("rule_executions")
+}
+
+/**
+ * RuleSchedule — Cron schedule for Level 3 (autonomous) rules.
+ */
+model RuleSchedule {
+  id              String   @id @default(cuid())
+  ruleId          String   @map("rule_id")
+  cronExpression  String   @map("cron_expression")
+  timezone        String   @default("UTC")
+  lastRun         DateTime? @map("last_run")
+  nextRun         DateTime? @map("next_run")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  rule WorkflowRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId])
+  @@index([ruleId])
+  @@map("rule_schedules")
+}
+
+/**
+ * RuleTemplate — Pre-built rule template (e.g., "Escalate pending approvals after 3 days").
+ */
+model RuleTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  description     String   @default("")
+  rules           Json     @default("[]")    // Array of rule definitions
+  category        String   @default("general") // "approval" | "alert" | "sync" | "general"
+  published       Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("rule_templates")
 }
 
 // ─── Phase 5 — Workflow & Automation ────────────────────────────────────────
