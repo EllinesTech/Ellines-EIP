@@ -8,6 +8,7 @@ import { PlatformModule } from './platform/platform.module';
 import { EnterpriseModule } from './enterprise/enterprise.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { RbacModule } from './rbac/rbac.module';
+import { LoggingModule } from './logging/logging.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { HealthController } from './health.controller';
 
@@ -21,6 +22,7 @@ import { HealthController } from './health.controller';
         '.env',
       ],
     }),
+    LoggingModule,
     PrismaModule,
     AuthModule,
     OrgsModule,

@@ -20,9 +20,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { ObservabilityInterceptor } from './middleware/observability.interceptor';
-import { LoggingMiddleware } from './middleware/logging.middleware';
 import { MetricsCollector } from './metrics/metrics-collector';
-import { Logger, createLogger } from './logging/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -32,15 +30,6 @@ async function bootstrap() {
   // Register global observability interceptor
   const metricsCollector = app.get(MetricsCollector);
   app.useGlobalInterceptors(new ObservabilityInterceptor(metricsCollector));
-
-  // Register logging middleware
-  const winstonLogger = createLogger();
-  app.use((req, res, next) => {
-    const loggingMiddleware = new LoggingMiddleware(
-      new (require('./logging/log-context').Logger)(winstonLogger),
-    );
-    loggingMiddleware.use(req, res, next);
-  });
 
   const configService = app.get(ConfigService);
   const corsRaw =

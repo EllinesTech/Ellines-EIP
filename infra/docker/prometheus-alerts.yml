@@ -1,0 +1,93 @@
+groups:
+  - name: ellines_eip_alerts
+    interval: 30s
+    rules:
+      # Critical: High error rate
+      - alert: HighErrorRate
+        expr: (rate(http_errors[5m]) / rate(http_request_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected (>1%)"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      # Warning: Slow API responses
+      - alert: SlowAPIResponse
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow API response times detected (>2s)"
+          description: "API p95 latency is {{ $value | humanizeDuration }} on {{ $labels.instance }}"
+
+      # Warning: Permission check performance degradation
+      - alert: SlowPermissionChecks
+        expr: histogram_quantile(0.95, permission_check_duration_ms) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Permission checks are slow (p95 >50ms)"
+          description: "Permission check p95 is {{ $value }}ms - possible cache issue"
+
+      # Warning: Database query performance
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database queries are slow (p95 >100ms)"
+          description: "Query p95 latency is {{ $value | humanizeDuration }} on {{ $labels.instance }}"
+
+      # Warning: Long-running rule executions
+      - alert: SlowRuleExecution
+        expr: histogram_quantile(0.95, rule_execution_duration_ms) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rule executions are slow (p95 >5s)"
+          description: "Rule execution p95 is {{ $value }}ms on {{ $labels.instance }}"
+
+      # Critical: High connector sync failure rate
+      - alert: HighConnectorFailureRate
+        expr: (rate(connector_error_total[5m]) / (rate(connector_error_total[5m]) + rate(connector_sync_duration_ms[5m]))) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High connector failure rate detected (>5%)"
+          description: "Connector failure rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      # Warning: Service is not responding
+      - alert: ServiceDown
+        expr: up{job="identity-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Identity service is down"
+          description: "Identity service has been down for more than 1 minute"
+
+      # Warning: High memory usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / (1024 * 1024) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected (>500MB)"
+          description: "Process memory usage is {{ $value }}MB on {{ $labels.instance }}"
+
+      # Info: Request latency above SLO
+      - alert: LatencyAboveSLO
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p99 latency above SLO (>1s)"
+          description: "API p99 latency is {{ $value | humanizeDuration }} - approaching SLO limit"

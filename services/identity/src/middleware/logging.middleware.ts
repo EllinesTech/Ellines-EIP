@@ -17,7 +17,13 @@ export class LoggingMiddleware implements NestMiddleware {
 
     res.on('finish', () => {
       const duration = Date.now() - start;
-      const durationSeconds = duration / 1000;
+
+      let level: 'debug' | 'info' | 'warn' | 'error' = 'info';
+      if (res.statusCode >= 500) {
+        level = 'error';
+      } else if (res.statusCode >= 400) {
+        level = 'warn';
+      }
 
       const context: LogContext = {
         trace_id: traceId,
@@ -25,7 +31,7 @@ export class LoggingMiddleware implements NestMiddleware {
         org_id: req.user?.org_id,
         service: 'identity',
         operation: `${req.method} ${req.path}`,
-        level: res.statusCode >= 400 ? 'warn' : 'info',
+        level,
         duration_ms: duration,
         metadata: {
           status: res.statusCode,
@@ -35,10 +41,6 @@ export class LoggingMiddleware implements NestMiddleware {
           user_agent: req.get('user-agent'),
         },
       };
-
-      if (res.statusCode >= 500) {
-        context.level = 'error';
-      }
 
       this.logger.log(context);
     });
@@ -52,6 +54,7 @@ export class LoggingMiddleware implements NestMiddleware {
           org_id: req.user?.org_id,
           service: 'identity',
           operation: `${req.method} ${req.path}`,
+          level: 'error',
           duration_ms: Date.now() - start,
         },
         error,

@@ -5,10 +5,11 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { tap, catchError } from 'rxjs/operators';
 import { Request, Response } from 'express';
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
 import { MetricsCollector } from '../metrics/metrics-collector';
+import { of, throwError } from 'rxjs';
 
 /**
  * Interceptor to:
@@ -52,59 +53,58 @@ export class ObservabilityInterceptor implements NestInterceptor {
       trace.setSpan(context.active(), span),
       () =>
         next.handle().pipe(
-          tap(
-            (data) => {
-              const duration = Date.now() - startTime;
+          tap(() => {
+            const duration = Date.now() - startTime;
 
-              // Record metrics
-              this.metricsCollector.recordRequestDuration(duration / 1000, {
-                method,
-                route,
-                status: String(res.statusCode),
-              });
+            // Record metrics
+            this.metricsCollector.recordRequestDuration(duration / 1000, {
+              method,
+              route,
+              status: String(res.statusCode),
+            });
 
-              this.metricsCollector.recordRequest({
-                method,
-                route,
-                status: String(res.statusCode),
-              });
+            this.metricsCollector.recordRequest({
+              method,
+              route,
+              status: String(res.statusCode),
+            });
 
-              // Update span with response status
-              span.setAttribute('http.status_code', res.statusCode);
-              span.setAttribute('http.response_duration_ms', duration);
+            // Update span with response status
+            span.setAttribute('http.status_code', res.statusCode);
+            span.setAttribute('http.response_duration_ms', duration);
 
-              if (res.statusCode >= 400) {
-                span.setStatus({
-                  code: SpanStatusCode.ERROR,
-                  message: `HTTP ${res.statusCode}`,
-                });
-              } else {
-                span.setStatus({ code: SpanStatusCode.OK });
-              }
-
-              span.end();
-            },
-            (error: Error) => {
-              const duration = Date.now() - startTime;
-
-              // Record error metrics
-              this.metricsCollector.recordRequestDuration(duration / 1000, {
-                method,
-                route,
-                status: 'error',
-              });
-
-              // Record error in span
-              span.recordException(error);
+            if (res.statusCode >= 400) {
               span.setStatus({
                 code: SpanStatusCode.ERROR,
-                message: error.message,
+                message: `HTTP ${res.statusCode}`,
               });
-              span.setAttribute('http.response_duration_ms', duration);
+            } else {
+              span.setStatus({ code: SpanStatusCode.OK });
+            }
 
-              span.end();
-            },
-          ),
+            span.end();
+          }),
+          catchError((error: Error) => {
+            const duration = Date.now() - startTime;
+
+            // Record error metrics
+            this.metricsCollector.recordRequestDuration(duration / 1000, {
+              method,
+              route,
+              status: 'error',
+            });
+
+            // Record error in span
+            span.recordException(error);
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error.message,
+            });
+            span.setAttribute('http.response_duration_ms', duration);
+
+            span.end();
+            return throwError(() => error);
+          }),
         ),
     );
   }
