@@ -8,12 +8,9 @@
     "services/*",
     "packages/*"
   ],
-  "overrides": {
-    "@opentelemetry/exporter-jaeger-basic": "@opentelemetry/exporter-jaeger@^1.20.0"
-  },
   "scripts": {
     "predev": "npm run build:shared",
-    "dev": "node scripts/free-ports.mjs 3100 3001 && concurrently -n shared,sdk,identity,web -c gray,yellow,magenta,cyan \"npm run dev -w @ellines-eip/shared\" \"npm run dev -w @ellines-eip/connec[...],
+    "dev": "node scripts/free-ports.mjs 3100 3001 && concurrently -n shared,sdk,identity,web -c gray,yellow,magenta,cyan \"npm run dev -w @ellines-eip/shared\" \"npm run dev -w @ellines-eip/connectors-sdk\" \"npm run dev -w @ellines-eip/identity\" \"npm run dev -w @ellines-eip/web\"",
     "dev:identity": "npm run dev -w @ellines-eip/identity",
     "dev:web": "npm run dev -w @ellines-eip/web",
     "build": "npm run build --workspaces --if-present",
