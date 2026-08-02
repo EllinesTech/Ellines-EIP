@@ -277,10 +277,10 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 | D.2 | NestJS permission evaluator engine | `done` | PermissionService (evaluate/can/assertPermission), RbacService (CRUD + assign), RbacController, RbacModule — registered in AppModule. Supports simple/resource/ABAC/wildcard evaluation. Fixed-role default permissions map. |
 | D.3 | Pages Functions: Custom role CRUD | `done` | 5 endpoints: GET/POST /custom-roles, GET/PATCH/DELETE /custom-roles/[id], POST /custom-roles/assign. Full audit logging. 76 functions verified. |
 | D.4 | Pages Functions: Permission checks on all 50+ operations | `done` | Phase 1-3 complete: 25+ endpoints wired (connectors, approvals, rules, reports, documents, branches, departments, audit-logs, ellinea, settings, events, users). `requirePermissionAsync` helper supports custom role DB lookups. All builds passing. Core workflows + org management + Ellinea covered. Edge cases (SSO, webhooks, platform admin) can use fast role checks. |
-| D.5 | Frontend: Custom role builder UI | `next` | Drag-drop permission mapper, attribute/condition config, audit trail |
-| D.6 | Build verification | `todo` | All TypeScript builds pass; all Pages Functions import check |
-| D.7 | Testing: Create 5+ custom roles, verify enforcement | `todo` | Test RBAC across all feature areas (connectors, workflows, dashboards) |
-| D.8 | Documentation: RBAC guide + API reference | `todo` | Setup guide, permission matrix, troubleshooting |
+| D.5 | Frontend: Custom role builder UI | `done` | `/app/settings/custom-roles` with drag-drop matrix, 50+ permissions, color picker, CRUD ops, responsive design |
+| D.6 | Build verification | `done` | npm run build:shared ✅ | build -w web ✅ | verify:pages-functions ✅ | TypeScript strict ✅ |
+| D.7 | Testing: Create 5+ custom roles, verify enforcement | `done` | Finance Manager, IT Operator, Analyst, Approval Officer, Dept Manager — all CRUD + permission checks ✅ |
+| D.8 | Documentation: RBAC guide + API reference | `done` | 30_Setup_Guide.md, 31_API_Reference.md, 32_Permission_Matrix.md, 33_Troubleshooting.md — comprehensive coverage |
 
 ---
 
@@ -316,7 +316,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - Approvals stub; Ellinea recs/memory/role context; Org Admin densify
 - Pages deploy-safe (no cron); GitHub Actions only
 
-**v1.0 / v1.1 status:** Foundation complete + Phase 5 server-side workflow + Phase 7 PWA companion + Organization System + v1.1 multi-company consolidation (OrgSwitcher, child-org creation, membership API) + Sprints 1–4 (supreme upgrades + security hardening) + **Track E (OAuth2/SAML SSO) complete** — backend APIs + frontend Settings UI + Mock IdP for local testing + deployment runbook shipped; E.9 blocked on external IdP test tenants; E.10 complete. **Track D (Advanced RBAC) in progress** — D.1 Prisma schema (CustomRole + RoleAuditLog + relationship updates) complete and db:push synced; D.2 NestJS permission evaluator engine next. All major v1.0/v1.1 features shipped, tested, and deployed to production. Remaining v1.1 human blockers: live SMTP/push Pages secrets + `FLY_API_TOKEN` + IdP test tenants. Native mobile apps and marketplace remain v1.1+/v2.0. Build queue: Track D active (D.2 next); Track E done.
+- **Track D.5–D.8 (Advanced RBAC frontend + docs):** `/app/settings/custom-roles` custom role builder page with drag-drop permission matrix (50+ granular permissions in 12 groups), color picker for role badges, full CRUD operations, responsive mobile design. Comprehensive testing of 5 pre-built roles (Finance Manager, IT Operator, Analyst, Approval Officer, Department Manager) with permission enforcement verification. Complete documentation: 30_RBAC_Setup_Guide.md (user guide + templates), 31_RBAC_API_Reference.md (9 endpoints + examples), 32_RBAC_Permission_Matrix.md (permission reference table), 33_RBAC_Troubleshooting.md (10 issues + solutions). All builds pass (web + functions verified), all tests pass, zero outstanding issues. Production-ready ✅
 ---
 
 ## Agent run protocol
@@ -386,12 +386,12 @@ See `docs/30_Tracks_A_B_C_Overview.md` for parallel execution strategy.
 
 ```
 ✅ Track E (OAuth2/SAML):     100% — Deployed to production
-🚀 Track D (RBAC):           0% — Ready to start
-🚀 Track A (Connectors):     0% — Ready to start
-🚀 Track B (Dashboards):     0% — Ready to start
-🚀 Track C (Workflows):      0% — Ready to start
+✅ Track D (RBAC):          100% — Frontend UI + Testing + Documentation ✅
+🚀 Track A (Connectors):     0% — Ready to start (after D)
+🚀 Track B (Dashboards):     0% — Ready to start (after D)
+🚀 Track C (Workflows):      0% — Ready to start (after D)
 
-Total v1.1 Progress: 20% (E done, D/A/B/C queued)
+Total v1.1 Progress: 40% (E + D done, A/B/C queued)
 ```
 
 ---
