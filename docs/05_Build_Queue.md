@@ -276,7 +276,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 | D.1 | Prisma schema: CustomRole + ResourcePermission | `done` | CustomRole model with permissions JSON array; RoleAuditLog for compliance tracking; OrganizationMembership.customRoleId field; relationships; db:push synced; see TRACK_D_IMPLEMENTATION_NOTES.md |
 | D.2 | NestJS permission evaluator engine | `done` | PermissionService (evaluate/can/assertPermission), RbacService (CRUD + assign), RbacController, RbacModule — registered in AppModule. Supports simple/resource/ABAC/wildcard evaluation. Fixed-role default permissions map. |
 | D.3 | Pages Functions: Custom role CRUD | `done` | 5 endpoints: GET/POST /custom-roles, GET/PATCH/DELETE /custom-roles/[id], POST /custom-roles/assign. Full audit logging. 76 functions verified. |
-| D.4 | Pages Functions: Permission checks on all 50+ operations | `next` | Inject permission guards into all existing endpoints (connectors, approvals, rules, reports, data access) |
+| D.4 | Pages Functions: Permission checks on all 50+ operations | `in_progress` | Phase 1 (core workflows) wired: connectors (installations, sync, test), approvals (GET/POST/decide), rules (GET/POST), reports (GET/POST), documents (GET/POST/DELETE), branches (GET/POST). `requirePermissionAsync` helper added to shared auth. Building & verifying. |
 | D.5 | Frontend: Custom role builder UI | `todo` | Drag-drop permission mapper, attribute/condition config, audit trail |
 | D.6 | Build verification | `todo` | All TypeScript builds pass; all Pages Functions import check |
 | D.7 | Testing: Create 5+ custom roles, verify enforcement | `todo` | Test RBAC across all feature areas (connectors, workflows, dashboards) |

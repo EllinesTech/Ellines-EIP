@@ -3,6 +3,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermission,
   type Env,
 } from '../../../shared/auth';
 

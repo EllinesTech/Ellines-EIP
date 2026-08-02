@@ -11,6 +11,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -60,6 +61,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
+
+  // Permission check per operation
+  if (context.request.method === 'GET') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'document:view',
+    );
+    if (permErr) return permErr;
+  } else if (context.request.method === 'POST') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'document:upload',
+    );
+    if (permErr) return permErr;
+  } else if (context.request.method === 'DELETE') {
+    // DELETE requires document:delete
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'document:delete',
+    );
+    if (permErr) return permErr;
+  }
 
   const supabase = getAdminClient(context.env);
 

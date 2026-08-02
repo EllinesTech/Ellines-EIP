@@ -287,3 +287,127 @@ export function auditRow(params: {
     ip_address: params.ip ?? null,
   };
 }
+
+// ─── Permission Evaluation (D.4) ─────────────────────────────────────────────
+
+export interface PermissionEntry {
+  permission: string;
+  resources?: string[];
+  attributes?: Record<string, string | number | boolean>;
+}
+
+/** Default permissions for each fixed role — mirrors PermissionService in NestJS identity. */
+const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
+  owner:     ['*'],
+  admin:     ['org:*', 'connector:*', 'approval:*', 'rule:*', 'report:*', 'document:*', 'ellinea:*', 'audit:view', 'webhook:*', 'notification:*', 'sso:view'],
+  executive: ['org:view', 'connector:read', 'approval:view', 'approval:decide', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'ellinea:view', 'audit:view', 'notification:view'],
+  manager:   ['org:view', 'connector:read', 'approval:view', 'approval:request', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'notification:view'],
+  member:    ['org:view', 'connector:read', 'approval:view', 'approval:request', 'report:view', 'document:view', 'ellinea:ask', 'notification:view'],
+  viewer:    ['org:view', 'connector:read', 'report:view', 'document:view', 'notification:view'],
+};
+
+/** Evaluate a single permission entry against the requested permission + optional resourceId. */
+function evalEntry(entry: PermissionEntry | string, permission: string, resourceId?: string): boolean {
+  const perm = typeof entry === 'string' ? entry : entry.permission;
+  const lowerPerm = perm.toLowerCase();
+  const lowerTarget = permission.toLowerCase();
+
+  if (lowerPerm === '*') return true;
+  if (lowerPerm.endsWith(':*')) {
+    if (!lowerTarget.startsWith(lowerPerm.slice(0, -1))) return false;
+  } else if (lowerPerm !== lowerTarget) {
+    return false;
+  }
+
+  if (typeof entry !== 'string' && resourceId && entry.resources?.length) {
+    if (!entry.resources.includes(resourceId)) return false;
+  }
+  return true;
+}
+
+/**
+ * Check whether a user (by role + optional customRolePermissions) can perform `permission`.
+ * Cheap — no DB round-trip when called with JWT role only.
+ */
+export function canByRole(
+  role: string,
+  permission: string,
+  resourceId?: string,
+  customPermissions?: PermissionEntry[],
+): boolean {
+  // Custom role overrides fixed role if provided
+  if (customPermissions && customPermissions.length > 0) {
+    return customPermissions.some((e) => evalEntry(e, permission, resourceId));
+  }
+  const perms = FIXED_ROLE_PERMISSIONS[role] ?? [];
+  return perms.some((p) => evalEntry(p, permission, resourceId));
+}
+
+/**
+ * Full permission check: reads customRoleId from org_memberships if needed.
+ * Use when the JWT role alone isn't enough (i.e. user might have a custom role).
+ */
+export async function checkPermission(
+  env: Env,
+  userId: string,
+  organizationId: string,
+  role: string,
+  permission: string,
+  resourceId?: string,
+): Promise<boolean> {
+  // Owner always passes — fast path
+  if (role === 'owner') return true;
+
+  // Check if user has a custom role in this org
+  const supabase = getAdminClient(env);
+  const { data: membership } = await supabase
+    .from('organization_memberships')
+    .select('custom_role_id')
+    .eq('user_id', userId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  if (membership?.custom_role_id) {
+    const { data: customRole } = await supabase
+      .from('custom_roles')
+      .select('permissions')
+      .eq('id', membership.custom_role_id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (customRole?.permissions) {
+      const perms = customRole.permissions as PermissionEntry[];
+      return perms.some((e) => evalEntry(e, permission, resourceId));
+    }
+  }
+
+  // Fall back to fixed role
+  return canByRole(role, permission, resourceId);
+}
+
+/** Return a 403 Response or null if allowed. Cheap role-only check — no DB. */
+export function requirePermission(role: string, permission: string): Response | null {
+  if (canByRole(role, permission)) return null;
+  return json({ statusCode: 403, message: `Permission denied: ${permission}` }, 403);
+}
+
+/**
+ * Full async permission check with custom role support.
+ * Returns a 403 Response or null if allowed.
+ * Use when the user might have a custom role assigned.
+ */
+export async function requirePermissionAsync(
+  env: Env,
+  userId: string,
+  organizationId: string,
+  role: string,
+  permission: string,
+  resourceId?: string,
+): Promise<Response | null> {
+  const allowed = await checkPermission(env, userId, organizationId, role, permission, resourceId);
+  if (allowed) return null;
+  return json(
+    { statusCode: 403, message: `Permission denied: ${permission}${resourceId ? ` on ${resourceId}` : ''}` },
+    403,
+  );
+}

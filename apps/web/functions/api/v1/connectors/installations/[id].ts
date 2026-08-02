@@ -3,7 +3,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 import {
@@ -17,8 +17,36 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
+
+  // All methods require connector:read at minimum; mutations require connector:update/delete
+  if (context.request.method === 'DELETE') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'connector:delete',
+    );
+    if (permErr) return permErr;
+  } else if (context.request.method === 'PATCH') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'connector:update',
+    );
+    if (permErr) return permErr;
+  } else {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'connector:read',
+    );
+    if (permErr) return permErr;
+  }
 
   const id = context.params.id as string;
   const supabase = getAdminClient(context.env);
@@ -61,5 +89,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json(toInstallationDto(data as Record<string, unknown>));
   }
 
-  return json({ message: 'Method not allowed' }, 405);
+  // GET
+  return json(toInstallationDto(existing as Record<string, unknown>));
 };

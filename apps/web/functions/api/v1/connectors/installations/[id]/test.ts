@@ -3,7 +3,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermissionAsync,
   type Env,
 } from '../../../../../shared/auth';
 import {
@@ -21,8 +21,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
+
+  // connector:read permission required for testing
+  const permErr = await requirePermissionAsync(
+    context.env,
+    auth.sub,
+    auth.organizationId,
+    auth.role,
+    'connector:read',
+  );
+  if (permErr) return permErr;
 
   const id = context.params.id as string;
   const supabase = getAdminClient(context.env);

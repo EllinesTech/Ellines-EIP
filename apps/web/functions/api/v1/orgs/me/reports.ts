@@ -7,7 +7,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -45,9 +45,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  // GET — Owner/IT only
-  const adminErr = requireOrgAdmin(auth.role);
-  if (adminErr) return adminErr;
+  // GET — report:view   POST — report:create
+  if (context.request.method === 'GET') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'report:view',
+    );
+    if (permErr) return permErr;
+  } else if (context.request.method === 'POST') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'report:create',
+    );
+    if (permErr) return permErr;
+  } else {
+    return json({ statusCode: 405, message: 'Method not allowed' }, 405);
+  }
 
   const supabase = getAdminClient(context.env);
 

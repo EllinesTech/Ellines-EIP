@@ -4,6 +4,7 @@ import {
   options,
   requireAuth,
   requireOrgAdmin,
+  requirePermissionAsync,
   getClientIp,
   auditRow,
   type Env,
@@ -15,8 +16,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
+
+  // GET: connector:read   POST: connector:install
+  if (context.request.method === 'GET') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'connector:read',
+    );
+    if (permErr) return permErr;
+  } else {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'connector:install',
+    );
+    if (permErr) return permErr;
+  }
 
   const supabase = getAdminClient(context.env);
 

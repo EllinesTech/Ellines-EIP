@@ -8,6 +8,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../../../shared/auth';
 import { sendOutboundEmail, resolveMailConfig } from '../../../../../../shared/mail';
@@ -57,6 +58,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
+
+  // approval:decide permission required
+  const permErr = await requirePermissionAsync(
+    context.env,
+    auth.sub,
+    auth.organizationId,
+    auth.role,
+    'approval:decide',
+  );
+  if (permErr) return permErr;
 
   const approvalId = context.params.id as string;
   const supabase = getAdminClient(context.env);

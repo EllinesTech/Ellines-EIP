@@ -9,6 +9,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -62,6 +63,14 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
 
   // ── GET: list approvals ────────────────────────────────────────────────────
   if (context.request.method === 'GET') {
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'approval:view',
+    );
+    if (permErr) return permErr;
     const { data, error } = await supabase
       .from('organizations')
       .select('settings')
@@ -76,6 +85,16 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
   if (context.request.method !== 'POST') {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   }
+
+  // Any org member can request an approval
+  const permErr = await requirePermissionAsync(
+    context.env,
+    auth.sub,
+    auth.organizationId,
+    auth.role,
+    'approval:request',
+  );
+  if (permErr) return permErr;
 
   let body: { title?: string; detail?: string; templateId?: string; source?: string };
   try {

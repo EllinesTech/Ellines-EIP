@@ -3,7 +3,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermission,
   type Env,
 } from '../../../../shared/auth';
 
@@ -16,8 +16,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
+  // Executives can also view audit logs (audit:view permission)
+  const permErr = requirePermission(auth.role, 'audit:view');
+  if (permErr) return permErr;
 
   const url = new URL(context.request.url);
   const limitRaw = Number(url.searchParams.get('limit') || '80');
