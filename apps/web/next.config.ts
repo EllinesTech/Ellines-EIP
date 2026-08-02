@@ -22,7 +22,10 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.100.147', '100.110.20.83', '192.168.43.46'],
   // TypeScript errors now caught early; separate CI step for full typecheck if needed
   typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: false },
+  // ESLint: no config file in repo yet — skip lint during build to prevent CI hang.
+  // (next lint prompts interactively when no .eslintrc exists; blocks CI)
+  // Re-enable once ESLint is properly wired up.
+  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;
