@@ -3,7 +3,7 @@ import {
   json,
   options,
   requireAuth,
-  requirePermission,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -16,8 +16,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  // Executives can also view audit logs (audit:view permission)
-  const permErr = requirePermission(auth.role, 'audit:view');
+  // audit:view permission required
+  const permErr = await requirePermissionAsync(
+    context.env,
+    auth.sub,
+    auth.organizationId,
+    auth.role,
+    'audit:view',
+  );
   if (permErr) return permErr;
 
   const url = new URL(context.request.url);

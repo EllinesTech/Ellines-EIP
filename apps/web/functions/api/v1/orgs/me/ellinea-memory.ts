@@ -8,6 +8,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -28,6 +29,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'GET') {
+    // ellinea:manage permission for reading memory
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'ellinea:manage',
+    );
+    if (permErr) return permErr;
+
     const { data, error } = await supabase
       .from('organizations')
       .select('settings')
@@ -38,6 +49,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (context.request.method === 'PUT') {
+    // ellinea:manage permission for writing memory
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'ellinea:manage',
+    );
+    if (permErr) return permErr;
+
     let body: unknown;
     try {
       body = await context.request.json();

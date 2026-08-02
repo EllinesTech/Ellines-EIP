@@ -3,7 +3,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -13,12 +13,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
-
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'GET') {
+    // org:view permission for reading departments
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:view',
+    );
+    if (permErr) return permErr;
+
     const { data, error } = await supabase
       .from('departments')
       .select('id, name, branch_id, created_at')
@@ -40,6 +47,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (context.request.method === 'POST') {
+    // org:manage_departments permission for creating departments
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:manage_departments',
+    );
+    if (permErr) return permErr;
+
     try {
       const body = (await context.request.json()) as { name?: string; branchId?: string };
       const name = (body.name || '').trim();
