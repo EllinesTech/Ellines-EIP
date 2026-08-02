@@ -1,0 +1,32 @@
+notifiers:
+  - name: 'Default Slack'
+    type: slack
+    uid: slack-notifier
+    isDefault: false
+    sendReminder: false
+    disableResolveMessage: false
+    settings:
+      url: ${SLACK_WEBHOOK_URL:}
+      mentionChannel: channel
+    secureSettings:
+      url: ${SLACK_WEBHOOK_URL:}
+
+  - name: 'Default PagerDuty'
+    type: pagerduty
+    uid: pagerduty-notifier
+    isDefault: false
+    sendReminder: false
+    disableResolveMessage: false
+    settings:
+      integrationKey: ${PAGERDUTY_KEY:}
+    secureSettings:
+      integrationKey: ${PAGERDUTY_KEY:}
+
+  - name: 'Email'
+    type: email
+    uid: email-notifier
+    isDefault: true
+    sendReminder: true
+    disableResolveMessage: false
+    settings:
+      addresses: ${ALERT_EMAIL:admin@example.com}
