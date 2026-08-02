@@ -34,6 +34,7 @@ services:
       - '9090:9090'
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
       - prometheus-storage:/prometheus
     networks:
       - ellines-observability
@@ -81,6 +82,7 @@ services:
       - grafana-storage:/var/lib/grafana
       - ./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana-provisioning/provisioning:/etc/grafana/provisioning
     networks:
       - ellines-observability
     depends_on:
