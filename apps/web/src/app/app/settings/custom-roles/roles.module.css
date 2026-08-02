@@ -1,0 +1,315 @@
+/* Custom Roles UI — Track D.5 */
+
+/* Role List */
+.rolesList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.roleCard {
+  border: 1px solid #444;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  transition: all 150ms ease;
+}
+
+.roleCard:hover {
+  border-color: #666;
+  background: #1f1f1f;
+}
+
+.roleCardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.roleName {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.roleDescription {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.roleStatus {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.roleActive {
+  background: rgba(124, 58, 237, 0.1);
+  color: #c084fc;
+}
+
+.roleInactive {
+  background: rgba(100, 100, 100, 0.1);
+  color: #888;
+}
+
+.rolePermissions {
+  margin-bottom: 0.75rem;
+}
+
+.permissionsLabel {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #aaa;
+}
+
+.permissionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.permissionChip {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.25rem;
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.permissionChipMore {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.25rem;
+  background: rgba(100, 100, 100, 0.1);
+  color: #999;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.roleActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.roleActions button {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* Permission Matrix */
+.permissionsSection {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #444;
+  border-radius: 0.5rem;
+  background: #0f172a;
+}
+
+.permissionsHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.permissionsHead h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.permissionsToolbar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.permissionsToolbar button {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.permissionsMatrix {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.permissionGroup {
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.permissionGroupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #0f172a;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+  user-select: none;
+  transition: background 150ms ease;
+}
+
+.permissionGroupHeader:hover {
+  background: #1a1f3a;
+}
+
+.permissionGroupHeader:focus-within {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.permissionGroupTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.permissionGroupCheckbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.permissionGroupTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.permissionGroupHint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.permissionGroupCounter {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  background: rgba(100, 100, 100, 0.1);
+  color: #aaa;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  margin-left: 1rem;
+  flex-shrink: 0;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #141414;
+}
+
+.permissionItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+  user-select: none;
+}
+
+.permissionItem:hover {
+  background: #1f1f1f;
+}
+
+.permissionItem input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #7c3aed;
+}
+
+.permissionItem input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.permissionLabel {
+  font-size: 0.85rem;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Drag-drop hints (for future enhancement) */
+.permissionItemDragover {
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px dashed #2563eb;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .permissionsMatrix {
+    gap: 0.75rem;
+  }
+
+  .permissionGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.35rem;
+    padding: 0.75rem;
+  }
+
+  .permissionGroupHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .permissionGroupCounter {
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .roleCard {
+    padding: 0.75rem;
+  }
+
+  .roleCardHead {
+    flex-direction: column;
+  }
+
+  .roleStatus {
+    align-self: flex-start;
+  }
+
+  .roleActions {
+    flex-direction: column;
+  }
+
+  .roleActions button {
+    width: 100%;
+  }
+}
