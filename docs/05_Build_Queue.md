@@ -52,7 +52,7 @@ while queue has next/in_progress and not blocked:
 | **Sprint 2 — Supreme upgrade** | `done` | Approval detail modal, combined Timeline, Platform per-org stats, Settings security+webhook sections |
 | **Sprint 3 — Completion** | `done` | Glance live refresh + trends, Reports email delivery status, Approval notification emails |
 | **Sprint 4 — Security & Quality** | `done` | Rate limiting, input validation, error standardization, strict TypeScript, Jest test infrastructure |
-| **Hosting** | Live | Pages via GitHub Actions; Identity Fly needs `FLY_API_TOKEN` once |
+| **Hosting** | ✅ Live | Cloudflare Pages via GitHub Actions (web + Pages Functions auth); Fly workflow removed (2026-08-02) |
 
 ### Priority order (first → next → later)
 
@@ -62,7 +62,7 @@ while queue has next/in_progress and not blocked:
 4. **Done —** Responsive phone shell / PWA stub (7.2): installable manifest, viewport, bottom nav, Ask float prefs.
 5. **Done —** Fleet + People + Glance + Inbox companion stubs (7.3–7.7) with empty-state degrade.
 6. **Done —** Access prefs for Ask float / hide-from-work-users (7.8).
-7. **Human blockers —** Pages env for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly. Native iOS/Android still out of scope.
+7. **Human blockers —** Pages env for live mail/push. Native iOS/Android still out of scope. Identity Fly deployment removed (2026-08-02) — now serves via Pages Functions only.
 8. **Done —** Connector auto-scan / Ellinea detect (IT): Owner/IT Auto-scan on Connectors (+ Console/Settings links); online edge probe + local browser ports; Hospidia catalog hint; Connect → wizard prefill. Access: `isOrgAdminRole` only; Settings notes later authorize-others.
 9. **Done —** Organization System hub + **capability catalog** (Owner/IT): data-driven domains; live UEM pages (branches, departments, tasks, assets, documents, alerts, finance); companion deep links (people/fleet/glance/inbox); appointments/inventory/attendance stubs until kinds exist; Settings **Allow work roles to open Organization System** (default off) + route/nav guard.
 
@@ -301,7 +301,7 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 - **Ellinea Console nav fix:** Owner/IT side nav → `/app/ellinea-console` (not Ask); Ask title stays “Ask Ellinea”; saved `/app/ellinea` nav slots remap to console.
 - **TS hygiene (~89 PagesFunction noise):** exclude `functions/` from Next `tsconfig`; add `functions/tsconfig.json` + ambient `cloudflare:sockets`; fix UEM/autofit/layout/notifications page exports.
 - **Mobile vision brief (7.1):** [13_Mobile_Work_Companion_Brief.md](./13_Mobile_Work_Companion_Brief.md).
-- **Secrets docs:** Pages mail/push env + Fly `FLY_API_TOKEN` clarified in docs/10, 07, 12 (and 08 for Fly).
+- **Secrets docs:** Pages mail/push env documented. Identity Fly deployment removed (2026-08-02) — now via Pages Functions.
 - **Ellinea enterprise reasoning upgrade (4.11):** Multi-hop Ask answers; smarter RAG (Memory/alerts/decisions/attention boosts); denser Watch/Decide/Delegate briefs; SoR-safe LLM system prompt; sharper Owner/IT role lenses. (`745445c` — do not regress.)
 - **Owner/IT side-nav rearrange:** Edit nav + drag reorder; order persisted in `eip_nav_order:{orgId}:{userId}`; non-admins keep fixed default; new items merge at default relative position (Ellinea Console above Settings by default).
 - **Web Push / VAPID:** subscription API + `/sw-push.js`; deliver attempts push when VAPID secrets + browser sub exist; else simulated/failed with clear message. Human Pages secrets required for live push.

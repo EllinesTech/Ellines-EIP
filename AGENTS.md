@@ -27,9 +27,9 @@ EIP sits **above** existing systems (ERP, CRM, etc.). It connects and observes; 
 ## Current maturity (summary)
 
 - **Live web:** Cloudflare Pages → [eip.ellines.co.ke](https://eip.ellines.co.ke) (static UI + same-origin `/api/v1` auth Functions)
-- **Identity (Nest / Fly):** optional full microservice — see `docs/08_Live_Identity_Setup.md`
+- **Identity:** Serves via Cloudflare Pages Functions only (Fly deployment removed 2026-08-02)
 - **Working:** Identity + auth, access layers, role-adaptive Command Center, connectors (incl. SQL), Ellinea Ask/Console/SDK, workflow stubs (approvals/rules/reports), notification outbox (SMTP/VAPID when secrets set), Phase 7 **web** companion (PWA shell, fleet/people/glance/inbox)
-- **Human blockers:** Pages secrets for live mail/push; GitHub `FLY_API_TOKEN` for Identity Fly
+- **Human blockers:** Pages secrets for live mail/push
 - **Not in queue:** Native iOS/Android apps; marketplace / digital twin / multi-company
 
 Full checklist: `docs/05_Build_Queue.md`.
@@ -91,7 +91,7 @@ Web: http://localhost:3100 · Identity: http://localhost:3001/api/v1/health
 | Surface | Trigger |
 |---------|---------|
 | Web (Pages) | Push to `main` → `.github/workflows/deploy-pages.yml` |
-| Identity (Fly) | Push to `main` touching identity/deploy paths → `.github/workflows/deploy-identity.yml` |
+| Identity (Pages Functions) | Automatic via same Pages deployment (no separate workflow needed) |
 
 ## Demo login (live)
 
