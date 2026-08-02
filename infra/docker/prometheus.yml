@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 15s # Default scrape interval
+  evaluation_interval: 15s # Default evaluation interval
+  external_labels:
+    monitor: ellines-eip
+    service: identity
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Jaeger metrics
+  - job_name: jaeger
+    static_configs:
+      - targets: ['localhost:14269']
+    scrape_interval: 10s
+
+  # Loki metrics
+  - job_name: loki
+    static_configs:
+      - targets: ['localhost:3100']
+    metrics_path: /loki/api/v1/metrics
+
+  # Identity Service metrics
+  - job_name: identity-service
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'identity-service'
+
+# Alert rules
+rule_files:
+  - '/etc/prometheus/alert-rules.yml'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093

@@ -5,15 +5,42 @@ import { join } from 'path';
 config({ path: join(__dirname, '..', '..', '..', '.env'), override: true });
 config({ path: join(__dirname, '..', '.env'), override: true });
 
+// Initialize OpenTelemetry tracing FIRST (before any async operations)
+import { initializeTracing } from './tracing/tracing';
+initializeTracing();
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AppModule } from './app.module';
+import { ObservabilityInterceptor } from './middleware/observability.interceptor';
+import { LoggingMiddleware } from './middleware/logging.middleware';
+import { MetricsCollector } from './metrics/metrics-collector';
+import { Logger, createLogger } from './logging/logger';
+
+async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api/v1');
+
+  // Register global observability interceptor
+  const metricsCollector = app.get(MetricsCollector);
+  app.useGlobalInterceptors(new ObservabilityInterceptor(metricsCollector));
+
+  // Register logging middleware
+  const winstonLogger = createLogger();
+  app.use((req, res, next) => {
+    const loggingMiddleware = new LoggingMiddleware(
+      new (require('./logging/log-context').Logger)(winstonLogger),
+    );
+    loggingMiddleware.use(req, res, next);
+  });
 
   const configService = app.get(ConfigService);
   const corsRaw =

@@ -8,6 +8,7 @@ import { PlatformModule } from './platform/platform.module';
 import { EnterpriseModule } from './enterprise/enterprise.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { RbacModule } from './rbac/rbac.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -27,6 +28,7 @@ import { HealthController } from './health.controller';
     EnterpriseModule,
     WorkflowModule,
     RbacModule,
+    ObservabilityModule,
   ],
   controllers: [HealthController],
 })

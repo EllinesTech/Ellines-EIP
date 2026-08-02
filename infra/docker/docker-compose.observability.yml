@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: ellines-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '6831:6831/udp' # Jaeger agent
+      - '14268:14268'   # Jaeger collector HTTP
+      - '4318:4318'     # OTLP receiver HTTP
+      - '16686:16686'   # Jaeger UI
+    networks:
+      - ellines-observability
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:16686/api/traces']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - 'com.example.description=Jaeger tracing backend'
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ellines-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-storage:/prometheus
+    networks:
+      - ellines-observability
+    depends_on:
+      - jaeger
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9090/-/healthy']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - 'com.example.description=Prometheus metrics collection'
+
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: ellines-loki
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - '3100:3100'
+    volumes:
+      - loki-storage:/loki
+      - ./loki-config.yml:/etc/loki/local-config.yml
+    networks:
+      - ellines-observability
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3100/ready']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - 'com.example.description=Loki log aggregation'
+
+  # Grafana for dashboards & visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ellines-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_ROOT_URL: http://localhost:3000
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - ellines-observability
+    depends_on:
+      - prometheus
+      - loki
+      - jaeger
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - 'com.example.description=Grafana dashboards & alerting'
+
+networks:
+  ellines-observability:
+    driver: bridge
+
+volumes:
+  prometheus-storage:
+  loki-storage:
+  grafana-storage:
