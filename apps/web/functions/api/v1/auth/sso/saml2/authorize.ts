@@ -38,8 +38,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 403, message: 'Provider is disabled' }, 403);
     }
 
-    // Generate SAML AuthnRequest
-    const id = `_${Buffer.from(Math.random().toString()).toString('base64').slice(0, 20)}`;
+    // Generate SAML AuthnRequest (use crypto.randomUUID — no Node Buffer in Workers)
+    const id = `_${crypto.randomUUID().replace(/-/g, '')}`;
     const instant = new Date().toISOString();
     const acsUrl =
       provider.acs_url ||
@@ -57,8 +57,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   <saml:Issuer>${provider.entity_id || `${process.env.BASE_URL || 'http://localhost:3100'}/saml`}</saml:Issuer>
 </samlp:AuthnRequest>`;
 
-    // Encode to base64
-    const encoded = Buffer.from(authnRequest).toString('base64');
+    // Encode to base64 using Web Crypto (no Buffer in Workers)
+    const encoded = btoa(
+      String.fromCharCode(...new TextEncoder().encode(authnRequest))
+    );
 
     // Return HTML form for auto-submit (POST binding)
     const html = `

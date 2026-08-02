@@ -6,14 +6,11 @@ import type { PagesFunction } from '@cloudflare/workers-types';
  * List all SSO providers for the org (Owner/Admin only)
  */
 async function handleGet(context: { env: Env; request: Request }) {
-  const auth = requireAuth(context.request);
-  if (!auth) {
-    return json({ statusCode: 401, message: 'Unauthorized' }, 401);
-  }
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
 
   const supabase = getAdminClient(context.env);
 
-  // Check if user is Owner or Admin
   const { data: user } = await supabase
     .from('users')
     .select('role, organization_id')
@@ -24,21 +21,15 @@ async function handleGet(context: { env: Env; request: Request }) {
     return json({ statusCode: 403, message: 'Forbidden' }, 403);
   }
 
-  // List SSO providers
   const { data: providers, error } = await supabase
     .from('sso_providers')
     .select('id, type, name, is_active, enforced, created_at, updated_at')
     .eq('organization_id', user.organization_id)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    return json({ statusCode: 500, message: error.message }, 500);
-  }
+  if (error) return json({ statusCode: 500, message: error.message }, 500);
 
-  return json({
-    statusCode: 200,
-    data: providers,
-  });
+  return json({ statusCode: 200, data: providers });
 }
 
 /**
@@ -46,14 +37,11 @@ async function handleGet(context: { env: Env; request: Request }) {
  * Create a new SSO provider (Owner only)
  */
 async function handlePost(context: { env: Env; request: Request }) {
-  const auth = requireAuth(context.request);
-  if (!auth) {
-    return json({ statusCode: 401, message: 'Unauthorized' }, 401);
-  }
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
 
   const supabase = getAdminClient(context.env);
 
-  // Check if user is Owner
   const { data: user } = await supabase
     .from('users')
     .select('role, organization_id')
@@ -88,31 +76,15 @@ async function handlePost(context: { env: Env; request: Request }) {
     };
 
     if (!body.type || !body.name) {
-      return json(
-        { statusCode: 400, message: 'type and name required' },
-        400,
-      );
+      return json({ statusCode: 400, message: 'type and name required' }, 400);
+    }
+    if (body.type === 'oauth2' && (!body.clientId || !body.clientSecret)) {
+      return json({ statusCode: 400, message: 'OAuth2 requires clientId and clientSecret' }, 400);
+    }
+    if (body.type === 'saml2' && (!body.idpEntityId || !body.idpSsoUrl)) {
+      return json({ statusCode: 400, message: 'SAML2 requires idpEntityId and idpSsoUrl' }, 400);
     }
 
-    if (body.type === 'oauth2') {
-      if (!body.clientId || !body.clientSecret) {
-        return json(
-          { statusCode: 400, message: 'OAuth2 requires clientId and clientSecret' },
-          400,
-        );
-      }
-    }
-
-    if (body.type === 'saml2') {
-      if (!body.idpEntityId || !body.idpSsoUrl) {
-        return json(
-          { statusCode: 400, message: 'SAML2 requires idpEntityId and idpSsoUrl' },
-          400,
-        );
-      }
-    }
-
-    // Create provider
     const { data: provider, error } = await supabase
       .from('sso_providers')
       .insert({
@@ -142,11 +114,8 @@ async function handlePost(context: { env: Env; request: Request }) {
       .select()
       .single();
 
-    if (error) {
-      return json({ statusCode: 500, message: error.message }, 500);
-    }
+    if (error) return json({ statusCode: 500, message: error.message }, 500);
 
-    // Audit log
     const ip = getClientIp(context.request);
     await supabase.from('audit_logs').insert(
       auditRow({
@@ -159,10 +128,7 @@ async function handlePost(context: { env: Env; request: Request }) {
       }),
     );
 
-    return json({
-      statusCode: 201,
-      data: provider,
-    });
+    return json({ statusCode: 201, data: provider });
   } catch (err) {
     console.error('Error creating SSO provider:', err);
     return json({ statusCode: 500, message: 'Failed to create provider' }, 500);
