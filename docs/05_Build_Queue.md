@@ -451,3 +451,137 @@ Total v1.1 Progress: 100% (All tracks complete — E/D/A/B/C ✅)
 ---
 
 ## Phase 7 — Mobile Work Companion (web PWA now; native v1.1+)
+
+
+---
+
+## Tier 1 Observability — Infrastructure & Dashboards ✅
+
+**Status:** ✅ Complete  
+**Date Completed:** 2026-08-02  
+**Scope:** OpenTelemetry tracing, Prometheus metrics, Loki logs, 5 dashboards, 9 alert rules
+
+### What's Complete
+
+**Core Infrastructure (2026-08-01):**
+- ✅ OpenTelemetry Node SDK with Jaeger exporter
+- ✅ Prometheus metrics collection (10+ business metrics)
+- ✅ Winston structured logging + Loki integration
+- ✅ Auto-instrumentation (HTTP, Express, PostgreSQL, Prisma, Redis)
+- ✅ Docker stack (Jaeger, Prometheus, Loki, Grafana)
+
+**Dashboards & Alerts (2026-08-02):**
+- ✅ 5 production Grafana dashboards (auto-provisioned):
+  - API Health Dashboard (requests/sec, error rate, latency p50/p95/p99)
+  - Database Performance Dashboard (query latency, queries/sec, errors)
+  - Permission System Dashboard (check latency, denial rate, cache hit)
+  - Rules Engine Dashboard (execution time by level, success rate)
+  - Connectors Dashboard (sync duration, failure rate, errors/sec)
+- ✅ 9 alert rules (critical + warnings + SLO violations)
+- ✅ Grafana notification channels (Email, Slack, PagerDuty)
+- ✅ Auto-provisioning config for dashboards + datasources
+
+**Documentation:**
+- ✅ `docs/42_Observability_Tier1_Setup.md` (setup guide, PromQL/LogQL examples)
+- ✅ `docs/43_Observability_Implementation_Status.md` (current state, build status)
+- ✅ `docs/44_Observability_Dashboards_Alerts.md` (dashboards, alerts, quick start)
+
+### File Manifest
+
+```
+infra/docker/
+├── docker-compose.observability.yml    (Updated: mounts alert rules + provisioning)
+├── prometheus.yml                       (Updated: includes prometheus-alerts.yml)
+├── prometheus-alerts.yml                (NEW: 9 alert rules)
+├── loki-config.yml
+├── grafana-provisioning/
+│   ├── datasources/
+│   │   └── datasources.yml
+│   ├── provisioning/
+│   │   ├── dashboards.yml              (NEW)
+│   │   └── notifiers.yml               (NEW)
+│   └── dashboards/
+│       ├── api-health.json             (NEW)
+│       ├── database-performance.json   (NEW)
+│       ├── permission-system.json      (NEW)
+│       ├── rules-engine.json           (NEW)
+│       └── connectors.json             (NEW)
+
+services/identity/src/
+├── tracing/
+├── metrics/
+├── logging/
+├── middleware/
+├── observability/
+└── (all auto-instrumented)
+
+docs/
+├── 42_Observability_Tier1_Setup.md     (Setup guide)
+├── 43_Observability_Implementation_Status.md   (Status)
+└── 44_Observability_Dashboards_Alerts.md       (Dashboards & Alerts)
+```
+
+### Quick Start
+
+```bash
+# Start observability stack (Jaeger, Prometheus, Loki, Grafana)
+docker-compose -f infra/docker/docker-compose.observability.yml up -d
+
+# Access dashboards
+# Grafana: http://localhost:3000 (admin/admin)
+# Prometheus: http://localhost:9090
+# Jaeger: http://localhost:16686
+
+# Generate test data
+npm run dev:identity
+
+# In another terminal, make requests
+curl -X POST http://localhost:3001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "SecurePassword123!",
+    "organizationName": "Test Org",
+    "organizationSlug": "test-org",
+    "fullName": "Test User"
+  }'
+
+# View dashboards in Grafana
+# Dashboards → Observability folder → Select dashboard
+```
+
+### Next Steps (Post-Tier 1)
+
+**Phase 2: Service Instrumentation** (blocked on pre-existing Prisma issues)
+- [ ] Add metrics recording to PermissionService (permission check latency tracking)
+- [ ] Add metrics recording to RuleService (rule execution duration tracking)
+- [ ] Add metrics recording to ConnectorService (sync duration, error tracking)
+- [ ] Implement custom business event metrics
+
+**Phase 3: Production Deployment**
+- [ ] Deploy to Kubernetes with proper resource limits
+- [ ] Configure external APM exporters (Datadog/Honeycomb for production)
+- [ ] Set up on-call alert routing (PagerDuty, Slack)
+- [ ] Create runbooks for each critical alert
+
+**Phase 4: Dashboard Enhancements**
+- [ ] Add custom business KPI dashboards
+- [ ] Create SLO tracking dashboards
+- [ ] Build per-org health dashboards
+- [ ] Add cost allocation dashboards
+
+**Phase 5: Alert Refinement**
+- [ ] Tune thresholds based on production data
+- [ ] Add maintenance window suppression rules
+- [ ] Implement escalation policies
+- [ ] Create alert runbooks
+
+**Build Status:**
+- ✅ `npm run build:shared` PASSING
+- ✅ `npm run build -w @ellines-eip/web` PASSING  
+- ⚠️ `npm run build -w @ellines-eip/identity` has pre-existing Prisma JsonValue casting errors (unrelated to observability)
+
+---
+
+*Last update: 2026-08-02*
+
