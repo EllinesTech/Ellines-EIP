@@ -9,6 +9,7 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -32,6 +33,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'GET') {
+    // org:view permission for reading settings
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:view',
+    );
+    if (permErr) return permErr;
+
     const { data, error } = await supabase
       .from('organizations')
       .select('settings')
@@ -42,17 +53,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (context.request.method === 'PATCH') {
-    const canEdit =
-      isOrgAdmin(auth.role) || platformAdminFromEnv(context.env, auth.email);
-    if (!canEdit) {
-      return json(
-        {
-          statusCode: 403,
-          message:
-            'Only organization admins or platform operators can change date & time settings',
-        },
-        403,
+    // org:manage_settings permission required (or platform admin)
+    const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
+    if (!isPlatformAdmin) {
+      const permErr = await requirePermissionAsync(
+        context.env,
+        auth.sub,
+        auth.organizationId,
+        auth.role,
+        'org:manage_settings',
       );
+      if (permErr) return permErr;
     }
 
     let body: Partial<{ timeFormat: TimeFormat; dateStyle: DateStyle }> = {};

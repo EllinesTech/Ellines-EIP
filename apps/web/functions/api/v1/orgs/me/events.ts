@@ -7,6 +7,7 @@ import {
   json,
   options,
   requireAuth,
+  requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
 
@@ -41,6 +42,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'GET') {
+    // org:view permission required
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:view',
+    );
+    if (permErr) return permErr;
+
     const { data, error } = await supabase
       .from('organizations')
       .select('settings')
@@ -54,6 +65,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method !== 'POST') {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   }
+
+  // org:view permission for publishing events
+  const permErr = await requirePermissionAsync(
+    context.env,
+    auth.sub,
+    auth.organizationId,
+    auth.role,
+    'org:view',
+  );
+  if (permErr) return permErr;
 
   let body: { type?: string; payload?: Record<string, unknown> };
   try {

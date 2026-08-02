@@ -6,7 +6,7 @@ import {
   json,
   options,
   requireAuth,
-  requireOrgAdmin,
+  requirePermissionAsync,
   type Env,
   type UserRole,
 } from '../../../../shared/auth';
@@ -18,12 +18,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  const denied = requireOrgAdmin(auth.role);
-  if (denied) return denied;
-
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'GET') {
+    // org:view permission for reading users
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:view',
+    );
+    if (permErr) return permErr;
+
     const { data, error } = await supabase
       .from('users')
       .select('id, email, full_name, role, is_active, created_at')
@@ -47,6 +54,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (context.request.method === 'POST') {
+    // org:manage_members permission required
+    const permErr = await requirePermissionAsync(
+      context.env,
+      auth.sub,
+      auth.organizationId,
+      auth.role,
+      'org:manage_members',
+    );
+    if (permErr) return permErr;
     try {
       const body = (await context.request.json()) as {
         email?: string;
