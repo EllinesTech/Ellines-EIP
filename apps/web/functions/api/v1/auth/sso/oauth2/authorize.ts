@@ -1,6 +1,8 @@
 import { getAdminClient, json, options, signAccessToken, auditRow, getClientIp, type Env } from '../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
-import { v4 as uuidv4 } from 'crypto';
+
+// Use Web Crypto API (available in all Cloudflare Workers/Pages)
+const uuidv4 = () => crypto.randomUUID();
 
 /**
  * GET /api/v1/auth/sso/oauth2/authorize

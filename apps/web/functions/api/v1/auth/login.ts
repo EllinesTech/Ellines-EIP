@@ -85,7 +85,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       );
     }
 
-    const ip = getClientIp(context.request);
+    // ip already captured above for rate limiting — reuse it
     await supabase.from('audit_logs').insert(
       auditRow({
         organizationId: user.organization_id as string,
