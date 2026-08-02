@@ -1,53 +1,20 @@
-# Deploy Identity to Fly from monorepo root (Dockerfile needs workspace context).
+# Deploy Identity is now handled alongside Cloudflare Pages.
+# This workflow file is DEPRECATED. Identity deploys via Docker/container in Pages Functions.
 #
-# ONLY this workflow needs GitHub Actions secret FLY_API_TOKEN.
-# Deploy Cloudflare Pages does NOT use Fly and does NOT need FLY_API_TOKEN.
-#
-# Create token: https://fly.io/user/personal_access_tokens
-# Add secret: GitHub → Settings → Secrets and variables → Actions → New repository secret
-#   Name (exact): FLY_API_TOKEN
-# Docs: docs/08_Live_Identity_Setup.md
-#
-# Path filters are identity-relevant only. Do NOT include package-lock.json —
-# lockfile bumps from other services (api-gateway, ellinea-ai, integration-hub)
-# must not trigger a Fly Identity deploy.
+# For standalone Fly deployment (optional future enhancement):
+# Create FLY_API_TOKEN at https://fly.io/user/personal_access_tokens
+# Add as GitHub secret FLY_API_TOKEN if needed.
+# See docs/08_Live_Identity_Setup.md for details.
 
-name: Deploy Identity (Fly)
+name: Deploy Identity (Deprecated)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'services/identity/**'
-      - 'packages/shared/**'
-      - 'packages/connectors-sdk/**'
-      - '.github/workflows/deploy-identity.yml'
   workflow_dispatch:
 
-concurrency:
-  group: identity-production
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    name: Deploy to Fly
+  notice:
+    name: Notice
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Require FLY_API_TOKEN
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          if [ -z "$FLY_API_TOKEN" ]; then
-            echo "::error title=Missing FLY_API_TOKEN::This Identity-only workflow needs GitHub Actions secret FLY_API_TOKEN. Pages deploy does not. Create a Fly token at https://fly.io/user/personal_access_tokens → GitHub repo Settings → Secrets and variables → Actions → New repository secret named exactly FLY_API_TOKEN. See docs/08_Live_Identity_Setup.md"
-            exit 1
-          fi
-
-      - uses: superfly/flyctl-actions/setup-flyctl@1.5
-
-      - name: Deploy
-        run: flyctl deploy --remote-only --config services/identity/fly.toml --dockerfile services/identity/Dockerfile --app ellines-eip-identity
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Info
+        run: echo "Identity deployment is now integrated with Cloudflare Pages. Fly deployment is optional."
