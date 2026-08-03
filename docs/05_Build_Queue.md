@@ -353,7 +353,8 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | A.1.3 | Agent execution engine | `done` | Trigger → evaluate confidence → act or queue for approval; event-driven execution from enterprise events; engine test UI with manual fire-event form + result display + executions table; 99 functions verified; web build ✅ |
 | A.1.4 | Agent webhooks & event subscriptions | `done` | Subscribe agents to connector/webhook events; AgentWebhookSubscription model; NestJS subscribe/unsubscribe/list endpoints; Pages Function for webhook trigger; api.ts functions; 100 functions verified; build ✅ |
 | A.1.5 | Agent audit trail & UI polish | `done` | View audit logs per agent modal; Pages Function for agent audit logs; "Audit" button in agent table; audit detail modal with JSON inspection; 101 functions verified; build ✅ |
-| A.2.1 | Dynamic learning (feedback loop) | `next` | Capture user feedback on agent actions; retrain DNA/Memory |
+| A.2.1 | Dynamic learning (feedback loop) | `done` | Feedback fields on AgentExecution (feedbackScore/comment/at/by); db:push synced; NestJS provideFeedback + getAgentFeedbackSummary; feedback controller endpoints; Pages Function feedback submission; 👍👎 UI in engine tab executions; 102 functions; build ✅ |
+| A.2.2 | Cohort learning (opt-in privacy) | `next` | Aggregate feedback signals from consenting orgs; opt-in setting; aggregate confidence adjustments |
 
 
 ---

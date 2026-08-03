@@ -14,6 +14,7 @@ import {
   listAgentTemplates,
   triggerAgentEvent,
   fetchAgentAuditLogs,
+  provideAgentExecutionFeedback,
   type EllineaAgentDto,
   type AgentTemplateDto,
   type AgentExecutionDto,
@@ -178,6 +179,19 @@ export default function AutomationPage() {
   function closeAuditModal() {
     setSelectedAgentId(null);
     setAuditLogs([]);
+  }
+
+  function giveFeedback(execId: string, score: -1 | 0 | 1) {
+    if (busy) return;
+    setBusy(true);
+    provideAgentExecutionFeedback(execId, score)
+      .then(() =>
+        setExecutions((prev) =>
+          prev.map((ex) => (ex.id === execId ? { ...ex, feedbackScore: score } : ex)),
+        ),
+      )
+      .catch(() => alert('Failed to submit feedback'))
+      .finally(() => setBusy(false));
   }
 
   function testEngine(e: FormEvent) {
@@ -540,6 +554,7 @@ export default function AutomationPage() {
                     <th>Confidence</th>
                     <th>Status</th>
                     <th>Created</th>
+                    <th>Feedback</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -565,6 +580,30 @@ export default function AutomationPage() {
                         </span>
                       </td>
                       <td>{new Date(exec.createdAt).toLocaleString()}</td>
+                      <td>
+                        {exec.feedbackScore === 1 ? (
+                          <span title="Helpful" style={{ color: '#16a34a' }}>👍</span>
+                        ) : exec.feedbackScore === -1 ? (
+                          <span title="Unhelpful" style={{ color: '#dc2626' }}>👎</span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', gap: '0.25rem' }}>
+                            <button
+                              type="button"
+                              title="Mark helpful"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.1rem', fontSize: '1rem' }}
+                              disabled={busy}
+                              onClick={() => giveFeedback(exec.id, 1)}
+                            >👍</button>
+                            <button
+                              type="button"
+                              title="Mark unhelpful"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.1rem', fontSize: '1rem' }}
+                              disabled={busy}
+                              onClick={() => giveFeedback(exec.id, -1)}
+                            >👎</button>
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

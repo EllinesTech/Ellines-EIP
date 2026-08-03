@@ -1535,6 +1535,20 @@ export function fetchAgentAuditLogs(agentId: string, limit = 50) {
   }>(`/api/v1/orgs/me/agents/audit-logs?agentId=${agentId}&limit=${limit}`);
 }
 
+export function provideAgentExecutionFeedback(
+  executionId: string,
+  score: -1 | 0 | 1,
+  comment?: string,
+) {
+  return request<{ ok: boolean; execution: AgentExecutionDto; message: string }>(
+    `/api/v1/orgs/me/agents-executions/${executionId}/feedback`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ score, comment }),
+    },
+  );
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 
@@ -1588,6 +1602,11 @@ export type AgentExecutionDto = {
   createdAt: string;
   updatedAt?: string;
   agent?: { name: string };
+  /** Feedback (v2.0 A.2 — learning) */
+  feedbackScore?: number | null; // -1, 0, or 1
+  feedbackComment?: string | null;
+  feedbackAt?: string | null;
+  feedbackBy?: string | null;
 };
 
 export type CreateAgentPayload = {

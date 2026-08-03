@@ -18,6 +18,8 @@ import { AgentsService } from './agents.service';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ExecuteAgentDto, ApproveExecutionDto } from './dto/execute-agent.dto';
+import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto/webhook-subscription.dto';
+import { ProvideFeedbackDto } from './dto/feedback.dto';
 
 type AuthReq = {
   user: {
@@ -221,5 +223,32 @@ export class AgentsController {
       req.user.userId,
       dto,
     );
+  }
+
+  // ── Feedback & Learning ────────────────────────────────────────────────────
+
+  /** POST /api/v1/orgs/me/agents-executions/:id/feedback — rate an execution */
+  @Post('me/agents-executions/:id/feedback')
+  @Roles(...ORG_ADMIN_ROLES)
+  provideFeedback(
+    @Request() req: AuthReq,
+    @Param('id') executionId: string,
+    @Body() dto: ProvideFeedbackDto,
+  ) {
+    return this.agents.provideFeedback(
+      req.user.organizationId,
+      executionId,
+      req.user.userId,
+      req.user.email,
+      dto.score,
+      dto.comment,
+    );
+  }
+
+  /** GET /api/v1/orgs/me/agents/:id/feedback-summary — learning metrics per agent */
+  @Get('me/agents/:id/feedback-summary')
+  @Roles(...ORG_ADMIN_ROLES)
+  getAgentFeedbackSummary(@Request() req: AuthReq, @Param('id') agentId: string) {
+    return this.agents.getAgentFeedbackSummary(req.user.organizationId, agentId);
   }
 }

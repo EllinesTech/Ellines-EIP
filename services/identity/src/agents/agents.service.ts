@@ -761,4 +761,100 @@ export class AgentsService {
 
     return { triggered: executions.length, executions };
   }
+
+  // ─── Feedback & Learning ──────────────────────────────────────────────────
+
+  /**
+   * Capture user feedback on an agent execution for learning/retraining.
+   * Feedback is used to update agent DNA and confidence scoring over time.
+   */
+  async provideFeedback(
+    organizationId: string,
+    executionId: string,
+    userId: string,
+    userEmail: string,
+    score: -1 | 0 | 1,
+    comment?: string,
+  ) {
+    const execution = await this.prisma.agentExecution.findFirst({
+      where: { id: executionId, organizationId },
+      include: { agent: true },
+    });
+
+    if (!execution) {
+      throw new Error('Execution not found');
+    }
+
+    const updated = await this.prisma.agentExecution.update({
+      where: { id: executionId },
+      data: {
+        feedbackScore: score,
+        feedbackComment: comment || null,
+        feedbackAt: new Date(),
+        feedbackBy: userEmail,
+      },
+    });
+
+    // Audit log
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId: execution.agentId,
+        organizationId,
+        userId,
+        action: 'agent.feedback_provided',
+        details: {
+          executionId,
+          score,
+          comment,
+          confidence: execution.confidence,
+        },
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Get feedback summary for an agent (avg score, distribution, recent comments).
+   * Used to assess agent quality and identify improvement areas.
+   */
+  async getAgentFeedbackSummary(organizationId: string, agentId: string) {
+    const feedbackItems = await this.prisma.agentExecution.findMany({
+      where: { agentId, organizationId, feedbackScore: { not: null } },
+      select: { feedbackScore: true, feedbackComment: true, feedbackAt: true, confidence: true },
+      orderBy: { feedbackAt: 'desc' },
+      take: 100,
+    });
+
+    if (!feedbackItems.length) {
+      return {
+        totalFeedback: 0,
+        averageScore: 0,
+        helpful: 0,
+        neutral: 0,
+        unhelpful: 0,
+        recentComments: [],
+      };
+    }
+
+    const helpful = feedbackItems.filter((f) => f.feedbackScore === 1).length;
+    const neutral = feedbackItems.filter((f) => f.feedbackScore === 0).length;
+    const unhelpful = feedbackItems.filter((f) => f.feedbackScore === -1).length;
+
+    const avgScore = feedbackItems.reduce((sum, f) => sum + (f.feedbackScore || 0), 0) / feedbackItems.length;
+
+    const recentComments = feedbackItems
+      .filter((f) => f.feedbackComment)
+      .slice(0, 10)
+      .map((f) => ({ score: f.feedbackScore, comment: f.feedbackComment, at: f.feedbackAt }));
+
+    return {
+      totalFeedback: feedbackItems.length,
+      averageScore: Number(avgScore.toFixed(2)),
+      helpful,
+      neutral,
+      unhelpful,
+      recentComments,
+    };
+  }
 }

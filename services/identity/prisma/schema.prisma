@@ -774,6 +774,12 @@ model AgentExecution {
   rolledBackAt        DateTime? @map("rolled_back_at")
   rolledBackBy        String?   @map("rolled_back_by")
   
+  // User feedback (v2.0 A.2 — learning)
+  feedbackScore       Int?      @map("feedback_score")    // -1 (unhelpful), 0 (neutral), +1 (helpful)
+  feedbackComment     String?   @map("feedback_comment")
+  feedbackAt          DateTime? @map("feedback_at")
+  feedbackBy          String?   @map("feedback_by")
+  
   // Timestamps
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
