@@ -356,7 +356,7 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | A.2.1 | Dynamic learning (feedback loop) | `done` | Feedback fields on AgentExecution (feedbackScore/comment/at/by); db:push synced; NestJS provideFeedback + getAgentFeedbackSummary; feedback controller endpoints; Pages Function feedback submission; 👍👎 UI in engine tab executions; 102 functions; build ✅ |
 | A.2.2 | Cohort learning (opt-in privacy) | `done` | agentCohortSettings in org settings (optIn/contributeFeedback/drawFromCohort); Pages Functions for settings + signal aggregation; Learning tab UI on /app/automation; confidence boost table from cross-org signals; 104 functions; build ✅ |
 | A.3.1 | Real-time alert correlation | `done` | Pages Function reads 24h events, groups by category+time-window (15 min), scores severity (low/medium/high/critical); root-cause hint + suggested actions per group; overview callout shows top 3 groups; 105 functions; build ✅ |
-| A.3.2 | Root-cause recommendation | `next` | Ellinea suggests why alerts fired; correlate with connector health; surface in Ask and overview |
+| A.3.2 | Root-cause recommendation | `done` | Pages Function calls Ellinea Ask (LLM if configured, template fallback); "Why? (Ellinea)" button on overview correlation callout; recommendation cached in org settings; 106 functions; build ✅ |
 
 
 ---

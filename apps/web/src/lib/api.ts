@@ -1608,6 +1608,21 @@ export function fetchAlertCorrelations() {
   }>('/api/v1/orgs/me/alert-correlations');
 }
 
+export function fetchAlertRootCause(
+  correlationGroups: AlertCorrelationGroupDto[],
+  orgName: string,
+) {
+  return request<{
+    recommendation: string;
+    mode: 'template' | 'llm';
+    groupCount: number;
+    computedAt: string;
+  }>('/api/v1/orgs/me/alert-root-cause', {
+    method: 'POST',
+    body: JSON.stringify({ correlationGroups, orgName }),
+  });
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 

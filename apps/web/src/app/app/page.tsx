@@ -13,7 +13,7 @@ import {
   sparkSeries,
   weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
@@ -45,6 +45,8 @@ function AdminOverview({
   const alerts = synced ? summary!.openAlerts : 0;
   const decisions = synced ? summary!.openDecisions : 0;
   const [range, setRange] = useState<'month' | 'quarter' | 'year'>('month');
+  const [rootCause, setRootCause] = useState<string | null>(null);
+  const [rootCauseBusy, setRootCauseBusy] = useState(false);
 
   const pulse = useMemo(() => pulseSeries(synced ? health : 42), [synced, health]);
   const sparks = useMemo(
@@ -167,9 +169,30 @@ function AdminOverview({
                 </div>
               ))}
             </div>
+            {rootCause && (
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f8f8ff', borderRadius: '0.35rem', border: '1px solid #ede9fe', fontSize: '0.84rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                <strong style={{ color: '#6f2d8d' }}>Ellinea root-cause:</strong>
+                <div style={{ marginTop: '0.3rem' }}>{rootCause}</div>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
             <Link href="/app/automation" className={styles.aiBtn}>Automation</Link>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={rootCauseBusy}
+              style={{ padding: '0.35rem 0.85rem', border: '1px solid var(--border)', borderRadius: '0.35rem', fontSize: '0.82rem', cursor: 'pointer', background: 'none' }}
+              onClick={() => {
+                setRootCauseBusy(true);
+                fetchAlertRootCause(correlationGroups, summary?.connectorName || 'organisation')
+                  .then((res) => setRootCause(res.recommendation))
+                  .catch(() => setRootCause('Could not load root-cause analysis.'))
+                  .finally(() => setRootCauseBusy(false));
+              }}
+            >
+              {rootCauseBusy ? 'Analysing…' : rootCause ? 'Refresh' : 'Why? (Ellinea)'}
+            </button>
             <Link href="/app/notifications" className={styles.ghostBtn} style={{ textAlign: 'center', textDecoration: 'none', padding: '0.35rem 0.85rem', border: '1px solid var(--border)', borderRadius: '0.35rem', fontSize: '0.82rem' }}>Notifications</Link>
           </div>
         </section>
