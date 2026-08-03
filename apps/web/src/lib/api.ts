@@ -1583,6 +1583,31 @@ export function fetchAgentCohortSignals() {
   }>('/api/v1/orgs/me/agent-cohort-signals');
 }
 
+// ─── v2.0 Phase A — Alert Correlation (A.3.1) ────────────────────────────────
+
+export type AlertCorrelationGroupDto = {
+  id: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  count: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  events: string[];
+  sources: string[];
+  rootCauseHint: string;
+  suggestedActions: string[];
+};
+
+export function fetchAlertCorrelations() {
+  return request<{
+    windowHours: number;
+    totalEvents: number;
+    correlationGroups: AlertCorrelationGroupDto[];
+    correlatedEvents: number;
+    computedAt: string;
+  }>('/api/v1/orgs/me/alert-correlations');
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 

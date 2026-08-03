@@ -13,7 +13,7 @@ import {
   sparkSeries,
   weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, listInstallations, type ConnectorInstallationDto, type EnterpriseSummaryDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
@@ -27,6 +27,7 @@ function AdminOverview({
   uiPrefs,
   installations,
   ruleHits,
+  correlationGroups,
 }: {
   name: string;
   role: string;
@@ -36,6 +37,7 @@ function AdminOverview({
   uiPrefs: UiPrefs;
   installations: ConnectorInstallationDto[];
   ruleHits: RuleHit[];
+  correlationGroups: AlertCorrelationGroupDto[];
 }) {
   const isOwner = role === 'owner';
   const health = synced ? summary!.healthScore : 0;
@@ -141,6 +143,37 @@ function AdminOverview({
           </Link>
         </section>
       ) : null}
+
+      {correlationGroups.length > 0 && (
+        <section className={styles.emptyCallout} role="status" style={{ borderColor: correlationGroups[0].severity === 'critical' ? '#dc2626' : correlationGroups[0].severity === 'high' ? '#d97706' : '#6f2d8d' }}>
+          <div style={{ flex: 1 }}>
+            <strong>Alert correlation — {correlationGroups.length} group{correlationGroups.length !== 1 ? 's' : ''} detected</strong>
+            <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {correlationGroups.slice(0, 3).map((grp) => (
+                <div key={grp.id} style={{ fontSize: '0.85rem' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '999px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    marginRight: '0.5rem',
+                    background: grp.severity === 'critical' ? '#fee2e2' : grp.severity === 'high' ? '#fef3c7' : '#ede9fe',
+                    color: grp.severity === 'critical' ? '#991b1b' : grp.severity === 'high' ? '#92400e' : '#6f2d8d',
+                  }}>{grp.severity.toUpperCase()}</span>
+                  <strong>{grp.count}× {grp.category.replace(/_/g, ' ')}</strong>
+                  {grp.sources.length > 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '0.4rem' }}>· {grp.sources.slice(0, 2).join(', ')}</span>}
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.1rem' }}>{grp.rootCauseHint}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
+            <Link href="/app/automation" className={styles.aiBtn}>Automation</Link>
+            <Link href="/app/notifications" className={styles.ghostBtn} style={{ textAlign: 'center', textDecoration: 'none', padding: '0.35rem 0.85rem', border: '1px solid var(--border)', borderRadius: '0.35rem', fontSize: '0.82rem' }}>Notifications</Link>
+          </div>
+        </section>
+      )}
 
       {!synced ? (
         <section className={styles.emptyCallout} role="status">
@@ -634,6 +667,7 @@ export default function CommandCenterPage() {
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
   const [installations, setInstallations] = useState<ConnectorInstallationDto[]>([]);
   const [ruleHits, setRuleHits] = useState<RuleHit[]>([]);
+  const [correlationGroups, setCorrelationGroups] = useState<AlertCorrelationGroupDto[]>([]);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
 
   useEffect(() => {
@@ -673,6 +707,9 @@ export default function CommandCenterPage() {
       listInstallations()
         .then(setInstallations)
         .catch(() => setInstallations([]));
+      fetchAlertCorrelations()
+        .then((res) => setCorrelationGroups(res.correlationGroups))
+        .catch(() => setCorrelationGroups([]));
     }
     return () => window.removeEventListener(UI_PREFS_EVENT, onPrefs);
   }, []);
@@ -691,6 +728,7 @@ export default function CommandCenterPage() {
         uiPrefs={uiPrefs}
         installations={installations}
         ruleHits={ruleHits}
+        correlationGroups={correlationGroups}
       />
     );
   }
