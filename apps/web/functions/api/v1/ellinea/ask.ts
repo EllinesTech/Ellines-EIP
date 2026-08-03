@@ -6,6 +6,7 @@ import {
   requirePermission,
   type Env,
 } from '../../../shared/auth';
+import { sendOutboundEmail } from '../../../shared/mail';
 
 type MemoryNote = { id: string; title: string; body: string; updatedAt: string };
 type DnaTrait = { id?: string; label?: string; detail?: string; source?: string };
@@ -233,9 +234,36 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     organizationName,
   });
 
+  /** Send a real email to the user's registered address with the Q&A result. */
+  async function notifyUser(answer: string, mode: string): Promise<void> {
+    const userEmail = auth.email;
+    if (!userEmail) return;
+    const orgLabel = organizationName ? ` — ${organizationName}` : '';
+    const subject = `Ellinea AI response${orgLabel}`;
+    const text = [
+      `Your Ellinea AI request has been processed.`,
+      ``,
+      `Question:`,
+      question,
+      ``,
+      `Answer (${mode}):`,
+      answer,
+      ``,
+      `---`,
+      `Ellines EIP — Enterprise Intelligence Platform`,
+      `This email was sent because you submitted a request through Ellinea AI.`,
+    ].join('\n');
+
+    // Fire-and-forget — don't let email failure block the API response.
+    sendOutboundEmail(context.env, { to: userEmail, subject, text }).catch(() => {
+      // silent — no email secrets configured or transient failure
+    });
+  }
+
   try {
     const llm = await callLlm(context.env, question, grounding, role);
     if (llm) {
+      void notifyUser(llm.answer, `llm:${llm.provider}`);
       return json({
         answer: llm.answer,
         mode: 'llm',
@@ -245,12 +273,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'LLM failed';
+    const fallbackAnswer =
+      typeof body.templateAnswer === 'string' && body.templateAnswer
+        ? body.templateAnswer
+        : `Ellinea could not reach the LLM provider (${message}). Falling back to template reasoning is recommended on the client.`;
+    void notifyUser(fallbackAnswer, 'error');
     return json(
       {
-        answer:
-          typeof body.templateAnswer === 'string' && body.templateAnswer
-            ? body.templateAnswer
-            : `Ellinea could not reach the LLM provider (${message}). Falling back to template reasoning is recommended on the client.`,
+        answer: fallbackAnswer,
         mode: 'error',
         error: message,
         groundingChars: grounding.length,
@@ -259,11 +289,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     );
   }
 
+  const ragAnswer =
+    typeof body.templateAnswer === 'string' && body.templateAnswer
+      ? body.templateAnswer
+      : `RAG grounding ready (${grounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. Use the template engine answer.`;
+  void notifyUser(ragAnswer, 'rag_template');
   return json({
-    answer:
-      typeof body.templateAnswer === 'string' && body.templateAnswer
-        ? body.templateAnswer
-        : `RAG grounding ready (${grounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. Use the template engine answer.`,
+    answer: ragAnswer,
     mode: 'rag_template',
     groundingChars: grounding.length,
   });
