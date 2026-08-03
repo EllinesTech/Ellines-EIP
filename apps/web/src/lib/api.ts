@@ -1426,6 +1426,22 @@ export function listAgentTemplates() {
   return request<AgentTemplateDto[]>('/api/v1/orgs/me/agent-templates');
 }
 
+export type AgentTriggerResultDto = {
+  triggered: number;
+  executions: AgentExecutionDto[];
+  message?: string;
+};
+
+export function triggerAgentEvent(payload: {
+  eventType: string;
+  payload?: Record<string, unknown>;
+}) {
+  return request<AgentTriggerResultDto>('/api/v1/orgs/me/agents-trigger', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 
@@ -1451,27 +1467,34 @@ export type AgentDto = {
 export type AgentExecutionDto = {
   id: string;
   agentId: string;
+  agentName?: string;
   status: 'pending' | 'running' | 'approved' | 'rejected' | 'executed' | 'failed' | 'rolled_back';
-  confidenceScore: number | null;
+  confidence?: number; // from trigger result
+  confidenceScore?: number | null;
   requiresApproval: boolean;
-  aiReasoning: {
+  aiReasoning?: {
     confidence: number;
     reasoning: string;
     evaluatedAt: string;
   } | null;
-  canRollback: boolean;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  rejectedBy: string | null;
-  rejectedAt: string | null;
-  executedAt: string | null;
-  executionResult: Record<string, unknown> | null;
-  executionError: string | null;
-  rolledBackAt: string | null;
-  rolledBackBy: string | null;
-  triggeredAt: string;
+  reasoning?: string; // from trigger result
+  recommendedAction?: string; // from trigger result
+  triggeredBy?: string; // from trigger result
+  triggerPayload?: Record<string, unknown>;
+  canRollback?: boolean;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectedAt?: string | null;
+  executedAt?: string | null;
+  executionResult?: Record<string, unknown> | null;
+  executionError?: string | null;
+  rolledBackAt?: string | null;
+  rolledBackBy?: string | null;
+  triggeredAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  agent?: { name: string };
 };
 
 export type CreateAgentPayload = {

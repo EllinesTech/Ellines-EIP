@@ -12,8 +12,10 @@ import {
   deleteAgent,
   executeAgent,
   listAgentTemplates,
+  triggerAgentEvent,
   type EllineaAgentDto,
   type AgentTemplateDto,
+  type AgentExecutionDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -48,8 +50,9 @@ export default function AutomationPage() {
   const [allowed, setAllowed] = useState(false);
   const [agents, setAgents] = useState<EllineaAgentDto[]>([]);
   const [templates, setTemplates] = useState<AgentTemplateDto[]>([]);
+  const [executions, setExecutions] = useState<AgentExecutionDto[]>([]);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'my-agents' | 'templates' | 'create'>('my-agents');
+  const [tab, setTab] = useState<'my-agents' | 'templates' | 'create' | 'engine'>('my-agents');
 
   // Form state
   const [name, setName] = useState('');
@@ -58,6 +61,11 @@ export default function AutomationPage() {
   const [actionType, setActionType] = useState('auto_approve');
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.7);
   const [requireApproval, setRequireApproval] = useState(false);
+
+  // Engine test state
+  const [testEventType, setTestEventType] = useState('approval_pending');
+  const [testPayload, setTestPayload] = useState('{"amount": 150, "requester": "alice@acme.com"}');
+  const [engineResult, setEngineResult] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -69,6 +77,13 @@ export default function AutomationPage() {
     listAgentTemplates().then(setTemplates).catch(() => setTemplates([]));
   }, [router]);
 
+  // Load executions when engine tab is opened
+  useEffect(() => {
+    if (tab === 'engine') {
+      // For now, executions will be populated by testEngine callback
+      // In a real app, you might load recent executions from an API
+    }
+  }, [tab]);
   function onAdd(e: FormEvent) {
     e.preventDefault();
     if (!name.trim() || busy) return;
@@ -142,6 +157,37 @@ export default function AutomationPage() {
       .finally(() => setBusy(false));
   }
 
+  function testEngine(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setEngineResult(null);
+
+    try {
+      const payload = JSON.parse(testPayload);
+      triggerAgentEvent({ eventType: testEventType, payload })
+        .then((result) => {
+          setEngineResult(
+            `✓ Triggered: ${result.triggered} execution(s)\n` +
+            result.executions.map((ex) => 
+              `  • ${ex.id.slice(0, 8)}: confidence ${((ex.confidence ?? 0.5) * 100).toFixed(0)}% → ${ex.status}`
+            ).join('\n')
+          );
+          // Update executions state with new executions
+          setExecutions((prev) => [...result.executions, ...prev].slice(0, 100));
+          return listAgents();
+        })
+        .then(setAgents)
+        .catch((err) => {
+          setEngineResult(`✗ Error: ${err?.message || 'Unknown'}`);
+        })
+        .finally(() => setBusy(false));
+    } catch (err) {
+      setEngineResult(`✗ Invalid JSON: ${String(err)}`);
+      setBusy(false);
+    }
+  }
+
   if (!allowed) {
     return <div className={styles.page}><p className={styles.lede}>Checking access…</p></div>;
   }
@@ -185,6 +231,13 @@ export default function AutomationPage() {
           onClick={() => setTab('create')}
         >
           + Create custom
+        </button>
+        <button
+          type="button"
+          className={tab === 'engine' ? pageStyles.tabActive : pageStyles.tab}
+          onClick={() => setTab('engine')}
+        >
+          Engine
         </button>
       </div>
 
@@ -389,6 +442,104 @@ export default function AutomationPage() {
               Create agent
             </button>
           </form>
+        </section>
+      )}
+
+      {/* ── Engine Test Panel ──────────────────────────────────────────── */}
+      {tab === 'engine' && (
+        <section className={styles.brief}>
+          <div className={styles.panelLabel}>Agent Execution Engine Test</div>
+          <p className={styles.lede} style={{ marginBottom: '1.5rem' }}>
+            Manually trigger an enterprise event to test how agents respond. Fire an event → agents match conditions → Ellinea scores confidence → executions created.
+          </p>
+
+          <form className={adminStyles.form} onSubmit={testEngine} style={{ marginBottom: '2rem' }}>
+            <label>
+              Event Type
+              <select value={testEventType} onChange={(e) => setTestEventType(e.target.value)}>
+                {TRIGGER_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Payload (JSON)
+              <textarea
+                value={testPayload}
+                onChange={(e) => setTestPayload(e.target.value)}
+                rows={4}
+                style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+              />
+            </label>
+            <button type="submit" className={adminStyles.primary} disabled={busy}>
+              {busy ? 'Firing…' : 'Fire Event'}
+            </button>
+          </form>
+
+          {engineResult && (
+            <div
+              style={{
+                background: engineResult.startsWith('✗') ? '#fee2e2' : '#dcfce7',
+                color: engineResult.startsWith('✗') ? '#7f1d1d' : '#166534',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                borderLeft: `4px solid ${engineResult.startsWith('✗') ? '#dc2626' : '#16a34a'}`,
+                marginBottom: '1.5rem',
+                fontFamily: 'monospace',
+                fontSize: '0.85rem',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {engineResult}
+            </div>
+          )}
+
+          {executions.length > 0 && (
+            <div>
+              <div className={styles.panelLabel} style={{ marginTop: '2rem', marginBottom: '1rem' }}>
+                Recent Executions
+              </div>
+              <table className={adminStyles.table} style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr>
+                    <th>Execution ID</th>
+                    <th>Agent</th>
+                    <th>Triggered</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {executions.slice(0, 20).map((exec) => (
+                    <tr key={exec.id}>
+                      <td>
+                        <code style={{ fontSize: '0.8rem' }}>{exec.id.slice(0, 12)}…</code>
+                      </td>
+                      <td>{exec.agent?.name || exec.agentName || '—'}</td>
+                      <td><code style={{ fontSize: '0.8rem' }}>{exec.triggeredBy || '—'}</code></td>
+                      <td>{Math.round(((exec.confidence ?? 0.5) * 100))}%</td>
+                      <td>
+                        <span
+                          className={
+                            exec.status === 'pending'
+                              ? pageStyles.badgeGray
+                              : exec.status === 'executed'
+                                ? pageStyles.badgeGreen
+                                : pageStyles.badgeGray
+                          }
+                        >
+                          {exec.status}
+                        </span>
+                      </td>
+                      <td>{new Date(exec.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 

@@ -147,4 +147,27 @@ export class AgentsController {
   listAgentTemplates() {
     return this.agents.listAgentTemplates();
   }
+
+  // ── Execution Engine ──────────────────────────────────────────────────────
+
+  /** POST /api/v1/orgs/me/agents/trigger — fire event → match agents → execute */
+  @Post('me/agents-trigger')
+  @Roles(...ORG_ADMIN_ROLES)
+  triggerEvent(
+    @Request() req: AuthReq,
+    @Body() body: { eventType: string; payload?: Record<string, unknown> },
+  ) {
+    return this.agents.triggerAgentsForEvent(
+      req.user.organizationId,
+      body.eventType,
+      body.payload || {},
+    );
+  }
+
+  /** POST /api/v1/orgs/me/agents/process — flush approved pending executions */
+  @Post('me/agents-process')
+  @Roles(...ORG_ADMIN_ROLES)
+  processQueue(@Request() req: AuthReq) {
+    return this.agents.processPendingExecutions(req.user.organizationId);
+  }
 }

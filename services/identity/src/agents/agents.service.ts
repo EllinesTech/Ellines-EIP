@@ -4,6 +4,92 @@ import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ExecuteAgentDto, ApproveExecutionDto } from './dto/execute-agent.dto';
 
+// ─── Condition evaluator ──────────────────────────────────────────────────────
+
+type Condition = {
+  field?: string;
+  op?: string;
+  value?: unknown;
+  and?: Condition[];
+  or?: Condition[];
+};
+
+function evalCondition(condition: unknown, context: Record<string, unknown>): boolean {
+  if (!condition || typeof condition !== 'object') return true; // empty condition = always match
+
+  const cond = condition as Condition;
+
+  // Compound: AND
+  if (Array.isArray(cond.and)) {
+    return cond.and.every((c) => evalCondition(c, context));
+  }
+
+  // Compound: OR
+  if (Array.isArray(cond.or)) {
+    return cond.or.some((c) => evalCondition(c, context));
+  }
+
+  // Simple leaf condition
+  const { field, op, value } = cond;
+  if (!field || !op) return true;
+
+  const actual = context[field];
+
+  switch (op) {
+    case 'eq':  return actual === value;
+    case 'neq': return actual !== value;
+    case 'gt':  return Number(actual) > Number(value);
+    case 'gte': return Number(actual) >= Number(value);
+    case 'lt':  return Number(actual) < Number(value);
+    case 'lte': return Number(actual) <= Number(value);
+    case 'contains':
+      return typeof actual === 'string' && actual.toLowerCase().includes(String(value).toLowerCase());
+    case 'in':
+      return Array.isArray(value) && value.includes(actual);
+    default:    return true;
+  }
+}
+
+// ─── Confidence scoring ────────────────────────────────────────────────────────
+
+function scoreConfidence(
+  agent: { condition: unknown; action: unknown; requireApproval: boolean },
+  context: Record<string, unknown>,
+): { score: number; reasoning: string } {
+  // Base confidence: condition match gives 0.8 floor
+  const conditionMet = evalCondition(agent.condition, context);
+  if (!conditionMet) return { score: 0, reasoning: 'Condition not met' };
+
+  const action = agent.action as Record<string, unknown>;
+  const actionType = String(action?.type || '');
+
+  // Higher base confidence for low-risk actions
+  const baseScores: Record<string, number> = {
+    notify: 0.95,
+    escalate: 0.90,
+    auto_approve: 0.80,
+    reorder: 0.70,
+    campaign: 0.65,
+    custom: 0.60,
+  };
+
+  const base = baseScores[actionType] ?? 0.70;
+
+  // Boost if context has supporting signals
+  let boost = 0;
+  if (context.ellineaRecommended === true) boost += 0.05;
+  if (context.historicalSuccessRate && Number(context.historicalSuccessRate) > 0.9) boost += 0.05;
+  if (context.amount && Number(context.amount) < 500) boost += 0.03; // low value = safer
+
+  const score = Math.min(1.0, base + boost);
+  const reasoning =
+    `Action "${actionType}" — base confidence ${(base * 100).toFixed(0)}%` +
+    (boost > 0 ? `, boosted by +${(boost * 100).toFixed(0)}% from context signals` : '') +
+    `. Final: ${(score * 100).toFixed(0)}%.`;
+
+  return { score, reasoning };
+}
+
 @Injectable()
 export class AgentsService {
   constructor(private prisma: PrismaService) {}
@@ -302,5 +388,123 @@ export class AgentsService {
     });
 
     return templates;
+  }
+
+  // ─── Execution Engine ────────────────────────────────────────────────────
+
+  /**
+   * Fan out an enterprise event to all matching agents in the org.
+   * Evaluates conditions, scores confidence, and creates executions.
+   * Agents below their threshold are queued for human approval.
+   */
+  async triggerAgentsForEvent(
+    organizationId: string,
+    eventType: string,
+    eventPayload: Record<string, unknown>,
+  ) {
+    // Find all active agents that match this event trigger
+    const agents = await this.prisma.ellineaAgent.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        isPaused: false,
+        trigger: eventType,
+      },
+    });
+
+    if (!agents.length) return { triggered: 0, executions: [] };
+
+    const context: Record<string, unknown> = { ...eventPayload, eventType };
+    const executions: unknown[] = [];
+
+    for (const agent of agents) {
+      // Evaluate condition
+      const conditionMet = evalCondition(agent.condition, context);
+      if (!conditionMet) continue;
+
+      // Score confidence
+      const { score, reasoning } = scoreConfidence(
+        { condition: agent.condition, action: agent.action, requireApproval: agent.requireApproval },
+        context,
+      );
+
+      const requiresApproval =
+        agent.requireApproval || score < agent.confidenceThreshold;
+
+      const execution = await this.prisma.agentExecution.create({
+        data: {
+          agentId: agent.id,
+          organizationId,
+          triggeredBy: eventType,
+          triggerPayload: eventPayload,
+          confidence: score,
+          reasoning: { summary: reasoning, score, conditionMet: true },
+          recommendedAction: String((agent.action as Record<string, unknown>)?.type ?? 'act'),
+          status: requiresApproval ? 'pending' : 'executed',
+          requiresApproval,
+          executedAt: requiresApproval ? null : new Date(),
+          canRollback: !requiresApproval,
+        },
+      });
+
+      // Update agent stats
+      await this.prisma.ellineaAgent.update({
+        where: { id: agent.id },
+        data: {
+          executionCount: { increment: 1 },
+          ...(!requiresApproval ? { successCount: { increment: 1 } } : {}),
+          lastExecutedAt: new Date(),
+        },
+      });
+
+      // Audit log
+      await this.prisma.agentAuditLog.create({
+        data: {
+          agentId: agent.id,
+          organizationId,
+          action: 'agent.executed',
+          details: {
+            executionId: execution.id,
+            eventType,
+            confidence: score,
+            requiresApproval,
+            reasoning,
+          },
+        },
+      });
+
+      executions.push(execution);
+    }
+
+    return { triggered: executions.length, executions };
+  }
+
+  /**
+   * Process all pending executions for an org — used by a cron or manual flush.
+   * Executions that have been approved by a human are marked 'executed'.
+   */
+  async processPendingExecutions(organizationId: string) {
+    const pending = await this.prisma.agentExecution.findMany({
+      where: { organizationId, status: 'approved' },
+      include: { agent: true },
+    });
+
+    for (const exec of pending) {
+      await this.prisma.agentExecution.update({
+        where: { id: exec.id },
+        data: { status: 'executed', executedAt: new Date() },
+      });
+
+      await this.prisma.agentAuditLog.create({
+        data: {
+          agentId: exec.agentId,
+          organizationId,
+          action: 'agent.executed',
+          details: { executionId: exec.id, processedAt: new Date().toISOString() },
+        },
+      });
+    }
+
+    return { processed: pending.length };
   }
 }

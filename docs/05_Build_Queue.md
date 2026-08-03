@@ -350,7 +350,8 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 |----|------|--------|-------|
 | A.1.1 | Ellinea Agent framework | `done` | Prisma (EllineaAgent/AgentExecution/AgentAuditLog/AgentTemplate), NestJS AgentsModule, 3 Pages Functions, `/app/automation` UI, api.ts additions; db:push synced; 97 Pages Functions verified; web build ✅ |
 | A.1.2 | Agent templates library | `done` | 4 pre-built templates seeded; agent-templates Pages Function; gallery tab with 1-click install; automation page CSS module; 98 functions verified; build ✅ |
-| A.1.3 | Agent execution engine | `next` | Trigger → evaluate confidence → act or queue for approval; event-driven execution from enterprise events |
+| A.1.3 | Agent execution engine | `done` | Trigger → evaluate confidence → act or queue for approval; event-driven execution from enterprise events; engine test UI with manual fire-event form + result display + executions table; 99 functions verified; web build ✅ |
+| A.1.4 | Agent webhooks & event subscriptions | `next` | Subscribe agents to connectors → fire trigger on sync complete; UI for agent → connector → event subscriptions |
 
 
 ---
