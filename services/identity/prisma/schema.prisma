@@ -47,6 +47,7 @@ model Organization {
   roleAuditLogs          RoleAuditLog[]
   dashboards             Dashboard[]             // Track B: BI Dashboards
   workflowRules          WorkflowRule[]          // Track C: Autonomous Workflows
+  ellineaAgents          EllineaAgent[]          // v2.0 A.1: Autonomous Agents
 
   @@index([parentOrgId])
   @@map("organizations")

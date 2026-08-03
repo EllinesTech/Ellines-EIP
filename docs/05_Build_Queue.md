@@ -344,6 +344,16 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 
 ---
 
+## v2.0 Phase A — Autonomous AI Agents (active)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| A.1.1 | Ellinea Agent framework | `done` | Prisma (EllineaAgent/AgentExecution/AgentAuditLog/AgentTemplate), NestJS AgentsModule, 3 Pages Functions, `/app/automation` UI, api.ts additions; db:push synced; 97 Pages Functions verified; web build ✅ |
+| A.1.2 | Agent templates library | `next` | 4 pre-built templates: auto-approve, escalate, campaign, reorder; seed script; gallery on `/app/automation` |
+
+
+---
+
 ## v1.1 Tracks D, A, B, C — Complete ✅ (Parallel Execution)
 
 **Status:** ✅ All tracks complete
