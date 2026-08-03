@@ -1549,6 +1549,40 @@ export function provideAgentExecutionFeedback(
   );
 }
 
+export type AgentCohortSettingsDto = {
+  optIn: boolean;
+  contributeFeedback: boolean;
+  drawFromCohort: boolean;
+  updatedAt: string;
+};
+
+export type AgentCohortSignalDto = {
+  actionType: string;
+  cohortAvgScore: number;
+  sampleSize: number;
+  confidenceBoost: number;
+};
+
+export function fetchAgentCohortSettings() {
+  return request<AgentCohortSettingsDto>('/api/v1/orgs/me/agent-cohort-settings');
+}
+
+export function updateAgentCohortSettings(payload: Partial<AgentCohortSettingsDto>) {
+  return request<AgentCohortSettingsDto>('/api/v1/orgs/me/agent-cohort-settings', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchAgentCohortSignals() {
+  return request<{
+    enabled: boolean;
+    message?: string;
+    signals: AgentCohortSignalDto[];
+    meta?: { totalOptedInOrgs: number; computedAt: string };
+  }>('/api/v1/orgs/me/agent-cohort-signals');
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 

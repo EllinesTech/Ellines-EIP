@@ -15,10 +15,15 @@ import {
   triggerAgentEvent,
   fetchAgentAuditLogs,
   provideAgentExecutionFeedback,
+  fetchAgentCohortSettings,
+  updateAgentCohortSettings,
+  fetchAgentCohortSignals,
   type EllineaAgentDto,
   type AgentTemplateDto,
   type AgentExecutionDto,
   type AgentAuditLogDto,
+  type AgentCohortSettingsDto,
+  type AgentCohortSignalDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -55,7 +60,7 @@ export default function AutomationPage() {
   const [templates, setTemplates] = useState<AgentTemplateDto[]>([]);
   const [executions, setExecutions] = useState<AgentExecutionDto[]>([]);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'my-agents' | 'templates' | 'create' | 'engine'>('my-agents');
+  const [tab, setTab] = useState<'my-agents' | 'templates' | 'create' | 'engine' | 'learning'>('my-agents');
 
   // Form state
   const [name, setName] = useState('');
@@ -74,6 +79,16 @@ export default function AutomationPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AgentAuditLogDto[]>([]);
 
+  // Cohort learning state
+  const [cohortSettings, setCohortSettings] = useState<AgentCohortSettingsDto>({
+    optIn: false,
+    contributeFeedback: false,
+    drawFromCohort: false,
+    updatedAt: new Date().toISOString(),
+  });
+  const [cohortSignals, setCohortSignals] = useState<AgentCohortSignalDto[]>([]);
+  const [cohortSignalMeta, setCohortSignalMeta] = useState<{ totalOptedInOrgs: number; computedAt: string } | null>(null);
+
   useEffect(() => {
     const s = getSession();
     if (!s) { router.replace('/login'); return; }
@@ -90,6 +105,18 @@ export default function AutomationPage() {
       // For now, executions will be populated by testEngine callback
       // In a real app, you might load recent executions from an API
     }
+  }, [tab]);
+
+  // Load cohort settings when learning tab opens
+  useEffect(() => {
+    if (tab !== 'learning') return;
+    fetchAgentCohortSettings().then(setCohortSettings).catch(() => {});
+    fetchAgentCohortSignals()
+      .then((res) => {
+        setCohortSignals(res.signals);
+        if (res.meta) setCohortSignalMeta(res.meta);
+      })
+      .catch(() => {});
   }, [tab]);
   function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -194,6 +221,24 @@ export default function AutomationPage() {
       .finally(() => setBusy(false));
   }
 
+  function saveCohortSettings(patch: Partial<AgentCohortSettingsDto>) {
+    if (busy) return;
+    setBusy(true);
+    const next = { ...cohortSettings, ...patch };
+    updateAgentCohortSettings(next)
+      .then(setCohortSettings)
+      .then(() => {
+        if (next.drawFromCohort) {
+          return fetchAgentCohortSignals().then((res) => {
+            setCohortSignals(res.signals);
+            if (res.meta) setCohortSignalMeta(res.meta);
+          });
+        }
+      })
+      .catch(() => alert('Failed to save cohort settings'))
+      .finally(() => setBusy(false));
+  }
+
   function testEngine(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -275,6 +320,13 @@ export default function AutomationPage() {
           onClick={() => setTab('engine')}
         >
           Engine
+        </button>
+        <button
+          type="button"
+          className={tab === 'learning' ? pageStyles.tabActive : pageStyles.tab}
+          onClick={() => setTab('learning')}
+        >
+          Learning
         </button>
       </div>
 
@@ -608,6 +660,108 @@ export default function AutomationPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Cohort Learning ────────────────────────────────────────────── */}
+      {tab === 'learning' && (
+        <section className={styles.brief}>
+          <div className={styles.panelLabel}>Cohort Learning — opt-in privacy</div>
+          <p className={styles.lede} style={{ marginBottom: '1.5rem', maxWidth: '60ch' }}>
+            Anonymised feedback from this organisation&apos;s agent executions can be pooled with
+            other opted-in organisations. The platform computes confidence boosts per action type —
+            no raw data ever leaves your org.
+          </p>
+
+          <div className={adminStyles.form} style={{ maxWidth: '480px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <input
+                type="checkbox"
+                checked={cohortSettings.optIn}
+                onChange={(e) => saveCohortSettings({ optIn: e.target.checked })}
+                disabled={busy}
+              />
+              <span>
+                <strong>Enable cohort learning</strong>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                  Master switch — enables the options below.
+                </div>
+              </span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', opacity: cohortSettings.optIn ? 1 : 0.4 }}>
+              <input
+                type="checkbox"
+                checked={cohortSettings.contributeFeedback}
+                disabled={busy || !cohortSettings.optIn}
+                onChange={(e) => saveCohortSettings({ contributeFeedback: e.target.checked })}
+              />
+              <span>
+                <strong>Contribute feedback</strong>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                  Share anonymised execution feedback scores with the cohort pool.
+                </div>
+              </span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', opacity: cohortSettings.optIn ? 1 : 0.4 }}>
+              <input
+                type="checkbox"
+                checked={cohortSettings.drawFromCohort}
+                disabled={busy || !cohortSettings.optIn}
+                onChange={(e) => saveCohortSettings({ drawFromCohort: e.target.checked })}
+              />
+              <span>
+                <strong>Draw confidence boosts from cohort</strong>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                  Apply cross-org confidence signals to improve agent accuracy.
+                </div>
+              </span>
+            </label>
+          </div>
+
+          {cohortSettings.drawFromCohort && (
+            <div style={{ marginTop: '2rem' }}>
+              <div className={styles.panelLabel}>Active Cohort Signals</div>
+              {cohortSignals.length === 0 ? (
+                <p className={styles.lede} style={{ marginTop: '0.5rem' }}>
+                  No cohort signals yet — need at least 3 feedback samples per action type across opted-in orgs.
+                </p>
+              ) : (
+                <>
+                  {cohortSignalMeta && (
+                    <p className={styles.lede} style={{ marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+                      {cohortSignalMeta.totalOptedInOrgs} org{cohortSignalMeta.totalOptedInOrgs !== 1 ? 's' : ''} contributing · computed {new Date(cohortSignalMeta.computedAt).toLocaleString()}
+                    </p>
+                  )}
+                  <table className={adminStyles.table} style={{ fontSize: '0.9rem', maxWidth: '600px' }}>
+                    <thead>
+                      <tr>
+                        <th>Action Type</th>
+                        <th>Avg Feedback</th>
+                        <th>Sample Size</th>
+                        <th>Confidence Boost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cohortSignals.map((sig) => (
+                        <tr key={sig.actionType}>
+                          <td><code className={adminStyles.actionCode}>{sig.actionType}</code></td>
+                          <td style={{ color: sig.cohortAvgScore > 0 ? '#16a34a' : sig.cohortAvgScore < 0 ? '#dc2626' : undefined }}>
+                            {sig.cohortAvgScore > 0 ? '+' : ''}{sig.cohortAvgScore}
+                          </td>
+                          <td>{sig.sampleSize}</td>
+                          <td style={{ color: sig.confidenceBoost > 0 ? '#16a34a' : sig.confidenceBoost < 0 ? '#dc2626' : undefined }}>
+                            {sig.confidenceBoost > 0 ? '+' : ''}{(sig.confidenceBoost * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
             </div>
           )}
         </section>

@@ -354,7 +354,8 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | A.1.4 | Agent webhooks & event subscriptions | `done` | Subscribe agents to connector/webhook events; AgentWebhookSubscription model; NestJS subscribe/unsubscribe/list endpoints; Pages Function for webhook trigger; api.ts functions; 100 functions verified; build ✅ |
 | A.1.5 | Agent audit trail & UI polish | `done` | View audit logs per agent modal; Pages Function for agent audit logs; "Audit" button in agent table; audit detail modal with JSON inspection; 101 functions verified; build ✅ |
 | A.2.1 | Dynamic learning (feedback loop) | `done` | Feedback fields on AgentExecution (feedbackScore/comment/at/by); db:push synced; NestJS provideFeedback + getAgentFeedbackSummary; feedback controller endpoints; Pages Function feedback submission; 👍👎 UI in engine tab executions; 102 functions; build ✅ |
-| A.2.2 | Cohort learning (opt-in privacy) | `next` | Aggregate feedback signals from consenting orgs; opt-in setting; aggregate confidence adjustments |
+| A.2.2 | Cohort learning (opt-in privacy) | `done` | agentCohortSettings in org settings (optIn/contributeFeedback/drawFromCohort); Pages Functions for settings + signal aggregation; Learning tab UI on /app/automation; confidence boost table from cross-org signals; 104 functions; build ✅ |
+| A.3.1 | Real-time alert correlation | `next` | Event engine groups related alerts; correlation UI on alerts/overview |
 
 
 ---
