@@ -21,12 +21,7 @@
 name: Deploy Cloudflare Pages
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-  workflow_dispatch:
+  workflow_dispatch:  # manual only — Cloudflare Git integration handles auto-deploy on push to main
 
 concurrency:
   group: pages-production
