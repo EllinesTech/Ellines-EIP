@@ -1,0 +1,166 @@
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  padding-bottom: 0;
+}
+
+.tab,
+.tabActive {
+  padding: 0.5rem 1.1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text-muted, #64748b);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text, #0f172a);
+}
+
+.tabActive {
+  color: var(--brand, #6f2d8d);
+  border-bottom-color: var(--brand, #6f2d8d);
+  font-weight: 600;
+}
+
+/* ── Gallery ─────────────────────────────────────────── */
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: box-shadow 0.15s;
+}
+
+.card:hover {
+  box-shadow: 0 2px 12px rgba(111, 45, 141, 0.08);
+}
+
+.cardHeader {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text, #0f172a);
+}
+
+.cardDesc {
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.5;
+  flex: 1;
+  margin: 0;
+}
+
+.cardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+
+.cardMeta code {
+  font-size: 0.78rem;
+  background: var(--surface-alt, #f1f5f9);
+  padding: 0 0.3rem;
+  border-radius: 0.2rem;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* ── Badges ──────────────────────────────────────────── */
+
+.categoryBadge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #6f2d8d;
+}
+
+.featuredBadge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.badgeGreen {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badgeGray {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-alt, #f1f5f9);
+  color: var(--text-muted, #64748b);
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-muted, #64748b);
+}
+
+.empty p {
+  margin: 0.5rem 0;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}

@@ -1404,6 +1404,28 @@ export function executeAgent(
   });
 }
 
+export type AgentTemplateDto = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  trigger: string;
+  triggerConfig: Record<string, unknown>;
+  condition: Record<string, unknown>;
+  action: Record<string, unknown>;
+  confidenceThreshold: number;
+  requireApproval: boolean;
+  published: boolean;
+  featured: boolean;
+  installCount: number;
+  installed?: boolean;
+};
+
+export function listAgentTemplates() {
+  return request<AgentTemplateDto[]>('/api/v1/orgs/me/agent-templates');
+}
+
 
 // ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 

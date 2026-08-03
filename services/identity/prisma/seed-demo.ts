@@ -358,6 +358,81 @@ async function main() {
 
   console.log(`✓ Seeded sample workflow rules`);
 
+  // ─── v2.0 Phase A: Agent Templates ────────────────────────────────
+
+  const agentTemplates = [
+    {
+      slug: 'auto-approve-low-value',
+      name: 'Auto-approve Low-value Requests',
+      description:
+        'Automatically approve approval requests below a configurable monetary threshold. High-confidence approvals (e.g. routine purchases < $500) execute without human review.',
+      category: 'approval',
+      trigger: 'approval_pending',
+      triggerConfig: { eventType: 'approval_created' },
+      condition: { field: 'amount', op: 'lt', value: 500 },
+      action: { type: 'auto_approve', notifyRequester: true },
+      confidenceThreshold: 0.85,
+      requireApproval: false,
+      published: true,
+      featured: true,
+    },
+    {
+      slug: 'escalate-stuck-approvals',
+      name: 'Escalate Stuck Approvals',
+      description:
+        'Monitor pending approvals and escalate to the Owner when they have been waiting more than 3 days. Keeps decision-making moving without manual follow-up.',
+      category: 'approval',
+      trigger: 'approval_pending',
+      triggerConfig: { eventType: 'approval_overdue', daysThreshold: 3 },
+      condition: { field: 'daysOpen', op: 'gte', value: 3 },
+      action: { type: 'escalate', target: 'owner', notifyStakeholders: true },
+      confidenceThreshold: 0.9,
+      requireApproval: false,
+      published: true,
+      featured: true,
+    },
+    {
+      slug: 'reorder-alert',
+      name: 'Reorder Low-stock Items',
+      description:
+        'Trigger a reorder workflow when inventory levels drop below the configured threshold. Integrates with connected ERP or inventory Systems of Record.',
+      category: 'workflow',
+      trigger: 'alert_threshold',
+      triggerConfig: { alertType: 'inventory_low' },
+      condition: { field: 'stockLevel', op: 'lt', value: 20 },
+      action: { type: 'reorder', quantityMultiplier: 2, notifyIT: true },
+      confidenceThreshold: 0.75,
+      requireApproval: true,
+      published: true,
+      featured: false,
+    },
+    {
+      slug: 'campaign-trigger',
+      name: 'Campaign Activation Trigger',
+      description:
+        'Automatically activate a marketing or outreach campaign when CRM lead count or pipeline value crosses a threshold. Connects to HubSpot, Salesforce, or any CRM connector.',
+      category: 'workflow',
+      trigger: 'sync_complete',
+      triggerConfig: { connectorCategory: 'CRM' },
+      condition: { field: 'newLeads', op: 'gte', value: 50 },
+      action: { type: 'campaign', campaignType: 'email_outreach', notifyOwner: true },
+      confidenceThreshold: 0.7,
+      requireApproval: true,
+      published: true,
+      featured: false,
+    },
+  ];
+
+  for (const tmpl of agentTemplates) {
+    await prisma.agentTemplate.upsert({
+      where: { slug: tmpl.slug },
+      update: tmpl,
+      create: tmpl,
+    });
+  }
+
+  console.log(`✓ Seeded ${agentTemplates.length} agent templates`);
+
   console.log('Demo user ready');
   console.log(`  org:   ${org.name} (${org.slug})`);
   console.log(`  email: ${DEMO_EMAIL}`);
