@@ -284,7 +284,9 @@ Do **not** implement full native iOS/Android in Foundation runs. Web companion s
 
 ---
 
-## Recently landed on main (through 2026-08-01)
+## Recently landed on main (through 2026-08-03)
+
+- **CI/CD pipeline stabilization (2026-08-03):** Fixed GitHub Actions deployment failures by pinning Node.js to 22.11.0 LTS, downgrading wrangler from 4.114.0 to stable 3.96.0, installing wrangler globally for secret management, and adding verbose logging to all build steps. Deploy workflow now runs reliably without Node.js version deprecation issues.
 
 - **v1.1 Multi-company consolidation:** `OrganizationMembership` join table + `Organization.parentOrgId` self-FK added to Prisma schema (db:push synced). NestJS `MultiOrgService` in identity: `GET /api/v1/orgs/my-orgs`, `POST /api/v1/orgs/switch` (new JWT for target org), `POST /api/v1/orgs/me/create-child` (Owner only). Matching Cloudflare Pages Functions for all three endpoints. `AuthSession.orgs[]` field in `api.ts`. `OrgSwitcher` dropdown component (lazy-loads org list, zero-regression on single-org). "Create linked org" section in `/app/admin` (Owner only). Org name in topbar now shows the switcher + role pill.
 
