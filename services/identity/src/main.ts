@@ -13,12 +13,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-
-async function bootstrap() {
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module';
 import { ObservabilityInterceptor } from './middleware/observability.interceptor';
 import { MetricsCollector } from './metrics/metrics-collector';
 

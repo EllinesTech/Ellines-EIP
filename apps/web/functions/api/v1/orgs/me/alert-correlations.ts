@@ -32,7 +32,7 @@ type EventRow = {
   id: string;
   type: string;
   payload: Record<string, unknown>;
-  created_at: string;
+  created_at: string; // Supabase column name is 'at' in schema but maps to created_at via select alias
 };
 
 type CorrelationGroup = {
@@ -163,10 +163,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const { data: events, error } = await supabase
     .from('enterprise_events')
-    .select('id, type, payload, created_at')
+    .select('id, type, payload, at')
     .eq('organization_id', auth.organizationId)
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
+    .gte('at', since)
+    .order('at', { ascending: false })
     .limit(500);
 
   if (error) {
@@ -177,7 +177,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     id: e.id,
     type: e.type,
     payload: asObj(e.payload),
-    created_at: e.created_at,
+    created_at: e.at,  // map 'at' column to created_at for correlate()
   }));
 
   const groups = correlate(rows);

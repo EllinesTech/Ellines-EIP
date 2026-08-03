@@ -170,9 +170,9 @@ function AdminOverview({
               ))}
             </div>
             {rootCause && (
-              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f8f8ff', borderRadius: '0.35rem', border: '1px solid #ede9fe', fontSize: '0.84rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                <strong style={{ color: '#6f2d8d' }}>Ellinea root-cause:</strong>
-                <div style={{ marginTop: '0.3rem' }}>{rootCause}</div>
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(111,45,141,0.12)', borderRadius: '0.35rem', border: '1px solid rgba(111,45,141,0.35)', fontSize: '0.84rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                <strong style={{ color: '#c084fc' }}>Ellinea root-cause:</strong>
+                <div style={{ marginTop: '0.3rem', color: '#e2e8f0' }}>{rootCause}</div>
               </div>
             )}
           </div>
