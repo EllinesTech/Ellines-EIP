@@ -222,6 +222,16 @@ function IconOrgSystem() {
   );
 }
 
+function IconAutomation() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+      <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+    </svg>
+  );
+}
+
 function IconDocuments() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -242,6 +252,7 @@ const NAV: NavItem[] = [
   { href: '/app/inbox', label: 'Inbox', icon: <IconInbox /> },
   { href: '/app/rules', label: 'Rules', icon: <IconRules />, adminOnly: true },
   { href: '/app/reports', label: 'Reports', icon: <IconReports />, adminOnly: true },
+  { href: '/app/automation', label: 'Automation', icon: <IconAutomation />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/documents', label: 'Documents', icon: <IconDocuments /> },
   {
@@ -489,6 +500,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Business Rules'
                 : pathname.startsWith('/app/reports')
                   ? 'Scheduled Reports'
+                : pathname.startsWith('/app/automation')
+                  ? 'Automation Agents'
                 : pathname.startsWith('/app/notify-policy')
                   ? 'Delivery policy'
                 : pathname.startsWith('/app/fleet')

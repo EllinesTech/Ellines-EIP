@@ -1313,3 +1313,228 @@ export function deleteExportApi(dashboardId: string, exportId: string, organizat
 export function fetchPlatformOrgStats(orgId: string) {
   return request<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
 }
+
+// ─── v2.0 Phase A — Ellinea Agents (Autonomous AI) ──────────────────────────
+
+export type EllineaAgentDto = {
+  id: string;
+  name: string;
+  description: string;
+  templateId: string | null;
+  trigger: string;
+  triggerConfig: Record<string, unknown>;
+  condition: Record<string, unknown>;
+  action: Record<string, unknown>;
+  confidenceThreshold: number;
+  requireApproval: boolean;
+  isActive: boolean;
+  isPaused: boolean;
+  executionCount: number;
+  successCount: number;
+  lastExecutedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentExecutionDto = {
+  id: string;
+  agentId: string;
+  triggeredBy: string;
+  triggerPayload: Record<string, unknown> | null;
+  confidence: number;
+  reasoning: Record<string, unknown> | null;
+  recommendedAction: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed' | 'skipped';
+  requiresApproval: boolean;
+  humanApprovalBy: string | null;
+  humanApprovalAt: string | null;
+  humanNote: string | null;
+  executedAt: string | null;
+  executionResult: Record<string, unknown> | null;
+  executionError: string | null;
+  canRollback: boolean;
+  rolledBackAt: string | null;
+  rolledBackBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function listAgents() {
+  return request<EllineaAgentDto[]>('/api/v1/orgs/me/agents');
+}
+
+export function getAgent(id: string) {
+  return request<EllineaAgentDto>(`/api/v1/orgs/me/agents/${id}`);
+}
+
+export function createAgent(payload: {
+  name: string;
+  description?: string;
+  templateId?: string;
+  trigger: string;
+  triggerConfig?: Record<string, unknown>;
+  condition?: Record<string, unknown>;
+  action: Record<string, unknown>;
+  confidenceThreshold?: number;
+  requireApproval?: boolean;
+}) {
+  return request<EllineaAgentDto>('/api/v1/orgs/me/agents', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAgent(
+  id: string,
+  payload: {
+    name?: string;
+    description?: string;
+    triggerConfig?: Record<string, unknown>;
+    condition?: Record<string, unknown>;
+    action?: Record<string, unknown>;
+    confidenceThreshold?: number;
+    requireApproval?: boolean;
+    isActive?: boolean;
+    isPaused?: boolean;
+  },
+) {
+  return request<EllineaAgentDto>(`/api/v1/orgs/me/agents/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAgent(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/orgs/me/agents/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export function executeAgent(
+  id: string,
+  payload?: {
+    triggeredBy?: string;
+    triggerPayload?: Record<string, unknown>;
+    confidence?: number;
+    reasoning?: Record<string, unknown>;
+    recommendedAction?: string;
+  },
+) {
+  return request<AgentExecutionDto>(`/api/v1/orgs/me/agents/${id}/execute`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+
+// ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
+
+export type AgentDto = {
+  id: string;
+  name: string;
+  description: string;
+  templateSlug: string;
+  autonomyLevel: 1 | 2 | 3;
+  trigger: string;
+  condition: Record<string, unknown>;
+  action: Record<string, unknown>;
+  confidenceThreshold: number;
+  cronExpression: string | null;
+  timezone: string;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  executionCount: number;
+};
+
+export type AgentExecutionDto = {
+  id: string;
+  agentId: string;
+  status: 'pending' | 'running' | 'approved' | 'rejected' | 'executed' | 'failed' | 'rolled_back';
+  confidenceScore: number | null;
+  requiresApproval: boolean;
+  aiReasoning: {
+    confidence: number;
+    reasoning: string;
+    evaluatedAt: string;
+  } | null;
+  canRollback: boolean;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectedBy: string | null;
+  rejectedAt: string | null;
+  executedAt: string | null;
+  executionResult: Record<string, unknown> | null;
+  executionError: string | null;
+  rolledBackAt: string | null;
+  rolledBackBy: string | null;
+  triggeredAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateAgentPayload = {
+  name: string;
+  description?: string;
+  templateSlug?: string;
+  autonomyLevel?: 1 | 2 | 3;
+  trigger?: string;
+  condition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+  confidenceThreshold?: number;
+  cronExpression?: string | null;
+  timezone?: string;
+  isActive?: boolean;
+};
+
+export function listAgentsApi() {
+  return request<AgentDto[]>('/api/v1/orgs/me/agents');
+}
+
+export function getAgentApi(id: string) {
+  return request<AgentDto>(`/api/v1/orgs/me/agents/${id}`);
+}
+
+export function createAgentApi(payload: CreateAgentPayload) {
+  return request<AgentDto>('/api/v1/orgs/me/agents', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAgentApi(id: string, payload: Partial<CreateAgentPayload>) {
+  return request<AgentDto>(`/api/v1/orgs/me/agents/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAgentApi(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/orgs/me/agents/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export function triggerAgentApi(id: string) {
+  return request<AgentExecutionDto>(`/api/v1/orgs/me/agents/${id}/trigger`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export function listAgentExecutionsApi(id: string, limit = 50) {
+  return request<AgentExecutionDto[]>(`/api/v1/orgs/me/agents/${id}/executions?limit=${limit}`);
+}
+
+export function decideExecutionApi(
+  agentId: string,
+  execId: string,
+  decision: 'approved' | 'rejected',
+) {
+  return request<AgentExecutionDto>(
+    `/api/v1/orgs/me/agents/${agentId}/executions/${execId}/decide`,
+    { method: 'POST', body: JSON.stringify({ decision }) },
+  );
+}

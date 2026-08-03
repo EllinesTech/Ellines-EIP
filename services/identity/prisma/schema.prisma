@@ -682,3 +682,169 @@ model RoleAuditLog {
   @@index([createdAt])
   @@map("role_audit_logs")
 }
+
+// ─── v2.0 Phase A — Autonomous AI & Advanced Workflows (Ellinea Agents) ─────────
+
+/**
+ * EllineaAgent — Autonomous AI agent that acts on enterprise events.
+ * Agents can auto-approve, auto-reorder, escalate, or execute custom actions.
+ * Three confidence levels: low (queue for approval), medium (notify + act), high (auto-execute).
+ */
+model EllineaAgent {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  name            String
+  description     String   @default("")
+  templateId      String?  @map("template_id")    // Optional reference to AgentTemplate
+  
+  // Trigger configuration
+  trigger         String                          // Event type: "approval_pending" | "alert_threshold" | "sync_complete" | "manual"
+  triggerConfig   Json     @default("{}")         // Trigger-specific config (e.g., { "alertType": "critical", "thresholdValue": 5 })
+  
+  // Condition logic (when to act)
+  condition       Json     @default("{}")         // Condition rules (e.g., { "field": "amount", "op": "gt", "value": 1000 })
+  
+  // Action configuration
+  action          Json     @default("{}")         // Action to execute (e.g., { "type": "auto_approve", "escalate": true, "notifyOwner": true })
+  
+  // Confidence & autonomy
+  confidenceThreshold Float @default(0.7) @map("confidence_threshold") // 0.0-1.0: minimum confidence to auto-execute
+  requireApproval Boolean  @default(false) @map("require_approval")   // If true, always queue for human approval regardless of confidence
+  
+  // Status
+  isActive        Boolean  @default(true) @map("is_active")
+  isPaused        Boolean  @default(false) @map("is_paused")
+  
+  // Stats
+  executionCount  Int      @default(0) @map("execution_count")
+  successCount    Int      @default(0) @map("success_count")
+  lastExecutedAt  DateTime? @map("last_executed_at")
+  
+  // Metadata
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   AgentExecution[]
+  auditLogs    AgentAuditLog[]
+
+  @@index([organizationId])
+  @@index([trigger])
+  @@index([isActive])
+  @@map("ellinea_agents")
+}
+
+/**
+ * AgentExecution — Log of agent execution with AI reasoning, confidence, and approval state.
+ */
+model AgentExecution {
+  id                  String    @id @default(cuid())
+  agentId             String    @map("agent_id")
+  organizationId      String    @map("organization_id")
+  
+  // Execution context
+  triggeredBy         String    @map("triggered_by")    // Event type or "manual"
+  triggerPayload      Json?     @map("trigger_payload") // Event payload snapshot
+  
+  // AI reasoning
+  confidence          Float                             // 0.0-1.0: AI confidence score
+  reasoning           Json?                             // AI explanation { "summary": "...", "evidence": [...], "risk": "low|medium|high" }
+  recommendedAction   String?   @map("recommended_action") // What the agent recommends
+  
+  // Execution status
+  status              String                            // "pending" | "approved" | "rejected" | "executed" | "failed" | "skipped"
+  requiresApproval    Boolean   @default(false) @map("requires_approval")
+  
+  // Human oversight
+  humanApprovalBy     String?   @map("human_approval_by")
+  humanApprovalAt     DateTime? @map("human_approval_at")
+  humanNote           String?   @map("human_note")
+  
+  // Execution result
+  executedAt          DateTime? @map("executed_at")
+  executionResult     Json?     @map("execution_result") // Result data from action
+  executionError      String?   @map("execution_error")
+  
+  // Rollback support
+  canRollback         Boolean   @default(false) @map("can_rollback")
+  rolledBackAt        DateTime? @map("rolled_back_at")
+  rolledBackBy        String?   @map("rolled_back_by")
+  
+  // Timestamps
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  agent EllineaAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([triggeredBy])
+  @@index([createdAt])
+  @@map("agent_executions")
+}
+
+/**
+ * AgentAuditLog — Comprehensive audit trail for all agent actions.
+ * Tracks creation, modification, execution, approval, and rollback.
+ */
+model AgentAuditLog {
+  id             String   @id @default(cuid())
+  agentId        String   @map("agent_id")
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")         // User who triggered the action (null for system)
+  action         String                           // 'agent.created' | 'agent.updated' | 'agent.executed' | 'agent.approved' | 'agent.rolled_back'
+  details        Json?                            // Action-specific details
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  agent EllineaAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("agent_audit_logs")
+}
+
+/**
+ * AgentTemplate — Pre-built agent templates (auto-approve <$500, escalate stuck approvals, etc.).
+ * Platform admins publish templates; org admins install with 1-click.
+ */
+model AgentTemplate {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String   @default("")
+  category        String   @default("general")    // "approval" | "alert" | "sync" | "workflow" | "general"
+  
+  // Template configuration
+  trigger         String
+  triggerConfig   Json     @default("{}")
+  condition       Json     @default("{}")
+  action          Json     @default("{}")
+  
+  // Default settings
+  confidenceThreshold Float @default(0.7) @map("confidence_threshold")
+  requireApproval Boolean  @default(false) @map("require_approval")
+  
+  // Publishing
+  published       Boolean  @default(true)
+  featured        Boolean  @default(false)       // Featured templates shown first in gallery
+  
+  // Usage stats
+  installCount    Int      @default(0) @map("install_count")
+  
+  // Metadata
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([published])
+  @@index([featured])
+  @@map("agent_templates")
+}
+
+
