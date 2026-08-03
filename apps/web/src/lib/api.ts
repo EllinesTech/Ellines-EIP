@@ -1337,29 +1337,6 @@ export type EllineaAgentDto = {
   updatedAt: string;
 };
 
-export type AgentExecutionDto = {
-  id: string;
-  agentId: string;
-  triggeredBy: string;
-  triggerPayload: Record<string, unknown> | null;
-  confidence: number;
-  reasoning: Record<string, unknown> | null;
-  recommendedAction: string | null;
-  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed' | 'skipped';
-  requiresApproval: boolean;
-  humanApprovalBy: string | null;
-  humanApprovalAt: string | null;
-  humanNote: string | null;
-  executedAt: string | null;
-  executionResult: Record<string, unknown> | null;
-  executionError: string | null;
-  canRollback: boolean;
-  rolledBackAt: string | null;
-  rolledBackBy: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export function listAgents() {
   return request<EllineaAgentDto[]>('/api/v1/orgs/me/agents');
 }
