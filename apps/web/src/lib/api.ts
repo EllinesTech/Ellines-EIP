@@ -1432,6 +1432,19 @@ export type AgentTriggerResultDto = {
   message?: string;
 };
 
+export type AgentWebhookSubscriptionDto = {
+  id: string;
+  agentId: string;
+  organizationId: string;
+  eventSource: string;
+  eventSourceId: string | null;
+  eventType: string;
+  filter: Record<string, unknown> | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function triggerAgentEvent(payload: {
   eventType: string;
   payload?: Record<string, unknown>;
@@ -1440,6 +1453,67 @@ export function triggerAgentEvent(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export function triggerAgentWebhookEvent(payload: {
+  eventSource: string;
+  eventSourceId?: string | null;
+  eventType: string;
+  payload?: Record<string, unknown>;
+}) {
+  return request<AgentTriggerResultDto>('/api/v1/orgs/me/agents-webhook-trigger', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listAgentSubscriptions(agentId: string) {
+  return request<AgentWebhookSubscriptionDto[]>(
+    `/api/v1/orgs/me/agents/${agentId}/subscriptions`,
+  );
+}
+
+export function subscribeAgentToEvent(
+  agentId: string,
+  payload: {
+    eventSource: string;
+    eventSourceId?: string;
+    eventType: string;
+    filter?: Record<string, unknown>;
+  },
+) {
+  return request<AgentWebhookSubscriptionDto>(
+    `/api/v1/orgs/me/agents/${agentId}/subscribe`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function updateAgentSubscription(
+  subscriptionId: string,
+  payload: {
+    isActive?: boolean;
+    filter?: Record<string, unknown>;
+  },
+) {
+  return request<AgentWebhookSubscriptionDto>(
+    `/api/v1/orgs/me/agents/subscriptions/${subscriptionId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function unsubscribeAgent(subscriptionId: string) {
+  return request<{ ok: boolean }>(
+    `/api/v1/orgs/me/agents/subscriptions/${subscriptionId}`,
+    {
+      method: 'DELETE',
+    },
+  );
 }
 
 

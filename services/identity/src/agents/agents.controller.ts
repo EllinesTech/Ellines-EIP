@@ -170,4 +170,56 @@ export class AgentsController {
   processQueue(@Request() req: AuthReq) {
     return this.agents.processPendingExecutions(req.user.organizationId);
   }
+
+  // ── Webhook Subscriptions ──────────────────────────────────────────────────
+
+  /** GET /api/v1/orgs/me/agents/:id/subscriptions — list subscriptions for agent */
+  @Get('me/agents/:id/subscriptions')
+  @Roles(...ORG_ADMIN_ROLES)
+  listSubscriptions(@Request() req: AuthReq, @Param('id') agentId: string) {
+    return this.agents.listSubscriptions(req.user.organizationId, agentId);
+  }
+
+  /** POST /api/v1/orgs/me/agents/:id/subscribe — subscribe agent to event source */
+  @Post('me/agents/:id/subscribe')
+  @Roles(...ORG_ADMIN_ROLES)
+  subscribeAgent(
+    @Request() req: AuthReq,
+    @Param('id') agentId: string,
+    @Body() dto: CreateWebhookSubscriptionDto,
+  ) {
+    return this.agents.subscribeAgent(
+      req.user.organizationId,
+      agentId,
+      req.user.userId,
+      dto,
+    );
+  }
+
+  /** DELETE /api/v1/orgs/me/agents/subscriptions/:id — unsubscribe from event */
+  @Delete('me/agents/subscriptions/:id')
+  @Roles(...ORG_ADMIN_ROLES)
+  unsubscribeAgent(@Request() req: AuthReq, @Param('id') subscriptionId: string) {
+    return this.agents.unsubscribeAgent(
+      req.user.organizationId,
+      subscriptionId,
+      req.user.userId,
+    );
+  }
+
+  /** PATCH /api/v1/orgs/me/agents/subscriptions/:id — update subscription */
+  @Patch('me/agents/subscriptions/:id')
+  @Roles(...ORG_ADMIN_ROLES)
+  updateSubscription(
+    @Request() req: AuthReq,
+    @Param('id') subscriptionId: string,
+    @Body() dto: UpdateWebhookSubscriptionDto,
+  ) {
+    return this.agents.updateSubscription(
+      req.user.organizationId,
+      subscriptionId,
+      req.user.userId,
+      dto,
+    );
+  }
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ExecuteAgentDto, ApproveExecutionDto } from './dto/execute-agent.dto';
+import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto/webhook-subscription.dto';
 
 // ─── Condition evaluator ──────────────────────────────────────────────────────
 
@@ -506,5 +507,258 @@ export class AgentsService {
     }
 
     return { processed: pending.length };
+  }
+
+  // ─── Webhook Subscriptions ────────────────────────────────────────────────
+
+  /**
+   * Subscribe an agent to an external event source (connector, webhook, system event).
+   */
+  async subscribeAgent(
+    organizationId: string,
+    agentId: string,
+    userId: string,
+    dto: CreateWebhookSubscriptionDto,
+  ) {
+    const agent = await this.prisma.ellineaAgent.findFirst({
+      where: { id: agentId, organizationId },
+    });
+
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    const subscription = await this.prisma.agentWebhookSubscription.create({
+      data: {
+        agentId,
+        organizationId,
+        eventSource: dto.eventSource,
+        eventSourceId: dto.eventSourceId || null,
+        eventType: dto.eventType,
+        filter: dto.filter || {},
+      },
+    });
+
+    // Audit log
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId,
+        organizationId,
+        userId,
+        action: 'agent.subscribed',
+        details: {
+          subscriptionId: subscription.id,
+          eventSource: dto.eventSource,
+          eventType: dto.eventType,
+        },
+      },
+    });
+
+    return subscription;
+  }
+
+  /**
+   * List all webhook subscriptions for an agent.
+   */
+  async listSubscriptions(organizationId: string, agentId: string) {
+    const subscriptions = await this.prisma.agentWebhookSubscription.findMany({
+      where: { agentId, organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return subscriptions;
+  }
+
+  /**
+   * Unsubscribe an agent from an event source.
+   */
+  async unsubscribeAgent(
+    organizationId: string,
+    subscriptionId: string,
+    userId: string,
+  ) {
+    const subscription = await this.prisma.agentWebhookSubscription.findFirst({
+      where: { id: subscriptionId, organizationId },
+      include: { agent: true },
+    });
+
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId: subscription.agentId,
+        organizationId,
+        userId,
+        action: 'agent.unsubscribed',
+        details: {
+          subscriptionId,
+          eventSource: subscription.eventSource,
+          eventType: subscription.eventType,
+        },
+      },
+    });
+
+    await this.prisma.agentWebhookSubscription.delete({
+      where: { id: subscriptionId },
+    });
+
+    return { ok: true };
+  }
+
+  /**
+   * Update webhook subscription status or filters.
+   */
+  async updateSubscription(
+    organizationId: string,
+    subscriptionId: string,
+    userId: string,
+    dto: UpdateWebhookSubscriptionDto,
+  ) {
+    const subscription = await this.prisma.agentWebhookSubscription.findFirst({
+      where: { id: subscriptionId, organizationId },
+    });
+
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    const updated = await this.prisma.agentWebhookSubscription.update({
+      where: { id: subscriptionId },
+      data: {
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.filter && { filter: dto.filter }),
+      },
+    });
+
+    // Audit log
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId: subscription.agentId,
+        organizationId,
+        userId,
+        action: 'agent.subscription_updated',
+        details: { subscriptionId, changes: dto },
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Trigger agents by webhook event from connector or external source.
+   * Finds matching subscriptions and fires agent execution engine.
+   */
+  async triggerByWebhookEvent(
+    organizationId: string,
+    eventSource: string,
+    eventSourceId: string | null,
+    eventType: string,
+    eventPayload: Record<string, unknown>,
+  ) {
+    // Find all active subscriptions for this event
+    const subscriptions = await this.prisma.agentWebhookSubscription.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        eventSource,
+        eventSourceId,
+        eventType,
+      },
+      include: { agent: true },
+    });
+
+    if (!subscriptions.length) {
+      return { triggered: 0, executions: [] };
+    }
+
+    const context: Record<string, unknown> = {
+      ...eventPayload,
+      eventSource,
+      eventSourceId,
+      eventType,
+    };
+
+    const executions: unknown[] = [];
+
+    for (const sub of subscriptions) {
+      const agent = sub.agent;
+
+      // Check filters if present
+      if (sub.filter && typeof sub.filter === 'object') {
+        const filter = sub.filter as Record<string, unknown>;
+        let filterMatch = true;
+
+        for (const [key, value] of Object.entries(filter)) {
+          if (context[key] !== value) {
+            filterMatch = false;
+            break;
+          }
+        }
+
+        if (!filterMatch) continue;
+      }
+
+      // Evaluate condition
+      const conditionMet = evalCondition(agent.condition, context);
+      if (!conditionMet) continue;
+
+      // Score confidence
+      const { score, reasoning } = scoreConfidence(
+        { condition: agent.condition, action: agent.action, requireApproval: agent.requireApproval },
+        context,
+      );
+
+      const requiresApproval =
+        agent.requireApproval || score < agent.confidenceThreshold;
+
+      const execution = await this.prisma.agentExecution.create({
+        data: {
+          agentId: agent.id,
+          organizationId,
+          triggeredBy: `${eventSource}:${eventType}`,
+          triggerPayload: eventPayload,
+          confidence: score,
+          reasoning: { summary: reasoning, score, conditionMet: true, subscriptionId: sub.id },
+          recommendedAction: String((agent.action as Record<string, unknown>)?.type ?? 'act'),
+          status: requiresApproval ? 'pending' : 'executed',
+          requiresApproval,
+          executedAt: requiresApproval ? null : new Date(),
+          canRollback: !requiresApproval,
+        },
+      });
+
+      // Update agent stats
+      await this.prisma.ellineaAgent.update({
+        where: { id: agent.id },
+        data: {
+          executionCount: { increment: 1 },
+          ...(!requiresApproval ? { successCount: { increment: 1 } } : {}),
+          lastExecutedAt: new Date(),
+        },
+      });
+
+      // Audit log
+      await this.prisma.agentAuditLog.create({
+        data: {
+          agentId: agent.id,
+          organizationId,
+          action: 'agent.webhook_triggered',
+          details: {
+            executionId: execution.id,
+            eventSource,
+            eventType,
+            confidence: score,
+            requiresApproval,
+            reasoning,
+          },
+        },
+      });
+
+      executions.push(execution);
+    }
+
+    return { triggered: executions.length, executions };
   }
 }

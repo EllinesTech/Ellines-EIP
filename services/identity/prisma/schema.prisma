@@ -48,6 +48,7 @@ model Organization {
   dashboards             Dashboard[]             // Track B: BI Dashboards
   workflowRules          WorkflowRule[]          // Track C: Autonomous Workflows
   ellineaAgents          EllineaAgent[]          // v2.0 A.1: Autonomous Agents
+  agentSubscriptions     AgentWebhookSubscription[] @relation("AgentSubscriptions")
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -729,6 +730,7 @@ model EllineaAgent {
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   executions   AgentExecution[]
   auditLogs    AgentAuditLog[]
+  subscriptions AgentWebhookSubscription[] @relation("AgentSubscriptions")
 
   @@index([organizationId])
   @@index([trigger])
@@ -846,6 +848,41 @@ model AgentTemplate {
   @@index([published])
   @@index([featured])
   @@map("agent_templates")
+}
+
+/**
+ * AgentWebhookSubscription — Subscribe agents to external event sources (connectors, webhooks, etc.)
+ * Allows agents to be triggered by connector sync events, external webhooks, or system events.
+ */
+model AgentWebhookSubscription {
+  id              String   @id @default(cuid())
+  agentId         String   @map("agent_id")
+  organizationId  String   @map("organization_id")
+  
+  // Event source
+  eventSource     String   @map("event_source")   // "connector" | "webhook" | "system" | "manual"
+  eventSourceId   String?  @map("event_source_id") // Connector ID, webhook ID, or null for system
+  eventType       String   @map("event_type")     // Event type to subscribe to (e.g., "sync_complete", "sync_failed", "alert_raised")
+  
+  // Filter (optional)
+  filter          Json?    @default("{}")         // Additional filter rules (e.g., { "connectorType": "sql_server" })
+  
+  // Status
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  // Metadata
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  agent EllineaAgent @relation("AgentSubscriptions", fields: [agentId], references: [id], onDelete: Cascade)
+  organization Organization @relation("AgentSubscriptions", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, eventSource, eventSourceId, eventType])
+  @@index([organizationId])
+  @@index([eventSource])
+  @@index([eventType])
+  @@index([isActive])
+  @@map("agent_webhook_subscriptions")
 }
 
 
