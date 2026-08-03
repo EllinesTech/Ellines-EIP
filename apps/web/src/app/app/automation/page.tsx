@@ -13,9 +13,11 @@ import {
   executeAgent,
   listAgentTemplates,
   triggerAgentEvent,
+  fetchAgentAuditLogs,
   type EllineaAgentDto,
   type AgentTemplateDto,
   type AgentExecutionDto,
+  type AgentAuditLogDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
@@ -66,6 +68,10 @@ export default function AutomationPage() {
   const [testEventType, setTestEventType] = useState('approval_pending');
   const [testPayload, setTestPayload] = useState('{"amount": 150, "requester": "alice@acme.com"}');
   const [engineResult, setEngineResult] = useState<string | null>(null);
+
+  // Audit log state
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AgentAuditLogDto[]>([]);
 
   useEffect(() => {
     const s = getSession();
@@ -155,6 +161,23 @@ export default function AutomationPage() {
       .then(() => listAgents().then(setAgents))
       .catch(() => alert('Failed to execute agent'))
       .finally(() => setBusy(false));
+  }
+
+  function viewAuditLogs(agentId: string) {
+    if (busy) return;
+    setBusy(true);
+    fetchAgentAuditLogs(agentId, 50)
+      .then((result) => {
+        setAuditLogs(result.audits);
+        setSelectedAgentId(agentId);
+      })
+      .catch(() => alert('Failed to load audit logs'))
+      .finally(() => setBusy(false));
+  }
+
+  function closeAuditModal() {
+    setSelectedAgentId(null);
+    setAuditLogs([]);
   }
 
   function testEngine(e: FormEvent) {
@@ -311,6 +334,14 @@ export default function AutomationPage() {
                         onClick={() => runNow(agent.id)}
                       >
                         Run
+                      </button>{' '}
+                      <button
+                        type="button"
+                        className={adminStyles.ghost}
+                        disabled={busy}
+                        onClick={() => viewAuditLogs(agent.id)}
+                      >
+                        Audit
                       </button>{' '}
                       <button
                         type="button"
@@ -554,6 +585,87 @@ export default function AutomationPage() {
           Every action is logged in the audit trail and can be rolled back within 24 h.
         </p>
       </section>
+
+      {/* ── Audit Logs Modal ────────────────────────────────────────────── */}
+      {selectedAgentId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+          onClick={closeAuditModal}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '0.5rem',
+              maxWidth: '900px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              padding: '2rem',
+              width: '100%',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2>Agent Audit Log</h2>
+              <button
+                type="button"
+                className={adminStyles.ghost}
+                onClick={closeAuditModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <p className={styles.lede}>No audit events for this agent yet.</p>
+            ) : (
+              <table className={adminStyles.table} style={{ fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{new Date(log.createdAt).toLocaleString()}</td>
+                      <td>
+                        <code className={adminStyles.actionCode}>{log.action}</code>
+                      </td>
+                      <td>
+                        {log.details ? (
+                          <details>
+                            <summary style={{ cursor: 'pointer', color: 'var(--brand)' }}>View details</summary>
+                            <pre style={{ fontSize: '0.75rem', overflow: 'auto', marginTop: '0.5rem', background: '#f5f5f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          </details>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

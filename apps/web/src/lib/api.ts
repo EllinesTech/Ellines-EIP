@@ -1445,6 +1445,16 @@ export type AgentWebhookSubscriptionDto = {
   updatedAt: string;
 };
 
+export type AgentAuditLogDto = {
+  id: string;
+  agentId: string;
+  agentName: string;
+  userId: string | null;
+  action: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 export function triggerAgentEvent(payload: {
   eventType: string;
   payload?: Record<string, unknown>;
@@ -1514,6 +1524,15 @@ export function unsubscribeAgent(subscriptionId: string) {
       method: 'DELETE',
     },
   );
+}
+
+export function fetchAgentAuditLogs(agentId: string, limit = 50) {
+  return request<{
+    agentId: string;
+    agentName: string;
+    audits: AgentAuditLogDto[];
+    total: number;
+  }>(`/api/v1/orgs/me/agents/audit-logs?agentId=${agentId}&limit=${limit}`);
 }
 
 
