@@ -1117,6 +1117,199 @@ export type PlatformOrgStatsDto = {
   };
 };
 
+export type DashboardDto = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string;
+  layout: Record<string, any>[];
+  refreshRate: number;
+  isPublic: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  widgets?: WidgetDto[];
+  exports?: DashboardExportDto[];
+};
+
+export type WidgetDto = {
+  id: string;
+  dashboardId: string;
+  type: string;
+  title: string;
+  config: Record<string, any>;
+  position: number;
+  size: Record<string, any>;
+  dataSourceId?: string;
+  createdAt: string;
+  updatedAt: string;
+  alerts?: AlertDto[];
+};
+
+export type AlertDto = {
+  id: string;
+  widgetId: string;
+  condition: string;
+  threshold: number;
+  actions: Record<string, any>[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DashboardExportDto = {
+  id: string;
+  dashboardId: string;
+  format: string;
+  schedule: string | null;
+  lastRun: string | null;
+  nextRun: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function listDashboardsApi(organizationId: string) {
+  return request<DashboardDto[]>('/api/v1/dashboards', {
+    method: 'POST',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function createDashboardApi(payload: {
+  organizationId: string;
+  name: string;
+  description?: string;
+  layout?: Record<string, any>[];
+  refreshRate?: number;
+  isPublic?: boolean;
+  createdBy: string;
+}) {
+  return request<DashboardDto>('/api/v1/dashboards', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getDashboardApi(id: string, organizationId: string) {
+  return request<DashboardDto>(`/api/v1/dashboards/${id}`, {
+    method: 'POST',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function updateDashboardApi(id: string, payload: {
+  organizationId: string;
+  name?: string;
+  description?: string;
+  layout?: Record<string, any>[];
+  refreshRate?: number;
+  isPublic?: boolean;
+}) {
+  return request<DashboardDto>(`/api/v1/dashboards/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDashboardApi(id: string, organizationId: string) {
+  return request<{ ok: boolean }>(`/api/v1/dashboards/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function addWidgetApi(dashboardId: string, payload: {
+  organizationId: string;
+  type: string;
+  title: string;
+  config?: Record<string, any>;
+  position?: number;
+  size?: Record<string, any>;
+  dataSourceId?: string;
+}) {
+  return request<WidgetDto>(`/api/v1/dashboards/${dashboardId}/widgets`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateWidgetApi(dashboardId: string, widgetId: string, payload: {
+  organizationId: string;
+  type?: string;
+  title?: string;
+  config?: Record<string, any>;
+  position?: number;
+  size?: Record<string, any>;
+}) {
+  return request<WidgetDto>(`/api/v1/dashboards/${dashboardId}/widgets/${widgetId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteWidgetApi(dashboardId: string, widgetId: string, organizationId: string) {
+  return request<{ ok: boolean }>(`/api/v1/dashboards/${dashboardId}/widgets/${widgetId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function addAlertApi(dashboardId: string, payload: {
+  organizationId: string;
+  widgetId: string;
+  condition: string;
+  threshold: number;
+  actions?: Record<string, any>[];
+  active?: boolean;
+}) {
+  return request<AlertDto>(`/api/v1/dashboards/${dashboardId}/alerts`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAlertApi(dashboardId: string, alertId: string, payload: {
+  organizationId: string;
+  condition?: string;
+  threshold?: number;
+  actions?: Record<string, any>[];
+  active?: boolean;
+}) {
+  return request<AlertDto>(`/api/v1/dashboards/${dashboardId}/alerts/${alertId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAlertApi(dashboardId: string, alertId: string, organizationId: string) {
+  return request<{ ok: boolean }>(`/api/v1/dashboards/${dashboardId}/alerts/${alertId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function exportDashboardApi(dashboardId: string, payload: {
+  organizationId: string;
+  format: 'pdf' | 'csv' | 'excel';
+  schedule?: string;
+}) {
+  return request<DashboardExportDto>(`/api/v1/dashboards/${dashboardId}/export`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listExportsApi(dashboardId: string, organizationId: string) {
+  return request<DashboardExportDto[]>(`/api/v1/dashboards/${dashboardId}/exports?organizationId=${organizationId}`);
+}
+
+export function deleteExportApi(dashboardId: string, exportId: string, organizationId: string) {
+  return request<{ ok: boolean }>(`/api/v1/dashboards/${dashboardId}/exports/${exportId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
 export function fetchPlatformOrgStats(orgId: string) {
   return request<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
 }

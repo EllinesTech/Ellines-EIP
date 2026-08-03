@@ -27,7 +27,7 @@ Ellines EIP is an AI-native enterprise intelligence platform that sits **above**
 | [Build Queue](./docs/05_Build_Queue.md) | Live status + ordered agent worklist |
 | [Automation prompt](./docs/06_Automation_Prompt.md) | Cursor Automations instructions |
 | [Demo login](./docs/07_Demo_Login.md) | Live site test account |
-| [Live Identity setup](./docs/08_Live_Identity_Setup.md) | One-time Fly deploy steps |
+| [Live Identity setup](./docs/08_Live_Identity_Setup.md) | Pages Functions auth — no separate deploy |
 | [Cloudflare Pages ↔ GitHub](./docs/10_Cloudflare_Pages_GitHub.md) | Actions secrets + deploy to eip.ellines.co.ke |
 | [AGENTS.md](./AGENTS.md) | Instructions for Cursor Cloud Agents |
 
@@ -115,8 +115,7 @@ See [docs/02_MVP_Scope_v1.0.md](./docs/02_MVP_Scope_v1.0.md) for full scope.
 | GitHub | [EllinesTech/Ellines-EIP](https://github.com/EllinesTech/Ellines-EIP) |
 | Cloudflare Pages | `ellines-eip` |
 | Custom domain | `eip.ellines.co.ke` |
-| Web deploy | Push to `main` → `.github/workflows/deploy-pages.yml` |
-| Identity API | Fly.io `ellines-eip-identity` → `.github/workflows/deploy-identity.yml` |
+| Web + Identity API | Cloudflare Pages `ellines-eip` via `.github/workflows/deploy-pages.yml` |
 | Demo login | [docs/07_Demo_Login.md](./docs/07_Demo_Login.md) |
 
 **Local sync with agents:** `git pull origin main` (source of truth is GitHub `main`).

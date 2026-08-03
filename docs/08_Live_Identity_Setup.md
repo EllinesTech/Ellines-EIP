@@ -1,70 +1,45 @@
-# One-time live Identity setup (Fly)
+# Live Identity setup (Pages Functions)
 
-Code and CI for Identity are in the repo. Completing **optional** Nest Identity on Fly needs a Fly account token once.
+Identity auth runs inside Cloudflare Pages Functions — no separate Fly deployment needed.
 
-## Pages vs Identity (read this first)
+## Pages vs Identity (current)
 
-| Deploy | Workflow | Needs `FLY_API_TOKEN`? |
-|--------|----------|------------------------|
-| **Live web** ([eip.ellines.co.ke](https://eip.ellines.co.ke)) | [Deploy Cloudflare Pages](../.github/workflows/deploy-pages.yml) | **No** — Pages uses Cloudflare credentials only |
-| **Identity API on Fly** | [Deploy Identity (Fly)](../.github/workflows/deploy-identity.yml) | **Yes** — this is the only workflow that reads `FLY_API_TOKEN` |
+| Deploy | Workflow | Notes |
+|--------|----------|-------|
+| **Live web + Identity** | [Deploy Cloudflare Pages](../.github/workflows/deploy-pages.yml) | Single deploy for frontend + auth API |
 
-If Actions shows **Deploy Cloudflare Pages** succeeding and **Deploy Identity (Fly)** failing with missing token, the site can still work via same-origin Pages Functions. Add the secret only when you want Fly Identity deploys to succeed.
+The `deploy-pages.yml` workflow builds the Next.js app, verifies Pages Functions, and deploys everything to Cloudflare Pages. Auth endpoints (`/api/v1/auth/*`, `/api/v1/orgs/*`, etc.) are served from `apps/web/functions/`.
 
-## 1. Create a Fly token (human — once)
+## 1. Required secrets
 
-1. Sign up / log in at https://fly.io  
-2. Create a personal access / deploy token: https://fly.io/user/personal_access_tokens  
-3. Copy the token (starts like `fly_…`). **Do not commit it** to the repo or paste it into chat/PRs.
+Human must add these in GitHub repo → Settings → Secrets and variables → Actions:
 
-### Local first deploy (optional)
+| Secret | Required? | Value |
+|--------|-----------|-------|
+| `DATABASE_URL` | Yes (for CI builds that run Prisma) | `postgresql://...` |
+| `DIRECT_URL` | Yes (for CI builds that run Prisma) | `postgresql://...` |
+| `NEXT_PUBLIC_API_URL` | No | Leave unset for same-origin Pages Functions, or set explicit Identity URL |
 
-On this machine (PowerShell):
-
-```powershell
-$env:FLY_API_TOKEN = 'fly_...'   # paste token — never commit
-$env:Path = "$env:USERPROFILE\.fly\bin;$env:Path"
-powershell -File scripts/setup-fly-identity.ps1
-```
-
-That creates `ellines-eip-identity`, sets `DATABASE_URL` / `DIRECT_URL` / `JWT_SECRET` from your local `.env`, and deploys.
-
-## 2. Confirm API (after Fly app exists)
-
-```text
-https://ellines-eip-identity.fly.dev/api/v1/health
-```
-
-Demo user is already seedable / seeded against the same Supabase DB:
+## 2. Local development
 
 ```bash
-npm run seed:demo
+# Start Postgres (if not running)
+sudo pg_ctlcluster 16 main start
+
+# Start identity dev server
+npm run dev:identity
+
+# In another terminal, start web dev server
+npm run dev:web
 ```
 
-## 3. GitHub secret for CI (required for Identity workflow)
+Health check: `http://localhost:3001/api/v1/health`
 
-Agents and CI **cannot** create this secret for you. A human must:
+## 3. Log in live
 
-1. Open the GitHub repo → **Settings** → **Secrets and variables** → **Actions**
-2. **New repository secret**
-3. Name (exact): `FLY_API_TOKEN`
-4. Value: the Fly token from step 1
-5. Save
+https://eip.ellines.co.ke/login
 
-| Secret | Value |
-|--------|--------|
-| `FLY_API_TOKEN` | **Required only for** [Deploy Identity (Fly)](../.github/workflows/deploy-identity.yml). Without it the job fails in a few seconds at the “Require FLY_API_TOKEN” step. |
-| `NEXT_PUBLIC_API_URL` | `https://ellines-eip-identity.fly.dev` (optional; live web uses same-origin Pages Functions unless overridden) |
-
-After adding `FLY_API_TOKEN`, re-run: **Actions** → **Deploy Identity (Fly)** → **Run workflow**, or push a change under `services/identity/**` (or `packages/shared/**` / `packages/connectors-sdk/**`).
-
-The Identity workflow path filters **exclude** `package-lock.json` and other services (`api-gateway`, `ellinea-ai`, `integration-hub`) so unrelated monorepo work does not spam failed Fly deploys.
-
-## 4. Log in live
-
-https://eip.ellines.co.ke/login  
-
-- Email: `demo@ellines.co.ke`  
-- Password: `EllinesDemo2026!`  
+- Email: `demo@ellines.co.ke`
+- Password: `EllinesDemo2026!`
 
 Details: [07_Demo_Login.md](./07_Demo_Login.md)

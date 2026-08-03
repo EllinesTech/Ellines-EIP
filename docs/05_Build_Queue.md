@@ -367,6 +367,7 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 - ✅ 5 widget types (KPI, Gauge, Line, Bar, Table)
 - ✅ Export & scheduling support (PDF/CSV)
 - ✅ Sample dashboard seeded with 3 widgets
+- ✅ Frontend: `/app/dashboards` list + `/app/dashboards/[id]` detail with widget/alert/export management
 - ✅ Docs: `docs/37_Track_B_BI_Dashboards_Deployment.md`
 
 ### Track C: Autonomous Workflows (AI Agent Rules) ✅
