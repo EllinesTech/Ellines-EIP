@@ -756,10 +756,10 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 | ID | Item | Priority | Notes |
 |----|------|----------|-------|
 | S9.1 | **Email connector live IMAP sync** | P0 | Actually connect to a mailbox via IMAP (using `imapHost`/`imapUser`/`imapPassword` from connector config) rather than parsing snapshot timeline. Fetch recent 50 unread + flagged messages, store in snapshot email array, expose in Org Data Window with real senders/bodies. |
-| S9.2 | **Report file upload (Excel / PDF / CSV)** | P0 | Owner/IT can upload Excel `.xlsx`, PDF, or CSV report files from any SoR directly into EIP Document Hub. Ellinea auto-interprets on upload: extracts tables from CSV/Excel, text from PDF, generates a structured summary. Available in Org Data Window reports tab and Document Hub. |
-| S9.3 | **Ellinea email daily digest** | P1 | Settings → Ellinea AI → "Send email digest at 07:00" — Ellinea sends a structured email to the user each morning: top unread/urgent emails, report summaries, key decisions pending, Ellinea brief. Delivered via Resend/SMTP. |
+| S9.2 | **Report file upload (Excel / PDF / CSV)** | `done` | Owner/IT uploads CSV/text/JSON into Document Hub; Ellinea auto-interprets (LLM or template); `ReportUploadWidget` in Org Data Window + `POST /api/v1/orgs/me/report-upload`. |
+| S9.3 | **Ellinea email daily digest** | `done` | `POST /api/v1/orgs/me/ellinea-digest` — aggregates KPIs, alerts, approvals, urgent emails; LLM brief or template; "Send digest now" in Settings; `sendEllineaDigest()` in api.ts. |
 | S9.4 | **Report comparison view** | P1 | Side-by-side comparison of two reports (different dates / periods) in Org Data Window. Ellinea highlights what changed — deltas, improvements, declines. Export comparison as HTML. |
-| S9.5 | **Platform Admin — per-org stats** | P2 | `/app/platform` expandable row: user count, connector count, last sync, last active; Ellinea brief per org. |
+| S9.5 | **Platform Admin — per-org stats** | `done` | `GET /api/v1/platform/orgs/[id]/stats` returns totalUsers, activeUsers, roleBreakdown, connectors, approvals, events, lastActivityAt, lastSyncedAt. Used in platform page and Settings. |
 | S9.6 | **People page — contact modal** | P2 | Click a person card to open a contact modal with full detail, org roles, branch, department, linked UEM objects, and Ellinea quick-ask about this person's activity. |
 
 ---

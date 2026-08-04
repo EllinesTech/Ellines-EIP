@@ -8,6 +8,7 @@ import {
   fetchOrgDataWindow,
   interpretReportApi,
   pullEmailSync,
+  uploadReport,
   getSession,
   type EllineaMemoryNoteDto,
   type OrgDataEmailDto,
@@ -49,6 +50,90 @@ function buildReportHtml(report: OrgDataReportDto, orgName: string): string {
 <div class="body">${content}</div>
 <div class="ft">Ellines EIP · Enterprise Intelligence Platform · Where Enterprise Systems Think Together.</div>
 </body></html>`;
+}
+
+/** Report file upload widget — CSV/text/JSON with Ellinea auto-interpret. */
+function ReportUploadWidget({
+  orgAdmin,
+  onUploaded,
+}: {
+  orgAdmin: boolean;
+  onUploaded: (summary: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+
+  if (!orgAdmin) return null;
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      // Pre-extract text for CSV/plain text files so Ellinea can read them
+      let textContent: string | undefined;
+      if (file.type.includes('csv') || file.type.includes('text') || file.name.endsWith('.csv')) {
+        textContent = new TextDecoder().decode(arrayBuffer).slice(0, 6000);
+      }
+
+      const result = await uploadReport({
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        content: base64,
+        textContent,
+        tags: ['uploaded'],
+      });
+
+      setNotice(`Uploaded "${result.name}" — ${result.mode === 'llm' ? 'Ellinea (LLM)' : 'Ellinea template'} summary ready.`);
+      onUploaded(result.ellineaSummary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div>
+      {error ? <p style={{ color: '#fca5a5', fontSize: '0.82rem', marginBottom: '0.4rem' }}>{error}</p> : null}
+      {notice ? <p style={{ color: '#6ee7b7', fontSize: '0.82rem', marginBottom: '0.4rem' }}>{notice}</p> : null}
+      <label
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.45rem 1rem',
+          borderRadius: '0.4rem',
+          background: busy ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)',
+          border: '1px solid rgba(37,99,235,0.4)',
+          color: '#93c5fd',
+          cursor: busy ? 'wait' : 'pointer',
+          fontSize: '0.82rem',
+          fontWeight: 600,
+        }}
+      >
+        {busy ? '⟳ Uploading & interpreting…' : '↑ Upload report file (CSV / TXT / JSON)'}
+        <input
+          type="file"
+          accept=".csv,.txt,.json,.tsv"
+          style={{ display: 'none' }}
+          disabled={busy}
+          onChange={(e) => void handleFile(e)}
+        />
+      </label>
+      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+        Max 500 KB. Stored in Document Hub. Ellinea auto-summarises on upload.
+      </p>
+    </div>
+  );
 }
 
 export default function OrgDataWindowPage() {
@@ -459,6 +544,19 @@ export default function OrgDataWindowPage() {
             <div><strong>EIP Scheduled Reports</strong><p>EIP can generate its own intelligence reports from your enterprise snapshot — schedules, run history, and email delivery are in Scheduled Reports.</p></div>
             <Link href="/app/reports" className={styles.ghostBtn}>Scheduled Reports →</Link>
           </div>
+
+          {/* ── Report file upload ──────────────────────────────────────── */}
+          {orgAdmin && (
+            <div style={{ marginTop:'1.1rem', padding:'1rem', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10 }}>
+              <div className={styles.panelLabel} style={{ marginBottom:'0.35rem' }}>Upload Report File</div>
+              <p style={{ fontSize:'0.78rem', color:'var(--c-muted)', marginBottom:'0.65rem' }}>
+                Upload a CSV, plain-text, or JSON report from any SoR directly into the Document Hub. Ellinea auto-interprets on upload.
+              </p>
+              <ReportUploadWidget orgAdmin={orgAdmin} onUploaded={(summary) => {
+                setAiText(`Uploaded report — Ellinea says:\n\n${summary}`);
+              }} />
+            </div>
+          )}
         </section>
       )}
 

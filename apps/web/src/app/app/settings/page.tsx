@@ -22,6 +22,7 @@ import {
   createApiKey,
   revokeApiKey,
   fetchHealth,
+  sendEllineaDigest,
   type ApiKeyDto,
   type ApiKeyCreatedDto,
   type AuditLogDto,
@@ -220,6 +221,7 @@ export default function SystemSettingsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [health, setHealth] = useState<HealthDto | null>(null);
+  const [digestBusy, setDigestBusy] = useState(false);
 
   // Security section state
   const [secBusy, setSecBusy] = useState(false);
@@ -565,6 +567,30 @@ export default function SystemSettingsPage() {
                 : health.email.live
                   ? `Live — ${health.email.provider}`
                   : 'Simulated — set RESEND_API_KEY or SMTP_* on Cloudflare Pages to send real email'}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Send Ellinea digest now */}
+        {orgAdmin ? (
+          <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={adminStyles.primary}
+              disabled={digestBusy}
+              onClick={() => {
+                setDigestBusy(true);
+                setError('');
+                sendEllineaDigest(true)
+                  .then((r) => setNotice(r.message))
+                  .catch((err) => setError(err instanceof Error ? err.message : 'Digest failed'))
+                  .finally(() => setDigestBusy(false));
+              }}
+            >
+              {digestBusy ? 'Sending…' : 'Send Ellinea digest now'}
+            </button>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Sends the morning brief, alerts, approvals and email summary to your inbox.
             </span>
           </div>
         ) : null}
