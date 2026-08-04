@@ -13,6 +13,8 @@
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
+    "strictPropertyInitialization": false,
+    "noUncheckedIndexedAccess": false,
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
