@@ -72,7 +72,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const approvalId = context.params.id as string;
   const supabase = getAdminClient(context.env);
 
-  let body: { decision?: string; actorName?: string };
+  let body: { decision?: string; actorName?: string; comment?: string };
   try {
     body = (await context.request.json()) as typeof body;
   } catch {
@@ -83,6 +83,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (decision !== 'approved' && decision !== 'rejected') {
     return json({ statusCode: 400, message: 'decision must be "approved" or "rejected"' }, 400);
   }
+  const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 500) : undefined;
 
   const { data: existing, error: readErr } = await supabase
     .from('organizations')
@@ -116,12 +117,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const now = new Date().toISOString();
   const actorName = body.actorName || auth.email;
 
-  // Update step
+  // Update step (include optional comment on the deciding step)
   const updatedSteps = item.steps.map((s, i) =>
-    i === stepIdx ? { ...s, status: decision, decidedBy: actorName, decidedAt: now } : s,
+    i === stepIdx
+      ? { ...s, status: decision, decidedBy: actorName, decidedAt: now, ...(comment ? { comment } : {}) }
+      : s,
   );
 
-  let updatedItem: ApprovalRecord;
+  let updatedItem: ApprovalRecord & { comment?: string };
   if (decision === 'rejected') {
     updatedItem = {
       ...item,
@@ -129,6 +132,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       status: 'rejected',
       decidedAt: now,
       decidedBy: actorName,
+      ...(comment ? { comment } : {}),
     };
   } else {
     const nextIdx = stepIdx + 1;
@@ -139,6 +143,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         status: 'approved',
         decidedAt: now,
         decidedBy: actorName,
+        ...(comment ? { comment } : {}),
       };
     } else {
       updatedItem = {
@@ -146,6 +151,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         steps: updatedSteps,
         currentStepIndex: nextIdx,
         status: 'pending',
+        ...(comment ? { comment } : {}),
       };
     }
   }
@@ -170,6 +176,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       decision,
       step: step.key,
       overall: updatedItem.status,
+      ...(comment ? { comment } : {}),
     },
   });
 
@@ -193,6 +200,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           `Decided by: ${actorName}`,
           `At: ${new Date(now).toLocaleString()}`,
           item.detail ? `\nDetails: ${item.detail}` : '',
+          comment ? `\nNote from approver: ${comment}` : '',
           '',
           `View in Ellines EIP: ${siteUrl}/app/approvals`,
           '',
@@ -201,6 +209,48 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           .filter((l) => l !== undefined)
           .join('\n'),
       }).catch(() => {/* fire-and-forget */});
+    }
+  }
+
+  // ── Notify next-step actor when intermediate step passes ──────────────────
+  if (!isFinalDecision && decision === 'approved') {
+    const mailConfig = resolveMailConfig(context.env);
+    if (mailConfig) {
+      const nextStep = updatedItem.steps[updatedItem.currentStepIndex];
+      if (nextStep) {
+        const siteUrl = context.request.headers.get('origin') || 'https://eip.ellines.co.ke';
+        const { data: nextActors } = await supabase
+          .from('users')
+          .select('email, full_name, role')
+          .eq('organization_id', auth.organizationId)
+          .eq('is_active', true)
+          .in('role', nextStep.actorRole === 'owner'
+            ? ['owner']
+            : nextStep.actorRole === 'executive'
+              ? ['executive', 'owner']
+              : ['admin', 'owner']);
+
+        for (const actor of (nextActors || []).slice(0, 4)) {
+          sendOutboundEmail(context.env, {
+            to: actor.email as string,
+            subject: `Approval awaiting your review: ${item.title}`,
+            text: [
+              `Hi ${(actor.full_name as string) || 'there'},`,
+              '',
+              `An approval request has passed the previous step and now needs your review.`,
+              '',
+              `Title: ${item.title}`,
+              `Requested by: ${item.requester}`,
+              `Your step: ${nextStep.label}`,
+              `Previous step approved by: ${actorName}`,
+              '',
+              `Review at: ${siteUrl}/app/approvals`,
+              '',
+              `— Ellines EIP Workflow`,
+            ].join('\n'),
+          }).catch(() => {/* fire-and-forget */});
+        }
+      }
     }
   }
 

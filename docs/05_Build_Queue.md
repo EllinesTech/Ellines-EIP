@@ -712,9 +712,121 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 | S8.5 | **Platform Admin — per-org stats** | P2 | `/app/platform` shows per-org: user count, connector count, last sync, last active; expandable row |
 | S8.6 | **Ellinea daily brief scheduled delivery** | P2 | Settings → Ellinea AI → "Send daily brief at 07:00" toggle; brief runs via existing report run mechanism + Resend |
 
-**Principle (from owner direction, 2026-08-04):**
+---
 
-> EIP should have a dedicated window showing data pulled from other systems (emails, reports, documents from ERP/CRM/HIS/email), surfaced and summarized by Ellinea. This is distinct from EIP's own features (approvals, rules, agents, memory).
+## Sprint 8 — Email Intelligence, Report Interpret & Approval Comments
+
+**Date:** 2026-08-04
+**Status:** `done`
+**Builds:** `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `verify:pages-functions` ✅ (115 functions)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S8.1 | **Report generation from snapshot — real content** | `done` | `POST /api/v1/orgs/me/reports/:id/run` now generates structured report body from live snapshot: health score, KPIs, alerts, Ellinea brief, timeline events, memory notes. Delivered via Resend/SMTP when configured. `emailStatus` returned. |
+| S8.4 | **Approval comment on decision** | `done` | Decision modal in `/app/approvals` now has an optional "Note / comment" textarea (max 500 chars). Comment stored on the step, included in the requester email notification, and logged in audit trail. Backend `decide.ts` updated. `decideApprovalApi` accepts `comment?`. |
+| S8.E1 | **Email Intelligence dashboard widget** | `done` | Owner/IT Command Center dashboard now includes an "Email & Reports Intelligence" full-width card: live unread/urgent/total/reports KPIs, top urgent email preview rows, Ellinea summary strip, "⟳ Pull emails" button (calls `/api/v1/orgs/me/email-sync`), links to Org Data Window + Inbox companion. |
+| S8.E2 | **Email manual pull endpoint** | `done` | `POST /api/v1/orgs/me/email-sync` — re-reads snapshot timeline, extracts email objects with tags (urgent/report/today/unread), builds today's Ellinea summary, audit-logs the pull. Returns `{ emails, summary, urgentCount, unreadCount, todayCount, connectors, syncedAt, pulledAt }`. |
+| S8.R1 | **Report interpret endpoint** | `done` | `POST /api/v1/orgs/me/report-interpret` — Ellinea interprets any report content with 4 action modes: **summarize** (3-5 bullet executive summary), **pivot** (dimension/grouping analysis), **highlight** (key figures, outliers, anomalies), **compare** (trend detection). LLM if configured, rich template fallback. |
+| S8.R2 | **Report interpret UI in Org Data Window** | `done` | Reports tab in `/app/org-data` now shows `✦ Ellinea: summarize | pivot | highlight | compare` action buttons per report. Results displayed inline below each report card. Dismiss per-result. Copy result button. Pull button on email tab refreshes inbox from snapshot. |
+| S8.R3 | **org-data page rewrite** | `done` | Full page rewrite in clean UTF-8. All mojibake encoding from prior edits fixed. `interpretReportApi` and `pullEmailSync` wired end-to-end. |
+
+### What ships in Sprint 8
+
+**Email Intelligence on dashboard** — the Owner/IT Command Center now has a full-width "Email & Reports Intelligence" card showing live unread, urgent, and total counts from the connected email connector. Top urgent/unread emails are previewed inline. Clicking "⟳ Pull emails" triggers a manual refresh of the inbox from the enterprise snapshot. The Ellinea summary strip shows a one-line brief ("3 emails today — 1 urgent"). Quick links to Org Data Window, Inbox companion, and Connectors.
+
+**Manual email pull** — users can pull/refresh emails from the Org Data Window email tab without waiting for the next connector sync cycle. The endpoint re-reads the snapshot timeline and returns enriched email objects tagged as today/urgent/unread/report.
+
+**Report intelligence (Ellinea interpret)** — every report in the Org Data Window now has four Ellinea action buttons: **Summarize** (executive summary), **Pivot** (dimension analysis and grouping recommendations), **Highlight** (key figures and anomaly detection), **Compare** (trend and change detection). Results appear inline below the report card and can be copied. Works in template mode without an LLM configured; richer with one.
+
+**Approval comments** — the decision modal now includes an optional "Note / comment" field. The note is included in the requester's email notification and stored in the audit trail. Fully backwards-compatible — comment is optional.
+
+---
+
+## Roadmap — Sprint 9 (next)
+
+| ID | Item | Priority | Notes |
+|----|------|----------|-------|
+| S9.1 | **Email connector live IMAP sync** | P0 | Actually connect to a mailbox via IMAP (using `imapHost`/`imapUser`/`imapPassword` from connector config) rather than parsing snapshot timeline. Fetch recent 50 unread + flagged messages, store in snapshot email array, expose in Org Data Window with real senders/bodies. |
+| S9.2 | **Report file upload (Excel / PDF / CSV)** | P0 | Owner/IT can upload Excel `.xlsx`, PDF, or CSV report files from any SoR directly into EIP Document Hub. Ellinea auto-interprets on upload: extracts tables from CSV/Excel, text from PDF, generates a structured summary. Available in Org Data Window reports tab and Document Hub. |
+| S9.3 | **Ellinea email daily digest** | P1 | Settings → Ellinea AI → "Send email digest at 07:00" — Ellinea sends a structured email to the user each morning: top unread/urgent emails, report summaries, key decisions pending, Ellinea brief. Delivered via Resend/SMTP. |
+| S9.4 | **Report comparison view** | P1 | Side-by-side comparison of two reports (different dates / periods) in Org Data Window. Ellinea highlights what changed — deltas, improvements, declines. Export comparison as HTML. |
+| S9.5 | **Platform Admin — per-org stats** | P2 | `/app/platform` expandable row: user count, connector count, last sync, last active; Ellinea brief per org. |
+| S9.6 | **People page — contact modal** | P2 | Click a person card to open a contact modal with full detail, org roles, branch, department, linked UEM objects, and Ellinea quick-ask about this person's activity. |
+
+---
+
+## Intelligence Roadmap — v2.0+ Features (owner direction 2026-08-04)
+
+These features capture the vision that *EIP should do what no normal system can do* — making Ellinea AI genuinely more intelligent and the platform a true enterprise intelligence layer.
+
+### Email Intelligence (Communication Intelligence Domain)
+
+| Feature | Description |
+|---------|-------------|
+| **Live IMAP mailbox connection** | Direct IMAP connection to admin@ellines.co.ke (or any org email). Fetch unread, flagged, and important messages in real time. |
+| **Ellinea inbox summarization on open** | Each time the Org Data Window emails tab is opened, Ellinea auto-generates a "Today's inbox brief": top threads by urgency, key senders, action items extracted. |
+| **Priority email detection** | Ellinea scores each email by urgency, sender importance (exec/board/client), and keywords. Ranks inbox by action priority, not arrival time. |
+| **Manual pull + Ellinea sync modes** | Two modes: (1) manual pull by user, (2) Ellinea-synchronized — Ellinea checks the mailbox on a schedule, summarizes, and pushes a digest to the dashboard. |
+| **Email-to-approval pipeline** | Ellinea detects emails requiring a decision (e.g. "please approve spend") and creates a draft Approval in EIP with one click. |
+| **Email thread summary** | Click any thread → Ellinea summarizes the full thread, extracts the ask, and suggests the next action. |
+| **Smart inbox filters** | Filter by: Today, Urgent, From executives, Requires action, Contains report/attachment, From clients/suppliers. |
+
+### Report Intelligence (Reporting Hub Domain)
+
+| Feature | Description |
+|---------|-------------|
+| **SoR report file upload** | Upload Excel/PDF/CSV reports from any SoR (ERP sales report, stock report, HR attendance). Ellinea ingests and interprets immediately. |
+| **Ellinea report pivot** | Given a sales or stock report, Ellinea auto-pivots by product/branch/period and surfaces top-3 and bottom-3 performers. |
+| **Ellinea report summarize** | One-click executive summary of any report: what it says, what it means, what to do. |
+| **Ellinea highlight anomalies** | Ellinea detects outliers and anomalies in numeric report data — unusually low sales, unexplained stock variance, sudden HR turnover. |
+| **Report comparison across periods** | Compare this month vs last month (or any two periods). Ellinea narrates the delta: what improved, what declined, what is unexplained. |
+| **CEO report dashboard** | A dedicated CEO view: all reports from connected systems, summarized by Ellinea, with a "What needs your attention" strip. Download any report in PDF format to their machine. |
+| **Scheduled report delivery** | Ellinea automatically generates and emails the CEO/Owner a report package every morning: sales, stock, HR, finance — all summarized. |
+| **Natural-language report query** | Ask Ellinea: "Show me sales by branch for last quarter" → Ellinea queries the connected SoR report data and generates a structured answer. |
+
+### Document Intelligence (Knowledge Intelligence Domain)
+
+| Feature | Description |
+|---------|-------------|
+| **Document Q&A** | Upload any document to Document Hub → Ask Ellinea questions about it in natural language. |
+| **Contract intelligence** | Upload a supplier contract or SLA → Ellinea extracts key dates, obligations, renewal clauses, and flags risks. |
+| **Policy enforcer** | Upload company policies → Ellinea references them when answering questions and flags when a request may violate a policy. |
+| **Document comparison** | Compare two versions of a document (e.g. contract amendments) → Ellinea narrates what changed. |
+
+### Workforce Intelligence
+
+| Feature | Description |
+|---------|-------------|
+| **Attendance intelligence** | Sync HR system → Ellinea detects attendance patterns: who is frequently absent, which departments have low attendance, flags anomalies. |
+| **Performance signals** | EIP reads performance data from HIS/HR → Ellinea surfaces quiet signals: departments falling behind, rising workload, under-resourced teams. |
+| **People smart search** | Natural-language people search: "Show me all sales staff in Nairobi branch with more than 2 absences this month." |
+
+### Financial Intelligence
+
+| Feature | Description |
+|---------|-------------|
+| **Finance glance real-time** | Connect to accounting system → Ellinea shows revenue, expenses, outstanding invoices, cash position — summarized for the CEO, not the accountant. |
+| **Budget vs actuals** | Upload budget Excel → connect to accounting system → Ellinea shows variance by department, flags overspending, recommends reallocation. |
+| **Invoice intelligence** | Ellinea scans uploaded invoices or email attachments, extracts amounts, vendors, due dates, and flags overdue items. |
+
+### Operational Intelligence
+
+| Feature | Description |
+|---------|-------------|
+| **Cross-system event correlation** | Ellinea notices when multiple systems are signalling the same problem (e.g. CRM shows lost clients, HR shows staff exits, ERP shows reduced orders) and surfaces the pattern. |
+| **Predictive alerts** | Based on historical patterns, Ellinea predicts upcoming issues: likely stock-out in 7 days, team overload next week, cash shortfall next month. |
+| **Workflow intelligence** | Ellinea learns which approval workflows are consistently slow or rejected and recommends process improvements. |
+| **Root-cause analysis** | When an alert fires, Ellinea traces back through connected systems to identify the likely root cause and the affected chain. |
+
+### Platform Intelligence (Ellinea as a product)
+
+| Feature | Description |
+|---------|-------------|
+| **Ellinea reasoning upgrade v2** | Multi-step reasoning chains: situation → evidence (cross-system) → risk → recommended action → confidence score → "what Ellinea doesn't know". |
+| **Enterprise DNA deepening** | Ellinea learns the org's culture, decision patterns, risk tolerance, and language preferences over time. Responses become more org-specific. |
+| **Cross-org benchmarking (opt-in)** | Orgs that opt in share anonymized signals → Ellinea benchmarks KPIs against peers in the same industry. |
+| **Ellinea voice assistant** | "Hey Ellinea, summarize today's emails" — voice interface for the mobile companion. |
+| **Ellinea autonomous agent v2** | Agents that can not only detect and alert but execute approved actions: send a reply email, update a record, trigger a payment approval, reassign a task. |
 
 **Architecture:**
 - `/app/org-data` — **Organization Data Window**: read-only projection of SoR data. Emails (from IMAP connector), reports/exports (from SoR + EIP scheduled reports), documents (from SoR attachments). Ellinea summarizes on demand.

@@ -12,6 +12,7 @@ import {
   requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
+import { sendOutboundEmail, resolveMailConfig } from '../../../../shared/mail';
 
 interface EnvWithIdentity extends Env {
   IDENTITY_API_URL?: string;
@@ -164,6 +165,51 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
     resource: 'approval_request',
     metadata: { id: newItem.id, title: newItem.title, templateId: newItem.templateId },
   });
+
+  // ── Notify Owner/IT that a new approval needs attention ───────────────────
+  const mailConfig = resolveMailConfig(context.env);
+  if (mailConfig) {
+    const siteUrl = context.request.headers.get('origin') || 'https://eip.ellines.co.ke';
+    // Notify the requester (confirmation) and look up Owner emails to alert
+    const { data: ownerUsers } = await supabase
+      .from('users')
+      .select('email, full_name, role')
+      .eq('organization_id', auth.organizationId)
+      .eq('is_active', true)
+      .in('role', ['owner', 'admin']);
+
+    const firstStep = newItem.steps[0];
+    const targets = (ownerUsers || []).filter((u) => {
+      if (!firstStep) return u.role === 'owner';
+      const r = firstStep.actorRole;
+      if (r === 'owner') return u.role === 'owner';
+      if (r === 'admin') return u.role === 'admin' || u.role === 'owner';
+      if (r === 'decider') return ['owner', 'admin'].includes(u.role);
+      return u.role === 'owner';
+    });
+
+    for (const target of targets.slice(0, 4)) {
+      sendOutboundEmail(context.env, {
+        to: target.email as string,
+        subject: `Approval requested: ${newItem.title}`,
+        text: [
+          `Hi ${(target.full_name as string) || 'there'},`,
+          '',
+          `A new approval request requires your attention.`,
+          '',
+          `Title: ${newItem.title}`,
+          `Requested by: ${newItem.requester}`,
+          newItem.detail ? `Details: ${newItem.detail}` : '',
+          `Template: ${newItem.templateId}`,
+          `Step: ${firstStep?.label || 'Decide'}`,
+          '',
+          `Review and decide at: ${siteUrl}/app/approvals`,
+          '',
+          `— Ellines EIP Workflow`,
+        ].filter(Boolean).join('\n'),
+      }).catch(() => {/* fire-and-forget */});
+    }
+  }
 
   return json(newItem);
 };

@@ -13,7 +13,7 @@ import {
   sparkSeries,
   weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, fetchOrgDataWindow, pullEmailSync, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto, type OrgDataWindowDto, type EmailSyncResultDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
@@ -227,6 +227,26 @@ function AdminOverview({
   const [range, setRange] = useState<'month' | 'quarter' | 'year'>('month');
   const [rootCause, setRootCause] = useState<string | null>(null);
   const [rootCauseBusy, setRootCauseBusy] = useState(false);
+  // ── Email Intelligence state ──────────────────────────────────────────────
+  const [emailData, setEmailData] = useState<OrgDataWindowDto | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailPulling, setEmailPulling] = useState(false);
+  const [emailResult, setEmailResult] = useState<EmailSyncResultDto | null>(null);
+
+  useEffect(() => {
+    fetchOrgDataWindow()
+      .then(setEmailData)
+      .catch(() => null)
+      .finally(() => setEmailLoading(false));
+  }, []);
+
+  function handleEmailPull() {
+    setEmailPulling(true);
+    pullEmailSync()
+      .then(setEmailResult)
+      .catch(() => null)
+      .finally(() => setEmailPulling(false));
+  }
 
   const pulse = useMemo(() => pulseSeries(synced ? health : 42), [synced, health]);
   const sparks = useMemo(
@@ -477,6 +497,100 @@ function AdminOverview({
       ) : null}
 
       <div className={styles.gridAdmin}>
+        {/* ── Email & Reports Intelligence (dashboard widget) ─────────────── */}
+        <section className={styles.card} style={{ gridColumn: '1 / -1' }}>
+          <div className={styles.cardHead}>
+            <h2 className={styles.cardTitle}>✉ Email &amp; Reports Intelligence</h2>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={handleEmailPull}
+                disabled={emailPulling}
+                style={{
+                  background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.4)',
+                  borderRadius: 6, color: '#c4b5fd', padding: '0.22rem 0.65rem',
+                  cursor: emailPulling ? 'wait' : 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                }}
+              >
+                {emailPulling ? 'Pulling…' : '⟳ Pull emails'}
+              </button>
+              <Link href="/app/org-data" className={styles.primaryLink}>Open Data Window →</Link>
+            </div>
+          </div>
+          {/* Ellinea email summary */}
+          {(emailResult?.summary || emailData) && (
+            <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.85rem', background: 'rgba(124,58,237,0.08)', borderRadius: 8, border: '1px solid rgba(124,58,237,0.2)' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c4b5fd', marginRight: '0.4rem' }}>✦ Ellinea</span>
+              <span style={{ fontSize: '0.83rem', color: '#e2e8f0' }}>
+                {emailResult?.summary ||
+                  (emailData?.emails.length
+                    ? `${emailData.emails.length} emails in snapshot — ${emailData.emails.filter((e) => e.unread).length} unread, ${emailData.emails.filter((e) => e.priority === 'high').length} urgent.`
+                    : 'No emails in current snapshot. Install an email connector and sync to see inbox intelligence here.')}
+              </span>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap' }}>
+            {/* Email KPIs */}
+            <div style={{ display: 'flex', gap: '0.6rem', flex: '1 1 280px', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Total emails', value: emailResult ? String(emailResult.emails.length) : emailData ? String(emailData.emails.length) : '—', sub: 'From connector' },
+                { label: 'Unread', value: emailResult ? String(emailResult.unreadCount) : emailData ? String(emailData.emails.filter((e) => e.unread).length) : '—', sub: 'Unseen messages', warn: true },
+                { label: 'Urgent', value: emailResult ? String(emailResult.urgentCount) : emailData ? String(emailData.emails.filter((e) => e.priority === 'high').length) : '—', sub: 'High priority', warn: true },
+                { label: 'Reports', value: emailData ? String(emailData.reports.length) : '—', sub: 'From SoR + EIP' },
+              ].map((kpi) => (
+                <article key={kpi.label} style={{
+                  background: 'rgba(255,255,255,0.04)', borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.07)', padding: '0.55rem 0.85rem',
+                  minWidth: 100, flex: '1 1 100px',
+                }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)', marginBottom: '0.2rem' }}>{kpi.label}</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: kpi.warn && kpi.value !== '0' && kpi.value !== '—' ? '#fde68a' : '#f4f7fb' }}>{kpi.value}</div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--c-muted)' }}>{kpi.sub}</div>
+                </article>
+              ))}
+            </div>
+            {/* Top urgent emails preview */}
+            {(() => {
+              const urgent = (emailResult?.emails ?? emailData?.emails ?? []).filter((e) => e.priority === 'high' || e.unread).slice(0, 3);
+              if (!urgent.length) return (
+                <div style={{ flex: '2 1 300px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--c-muted)', textAlign: 'center' }}>
+                    {installations.some((i) => i.catalogId?.includes('email') || i.catalogId?.includes('imap'))
+                      ? 'No urgent or unread emails in snapshot. Sync to refresh.'
+                      : 'No email connector installed. IT Admin can add one under Connectors.'}
+                  </p>
+                </div>
+              );
+              return (
+                <div style={{ flex: '2 1 300px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {urgent.map((email) => (
+                    <div key={email.id} style={{
+                      display: 'flex', gap: '0.6rem', alignItems: 'flex-start',
+                      padding: '0.45rem 0.7rem', borderRadius: 7,
+                      background: email.priority === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${email.priority === 'high' ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.07)'}`,
+                      borderLeft: `3px solid ${email.priority === 'high' ? '#ef4444' : 'rgba(124,58,237,0.6)'}`,
+                    }}>
+                      <span style={{ fontSize: '1rem', flexShrink: 0 }}>{email.priority === 'high' ? '🔴' : '✉️'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.83rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email.subject}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)' }}>From: {email.from} · {new Date(email.at).toLocaleString()}</div>
+                      </div>
+                      {email.unread && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', flexShrink: 0, marginTop: 4 }} aria-label="unread" />}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+          <div style={{ marginTop: '0.65rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Link href="/app/org-data" style={{ fontSize: '0.78rem', padding: '0.22rem 0.65rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--c-muted)', textDecoration: 'none' }}>View all emails</Link>
+            <Link href="/app/org-data" style={{ fontSize: '0.78rem', padding: '0.22rem 0.65rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--c-muted)', textDecoration: 'none' }}>Reports &amp; downloads</Link>
+            <Link href="/app/inbox" style={{ fontSize: '0.78rem', padding: '0.22rem 0.65rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--c-muted)', textDecoration: 'none' }}>Inbox companion</Link>
+            {isOwner ? <Link href="/app/connectors" style={{ fontSize: '0.78rem', padding: '0.22rem 0.65rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--c-muted)', textDecoration: 'none' }}>Manage connectors</Link> : null}
+          </div>
+        </section>
+
         <section className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Enterprise Pulse</h2>

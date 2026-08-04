@@ -6,6 +6,7 @@ import {
   ConnectorPackDto,
   createPlatformConnectorPack,
   FeatureFlag,
+  fetchHealth,
   fetchPlatformOrgDateTimeSettings,
   fetchPlatformOrgStats,
   getSession,
@@ -18,6 +19,7 @@ import {
   updatePlatformOrgDateTimeSettings,
   updatePlatformOrgStatus,
   type ConnectorInstallationDto,
+  type HealthDto,
   type OrgDateTimeSettingsDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
@@ -49,6 +51,7 @@ export default function PlatformAdminPage() {
   const [selectedOrgId, setSelectedOrgId] = useState('');
   const [orgStats, setOrgStats] = useState<PlatformOrgStatsDto | null>(null);
   const [statsBusy, setStatsBusy] = useState(false);
+  const [platformHealth, setPlatformHealth] = useState<HealthDto | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -80,6 +83,7 @@ export default function PlatformAdminPage() {
       if (!settingsOrgId && o[0]) {
         setSettingsOrgId(o[0].id);
       }
+      fetchHealth().then((h) => { if (h) setPlatformHealth(h); }).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load platform data');
     } finally {
@@ -231,6 +235,35 @@ export default function PlatformAdminPage() {
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
       {notice ? <p className={adminStyles.notice}>{notice}</p> : null}
+
+      {/* Platform health strip */}
+      {platformHealth ? (
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          flexWrap: 'wrap',
+          padding: '0.65rem 1rem',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '0.5rem',
+          marginBottom: '1rem',
+          fontSize: '0.82rem',
+          alignItems: 'center',
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} aria-hidden />
+            <strong>Platform</strong> {platformHealth.version}
+          </span>
+          <span style={{ color: 'var(--text-muted)' }}>Uptime {Math.floor(platformHealth.uptimeSeconds / 60)}m</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: platformHealth.email.live ? '#22c55e' : '#f59e0b', display: 'inline-block' }} aria-hidden />
+            Email: {platformHealth.email.live ? `live (${platformHealth.email.provider})` : 'simulated — set RESEND_API_KEY or SMTP_* on Pages'}
+          </span>
+          <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+            {new Date(platformHealth.ts).toLocaleTimeString()}
+          </span>
+        </div>
+      ) : null}
 
       <section className={adminStyles.tableWrap}>
         <div className={styles.panelLabel}>Tenant date &amp; time</div>

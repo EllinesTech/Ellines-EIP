@@ -66,6 +66,7 @@ export default function ApprovalsPage() {
   const [busy, setBusy] = useState(false);
   const [serverSync, setServerSync] = useState(false);
   const [detailItem, setDetailItem] = useState<ApprovalRequest | null>(null);
+  const [decisionComment, setDecisionComment] = useState('');
 
   useEffect(() => {
     const session = getSession();
@@ -165,12 +166,14 @@ export default function ApprovalsPage() {
 
   function decide(id: string, status: 'approved' | 'rejected') {
     setBusy(true);
+    const comment = decisionComment.trim() || undefined;
 
     if (serverSync) {
-      decideApprovalApi(id, { decision: status, actorName: actorName || role })
+      decideApprovalApi(id, { decision: status, actorName: actorName || role, comment })
         .then((dto) => {
           const updated = fromDto(dto);
           setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+          setDecisionComment('');
           publishEnterpriseEvent(`approval.${status}`, {
             approvalId: id,
             title: updated.title,
@@ -179,7 +182,7 @@ export default function ApprovalsPage() {
           void deliverNotification({
             channel: 'email',
             subject: `Approval ${status}: ${updated.title}`,
-            body: `${updated.title} is now ${updated.status}.`,
+            body: `${updated.title} is now ${updated.status}.${comment ? ` Note: ${comment}` : ''}`,
             eventType: `approval.${status}`,
           }).catch(() => undefined);
         })
@@ -189,6 +192,7 @@ export default function ApprovalsPage() {
             item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
           );
           persist(next);
+          setDecisionComment('');
         })
         .finally(() => setBusy(false));
       return;
@@ -198,6 +202,7 @@ export default function ApprovalsPage() {
       item.id === id ? advanceApproval(item, status, actorName || role, role) : item,
     );
     persist(next);
+    setDecisionComment('');
     const updated = next.find((i) => i.id === id);
     if (updated) {
       publishEnterpriseEvent(`approval.${status}`, {
@@ -208,7 +213,7 @@ export default function ApprovalsPage() {
       void deliverNotification({
         channel: 'email',
         subject: `Approval ${status}: ${updated.title}`,
-        body: `${updated.title} is now ${updated.status}.`,
+        body: `${updated.title} is now ${updated.status}.${comment ? ` Note: ${comment}` : ''}`,
         eventType: `approval.${status}`,
       }).catch(() => undefined);
     }
@@ -234,7 +239,7 @@ export default function ApprovalsPage() {
             background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
           }}
-          onClick={(e) => { if (e.target === e.currentTarget) setDetailItem(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setDetailItem(null); setDecisionComment(''); } }}
           role="dialog"
           aria-modal="true"
           aria-label={`Approval: ${detailItem.title}`}
@@ -261,7 +266,7 @@ export default function ApprovalsPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setDetailItem(null)}
+                  onClick={() => { setDetailItem(null); setDecisionComment(''); }}
                   aria-label="Close"
                   style={{ background: 'transparent', border: 'none', color: 'var(--c-muted)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1, padding: '0.25rem' }}
                 >✕</button>
@@ -337,23 +342,41 @@ export default function ApprovalsPage() {
               const currentStep = detailItem.steps[detailItem.currentStepIndex];
               if (!canAct || detailItem.status !== 'pending') return null;
               return (
-                <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button
-                    type="button"
-                    className={adminStyles.primary}
-                    disabled={busy}
-                    onClick={() => { decide(detailItem.id, 'approved'); setDetailItem(null); }}
-                  >
-                    Approve — {currentStep?.label}
-                  </button>
-                  <button
-                    type="button"
-                    className={adminStyles.ghost}
-                    disabled={busy}
-                    onClick={() => { decide(detailItem.id, 'rejected'); setDetailItem(null); }}
-                  >
-                    Reject
-                  </button>
+                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--c-muted)', marginBottom: '0.4rem' }}>
+                    Note / comment (optional)
+                  </label>
+                  <textarea
+                    value={decisionComment}
+                    onChange={(e) => setDecisionComment(e.target.value)}
+                    placeholder="Add a note visible to the requester…"
+                    maxLength={500}
+                    rows={2}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 6, color: 'inherit', padding: '0.4rem 0.6rem',
+                      fontSize: '0.84rem', lineHeight: 1.5, marginBottom: '0.65rem',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className={adminStyles.primary}
+                      disabled={busy}
+                      onClick={() => { decide(detailItem.id, 'approved'); setDetailItem(null); }}
+                    >
+                      Approve — {currentStep?.label}
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      disabled={busy}
+                      onClick={() => { decide(detailItem.id, 'rejected'); setDetailItem(null); }}
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               );
             })()}
