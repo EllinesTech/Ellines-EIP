@@ -1071,6 +1071,45 @@ export default function SystemSettingsPage() {
       {/* API Keys — Owner/IT only */}
       {orgAdmin ? <ApiKeysSection /> : null}
 
+      {/* Billing stub — Owner only (S7.7) */}
+      {isOwner ? (
+        <section className={settingsStyles.card}>
+          <div className={settingsStyles.cardHead}>
+            <p className={settingsStyles.cardEyebrow}>Account</p>
+            <h2 className={settingsStyles.cardTitle}>Plan &amp; billing</h2>
+            <p className={settingsStyles.cardHint}>
+              Current plan and usage. Upgrade to unlock higher limits, more connectors, and priority support.
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ flex: 1, minWidth: 160, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10, padding: '1rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Current plan</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f4f7fb' }}>Foundation</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)', marginTop: '0.2rem' }}>v1.0 · All core features included</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 160, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '1rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Connectors</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f4f7fb' }}>Unlimited</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)', marginTop: '0.2rem' }}>REST, SQL, CSV, Email, SFTP</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 160, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '1rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Users</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f4f7fb' }}>Unlimited</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)', marginTop: '0.2rem' }}>All roles included</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 160, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '1rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Support</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f4f7fb' }}>Standard</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)', marginTop: '0.2rem' }}>Email · Community</div>
+            </div>
+          </div>
+          <div style={{ padding: '0.85rem 1rem', borderRadius: 8, background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', fontSize: '0.82rem', color: '#c5cddb' }}>
+            <strong style={{ color: '#93c5fd' }}>Enterprise plan coming soon</strong> — priority support, SLA, multi-region data residency, compliance audit packs, and advanced AI agent credits.
+            Contact <a href="mailto:sales@ellines.co.ke" style={{ color: '#93c5fd' }}>sales@ellines.co.ke</a> to join the early access list.
+          </div>
+        </section>
+      ) : null}
+
     </div>
   );
 }

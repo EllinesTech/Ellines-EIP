@@ -52,6 +52,9 @@ export default function AdminPage() {
   const [deptBranchId, setDeptBranchId] = useState('');
   const [childOrgName, setChildOrgName] = useState('');
   const [childOrgNotice, setChildOrgNotice] = useState('');
+  const [csvText, setCsvText] = useState('');
+  const [csvBusy, setCsvBusy] = useState(false);
+  const [csvResult, setCsvResult] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getSession();
@@ -540,6 +543,61 @@ export default function AdminPage() {
           {childOrgNotice ? <p className={adminStyles.notice}>{childOrgNotice}</p> : null}
         </section>
       )}
+
+      {/* ── Bulk CSV invite (S7.6) ───────────────────────────────────────── */}
+      <section className={styles.brief} style={{ marginTop: '0.85rem' }}>
+        <div className={styles.panelLabel}>Bulk invite — CSV</div>
+        <p className={styles.lede}>
+          Paste a CSV with columns: <code>email, fullName, role</code> (role optional, defaults to member).
+          One row per line. Each person receives a magic-link invite email.
+        </p>
+        <form className={adminStyles.form} onSubmit={async (e) => {
+          e.preventDefault();
+          if (!csvText.trim() || csvBusy) return;
+          setCsvBusy(true); setCsvResult(null); setError('');
+          const lines = csvText.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+          const results: string[] = [];
+          let ok = 0; let fail = 0;
+          for (const line of lines.slice(0, 50)) {
+            const [emailRaw, fullNameRaw, roleRaw] = line.split(',').map((s) => s.trim());
+            const invEmail = emailRaw?.toLowerCase();
+            const invName = fullNameRaw || invEmail;
+            const invRole = assignableRoles.includes((roleRaw || 'member') as (typeof assignableRoles)[number]) ? (roleRaw || 'member') : 'member';
+            if (!invEmail || !invEmail.includes('@')) { results.push(`✗ Skipped: "${line}" (invalid email)`); fail++; continue; }
+            try {
+              const r = await sendInvite({ email: invEmail, fullName: invName, role: invRole });
+              results.push(`✓ ${invEmail} — ${r.emailSent ? 'email sent' : 'link generated'}`);
+              ok++;
+            } catch (err) {
+              results.push(`✗ ${invEmail} — ${err instanceof Error ? err.message : 'failed'}`);
+              fail++;
+            }
+          }
+          setCsvResult(`Done: ${ok} invited, ${fail} failed.\n\n${results.join('\n')}`);
+          setCsvText('');
+          setCsvBusy(false);
+          await loadAll();
+        }}>
+          <label style={{ gridColumn: '1 / -1' }}>
+            CSV rows
+            <textarea
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              rows={5}
+              placeholder={`jane@company.com, Jane Mwangi, executive\njohn@company.com, John Doe, member`}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit', padding: '0.5rem 0.7rem', fontSize: '0.85rem', resize: 'vertical' }}
+            />
+          </label>
+          <button type="submit" className={adminStyles.primary} disabled={csvBusy || !csvText.trim()}>
+            {csvBusy ? 'Sending invites…' : 'Send bulk invites'}
+          </button>
+        </form>
+        {csvResult ? (
+          <pre style={{ marginTop: '0.65rem', background: 'rgba(0,0,0,0.25)', borderRadius: 6, padding: '0.65rem', fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: '#c5cddb', maxHeight: 200, overflowY: 'auto' }}>
+            {csvResult}
+          </pre>
+        ) : null}
+      </section>
     </div>
   );
 }

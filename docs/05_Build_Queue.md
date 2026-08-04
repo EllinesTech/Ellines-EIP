@@ -664,7 +664,44 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 
 ---
 
-## Product Decision — Organization Data Window
+## Sprint 7 — Org Data Window v2 + Bulk Invite + Billing Stub
+
+**Date:** 2026-08-04  
+**Status:** `done`  
+**Builds:** `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `verify:pages-functions` ✅ (112 functions)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S7.1 | **Rich email thread view** in Org Data Window | `done` | Click any email row to expand full body + Ellinea Ask button inline. Per-user inbox note showing logged-in user's email address. EIP-observe reminder shown. |
+| S7.4 | **EIP-native vs SoR visual separation** | `done` | Colour-coded banner at top of `/app/org-data`: green "📡 SoR Data" badge + quick links to EIP-native pages (Approvals, Agents, Rules). Clear labelling throughout. |
+| S7.5 | **HTML report download + print** | `done` | Reports tab now has: ↓ HTML (styled, printable as PDF via browser), 🖨 Print/PDF (opens print dialog), ↓ .txt, Copy. `buildReportHtml()` generates branded A4-ready HTML with org name, date, source badge and EIP footer. |
+| S7.6 | **Bulk CSV invite** | `done` | Admin page → "Bulk invite — CSV" section. Paste `email, fullName, role` rows (up to 50). Each valid row triggers magic-link invite. Results summary shown per-row with success/failure. |
+| S7.7 | **Settings → Plan & billing stub** | `done` | Owner-only "Plan & billing" card in System Settings: Foundation plan, Unlimited connectors/users, Standard support, Enterprise plan coming soon CTA with sales@ link. Commercial readiness signal. |
+
+### What ships in Sprint 7
+
+**Rich email view** — emails in the Org Data Window are now expandable cards. Click any email to see the full body (or preview if no body is in the snapshot), with an inline Ellinea Ask button and "Open Ask workspace" link. The page also shows the logged-in user's email address as context.
+
+**SoR vs EIP-native separation** — a persistent banner at the top of `/app/org-data` clearly marks it as "SoR Data" (read-only from connected systems) with quick pill-links to EIP-native features (Approvals, Agents, Rules). No ambiguity about what is pulled from SoR vs what EIP generates.
+
+**Report downloads** — three download options per report: styled printable HTML (brand colours, org name, date, suitable for printing as PDF), plain text, and copy to clipboard. A print button opens the browser print dialog directly.
+
+**Bulk CSV invite** — IT Admin pastes up to 50 `email, name, role` rows and clicks once. Each row gets a magic-link invite. A results log shows per-row success or failure message.
+
+**Billing stub** — Owner sees a Plan & billing card in Settings. Foundation plan details plus an Enterprise upgrade CTA. No payment integration — purely a commercial readiness signal and contact point.
+
+---
+
+## Roadmap — Sprint 8 (next)
+
+| ID | Item | Priority | Notes |
+|----|------|----------|-------|
+| S8.1 | **Report generation from snapshot** — real content | P0 | `runReportFullApi` generates actual content: org name, health score, KPI table, open alerts summary, Ellinea brief excerpt, top timeline events. Sent via Resend. Currently preview is a stub string. |
+| S8.2 | **People page — search & filter** | P1 | Real search + role/branch/department filter on `/app/people`; contact card modal per person; bulk deactivate |
+| S8.3 | **Fleet page — real asset table** | P1 | Real asset table on `/app/fleet`: search, status filter (active/idle/maintenance), assigned-user column, branch column |
+| S8.4 | **Approval comment on decision** | P1 | Decision modal: optional comment/note field; stored on ApprovalStep.decidedBy + new `comment` field; shown in step history |
+| S8.5 | **Platform Admin — per-org stats** | P2 | `/app/platform` shows per-org: user count, connector count, last sync, last active; expandable row |
+| S8.6 | **Ellinea daily brief scheduled delivery** | P2 | Settings → Ellinea AI → "Send daily brief at 07:00" toggle; brief runs via existing report run mechanism + Resend |
 
 **Principle (from owner direction, 2026-08-04):**
 
