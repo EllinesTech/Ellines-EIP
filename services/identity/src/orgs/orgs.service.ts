@@ -298,4 +298,90 @@ export class OrgsService {
     });
     return dept;
   }
+
+  // ── Alert Correlation Engine (A.3.1) ──────────────────────────────────────
+
+  async getAlertCorrelations(organizationId: string) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const events = await this.prisma.enterpriseEvent.findMany({
+      where: { organizationId, at: { gte: since } },
+      orderBy: { at: 'desc' },
+      take: 500,
+    });
+
+    const rows = events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      payload: (e.payload && typeof e.payload === 'object' && !Array.isArray(e.payload)
+        ? e.payload
+        : {}) as Record<string, unknown>,
+      created_at: e.at.toISOString(),
+    }));
+
+    const groups = this.correlate(rows);
+
+    return {
+      windowHours: 24,
+      totalEvents: rows.length,
+      correlationGroups: groups,
+      correlatedEvents: groups.reduce((s: number, g: { count: number }) => s + g.count, 0),
+      computedAt: new Date().toISOString(),
+    };
+  }
+
+  private categorise(eventType: string): string {
+    if (eventType.includes('alert')) return 'alert_threshold';
+    if (eventType.includes('sync')) return 'sync_event';
+    if (eventType.includes('fail') || eventType.includes('error')) return 'connector_error';
+    if (eventType.includes('approval') || eventType.includes('approve')) return 'approval_pressure';
+    return 'general';
+  }
+
+  private correlationSeverity(count: number, category: string): string {
+    if (category === 'connector_error') return count >= 3 ? 'critical' : count >= 2 ? 'high' : 'medium';
+    if (category === 'alert_threshold') return count >= 5 ? 'critical' : count >= 3 ? 'high' : count >= 2 ? 'medium' : 'low';
+    if (category === 'approval_pressure') return count >= 4 ? 'high' : count >= 2 ? 'medium' : 'low';
+    return count >= 5 ? 'high' : count >= 3 ? 'medium' : 'low';
+  }
+
+  private correlate(events: { id: string; type: string; payload: Record<string, unknown>; created_at: string }[]) {
+    if (!events.length) return [];
+    const sorted = [...events].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const buckets = new Map<string, typeof sorted>();
+
+    for (const ev of sorted) {
+      const cat = this.categorise(ev.type);
+      const windowKey = Math.floor(new Date(ev.created_at).getTime() / (15 * 60 * 1000));
+      const key = `${cat}::${windowKey}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push(ev);
+    }
+
+    const groups: unknown[] = [];
+    let gIdx = 0;
+
+    for (const [key, evs] of buckets) {
+      if (evs.length < 2) continue;
+      const [cat] = key.split('::');
+      const sources = [...new Set(evs.map((e) => String(e.payload?.['source'] || e.payload?.['connectorName'] || '')).filter(Boolean))];
+      groups.push({
+        id: `corr_${++gIdx}_${cat}`,
+        category: cat,
+        severity: this.correlationSeverity(evs.length, cat),
+        count: evs.length,
+        firstSeenAt: evs[0].created_at,
+        lastSeenAt: evs[evs.length - 1].created_at,
+        events: evs.map((e) => e.id),
+        sources,
+        rootCauseHint: `Cluster of ${evs.length} ${cat.replace(/_/g, ' ')} events — investigate with Ellinea Ask.`,
+        suggestedActions: ['Review timeline', 'Ask Ellinea for brief'],
+      });
+    }
+
+    const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    return (groups as { severity: string; count: number }[]).sort(
+      (a, b) => (order[a.severity] ?? 4) - (order[b.severity] ?? 4) || b.count - a.count,
+    );
+  }
 }

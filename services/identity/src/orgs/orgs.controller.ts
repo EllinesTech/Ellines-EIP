@@ -168,4 +168,11 @@ export class OrgsController {
       body.name,
     );
   }
+
+  /** GET /api/v1/orgs/me/alert-correlations — real-time alert correlation engine */
+  @Get('me/alert-correlations')
+  @Roles('owner', 'admin')
+  getAlertCorrelations(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getAlertCorrelations(req.user.organizationId);
+  }
 }
