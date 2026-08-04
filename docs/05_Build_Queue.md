@@ -369,6 +369,15 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | S7.3 | `GET /api/v1/orgs/me/status` endpoint | `done` | Returns connectorCount, activeConnectorCount, lastSyncedAt, memberCount, pendingInviteCount, hasSync, healthScore; `fetchOrgStatus()` in api.ts |
 | S7.4 | Splash instant-redirect for logged-in users | `done` | Logged-in users skip the 3-second boot animation entirely; `skip` state renders `aria-hidden` splash; new session check at top of effect |
 
+## Sprint 8 — Approval workflow emails + Platform health
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S8.1 | Email decision-makers on approval created | `done` | `approvals.ts` POST: looks up Owner/IT users matching first step's actorRole; fires invite emails to up to 4 decision-makers (fire-and-forget) |
+| S8.2 | Email next-step actor on intermediate approval | `done` | `decide.ts`: when intermediate step passes, looks up users for next step's actorRole and emails them; keeps existing final-decision email to requester |
+| S8.3 | Onboarding checklist uses `fetchOrgStatus` | `done` | Replaced `listOrgUsers` call in `OnboardingChecklist` with single `fetchOrgStatus()` call; reduces API calls from 2 to 1 |
+| S8.4 | Platform health strip on `/app/platform` | `done` | Super Admin sees live version, uptime, and email provider status at top of Platform page |
+
 
 ---
 
