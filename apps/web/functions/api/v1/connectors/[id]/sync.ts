@@ -16,6 +16,7 @@ import {
   toTimelineStorage,
   type InstallConfig,
 } from '../../../../shared/connectors';
+import { sendOutboundEmail } from '../../../../shared/mail';
 
 const CSV_SAMPLE = `metric,value
 healthScore,81
@@ -365,6 +366,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         displayName,
         payload,
       );
+
+      // Fire-and-forget sync notification to the IT admin who triggered the sync.
+      sendOutboundEmail(context.env, {
+        to: auth.email,
+        subject: `Ellines EIP — Connector synced: ${displayName}`,
+        text: [
+          `Connector sync completed successfully.`,
+          ``,
+          `Connector: ${displayName}`,
+          `Health Score: ${summary.healthScore}/100`,
+          `Connected Systems: ${summary.connectedSystems}`,
+          `Open Alerts: ${summary.openAlerts}`,
+          `Open Decisions: ${summary.openDecisions}`,
+          `Brief: ${summary.briefHighlight || '—'}`,
+          `Synced at: ${summary.syncedAt}`,
+          ``,
+          `---`,
+          `Ellines EIP — Enterprise Intelligence Platform`,
+        ].join('\n'),
+      }).catch(() => {/* silent — email secrets not configured */});
+
       return json(summary);
     }
 

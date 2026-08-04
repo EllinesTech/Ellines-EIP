@@ -6,6 +6,7 @@ import {
   randomTokenHex,
   type Env,
 } from '../../../shared/auth';
+import { resolveMailConfig, sendOutboundEmail } from '../../../shared/mail';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -21,13 +22,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const base = {
-      message: 'If that email is registered, a password reset token has been issued.',
+      message: 'If that email is registered, a password reset link has been sent.',
     };
 
     const supabase = getAdminClient(context.env);
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, organization_id, is_active')
+      .select('id, organization_id, is_active, full_name')
       .eq('email', email)
       .maybeSingle();
 
@@ -65,11 +66,44 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       created_at: now.toISOString(),
     });
 
-    // Until notification service exists, return token so the client can complete reset (MVP).
+    // Determine the site origin to build a real reset link.
+    const origin = new URL(context.request.url).origin;
+    const resetLink = `${origin}/reset-password?token=${rawToken}`;
+    const fullName = (user as { full_name?: string }).full_name || 'there';
+
+    const mailConfig = resolveMailConfig(context.env);
+    if (mailConfig) {
+      // Real email available — send the reset link and do not expose the token in the response.
+      await sendOutboundEmail(context.env, {
+        to: email,
+        subject: 'Ellines EIP — Reset your password',
+        text: [
+          `Hi ${fullName},`,
+          ``,
+          `We received a request to reset your Ellines EIP password.`,
+          ``,
+          `Click the link below to choose a new password (valid for 1 hour):`,
+          ``,
+          resetLink,
+          ``,
+          `If you did not request this, you can safely ignore this email.`,
+          ``,
+          `---`,
+          `Ellines EIP — Enterprise Intelligence Platform`,
+        ].join('\n'),
+      }).catch(() => {/* ignore transient failure */});
+
+      return json(base);
+    }
+
+    // No email provider configured — return raw token so the operator/client can complete
+    // the reset manually (MVP fallback; remove once email secrets are set on Pages).
     return json({
       ...base,
       resetToken: rawToken,
+      resetLink,
       expiresIn: '1h',
+      _note: 'Email provider not configured on Pages. Set RESEND_API_KEY or SMTP_* to send real reset emails.',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

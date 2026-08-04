@@ -451,8 +451,12 @@ export default function ConnectorsPage() {
           <p className={styles.eyebrow}>Integration Hub · Owner / IT</p>
           <h1>Connectors</h1>
           <p className={styles.lede}>
-            Connect System B (HIS, ERP, CRM…) so Owner, IT, and employees can see and act on what that
-            system can do. Set sync schedules per install; due syncs run when IT opens this page.
+            Connect any System of Record — ERP, HIS, CRM, legacy .NET, ASPX, database, file drop,
+            or any HTTP/HTTPS endpoint. Ellines EIP connects{' '}
+            <strong>server-to-server</strong>: your browser never touches the client system directly.
+            The cloud proxy handles authentication, Mixed Content, and private-network hints — so
+            the handshake works even without modifying the client system or exposing it to the
+            internet. Set sync schedules per install; due syncs run when IT opens this page.
           </p>
         </div>
         <div className={styles.headerActions}>

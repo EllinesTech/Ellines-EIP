@@ -350,6 +350,7 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | S5.1 | Universal connector proxy (`POST /api/v1/connectors/proxy`) | `done` | Cloud-side fetch bypasses Mixed Content; handles HTTP/HTTPS, any auth type; size-limited (512 KB); private-IP hint; audit logged |
 | S5.2 | Installed-connector universal sync | `done` | `[id]/sync.ts` now handles all catalogIds (rest-api, openapi, csv-file, postgres/sqlserver/mysql, demo-json, generic fallback) by UUID installation lookup |
 | S5.3 | Ellinea Ask → real email to user | `done` | `ask.ts` sends real email (Resend / SMTP) to the authenticated user's registered address after every request; fire-and-forget so API is not blocked |
+| S5.4 | Register welcome email + forgot-password real email | `done` | `register.ts` sends welcome email (fire-and-forget) on new org creation; `forgot-password.ts` sends real reset-link email when RESEND/SMTP secrets set, falls back to token-in-response with `_note` when no provider; connector sync emails IT admin on successful sync |
 
 
 ---

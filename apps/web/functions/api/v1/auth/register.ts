@@ -1,4 +1,5 @@
 import { getAdminClient, json, options, signAccessToken, BCRYPT_ROUNDS, getClientIp, auditRow, type Env } from '../../../shared/auth';
+import { sendOutboundEmail } from '../../../shared/mail';
 
 function slugify(name: string): string {
   return name
@@ -110,6 +111,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       email,
       organizationId: orgId,
       role: 'owner',
+    });
+
+    // Fire-and-forget welcome email — does not block the response.
+    sendOutboundEmail(context.env, {
+      to: email,
+      subject: `Welcome to Ellines EIP — ${organizationName}`,
+      text: [
+        `Hi ${fullName},`,
+        ``,
+        `Your Ellines EIP account has been created successfully.`,
+        ``,
+        `Organisation: ${organizationName}`,
+        `Email: ${email}`,
+        `Role: Owner`,
+        ``,
+        `You can sign in at any time and start connecting your enterprise systems.`,
+        ``,
+        `If you did not register for this account, please contact support immediately.`,
+        ``,
+        `---`,
+        `Ellines EIP — Enterprise Intelligence Platform`,
+        `Where Enterprise Systems Think Together.`,
+      ].join('\n'),
+    }).catch(() => {
+      // Silent — email secrets not configured or transient failure.
     });
 
     return json({
