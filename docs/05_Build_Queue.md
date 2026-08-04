@@ -352,6 +352,14 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | S5.3 | Ellinea Ask → real email to user | `done` | `ask.ts` sends real email (Resend / SMTP) to the authenticated user's registered address after every request; fire-and-forget so API is not blocked |
 | S5.4 | Register welcome email + forgot-password real email | `done` | `register.ts` sends welcome email (fire-and-forget) on new org creation; `forgot-password.ts` sends real reset-link email when RESEND/SMTP secrets set, falls back to token-in-response with `_note` when no provider; connector sync emails IT admin on successful sync |
 
+## Sprint 6 — Onboarding completeness + Connector test email
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S6.1 | `/accept-invite` frontend page | `done` | Full invite-acceptance page at `/accept-invite?token=…`; sets password, activates account, logs user in immediately; matches brand shell; `acceptInvite()` added to `api.ts` |
+| S6.2 | Connector test email notification | `done` | `installations/[id]/test.ts` emails IT admin on test pass/fail (fire-and-forget, silent without secrets) |
+| S6.3 | Onboarding checklist on Command Center | `done` | `OnboardingChecklist` component on Owner/IT dashboard — 3 milestones (install connector, sync, invite team member); progress bar; auto-dismisses when all done; manual dismiss persisted in localStorage |
+
 
 ---
 

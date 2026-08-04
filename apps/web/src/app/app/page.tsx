@@ -13,10 +13,190 @@ import {
   sparkSeries,
   weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
+
+/** Onboarding checklist — shown to Owner/IT until all 3 milestones are done or dismissed. */
+function OnboardingChecklist({
+  synced,
+  installations,
+}: {
+  synced: boolean;
+  installations: ConnectorInstallationDto[];
+}) {
+  const DISMISS_KEY = 'eip_onboarding_dismissed';
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(DISMISS_KEY) === '1';
+  });
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    listOrgUsers()
+      .then((users) => setMemberCount(users.length))
+      .catch(() => setMemberCount(null));
+  }, []);
+
+  const hasConnector = installations.length > 0;
+  const hasSynced = synced;
+  const hasTeamMember = memberCount !== null && memberCount > 1;
+  const allDone = hasConnector && hasSynced && hasTeamMember;
+
+  // Auto-dismiss once everything is complete
+  useEffect(() => {
+    if (allDone && typeof window !== 'undefined') {
+      localStorage.setItem(DISMISS_KEY, '1');
+      setDismissed(true);
+    }
+  }, [allDone]);
+
+  if (dismissed) return null;
+
+  const steps = [
+    {
+      done: hasConnector,
+      label: 'Install a connector',
+      detail: 'Connect your first system — ERP, HIS, CRM, database, or any HTTP endpoint.',
+      href: '/app/connectors',
+      cta: 'Open Connectors',
+    },
+    {
+      done: hasSynced,
+      label: 'Run your first sync',
+      detail: 'Sync a connector to pull live data. KPIs and Ellinea unlock immediately.',
+      href: '/app/connectors',
+      cta: 'Sync now',
+    },
+    {
+      done: hasTeamMember,
+      label: 'Invite a team member',
+      detail: 'Add IT Admin or a colleague so your organisation can collaborate.',
+      href: '/app/admin',
+      cta: 'Invite user',
+    },
+  ];
+
+  const doneCount = steps.filter((s) => s.done).length;
+
+  return (
+    <section
+      aria-label="Getting started checklist"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '0.6rem',
+        padding: '1.1rem 1.25rem',
+        marginBottom: '1.25rem',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div>
+          <strong style={{ fontSize: '0.95rem' }}>Getting started — {doneCount}/3 complete</strong>
+          <div
+            style={{
+              height: '4px',
+              borderRadius: '999px',
+              background: 'var(--border)',
+              marginTop: '0.35rem',
+              width: '180px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.round((doneCount / 3) * 100)}%`,
+                background: doneCount === 3 ? '#22c55e' : '#6f2d8d',
+                borderRadius: '999px',
+                transition: 'width 0.4s ease',
+              }}
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Dismiss checklist"
+          onClick={() => {
+            localStorage.setItem(DISMISS_KEY, '1');
+            setDismissed(true);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+            fontSize: '1.1rem',
+            lineHeight: 1,
+            padding: '0.2rem 0.4rem',
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        {steps.map((step) => (
+          <div
+            key={step.label}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.75rem',
+              opacity: step.done ? 0.55 : 1,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                width: '1.3rem',
+                height: '1.3rem',
+                borderRadius: '50%',
+                border: step.done ? '2px solid #22c55e' : '2px solid var(--border)',
+                background: step.done ? '#22c55e' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.7rem',
+                color: '#fff',
+                marginTop: '0.1rem',
+              }}
+            >
+              {step.done ? '✓' : ''}
+            </span>
+            <div style={{ flex: 1 }}>
+              <strong style={{ fontSize: '0.875rem', textDecoration: step.done ? 'line-through' : 'none' }}>
+                {step.label}
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                {step.detail}
+              </p>
+            </div>
+            {!step.done ? (
+              <Link
+                href={step.href}
+                style={{
+                  flexShrink: 0,
+                  fontSize: '0.78rem',
+                  padding: '0.25rem 0.65rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.3rem',
+                  textDecoration: 'none',
+                  color: 'var(--text)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {step.cta} →
+              </Link>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function AdminOverview({
   name,
