@@ -23,21 +23,16 @@ export default function SplashPage() {
   const [ready, setReady] = useState(false);
   const [showBootUi, setShowBootUi] = useState(true);
   const [status, setStatus] = useState('Initializing your intelligent workspace…');
-
-  useEffect(() => {
-    document.documentElement.classList.add('eip-splash-lock');
-    document.body.classList.add('eip-splash-lock');
-    return () => {
-      document.documentElement.classList.remove('eip-splash-lock');
-      document.body.classList.remove('eip-splash-lock');
-    };
-  }, []);
+  // If user is already logged in, redirect immediately without showing the animation
+  const [skip, setSkip] = useState(false);
 
   useEffect(() => {
     try {
       const s = getSession();
       if (s?.accessToken && s?.user?.id) {
+        setSkip(true);
         router.replace('/app');
+        return;
       }
     } catch {
       // ignore
@@ -45,6 +40,17 @@ export default function SplashPage() {
   }, [router]);
 
   useEffect(() => {
+    if (skip) return;
+    document.documentElement.classList.add('eip-splash-lock');
+    document.body.classList.add('eip-splash-lock');
+    return () => {
+      document.documentElement.classList.remove('eip-splash-lock');
+      document.body.classList.remove('eip-splash-lock');
+    };
+  }, [skip]);
+
+  useEffect(() => {
+    if (skip) return;
     if (!window.__eipSplashBoot) {
       window.__eipSplashBoot = { t0: Date.now(), done: false };
     }
@@ -80,7 +86,7 @@ export default function SplashPage() {
   }, []);
 
   return (
-    <main className={styles.page} data-eip-fit>
+    <main className={styles.page} data-eip-fit aria-hidden={skip}>
       <div className={styles.atmosphere} aria-hidden>
         <img
           src="/brand/splash-bg.png"

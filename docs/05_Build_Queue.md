@@ -360,6 +360,15 @@ Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
 | S6.2 | Connector test email notification | `done` | `installations/[id]/test.ts` emails IT admin on test pass/fail (fire-and-forget, silent without secrets) |
 | S6.3 | Onboarding checklist on Command Center | `done` | `OnboardingChecklist` component on Owner/IT dashboard — 3 milestones (install connector, sync, invite team member); progress bar; auto-dismisses when all done; manual dismiss persisted in localStorage |
 
+## Sprint 7 — Production Readiness & UX Polish
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S7.1 | Enriched `/api/v1/health` endpoint | `done` | Returns version, uptimeSeconds, email provider + live flag; `fetchHealth()` added to api.ts |
+| S7.2 | Email provider status badge in Settings | `done` | Live indicator (green=live, amber=simulated) in Notifications section → IT sees at a glance whether RESEND/SMTP is configured |
+| S7.3 | `GET /api/v1/orgs/me/status` endpoint | `done` | Returns connectorCount, activeConnectorCount, lastSyncedAt, memberCount, pendingInviteCount, hasSync, healthScore; `fetchOrgStatus()` in api.ts |
+| S7.4 | Splash instant-redirect for logged-in users | `done` | Logged-in users skip the 3-second boot animation entirely; `skip` state renders `aria-hidden` splash; new session check at top of effect |
+
 
 ---
 

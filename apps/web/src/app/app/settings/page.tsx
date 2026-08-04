@@ -21,9 +21,11 @@ import {
   listApiKeys,
   createApiKey,
   revokeApiKey,
+  fetchHealth,
   type ApiKeyDto,
   type ApiKeyCreatedDto,
   type AuditLogDto,
+  type HealthDto,
   type OrgDateTimeSettingsDto,
   type WebhookSecretDto,
 } from '@/lib/api';
@@ -217,6 +219,7 @@ export default function SystemSettingsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [health, setHealth] = useState<HealthDto | null>(null);
 
   // Security section state
   const [secBusy, setSecBusy] = useState(false);
@@ -259,6 +262,8 @@ export default function SystemSettingsPage() {
     // Security section: load webhook + recent audit
     fetchWebhookSecret().then(setWebhook).catch(() => {/* ignore */});
     listOrgAuditLogs(8).then(setRecentAudit).catch(() => {/* ignore */});
+    // Platform health — unauthenticated, safe to call always
+    fetchHealth().then((h) => { if (h) setHealth(h); }).catch(() => {/* ignore */});
   }, []);
 
   useEffect(() => {
@@ -525,6 +530,44 @@ export default function SystemSettingsPage() {
             Email / push policy →
           </Link>
         </div>
+
+        {/* Email provider status — live indicator for IT */}
+        {orgAdmin ? (
+          <div style={{
+            marginTop: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            padding: '0.55rem 0.85rem',
+            borderRadius: '0.4rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            fontSize: '0.82rem',
+          }}>
+            <span
+              aria-hidden
+              style={{
+                width: '0.55rem',
+                height: '0.55rem',
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: !health
+                  ? '#6b7280'
+                  : health.email.live
+                    ? '#22c55e'
+                    : '#f59e0b',
+              }}
+            />
+            <span>
+              <strong>Email delivery: </strong>
+              {!health
+                ? 'checking…'
+                : health.email.live
+                  ? `Live — ${health.email.provider}`
+                  : 'Simulated — set RESEND_API_KEY or SMTP_* on Cloudflare Pages to send real email'}
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <section className={settingsStyles.card}>

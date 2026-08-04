@@ -874,9 +874,62 @@ export function createApprovalApi(payload: {
 
 export function decideApprovalApi(
   approvalId: string,
-  payload: { decision: 'approved' | 'rejected'; actorName?: string },
+  payload: { decision: 'approved' | 'rejected'; actorName?: string; comment?: string },
 ) {
   return request<ApprovalRequestDto>(`/api/v1/orgs/me/approvals/${approvalId}/decide`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── Email Intelligence ────────────────────────────────────────────────────────
+
+export type EmailSyncResultDto = {
+  emails: {
+    id: string;
+    subject: string;
+    from: string;
+    preview: string;
+    body: string;
+    at: string;
+    unread: boolean;
+    priority: 'high' | 'normal' | 'low';
+    source: string;
+    tags: string[];
+  }[];
+  summary: string;
+  urgentCount: number;
+  unreadCount: number;
+  todayCount: number;
+  connectors: { id: string; name: string; status: string; lastSyncedAt: string | null }[];
+  syncedAt: string | null;
+  pulledAt: string;
+};
+
+export function pullEmailSync() {
+  return request<EmailSyncResultDto>('/api/v1/orgs/me/email-sync', {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+// ─── Report Intelligence ──────────────────────────────────────────────────────
+
+export type ReportInterpretResultDto = {
+  interpretation: string;
+  action: 'summarize' | 'pivot' | 'highlight' | 'compare';
+  mode: 'llm' | 'template';
+  title: string;
+};
+
+export function interpretReportApi(payload: {
+  reportId?: string;
+  title: string;
+  content: string;
+  action?: 'summarize' | 'pivot' | 'highlight' | 'compare';
+  orgName?: string;
+}) {
+  return request<ReportInterpretResultDto>('/api/v1/orgs/me/report-interpret', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -1874,4 +1927,39 @@ export type OrgDataWindowDto = {
 /** Aggregate emails + reports from all connected/synced systems for the Org Data Window. */
 export function fetchOrgDataWindow() {
   return request<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
+}
+
+// ─── Sprint 7 — Health + Org Status ──────────────────────────────────────────
+
+export interface HealthDto {
+  status: string;
+  service: string;
+  version: string;
+  ts: string;
+  uptimeSeconds: number;
+  email: {
+    provider: 'resend' | 'smtp' | 'none';
+    live: boolean;
+  };
+}
+
+/** Unauthenticated — safe to call without a token. */
+export function fetchHealth() {
+  return fetch(`${API_URL}/api/v1/health`)
+    .then((r) => r.json() as Promise<HealthDto>)
+    .catch(() => null);
+}
+
+export interface OrgStatusDto {
+  connectorCount: number;
+  activeConnectorCount: number;
+  lastSyncedAt: string | null;
+  memberCount: number;
+  pendingInviteCount: number;
+  hasSync: boolean;
+  healthScore: number | null;
+}
+
+export function fetchOrgStatus() {
+  return request<OrgStatusDto>('/api/v1/orgs/me/status');
 }
