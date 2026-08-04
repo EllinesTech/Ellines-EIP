@@ -86,9 +86,82 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!config.imapHost?.trim() || !config.imapUser?.trim()) {
         throw new Error('IMAP host and user are required');
       }
-      message =
-        'Config saved. IMAP TCP test/sync requires the Identity API (Nest). Format looks ready.';
-      ok = true;
+      if (!config.imapPassword?.trim()) {
+        // Password not yet set — mark as partially configured
+        message = `Config saved. Enter the IMAP password to enable live sync.`;
+        ok = true;
+      } else {
+        // Try a live TCP connection: LOGIN then LOGOUT
+        try {
+          const host = config.imapHost.trim();
+          const port = Number(config.imapPort) || 993;
+          const user = config.imapUser.trim();
+          const pass = config.imapPassword.trim();
+          const secure = config.imapSecure !== false;
+
+          const mod = (await import('cloudflare:sockets')) as {
+            connect: (opts: { hostname: string; port: number; secureTransport?: 'on' | 'starttls' | 'off' }) => {
+              readable: ReadableStream<Uint8Array>;
+              writable: WritableStream<Uint8Array>;
+              opened: Promise<unknown>;
+              close: () => void;
+              startTls?: () => void;
+            };
+          };
+          const socket = mod.connect({ hostname: host, port, secureTransport: secure ? 'on' : 'starttls' });
+          await socket.opened;
+
+          const reader = socket.readable.getReader();
+          const writer = socket.writable.getWriter();
+          const dec = new TextDecoder();
+          let ibuf = '';
+
+          async function iReadLine() {
+            while (!ibuf.includes('\n')) {
+              const { value, done } = await reader.read();
+              if (done) throw new Error('Connection closed');
+              ibuf += dec.decode(value, { stream: true });
+            }
+            const nl = ibuf.indexOf('\n');
+            const l = ibuf.slice(0, nl).replace(/\r$/, '');
+            ibuf = ibuf.slice(nl + 1);
+            return l;
+          }
+
+          async function iCmd(tag: string, command: string) {
+            await writer.write(new TextEncoder().encode(`${tag} ${command}\r\n`));
+            const lines: string[] = [];
+            while (true) {
+              const l = await iReadLine();
+              lines.push(l);
+              if (l.startsWith(tag + ' ') || l.startsWith('* BYE')) break;
+            }
+            return lines;
+          }
+
+          await iReadLine(); // server greeting
+          if (!secure && typeof socket.startTls === 'function') {
+            await iCmd('T0', 'STARTTLS');
+            socket.startTls();
+          }
+          const loginResp = await iCmd('T1', `LOGIN "${user.replace(/"/g, '\\"')}" "${pass.replace(/"/g, '\\"')}"`);
+          const loginOk = loginResp.some((l) => l.startsWith('T1 OK'));
+          await iCmd('T2', 'LOGOUT').catch(() => {/* ignore */});
+          socket.close();
+
+          if (!loginOk) throw new Error('IMAP LOGIN failed — check your email and password');
+          message = `IMAP connection OK — authenticated as ${user}`;
+          ok = true;
+        } catch (imapErr) {
+          const errMsg = imapErr instanceof Error ? imapErr.message : 'IMAP test failed';
+          if (/Cannot find module|cloudflare:sockets|Failed to resolve/i.test(errMsg)) {
+            message = `Config saved. IMAP format looks ready — live test requires Cloudflare deployment.`;
+            ok = true;
+          } else {
+            throw imapErr;
+          }
+        }
+      }
     } else if (catalogId === 'sftp') {
       if (!config.sftpHost?.trim() || !config.sftpUsername?.trim() || !config.sftpRemotePath?.trim()) {
         throw new Error('SFTP host, username, and remotePath are required');

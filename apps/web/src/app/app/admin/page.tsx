@@ -20,6 +20,7 @@ import {
   OrgMember,
   PendingInviteDto,
   updateOrgUser,
+  deleteOrgUser,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from './admin.module.css';
@@ -194,6 +195,20 @@ export default function AdminPage() {
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteUser(user: OrgMember) {
+    if (!confirm(`Permanently delete ${user.fullName} (${user.email})? This cannot be undone.`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      await deleteOrgUser(user.id);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setBusy(false);
     }
@@ -479,14 +494,25 @@ export default function AdminPage() {
                     <td>{u.isActive ? 'Active' : 'Inactive'}</td>
                     <td>
                       {!self ? (
-                        <button
-                          type="button"
-                          className={adminStyles.ghost}
-                          disabled={busy}
-                          onClick={() => void onToggleActive(u)}
-                        >
-                          {u.isActive ? 'Deactivate' : 'Reactivate'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className={adminStyles.ghost}
+                            disabled={busy}
+                            onClick={() => void onToggleActive(u)}
+                          >
+                            {u.isActive ? 'Deactivate' : 'Reactivate'}
+                          </button>
+                          <button
+                            type="button"
+                            className={adminStyles.ghost}
+                            disabled={busy}
+                            style={{ color: '#fca5a5' }}
+                            onClick={() => void onDeleteUser(u)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       ) : (
                         'You'
                       )}

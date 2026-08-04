@@ -264,6 +264,12 @@ export function updateOrgUser(userId: string, payload: { role?: string; isActive
   });
 }
 
+export function deleteOrgUser(userId: string) {
+  return request<{ ok: boolean; id: string }>(`/api/v1/orgs/me/users/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
 export type OrgBranch = {
   id: string;
   name: string;
@@ -1962,4 +1968,49 @@ export interface OrgStatusDto {
 
 export function fetchOrgStatus() {
   return request<OrgStatusDto>('/api/v1/orgs/me/status');
+}
+
+// ─── Sprint 9 — Report upload + Ellinea digest ────────────────────────────────
+
+export type ReportUploadResultDto = {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  tags: string[];
+  branch?: string;
+  department?: string;
+  summary?: string;
+  ellineaSummary: string;
+  mode: 'llm' | 'template';
+  uploadedBy: string;
+  uploadedAt: string;
+};
+
+export function uploadReport(payload: {
+  name: string;
+  mimeType: string;
+  content: string; // base64
+  textContent?: string;
+  branch?: string;
+  department?: string;
+  tags?: string[];
+}) {
+  return request<ReportUploadResultDto>('/api/v1/orgs/me/report-upload', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type EllineaDigestResultDto = {
+  ok: boolean;
+  message: string;
+  provider?: string;
+};
+
+export function sendEllineaDigest(force = false) {
+  return request<EllineaDigestResultDto>('/api/v1/orgs/me/ellinea-digest', {
+    method: 'POST',
+    body: JSON.stringify({ force }),
+  });
 }

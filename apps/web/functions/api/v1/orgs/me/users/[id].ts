@@ -15,7 +15,7 @@ import {
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
-  if (context.request.method !== 'PATCH') {
+  if (context.request.method !== 'PATCH' && context.request.method !== 'DELETE') {
     return json({ message: 'Method not allowed' }, 405);
   }
 
@@ -30,6 +30,64 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 400, message: 'User id required' }, 400);
   }
 
+  // ── DELETE: permanently remove a user from the org ────────────────────────
+  if (context.request.method === 'DELETE') {
+    const supabase = getAdminClient(context.env);
+    const { data: target, error: findErr } = await supabase
+      .from('users')
+      .select('id, email, full_name, role, is_active')
+      .eq('id', userId)
+      .eq('organization_id', auth.organizationId)
+      .maybeSingle();
+
+    if (findErr) return json({ statusCode: 500, message: findErr.message }, 500);
+    if (!target) return json({ statusCode: 404, message: 'User not found' }, 404);
+
+    // Cannot delete yourself
+    if (target.id === auth.sub) {
+      return json({ statusCode: 403, message: 'You cannot delete your own account' }, 403);
+    }
+
+    // Only owner can delete owner-role users; admins can delete non-admin/non-owner
+    const manageErr = assertCanManageOrgUser(auth.role, target.role as string);
+    if (manageErr) return json({ statusCode: 403, message: manageErr }, 403);
+
+    // Cannot delete the last active owner
+    if (target.role === 'owner') {
+      const lastOwner = await isLastActiveOwner(supabase, auth.organizationId, target.id as string);
+      if (lastOwner) {
+        return json({ statusCode: 403, message: 'Cannot delete the last active owner' }, 403);
+      }
+    }
+
+    const { error: delErr } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId)
+      .eq('organization_id', auth.organizationId);
+
+    if (delErr) return json({ statusCode: 500, message: delErr.message }, 500);
+
+    const ip = getClientIp(context.request);
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'org.delete_user',
+        resource: 'user',
+        metadata: {
+          targetUserId: target.id,
+          targetEmail: target.email,
+          role: target.role,
+        },
+        ip,
+      }),
+    );
+
+    return json({ ok: true, id: userId });
+  }
+
+  // ── PATCH: update role / isActive ──────────────────────────────────────────
   try {
     const body = (await context.request.json()) as {
       role?: UserRole;
