@@ -1,4 +1,5 @@
-import { json, options, mailProviderLabel, type Env } from '../../shared/auth';
+import { json, options, type Env } from '../../shared/auth';
+import { mailProviderLabel } from '../../shared/mail';
 
 const START_TIME = Date.now();
 
