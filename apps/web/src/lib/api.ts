@@ -214,6 +214,13 @@ export function resetPassword(token: string, newPassword: string) {
   });
 }
 
+export function acceptInvite(token: string, password: string, fullName?: string) {
+  return request<AuthSession>('/api/v1/auth/accept-invite', {
+    method: 'POST',
+    body: JSON.stringify({ token, password, fullName }),
+  });
+}
+
 export function ssoRequest(email: string, provider?: string) {
   return request<{ message: string; ssoToken?: string; expiresIn?: string }>(
     '/api/v1/auth/sso/request',
@@ -1745,4 +1752,126 @@ export function decideExecutionApi(
     `/api/v1/orgs/me/agents/${agentId}/executions/${execId}/decide`,
     { method: 'POST', body: JSON.stringify({ decision }) },
   );
+}
+
+// ─── S6.2 — Invite magic link ─────────────────────────────────────────────────
+
+export type PendingInviteDto = {
+  email: string;
+  fullName: string;
+  role: string;
+  expiresAt: string;
+  invitedBy: string;
+  sentAt: string;
+  emailSent: boolean;
+};
+
+export type InviteResultDto = {
+  ok: boolean;
+  email: string;
+  fullName: string;
+  role: string;
+  expiresAt: string;
+  emailSent: boolean;
+  acceptLink?: string; // only returned when no email provider configured
+  _note?: string;
+};
+
+/** List pending (not yet accepted) invites for this org. */
+export function listPendingInvites() {
+  return request<PendingInviteDto[]>('/api/v1/orgs/me/invite');
+}
+
+/** Send a magic-link invite email. Replaces the temp-password flow. */
+export function sendInvite(payload: { email: string; fullName: string; role: string }) {
+  return request<InviteResultDto>('/api/v1/orgs/me/invite', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Resend the invite (renews the token). */
+export function resendInvite(payload: { email: string; fullName: string; role: string }) {
+  return request<InviteResultDto>('/api/v1/orgs/me/invite-resend', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Revoke a pending invite and deactivate the placeholder account. */
+export function revokeInvite(email: string) {
+  return request<{ ok: boolean; message: string }>('/api/v1/orgs/me/invite', {
+    method: 'DELETE',
+    body: JSON.stringify({ email }),
+  });
+}
+
+// ─── S6.6 — API Keys ──────────────────────────────────────────────────────────
+
+export type ApiKeyDto = {
+  id: string;
+  name: string;
+  keyPreview: string; // last 6 chars visible, rest masked
+  createdAt: string;
+  createdBy: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+};
+
+export type ApiKeyCreatedDto = ApiKeyDto & {
+  key: string; // full key returned ONCE on creation
+};
+
+export function listApiKeys() {
+  return request<ApiKeyDto[]>('/api/v1/orgs/me/api-keys');
+}
+
+export function createApiKey(payload: { name: string; expiresInDays?: number }) {
+  return request<ApiKeyCreatedDto>('/api/v1/orgs/me/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function revokeApiKey(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/orgs/me/api-keys/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Organization Data Window ─────────────────────────────────────────────────
+
+export type OrgDataEmailDto = {
+  id: string;
+  subject: string;
+  from: string;
+  preview: string;
+  at: string;
+  unread: boolean;
+  priority: 'high' | 'normal' | 'low';
+  source: string;
+  body?: string;
+};
+
+export type OrgDataReportDto = {
+  id: string;
+  title: string;
+  source: string;
+  generatedAt: string;
+  format: string;
+  sizeKb?: number;
+  downloadUrl?: string;
+  content?: string;
+};
+
+export type OrgDataWindowDto = {
+  emails: OrgDataEmailDto[];
+  reports: OrgDataReportDto[];
+  connectors: { id: string; name: string; type: string; status: string; lastSyncedAt: string | null }[];
+  syncedAt: string | null;
+};
+
+/** Aggregate emails + reports from all connected/synced systems for the Org Data Window. */
+export function fetchOrgDataWindow() {
+  return request<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
 }

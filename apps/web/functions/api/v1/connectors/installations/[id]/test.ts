@@ -12,6 +12,7 @@ import {
   toInstallationDto,
   type InstallConfig,
 } from '../../../../../shared/connectors';
+import { sendOutboundEmail } from '../../../../../shared/mail';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -116,6 +117,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .select('*')
     .single();
   if (error) return json({ statusCode: 500, message: error.message }, 500);
+
+  // Fire-and-forget: notify the IT admin of the test result.
+  const displayName = (existing.display_name as string) || (existing.catalog_id as string);
+  sendOutboundEmail(context.env, {
+    to: auth.email,
+    subject: ok
+      ? `Ellines EIP — Connector test passed: ${displayName}`
+      : `Ellines EIP — Connector test failed: ${displayName}`,
+    text: [
+      `Connector connection test ${ok ? 'passed ✓' : 'failed ✗'}.`,
+      ``,
+      `Connector: ${displayName}`,
+      `Type: ${existing.catalog_id as string}`,
+      `Result: ${message}`,
+      `Tested at: ${now}`,
+      ``,
+      ok
+        ? `The connector is ready to sync. Go to Connectors → Sync to pull live data.`
+        : `Check your credentials and endpoint, then test again.`,
+      ``,
+      `---`,
+      `Ellines EIP — Enterprise Intelligence Platform`,
+    ].join('\n'),
+  }).catch(() => {/* silent — email secrets not configured */});
 
   return json({ ok, message, installation: toInstallationDto(data as Record<string, unknown>) });
 };

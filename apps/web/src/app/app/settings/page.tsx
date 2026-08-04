@@ -18,6 +18,11 @@ import {
   setSession,
   updateOrgDateTimeSettings,
   updateOrgProfile,
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+  type ApiKeyDto,
+  type ApiKeyCreatedDto,
   type AuditLogDto,
   type OrgDateTimeSettingsDto,
   type WebhookSecretDto,
@@ -40,6 +45,133 @@ import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import settingsStyles from './settings.module.css';
+
+// ─── API Keys sub-component ───────────────────────────────────────────────────
+function ApiKeysSection() {
+  const [keys, setKeys] = useState<ApiKeyDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [expiresInDays, setExpiresInDays] = useState('');
+  const [created, setCreated] = useState<ApiKeyCreatedDto | null>(null);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    listApiKeys()
+      .then(setKeys)
+      .catch(() => { /* ignore — endpoint may not exist on older deploys */ })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault();
+    if (!newKeyName.trim()) return;
+    setBusy(true); setError(''); setCreated(null);
+    try {
+      const result = await createApiKey({
+        name: newKeyName.trim(),
+        expiresInDays: expiresInDays ? Number(expiresInDays) : undefined,
+      });
+      setCreated(result);
+      setKeys((prev) => [result, ...prev]);
+      setNewKeyName(''); setExpiresInDays('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create API key');
+    } finally { setBusy(false); }
+  }
+
+  async function onRevoke(id: string) {
+    if (!confirm('Revoke this API key? Any integration using it will stop working immediately.')) return;
+    setBusy(true);
+    try {
+      await revokeApiKey(id);
+      setKeys((prev) => prev.filter((k) => k.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Revoke failed');
+    } finally { setBusy(false); }
+  }
+
+  async function copyKey(key: string) {
+    try { await navigator.clipboard.writeText(key); } catch { /* ignore */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  return (
+    <section className={settingsStyles.card}>
+      <div className={settingsStyles.cardHead}>
+        <p className={settingsStyles.cardEyebrow}>Integration</p>
+        <h2 className={settingsStyles.cardTitle}>API Keys</h2>
+        <p className={settingsStyles.cardHint}>
+          Generate API keys for external integrations and scripts to authenticate with Ellines EIP.
+          Each key is shown only once on creation — store it securely.
+        </p>
+      </div>
+
+      {error ? <p className={adminStyles.error}>{error}</p> : null}
+
+      {/* New key created — show once */}
+      {created ? (
+        <div className={adminStyles.notice} style={{ marginBottom: '0.75rem' }}>
+          <strong>API key created — copy it now, it won't be shown again:</strong>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+            <code style={{ flex: 1, background: 'rgba(0,0,0,0.3)', padding: '0.3rem 0.6rem', borderRadius: 5, fontSize: '0.78rem', wordBreak: 'break-all', userSelect: 'all' }}>
+              {created.key}
+            </code>
+            <button type="button" className={adminStyles.primary}
+              onClick={() => void copyKey(created.key)}
+              style={{ whiteSpace: 'nowrap' }}>
+              {copied ? '✓ Copied' : 'Copy key'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Create form */}
+      <form className={adminStyles.form} onSubmit={(e) => void onCreate(e)} style={{ marginBottom: '1rem' }}>
+        <label>
+          Key name
+          <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="e.g. CI/CD pipeline" required minLength={2} />
+        </label>
+        <label>
+          Expires in days <span style={{ color: 'var(--c-muted)', fontWeight: 400 }}>(optional)</span>
+          <input type="number" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} placeholder="e.g. 90" min={1} max={365} />
+        </label>
+        <button type="submit" className={adminStyles.primary} disabled={busy || !newKeyName.trim()}>
+          {busy ? 'Generating…' : 'Generate API key'}
+        </button>
+      </form>
+
+      {/* Existing keys */}
+      {loading ? <p className={settingsStyles.cardHint}>Loading keys…</p> : null}
+      {!loading && keys.length === 0 ? (
+        <p className={settingsStyles.cardHint}>No API keys yet. Generate one above.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {keys.map((key) => (
+            <div key={key.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '0.6rem 0.85rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>{key.name}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)', marginTop: '0.1rem' }}>
+                  <code style={{ fontFamily: 'monospace' }}>{key.keyPreview}</code>
+                  {' · '}Created {new Date(key.createdAt).toLocaleDateString()}
+                  {' · '}by {key.createdBy}
+                  {key.expiresAt ? ` · Expires ${new Date(key.expiresAt).toLocaleDateString()}` : ' · No expiry'}
+                  {key.lastUsedAt ? ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}` : ''}
+                </div>
+              </div>
+              <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => void onRevoke(key.id)}
+                style={{ flexShrink: 0, color: '#fca5a5' }}>
+                Revoke
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 function Toggle({
   on,
@@ -935,6 +1067,10 @@ export default function SystemSettingsPage() {
           {orgAdmin ? <Link href="/app/audit" className={styles.primaryLink}>Audit Center →</Link> : null}
         </div>
       </section>
+
+      {/* API Keys — Owner/IT only */}
+      {orgAdmin ? <ApiKeysSection /> : null}
+
     </div>
   );
 }

@@ -214,6 +214,8 @@ function AdminOverview({
         </section>
       ) : null}
 
+      <OnboardingChecklist synced={synced} installations={installations} />
+
       {installations.length ? (
         <section className={styles.healthStrip} aria-label="Connector health">
           <div className={styles.panelLabel}>Connector health</div>

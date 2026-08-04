@@ -11,9 +11,14 @@ import {
   listOrgBranches,
   listOrgDepartments,
   listOrgUsers,
+  listPendingInvites,
+  sendInvite,
+  resendInvite,
+  revokeInvite,
   OrgBranch,
   OrgDepartment,
   OrgMember,
+  PendingInviteDto,
   updateOrgUser,
 } from '@/lib/api';
 import styles from '../command.module.css';
@@ -38,7 +43,8 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ emailSent: boolean; acceptLink?: string; note?: string } | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<PendingInviteDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [branchName, setBranchName] = useState('');
   const [branchCode, setBranchCode] = useState('');
@@ -66,14 +72,16 @@ export default function AdminPage() {
     setLoading(true);
     setError('');
     try {
-      const [u, b, d] = await Promise.all([
+      const [u, b, d, pi] = await Promise.all([
         listOrgUsers(),
         listOrgBranches(),
         listOrgDepartments(),
+        listPendingInvites().catch(() => [] as PendingInviteDto[]),
       ]);
       setUsers(u);
       setBranches(b);
       setDepartments(d);
+      setPendingInvites(pi);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load admin data');
     } finally {
@@ -93,20 +101,32 @@ export default function AdminPage() {
     e.preventDefault();
     setBusy(true);
     setError('');
-    setTempPassword(null);
+    setInviteResult(null);
     try {
-      const result = await inviteOrgUser({
+      const result = await sendInvite({
         email: inviteEmail,
         fullName: inviteName,
         role: inviteRole,
       });
-      setTempPassword(result.temporaryPassword);
+      setInviteResult({
+        emailSent: result.emailSent,
+        acceptLink: result.acceptLink,
+        note: result._note,
+      });
       setInviteEmail('');
       setInviteName('');
       setInviteRole('member');
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invite failed');
+      // Fall back to legacy temp-password invite if new endpoint not available
+      try {
+        const legacy = await inviteOrgUser({ email: inviteEmail, fullName: inviteName, role: inviteRole });
+        setInviteResult({ emailSent: false, note: `Temporary password: ${legacy.temporaryPassword} — share securely.` });
+        setInviteEmail(''); setInviteName(''); setInviteRole('member');
+        await loadAll();
+      } catch {
+        setError(err instanceof Error ? err.message : 'Invite failed');
+      }
     } finally {
       setBusy(false);
     }
@@ -218,16 +238,21 @@ export default function AdminPage() {
       </header>
 
       {error ? <p className={adminStyles.error}>{error}</p> : null}
-      {tempPassword ? (
-        <p className={adminStyles.notice}>
-          Invite created. Temporary password: <code>{tempPassword}</code> — share securely; user
-          should change it after first login.
-        </p>
+      {inviteResult ? (
+        <div className={adminStyles.notice}>
+          {inviteResult.emailSent
+            ? '✉️ Invite email sent with magic link. The user will click to set their password and activate their account.'
+            : null}
+          {inviteResult.acceptLink ? (
+            <span> No email provider configured. Share this link: <code style={{ wordBreak: 'break-all' }}>{inviteResult.acceptLink}</code></span>
+          ) : null}
+          {inviteResult.note && !inviteResult.emailSent ? <span> {inviteResult.note}</span> : null}
+        </div>
       ) : null}
 
       <section className={styles.brief}>
-        <div className={styles.panelLabel}>Invite user</div>
-        <form className={adminStyles.form} onSubmit={onInvite}>
+        <div className={styles.panelLabel}>Invite user — magic link</div>
+        <form className={adminStyles.form} onSubmit={(e) => void onInvite(e)}>
           <label>
             Full name
             <input
@@ -259,10 +284,54 @@ export default function AdminPage() {
             </select>
           </label>
           <button type="submit" className={adminStyles.primary} disabled={busy}>
-            {busy ? 'Working…' : 'Invite'}
+            {busy ? 'Working…' : 'Send invite'}
           </button>
         </form>
+        <p className={styles.lede} style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
+          An invitation email with a magic link is sent to the user (requires email secrets on Pages).
+          The user clicks the link to set their own password and activate their account.
+          Without email secrets, a one-time link is returned for manual sharing.
+        </p>
       </section>
+
+      {/* Pending invites */}
+      {pendingInvites.length > 0 && (
+        <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
+          <div className={styles.panelLabel}>Pending invites · {pendingInvites.length}</div>
+          <table className={adminStyles.table}>
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th>Invited by</th><th>Expires</th><th /></tr>
+            </thead>
+            <tbody>
+              {pendingInvites.map((inv) => (
+                <tr key={inv.email}>
+                  <td>{inv.fullName}</td>
+                  <td>{inv.email}</td>
+                  <td>{roleLabel(inv.role)}</td>
+                  <td style={{ fontSize: '0.75rem' }}>{inv.invitedBy}</td>
+                  <td style={{ fontSize: '0.75rem' }}>{new Date(inv.expiresAt).toLocaleDateString()}</td>
+                  <td style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" className={adminStyles.ghost} disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try { await resendInvite({ email: inv.email, fullName: inv.fullName, role: inv.role }); await loadAll(); }
+                        catch (e) { setError(e instanceof Error ? e.message : 'Resend failed'); }
+                        finally { setBusy(false); }
+                      }}>Resend</button>
+                    <button type="button" className={adminStyles.ghost} disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try { await revokeInvite(inv.email); await loadAll(); }
+                        catch (e) { setError(e instanceof Error ? e.message : 'Revoke failed'); }
+                        finally { setBusy(false); }
+                      }}>Revoke</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
         <div className={styles.panelLabel}>Org structure · Branches</div>

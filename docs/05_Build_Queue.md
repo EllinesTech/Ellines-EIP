@@ -616,3 +616,56 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 
 *Last update: 2026-08-02*
 
+---
+
+## Sprint 6 — Product Maturity, Invite Magic Link & Organization Data Window
+
+**Date:** 2026-08-04  
+**Status:** `done`  
+**Builds:** `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `verify:pages-functions` ✅ (112 functions)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S6.1 | **Invite magic link** — full flow | `done` | `POST /api/v1/orgs/me/invite` creates placeholder user (inactive), stores token in `password_reset_tokens`, emails one-click accept link (72h TTL). `POST /api/v1/auth/accept-invite` validates token, activates user, sets password, returns JWT session. `/accept-invite` page. Admin UI: pending invites list + Resend/Revoke per invite. Falls back gracefully when no email provider. |
+| S6.2 | **Invite resend & revoke** | `done` | `POST /api/v1/orgs/me/invite-resend` renews token + resends email. `DELETE /api/v1/orgs/me/invite` revokes + deactivates placeholder. Admin page shows pending invites table. |
+| S6.3 | **API Key management** | `done` | `GET/POST/DELETE /api/v1/orgs/me/api-keys` — generate named keys (stored as SHA-256 hash in org settings), full key returned once on creation, masked preview thereafter, expiry support, audit logged. Settings page → "API Keys" section (Owner/IT only). |
+| S6.4 | **Organization Data Window** (`/app/org-data`) | `done` | New `/app/org-data` page — three tabs: **Emails** (from email connector + UEM, per-thread Ellinea Summarize button), **Reports** (from scheduled reports + SoR timeline, Download + Copy), **Connectors** (health at a glance). `GET /api/v1/orgs/me/org-data-window` Pages Function aggregates from snapshot + installations. Ellinea AI summary button per tab. Added to sidebar nav (orgSystemAccess). |
+| S6.5 | **Roadmap: Org Data Window v2** | `done` | Added to `docs/18_v2.0_Build_Queue.md` — full rich Org Data Window with dedicated email client view, PDF report rendering, SoR attachment download, per-user work email via authenticated login (Ellinea summarizes on open), and EIP-native features kept separate from SoR data surface. |
+
+### What ships in Sprint 6
+
+**Invite magic link** — When IT Admin invites a user, they now receive an email with a one-click link (`/accept-invite?token=…`). The user clicks, sets their own password, and is immediately signed in. The old temp-password flow is the fallback when no email provider is configured. Admins see pending invites (not yet accepted) with Resend and Revoke controls.
+
+**API Keys** — Owner/IT can generate named API keys from Settings → API Keys for external integrations (CI/CD, scripts, SDK consumers). Keys are stored hashed, shown once on creation, and can be revoked at any time. Full audit trail.
+
+**Organization Data Window** — A new dedicated surface at `/app/org-data` that shows everything pulled from connected Systems of Record: work emails (with per-thread Ellinea summary), reports (download/copy), and connector health. EIP features (approvals, rules, agents) stay on their own pages — this window is purely the SoR data layer.
+
+---
+
+## Roadmap — Sprint 7 (next)
+
+| ID | Item | Priority | Notes |
+|----|------|----------|-------|
+| S7.1 | **Organization Data Window v2** — rich email view | P0 | Per-user work email view when user logs in with work credentials; Ellinea summarizes inbox on open; thread detail with full body; reply/forward stub (EIP observes, user acts in native client) |
+| S7.2 | **Organization Data Window v2** — PDF report rendering | P0 | Reports from SoR rendered as proper PDF previews in-browser; download as PDF; export to EIP Document Hub |
+| S7.3 | **Organization Data Window v2** — SoR attachment list | P1 | Documents/attachments from connected CRM/ERP/HIS listed; click → download from SoR via connector proxy |
+| S7.4 | **EIP-native vs SoR data** — clear separation UI | P0 | Visual distinction: "From your connected systems" (SoR data, read-only) vs "Ellines EIP" (approvals, rules, agents, memory — EIP-native). Two sections clearly labelled in org-data and org-system. |
+| S7.5 | **Report PDF generation** (EIP native) | P1 | Scheduled reports generate real content from snapshot + memory; rendered as styled HTML with charts; downloadable; delivered via Resend |
+| S7.6 | **Invite bulk CSV upload** | P2 | IT Admin uploads a CSV of emails + names + roles → batch invite with one click |
+| S7.7 | **Settings → Billing stub** | P2 | Commercial readiness: plan name, usage counts, upgrade CTA (static stub, no payment) |
+
+---
+
+## Product Decision — Organization Data Window
+
+**Principle (from owner direction, 2026-08-04):**
+
+> EIP should have a dedicated window showing data pulled from other systems (emails, reports, documents from ERP/CRM/HIS/email), surfaced and summarized by Ellinea. This is distinct from EIP's own features (approvals, rules, agents, memory).
+
+**Architecture:**
+- `/app/org-data` — **Organization Data Window**: read-only projection of SoR data. Emails (from IMAP connector), reports/exports (from SoR + EIP scheduled reports), documents (from SoR attachments). Ellinea summarizes on demand.
+- `/app/org-system` — **Organization System**: capability catalog, UEM domains, live object counts.
+- `/app/approvals`, `/app/rules`, `/app/automation` etc. — **EIP-native features**: workflows, agents, memory — EIP's own intelligence layer.
+
+EIP connects and observes SoR. It never writes back. The Data Window makes SoR data *accessible and intelligible* to users without opening multiple legacy systems.
+

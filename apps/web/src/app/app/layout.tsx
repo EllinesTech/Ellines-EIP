@@ -222,6 +222,15 @@ function IconOrgSystem() {
   );
 }
 
+function IconOrgData() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" />
+      <path d="M17 14v6M14 17h6" />
+    </svg>
+  );
+}
+
 function IconAutomation() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -255,6 +264,12 @@ const NAV: NavItem[] = [
   { href: '/app/automation', label: 'Automation', icon: <IconAutomation />, adminOnly: true },
   { href: '/app/connectors', label: 'Connectors', icon: <IconConnectors />, adminOnly: true },
   { href: '/app/documents', label: 'Documents', icon: <IconDocuments /> },
+  {
+    href: '/app/org-data',
+    label: 'Organization Data',
+    icon: <IconOrgData />,
+    orgSystemAccess: true,
+  },
   {
     href: '/app/org-system',
     label: 'Organization System',
@@ -512,6 +527,8 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                   ? 'Live glance'
                 : pathname.startsWith('/app/inbox')
                   ? 'Work email'
+                : pathname.startsWith('/app/org-data')
+                  ? 'Organization Data'
                 : pathname.startsWith('/app/org-system')
                   ? 'Organization System'
                 : pathname.startsWith('/app/search')
