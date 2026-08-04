@@ -115,7 +115,8 @@ describe('AuthService SSO', () => {
     sign: jest.fn().mockReturnValue('sso.jwt.token'),
     verify: jest.fn(),
   } as unknown as JwtService;
-  const auth = new AuthService(prisma, jwt);
+  const config = { get: jest.fn() } as unknown as ConfigService;
+  const auth = new AuthService(prisma, jwt, config);
 
   beforeEach(() => {
     jest.clearAllMocks();

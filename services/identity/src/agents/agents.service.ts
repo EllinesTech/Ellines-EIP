@@ -142,9 +142,9 @@ export class AgentsService {
         description: dto.description?.trim().slice(0, 500) || '',
         templateId: dto.templateId || null,
         trigger: dto.trigger,
-        triggerConfig: dto.triggerConfig || {},
-        condition: dto.condition || {},
-        action: dto.action,
+        triggerConfig: (dto.triggerConfig || {}) as any,
+        condition: (dto.condition || {}) as any,
+        action: dto.action as any,
         confidenceThreshold: dto.confidenceThreshold ?? 0.7,
         requireApproval: dto.requireApproval ?? false,
         createdBy: userEmail,
@@ -158,7 +158,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.created',
-        details: { name: agent.name, trigger: agent.trigger },
+        details: { name: agent.name, trigger: agent.trigger } as any,
       },
     });
 
@@ -183,21 +183,15 @@ export class AgentsService {
       where: { id: agentId },
       data: {
         ...(dto.name && { name: dto.name.trim().slice(0, 120) }),
-        ...(dto.description !== undefined && {
-          description: dto.description.trim().slice(0, 500),
-        }),
-        ...(dto.triggerConfig && { triggerConfig: dto.triggerConfig }),
-        ...(dto.condition && { condition: dto.condition }),
-        ...(dto.action && { action: dto.action }),
-        ...(dto.confidenceThreshold !== undefined && {
-          confidenceThreshold: dto.confidenceThreshold,
-        }),
-        ...(dto.requireApproval !== undefined && {
-          requireApproval: dto.requireApproval,
-        }),
+        ...(dto.description !== undefined && { description: dto.description.trim().slice(0, 500) }),
+        ...(dto.triggerConfig && { triggerConfig: dto.triggerConfig as any }),
+        ...(dto.condition && { condition: dto.condition as any }),
+        ...(dto.action && { action: dto.action as any }),
+        ...(dto.confidenceThreshold !== undefined && { confidenceThreshold: dto.confidenceThreshold }),
+        ...(dto.requireApproval !== undefined && { requireApproval: dto.requireApproval }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.isPaused !== undefined && { isPaused: dto.isPaused }),
-      },
+      } as any,
     });
 
     // Audit log
@@ -207,7 +201,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.updated',
-        details: { changes: dto },
+        details: { changes: dto } as any,
       },
     });
 
@@ -229,7 +223,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.deleted',
-        details: { name: existing.name },
+        details: { name: existing.name } as any,
       },
     });
 
@@ -267,9 +261,9 @@ export class AgentsService {
         agentId: agent.id,
         organizationId,
         triggeredBy: dto.triggeredBy || 'manual',
-        triggerPayload: dto.triggerPayload || null,
+        triggerPayload: (dto.triggerPayload || null) as any,
         confidence,
-        reasoning: dto.reasoning || null,
+        reasoning: (dto.reasoning || null) as any,
         recommendedAction: dto.recommendedAction || null,
         status: requiresApproval ? 'pending' : 'executed',
         requiresApproval,
@@ -294,11 +288,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.executed',
-        details: {
-          executionId: execution.id,
-          confidence,
-          requiresApproval,
-        },
+        details: { executionId: execution.id, confidence, requiresApproval } as any,
       },
     });
 
@@ -371,11 +361,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.approved',
-        details: {
-          executionId,
-          decision: dto.decision,
-          note: dto.note,
-        },
+        details: { executionId, decision: dto.decision, note: dto.note } as any,
       },
     });
 
@@ -437,9 +423,9 @@ export class AgentsService {
           agentId: agent.id,
           organizationId,
           triggeredBy: eventType,
-          triggerPayload: eventPayload,
+          triggerPayload: eventPayload as any,
           confidence: score,
-          reasoning: { summary: reasoning, score, conditionMet: true },
+          reasoning: { summary: reasoning, score, conditionMet: true } as any,
           recommendedAction: String((agent.action as Record<string, unknown>)?.type ?? 'act'),
           status: requiresApproval ? 'pending' : 'executed',
           requiresApproval,
@@ -464,13 +450,7 @@ export class AgentsService {
           agentId: agent.id,
           organizationId,
           action: 'agent.executed',
-          details: {
-            executionId: execution.id,
-            eventType,
-            confidence: score,
-            requiresApproval,
-            reasoning,
-          },
+          details: { executionId: execution.id, eventType, confidence: score, requiresApproval, reasoning } as any,
         },
       });
 
@@ -501,7 +481,7 @@ export class AgentsService {
           agentId: exec.agentId,
           organizationId,
           action: 'agent.executed',
-          details: { executionId: exec.id, processedAt: new Date().toISOString() },
+          details: { executionId: exec.id, processedAt: new Date().toISOString() } as any,
         },
       });
     }
@@ -535,22 +515,18 @@ export class AgentsService {
         eventSource: dto.eventSource,
         eventSourceId: dto.eventSourceId || null,
         eventType: dto.eventType,
-        filter: dto.filter || {},
+        filter: (dto.filter || {}) as any,
       },
     });
 
     // Audit log
     await this.prisma.agentAuditLog.create({
       data: {
-        agentId,
+        agentId: subscription.agentId,
         organizationId,
         userId,
         action: 'agent.subscribed',
-        details: {
-          subscriptionId: subscription.id,
-          eventSource: dto.eventSource,
-          eventType: dto.eventType,
-        },
+        details: { subscriptionId: subscription.id, eventSource: dto.eventSource, eventType: dto.eventType } as any,
       },
     });
 
@@ -596,7 +572,7 @@ export class AgentsService {
           subscriptionId,
           eventSource: subscription.eventSource,
           eventType: subscription.eventType,
-        },
+        } as any,
       },
     });
 
@@ -628,7 +604,7 @@ export class AgentsService {
       where: { id: subscriptionId },
       data: {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-        ...(dto.filter && { filter: dto.filter }),
+        ...(dto.filter && { filter: dto.filter as any }),
       },
     });
 
@@ -639,7 +615,7 @@ export class AgentsService {
         organizationId,
         userId,
         action: 'agent.subscription_updated',
-        details: { subscriptionId, changes: dto },
+        details: { subscriptionId, changes: dto } as any,
       },
     });
 
@@ -718,9 +694,9 @@ export class AgentsService {
           agentId: agent.id,
           organizationId,
           triggeredBy: `${eventSource}:${eventType}`,
-          triggerPayload: eventPayload,
+          triggerPayload: eventPayload as any,
           confidence: score,
-          reasoning: { summary: reasoning, score, conditionMet: true, subscriptionId: sub.id },
+          reasoning: { summary: reasoning, score, conditionMet: true, subscriptionId: sub.id } as any,
           recommendedAction: String((agent.action as Record<string, unknown>)?.type ?? 'act'),
           status: requiresApproval ? 'pending' : 'executed',
           requiresApproval,
@@ -752,7 +728,7 @@ export class AgentsService {
             confidence: score,
             requiresApproval,
             reasoning,
-          },
+          } as any,
         },
       });
 
@@ -807,7 +783,7 @@ export class AgentsService {
           score,
           comment,
           confidence: execution.confidence,
-        },
+        } as any,
       },
     });
 

@@ -1,7 +1,7 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
-import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { trace } from '@opentelemetry/api';
 
 /**
@@ -14,12 +14,8 @@ export function initializeTracing() {
     port: parseInt(process.env.JAEGER_PORT || '6831'),
   });
 
-  const tracerProvider = new BasicTracerProvider();
-  tracerProvider.addSpanProcessor(new BatchSpanProcessor(jaegerExporter));
-
   const sdk = new NodeSDK({
-    traceExporter: jaegerExporter,
-    tracerProvider,
+    spanProcessors: [new BatchSpanProcessor(jaegerExporter)],
     instrumentations: [
       getNodeAutoInstrumentations({
         '@opentelemetry/instrumentation-fs': { enabled: false },

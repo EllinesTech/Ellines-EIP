@@ -221,6 +221,14 @@ export default function EnterpriseTimelinePage() {
           if (k !== 'all' && count === 0) return null;
           const meta = k !== 'all' ? KIND_META[k as FeedKind] : null;
           const active = kindFilter === k;
+          // Use hex colors from KIND_META; convert to rgba for alpha backgrounds
+          // so browsers don't fall back to UA white on unsupported 8-digit hex
+          const activeColor = meta?.color || '#a78bfa';
+          // Parse the hex color into r,g,b for rgba() usage
+          const hex = activeColor.replace('#', '');
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
           return (
             <button
               key={k}
@@ -229,9 +237,9 @@ export default function EnterpriseTimelinePage() {
               style={{
                 padding: '0.2rem 0.7rem',
                 borderRadius: 99,
-                border: `1px solid ${active ? (meta?.color || 'rgba(124,58,237,0.6)') + '80' : 'rgba(255,255,255,0.1)'}`,
-                background: active ? (meta?.color || 'rgba(124,58,237,0.6)') + '22' : 'transparent',
-                color: active ? (meta?.color || '#c4b5fd') : 'var(--c-muted)',
+                border: `1px solid ${active ? activeColor : 'rgba(255,255,255,0.1)'}`,
+                background: active ? `rgba(${r},${g},${b},0.15)` : 'transparent',
+                color: active ? activeColor : '#8b95a8',
                 cursor: 'pointer',
                 fontSize: '0.78rem',
                 fontWeight: 600,

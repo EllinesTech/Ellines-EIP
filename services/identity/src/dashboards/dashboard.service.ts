@@ -76,7 +76,7 @@ export class DashboardService {
   ): Promise<Dashboard> {
     return this.prisma.dashboard.update({
       where: { id },
-      data: input,
+      data: input as any,
     });
   }
 
@@ -137,7 +137,7 @@ export class DashboardService {
 
     return this.prisma.widget.update({
       where: { id: widgetId },
-      data: input,
+      data: input as any,
     });
   }
 
@@ -198,7 +198,7 @@ export class DashboardService {
 
     return this.prisma.alert.update({
       where: { id: alertId },
-      data: input,
+      data: input as any,
     });
   }
 

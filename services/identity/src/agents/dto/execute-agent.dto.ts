@@ -7,6 +7,6 @@ export class ExecuteAgentDto {
 }
 
 export class ApproveExecutionDto {
-  decision: 'approved' | 'rejected';
+  decision!: 'approved' | 'rejected';
   note?: string;
 }

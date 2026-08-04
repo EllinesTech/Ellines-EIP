@@ -49,11 +49,10 @@ export class Logger {
    * Log an error with full context
    */
   error(context: LogContext, error: Error) {
-    const { service, operation, ...rest } = context;
+    const { service, operation, level: _level, ...rest } = context;
     const message = error.message || `[${service}] ${operation}`;
 
     this.winstonLogger.error({
-      level: 'error',
       message,
       stack: error.stack,
       timestamp: new Date().toISOString(),

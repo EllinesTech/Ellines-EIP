@@ -69,7 +69,7 @@ export class TemplateService {
    */
   async getConfigSchema(id: string): Promise<Record<string, any>> {
     const template = await this.getById(id);
-    return template.configSchema;
+    return template.configSchema as Record<string, any>;
   }
 
   /**
@@ -82,10 +82,11 @@ export class TemplateService {
     displayName: string,
   ) {
     const template = await this.getById(templateId);
+    const schema = template.configSchema as Record<string, any> | null;
 
     // Merge user config with template defaults
     const mergedConfig = {
-      ...template.configSchema.default,
+      ...(schema?.['default'] ?? {}),
       ...templateConfig,
     };
 
@@ -140,7 +141,7 @@ export class TemplateService {
     input: Omit<ConnectorTemplate, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<ConnectorTemplate> {
     return this.prisma.connectorTemplate.create({
-      data: input,
+      data: input as any,
     });
   }
 
@@ -153,7 +154,7 @@ export class TemplateService {
   ): Promise<ConnectorTemplate> {
     return this.prisma.connectorTemplate.update({
       where: { id },
-      data: input,
+      data: input as any,
     });
   }
 

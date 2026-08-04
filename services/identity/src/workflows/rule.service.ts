@@ -83,7 +83,7 @@ export class RuleService {
   ): Promise<WorkflowRule> {
     return this.prisma.workflowRule.update({
       where: { id },
-      data: input,
+      data: input as any,
     });
   }
 
@@ -158,26 +158,27 @@ export class RuleService {
     }
 
     // Evaluate condition
-    const conditionMet = this.evaluateCondition(rule.condition, context);
+    const conditionMet = this.evaluateCondition(rule.condition as Record<string, any>, context);
 
     if (!conditionMet) {
       return { success: false, message: 'Condition not met' };
     }
 
+    const action = rule.action as Record<string, any>;
     // Log execution
     const execution = await this.prisma.ruleExecution.create({
       data: {
         ruleId,
         triggeredAt: new Date(),
         status: rule.autonomyLevel === 2 ? 'pending' : 'executed',
-        aiRecommendation: { recommendation: `Auto ${rule.action.type}`, confidence: 0.85 },
+        aiRecommendation: { recommendation: `Auto ${action?.type}`, confidence: 0.85 } as any,
         executedAt: rule.autonomyLevel === 2 ? null : new Date(),
       },
     });
 
     return {
       success: true,
-      message: `Rule executed (autonomy level ${rule.autonomyLevel}): ${rule.action.type}`,
+      message: `Rule executed (autonomy level ${rule.autonomyLevel}): ${action?.type}`,
     };
   }
 
@@ -195,11 +196,11 @@ export class RuleService {
   }> {
     const rule = await this.getRule(ruleId, organizationId);
 
-    const conditionMet = this.evaluateCondition(rule.condition, context);
+    const conditionMet = this.evaluateCondition(rule.condition as Record<string, any>, context);
 
     return {
       conditionMet,
-      action: rule.action,
+      action: rule.action as Record<string, any>,
       message: conditionMet
         ? `Condition met. Action: ${JSON.stringify(rule.action)}`
         : 'Condition not met',
