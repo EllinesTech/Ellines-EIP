@@ -844,3 +844,22 @@ These features capture the vision that *EIP should do what no normal system can 
 
 EIP connects and observes SoR. It never writes back. The Data Window makes SoR data *accessible and intelligible* to users without opening multiple legacy systems.
 
+---
+
+## Sprint 10 — Report Comparison & People Contact Intelligence
+
+**Date:** 2026-08-05  
+**Status:** `done`  
+**Builds:** `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `verify:pages-functions` ✅ (118 functions)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S10.1 | **Report comparison view** | `done` | Select any 2 reports in Org Data Window → Ellinea compare panel (LLM + template); numeric delta detection; keyword diff; narrative; side-by-side headers; Export HTML; Copy; panel hidden when <2 reports. `compareReportsApi` + `ReportCompareResultDto` in api.ts. `report-compare.ts` rewritten with `requireAuth` shared helper. |
+| S10.2 | **People page contact modal** | `done` | Click any person card → `PersonModal` with full profile (role/status/source badges, email, branch, dept, member-since), email action link, call stub, Ellinea quick-ask panel. Cards are keyboard-accessible (role=button). `fetchEllineaMemory` added to page load for richer Ellinea context. |
+
+### What ships in Sprint 10
+
+**Report comparison** — in the Org Data Window Reports tab, when two or more reports are available, a "✦ Ellinea: Compare two reports" panel appears. Select Report A and Report B from dropdowns, click Compare. Ellinea detects numeric deltas (improvements ↑ / declines ↓), keyword changes, and writes a natural-language narrative. Works in template mode without LLM; richer with one configured. Export as branded A4 HTML or copy the analysis.
+
+**People contact modal** — every person card in the People directory is now clickable. Opening a card shows a full contact sheet: name, role badge, status, source (EIP vs SoR), email (with mailto link), branch, department, member-since date, a call stub, and an "Ask Ellinea" panel that queries Ellinea with context about that person. Fully keyboard-accessible.
+
