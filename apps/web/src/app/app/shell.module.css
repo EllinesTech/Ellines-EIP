@@ -33,7 +33,7 @@
   overflow: hidden;
   background: var(--dash-bg);
   color: var(--dash-text);
-  font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  font-family: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
   font-size: var(--dash-font);
   line-height: 1.45;
   transition: grid-template-columns 0.28s ease;

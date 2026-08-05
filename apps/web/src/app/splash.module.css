@@ -25,7 +25,7 @@
   gap: 1rem;
   background: var(--ink);
   color: var(--mist);
-  font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  font-family: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: manipulation;

@@ -2044,3 +2044,33 @@ export function compareReportsApi(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+// ─── Sprint 10 — Report comparison + People contact ──────────────────────────
+
+export type ReportComparisonDto = {
+  reportAId: string;
+  reportBId: string;
+  titleA: string;
+  titleB: string;
+  comparison: string;
+  exportHtml: string;
+  mode: 'llm' | 'template';
+  comparedAt: string;
+};
+
+export function compareReports(payload: {
+  reportAId: string;
+  reportBId: string;
+  titleA: string;
+  titleB: string;
+  contentA: string;
+  contentB: string;
+  dateA?: string;
+  dateB?: string;
+  orgName?: string;
+}) {
+  return request<ReportComparisonDto>('/api/v1/orgs/me/report-compare', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

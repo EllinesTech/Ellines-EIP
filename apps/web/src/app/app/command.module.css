@@ -15,7 +15,7 @@
   max-width: 1280px;
   margin: 0 auto;
   color: var(--c-text);
-  font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  font-family: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
 }
 
 .header {

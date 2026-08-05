@@ -22,7 +22,7 @@
   --eip-white: #ffffff;
   --eip-border: rgba(255, 255, 255, 0.1);
   --eip-gradient: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-  --eip-font: 'Exo 2', system-ui, sans-serif;
+  --eip-font: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
   --eip-radius: 14px;
   --eip-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
@@ -166,7 +166,7 @@ input {
     radial-gradient(ellipse 50% 40% at 90% 90%, rgba(37, 99, 235, 0.12), transparent 50%),
     #04060d;
   color: #eef3fb;
-  font-family: 'Exo 2', var(--eip-font), system-ui, sans-serif;
+  font-family: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
 }
 
 .auth-card {
