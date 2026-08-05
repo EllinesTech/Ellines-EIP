@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   askEllineaApi,
+  compareReportsApi,
   fetchEllineaMemory,
   fetchOrgDataWindow,
   interpretReportApi,
@@ -15,6 +16,7 @@ import {
   type OrgDataReportDto,
   type OrgDataWindowDto,
   type EmailSyncResultDto,
+  type ReportCompareResultDto,
 } from '@/lib/api';
 import { isOrgAdminRole } from '@ellines-eip/shared';
 import styles from '../command.module.css';
@@ -157,6 +159,12 @@ export default function OrgDataWindowPage() {
   const [emailSyncResult, setEmailSyncResult] = useState<EmailSyncResultDto | null>(null);
   const [interpretingId, setInterpretingId] = useState<string | null>(null);
   const [interpretResults, setInterpretResults] = useState<Record<string, string>>({});
+  // Report comparison (S10.1)
+  const [compareSelA, setCompareSelA] = useState<string>('');
+  const [compareSelB, setCompareSelB] = useState<string>('');
+  const [comparing, setComparing] = useState(false);
+  const [compareResult, setCompareResult] = useState<ReportCompareResultDto | null>(null);
+  const [compareError, setCompareError] = useState('');
 
   useEffect(() => {
     const s = getSession();
@@ -262,6 +270,37 @@ export default function OrgDataWindowPage() {
     } catch (e) {
       setInterpretResults((prev) => ({ ...prev, [key]: e instanceof Error ? e.message : 'Failed' }));
     } finally { setInterpretingId(null); }
+  }
+
+  async function handleCompareReports() {
+    if (!compareSelA || !compareSelB || compareSelA === compareSelB) return;
+    const repA = reports.find((r) => r.id === compareSelA);
+    const repB = reports.find((r) => r.id === compareSelB);
+    if (!repA || !repB) return;
+    setComparing(true); setCompareResult(null); setCompareError('');
+    try {
+      const res = await compareReportsApi({
+        reportAId: repA.id, reportBId: repB.id,
+        titleA: repA.title, titleB: repB.title,
+        contentA: repA.content || repA.title, contentB: repB.content || repB.title,
+        dateA: repA.generatedAt, dateB: repB.generatedAt,
+        orgName,
+      });
+      setCompareResult(res);
+    } catch (e) {
+      setCompareError(e instanceof Error ? e.message : 'Comparison failed');
+    } finally { setComparing(false); }
+  }
+
+  function downloadCompareHtml() {
+    if (!compareResult?.exportHtml) return;
+    const blob = new Blob([compareResult.exportHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_comparison_${new Date().toISOString().slice(0, 10)}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const tabStyle = (t: Tab): React.CSSProperties => ({
@@ -545,7 +584,102 @@ export default function OrgDataWindowPage() {
             <Link href="/app/reports" className={styles.ghostBtn}>Scheduled Reports →</Link>
           </div>
 
-          {/* ── Report file upload ──────────────────────────────────────── */}
+          {/* ── Report comparison panel ─────────────────────────────────── */}
+          {reports.length >= 2 && (
+            <div style={{ marginTop:'1.1rem', padding:'1rem', background:'rgba(124,58,237,0.06)', border:'1px solid rgba(124,58,237,0.2)', borderRadius:10 }}>
+              <div className={styles.panelLabel} style={{ marginBottom:'0.45rem' }}>✦ Ellinea: Compare two reports</div>
+              <p style={{ fontSize:'0.78rem', color:'var(--c-muted)', marginBottom:'0.75rem' }}>
+                Select any two reports to get a side-by-side Ellinea analysis — deltas, improvements, declines, and a narrative. Export as HTML.
+              </p>
+              <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', alignItems:'center', marginBottom:'0.65rem' }}>
+                <select
+                  value={compareSelA}
+                  onChange={(e) => { setCompareSelA(e.target.value); setCompareResult(null); }}
+                  aria-label="Select Report A"
+                  style={{ flex:'1 1 180px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(124,58,237,0.3)', borderRadius:6, color:'inherit', padding:'0.4rem 0.7rem', fontSize:'0.82rem' }}
+                >
+                  <option value="">— Report A —</option>
+                  {reports.map((r) => (
+                    <option key={r.id} value={r.id} disabled={r.id === compareSelB} style={{ background:'#1e293b' }}>
+                      {r.title} ({r.generatedAt.slice(0,10)})
+                    </option>
+                  ))}
+                </select>
+                <span style={{ color:'var(--c-muted)', fontSize:'0.82rem' }}>vs</span>
+                <select
+                  value={compareSelB}
+                  onChange={(e) => { setCompareSelB(e.target.value); setCompareResult(null); }}
+                  aria-label="Select Report B"
+                  style={{ flex:'1 1 180px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(124,58,237,0.3)', borderRadius:6, color:'inherit', padding:'0.4rem 0.7rem', fontSize:'0.82rem' }}
+                >
+                  <option value="">— Report B —</option>
+                  {reports.map((r) => (
+                    <option key={r.id} value={r.id} disabled={r.id === compareSelA} style={{ background:'#1e293b' }}>
+                      {r.title} ({r.generatedAt.slice(0,10)})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!compareSelA || !compareSelB || compareSelA === compareSelB || comparing}
+                  onClick={() => void handleCompareReports()}
+                  className={styles.aiBtn}
+                  style={{ whiteSpace:'nowrap' }}
+                >
+                  {comparing ? '⟳ Comparing…' : '✦ Compare'}
+                </button>
+              </div>
+
+              {compareError && (
+                <p style={{ color:'#fca5a5', fontSize:'0.82rem', marginBottom:'0.5rem' }}>{compareError}</p>
+              )}
+
+              {compareResult && (
+                <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:8, border:'1px solid rgba(124,58,237,0.25)', padding:'1rem', marginTop:'0.5rem' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'0.65rem', flexWrap:'wrap', gap:'0.5rem' }}>
+                    <div>
+                      <span style={{ fontSize:'0.72rem', fontWeight:700, color:'#c4b5fd' }}>✦ Ellinea Comparison</span>
+                      <span style={{ fontSize:'0.68rem', color:'var(--c-muted)', marginLeft:'0.5rem' }}>
+                        {compareResult.mode === 'llm' ? 'AI-powered' : 'Template analysis'} · {new Date(compareResult.comparedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', gap:'0.4rem', flexWrap:'wrap' }}>
+                      <button type="button" onClick={downloadCompareHtml}
+                        style={{ background:'rgba(37,99,235,0.2)', border:'1px solid rgba(37,99,235,0.35)', borderRadius:6, color:'#93c5fd', padding:'0.2rem 0.6rem', cursor:'pointer', fontSize:'0.72rem', whiteSpace:'nowrap' }}>
+                        ↓ Export HTML
+                      </button>
+                      <button type="button" onClick={() => void copyText(compareResult.comparison, 'compare-copy')}
+                        style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.1)', borderRadius:6, color:'var(--c-muted)', padding:'0.2rem 0.6rem', cursor:'pointer', fontSize:'0.72rem' }}>
+                        {copiedKey === 'compare-copy' ? '✓ Copied' : 'Copy'}
+                      </button>
+                      <button type="button" onClick={() => setCompareResult(null)}
+                        style={{ background:'none', border:'none', color:'var(--c-muted)', cursor:'pointer', fontSize:'0.85rem', lineHeight:1, padding:'0.2rem 0.4rem' }}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem', marginBottom:'0.75rem' }}>
+                    {([
+                      { title: compareResult.titleA, id: compareResult.reportAId },
+                      { title: compareResult.titleB, id: compareResult.reportBId },
+                    ] as { title: string; id: string }[]).map((rep, idx) => {
+                      const r = reports.find((x) => x.id === rep.id);
+                      return (
+                        <div key={idx} style={{ padding:'0.6rem 0.85rem', background:'rgba(255,255,255,0.04)', borderRadius:7, border:'1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ fontSize:'0.72rem', color:'#c4b5fd', fontWeight:700, marginBottom:'0.15rem' }}>
+                            {idx === 0 ? 'Report A' : 'Report B'}
+                          </div>
+                          <div style={{ fontSize:'0.82rem', fontWeight:700 }}>{rep.title}</div>
+                          {r && <div style={{ fontSize:'0.72rem', color:'var(--c-muted)', marginTop:'0.1rem' }}>{new Date(r.generatedAt).toLocaleString()} · {r.source}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize:'0.83rem', color:'#e2e8f0', whiteSpace:'pre-line', lineHeight:1.65, margin:0 }}>
+                    {compareResult.comparison}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {orgAdmin && (
             <div style={{ marginTop:'1.1rem', padding:'1rem', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10 }}>
               <div className={styles.panelLabel} style={{ marginBottom:'0.35rem' }}>Upload Report File</div>

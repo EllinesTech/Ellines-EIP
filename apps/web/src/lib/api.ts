@@ -2014,3 +2014,33 @@ export function sendEllineaDigest(force = false) {
     body: JSON.stringify({ force }),
   });
 }
+
+// ─── Report Comparison (S10.1) ───────────────────────────────────────────────
+
+export type ReportCompareResultDto = {
+  reportAId: string;
+  reportBId: string;
+  titleA: string;
+  titleB: string;
+  comparison: string;
+  exportHtml: string;
+  mode: 'llm' | 'template';
+  comparedAt: string;
+};
+
+export function compareReportsApi(payload: {
+  reportAId: string;
+  reportBId: string;
+  titleA: string;
+  titleB: string;
+  contentA: string;
+  contentB: string;
+  dateA: string;
+  dateB: string;
+  orgName?: string;
+}) {
+  return request<ReportCompareResultDto>('/api/v1/orgs/me/report-compare', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
