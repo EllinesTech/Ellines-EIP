@@ -49,7 +49,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import settingsStyles from './settings.module.css';
-./DatabaseConfigPage
+
 // ─── API Keys sub-component ───────────────────────────────────────────────────
 function ApiKeysSection() {
   const [keys, setKeys] = useState<ApiKeyDto[]>([]);
