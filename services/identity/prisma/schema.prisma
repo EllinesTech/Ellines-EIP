@@ -49,6 +49,8 @@ model Organization {
   workflowRules          WorkflowRule[]          // Track C: Autonomous Workflows
   ellineaAgents          EllineaAgent[]          // v2.0 A.1: Autonomous Agents
   agentSubscriptions     AgentWebhookSubscription[] @relation("AgentSubscriptions")
+  databaseConfigs        DatabaseConfiguration[]   // Multi-database support
+  databaseSwitchLogs     DatabaseSwitchLog[]     // Database switch audit trail
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -892,3 +894,96 @@ model AgentWebhookSubscription {
 }
 
 
+
+// ─── Database Configuration (Multi-database Support) ─────────────────────────
+
+/**
+ * DatabaseConfiguration — Organizations can configure multiple databases (local + cloud).
+ * Admin can switch primary database without code changes.
+ * Supports: Local PostgreSQL, Supabase, Custom PostgreSQL servers.
+ * 
+ * Usage:
+ * - Client chooses: local database (on-premise) OR supabase (cloud) OR custom server
+ * - Admin can test connection before switching
+ * - Switch marked as "primary" to use for all operations
+ * - Optional backup sync (local ↔ cloud)
+ */
+model DatabaseConfiguration {
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  
+  // Basic info
+  name              String                     // "Local Ubuntu", "Supabase Production", "Custom PG Server"
+  type              String                     // 'local' | 'supabase' | 'custom_postgres'
+  description       String    @default("")    @map("description")
+  
+  // Connection details (encrypted in production)
+  host              String?                    // localhost | supabase-id.supabase.co | remote-server.com
+  port              Int       @default(5432)
+  username          String?                    @map("username")
+  passwordEncrypted String?   @map("password_encrypted")  // Encrypted with org encryption key
+  databaseName      String?   @map("database_name")
+  
+  // Supabase specific
+  supabaseUrl       String?   @map("supabase_url")        // https://xxx.supabase.co
+  supabaseKeyEncrypted String? @map("supabase_key_encrypted")  // Encrypted API key
+  
+  // Custom PostgreSQL additional options
+  sslMode           String    @default("require") @map("ssl_mode")  // prefer | require | disable
+  connectionTimeout Int       @default(30) @map("connection_timeout")  // Seconds
+  
+  // Status
+  isPrimary         Boolean   @default(false) @map("is_primary")       // Primary database for all operations
+  isActive          Boolean   @default(true) @map("is_active")
+  testStatus        String    @default("untested")  @map("test_status") // untested | success | failed
+  testMessage       String?   @map("test_message")  // Last test error/success message
+  lastTestedAt      DateTime? @map("last_tested_at")
+  
+  // Sync configuration (for hybrid setups)
+  enableAutoSync     Boolean   @default(false) @map("enable_auto_sync")  // Auto-sync local ↔ cloud
+  syncDirection      String    @default("bidirectional") @map("sync_direction")  // local-to-cloud | cloud-to-local | bidirectional
+  lastSyncAt        DateTime? @map("last_sync_at")
+  syncStatus        String?   @map("sync_status")  // syncing | success | failed
+  
+  // Metadata
+  createdBy         String    @map("created_by")  // User who created this config
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([isPrimary])
+  @@index([type])
+  @@map("database_configurations")
+}
+
+/**
+ * DatabaseSwitchLog — Audit trail of database switches (for compliance).
+ * Tracks who switched databases, when, and why.
+ */
+model DatabaseSwitchLog {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  configId          String   @map("config_id")  // Which config was switched TO
+  previousConfigId  String?  @map("previous_config_id")  // Which config was switched FROM
+  
+  switchedBy        String   @map("switched_by")  // User ID who made the switch
+  reason            String?  // Optional: why was the switch made
+  
+  // Sync details (if data was migrated)
+  syncPerformed     Boolean  @default(false) @map("sync_performed")
+  recordsMigrated   Int?     @map("records_migrated")
+  durationSeconds   Int?     @map("duration_seconds")
+  syncStatus        String?  @map("sync_status")  // success | partial | failed
+  syncError         String?  @map("sync_error")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("database_switch_logs")
+}
