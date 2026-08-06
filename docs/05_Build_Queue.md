@@ -1381,28 +1381,48 @@ After S14 completes:
 ## BUILD BLOCKER: React #31 Error During Static Export (2026-08-06)
 
 **Status:** `blocked` — `npm run build -w @ellines-eip/web` fails with React error #31 during static export  
-**Root Cause:** During static export (output: 'export'), Next.js 15.5.22 attempts to pre-render 404/500 error pages at build time. This triggers an unidentified issue during page pre-rendering that manifests as React error #31 on the root layout or error pages.
+**Root Cause:** During static export (output: 'export'), Next.js 15.5.22 attempts to pre-render 404/500 error pages at build time. This triggers an unidentified React serialization issue (error #31: "Objects are not valid as a React child") that prevents the build from completing.
 
 **Actions Taken:**
 - ✅ Restructured `/app` directory to route group `/(app)` (committed 8ee8b88)
 - ✅ Fixed client-side hydration mismatch by restoring `suppressHydrationWarning` on root layout
 - ✅ Copied Exo2 fonts to public/ for local serving
+- ✅ Created minimal error.tsx and error boundary — did not resolve React #31
+- ✅ Modified not-found.tsx to be completely static — did not resolve React #31
+- ✅ Attempted `output: 'standalone'` mode — incompatible with Cloudflare Pages wrangler.toml configuration
+- ✅ Tested with clean build cache — error persists
 - ✅ Dev server (`npm run dev:web`) works correctly (local development is not blocked)
 
 **Current Behavior:**
 - ✅ `npm run build:shared` — passes
-- ✅ `npm run verify:pages-functions` — passes (118 functions)
-- ✅ `npm run dev -w @ellines-eip/web` — runs on http://localhost:3100 (development works)
-- ✗ `npm run build -w @ellines-eip/web` — fails on `/404` page pre-render with React #31
+- ✅ `npm run verify:pages-functions` — passes (121 functions)
+- ✅ `npm run dev -w @ellines-eip/web` — runs on http://localhost:3100 (development works fine)
+- ✗ `npm run build -w @ellines-eip/web` — fails on `/404` page pre-render with React #31 minified error
 
-**Hypothesis:** The static export pre-rendering process has an issue that only manifests when building to static HTML. The error is minified and non-deterministic to track. Since dev server works, local development can continue while this is investigated further.
+**Technical Details:**
+- Error originates during "Generating static pages" phase
+- Happens on both `/404` and `/500` pages
+- Appears to be a React serialization issue in the component tree during static export
+- Unrelated to specific component code (error persists with minimal error/404 pages)
+- Minified error message references React error #31 invariant
 
-**Next Steps for Resolution:**
-1. **Check if deployment succeeds despite build error**: Pages cache may allow deployment without the failed build
-2. **Try Node 22.11.0 LTS**: Downgrade from current Node 24.12.0 to match recommended version
-3. **Downgrade Next.js**: Try 15.5.21 or 15.5.20 to rule out version-specific bug
-4. **Alternative output mode**: Test `output: 'standalone'` to see if Pages Functions can handle it without static export
-5. **File-level debugging**: Add console.log to notFound.tsx + error.tsx to trace where error originates
+**Hypothesis:** 
+The static export pre-rendering process has a fundamental incompatibility with the current Next.js 15.5.22 + React 19 + Cloudflare Pages configuration. The error only manifests during static export generation of error pages, suggesting a framework-level issue rather than application code.
 
-**Development Unblocked:** Use `npm run dev:web` to continue UI work locally. Static export blocker is isolated to build pipeline, not development or Pages runtime.
+**Constraints:**
+- Cannot use `output: 'standalone'` because wrangler.toml is configured for `pages_build_output_dir = "apps/web/out"` (expects static files from static export)
+- Cannot modify wrangler.toml without re-architecting Pages Function serving
+- Error is non-deterministic and minified, difficult to debug
+
+**Next Steps for Resolution (Priority Order):**
+1. **Test Next.js 15.5.21 or 15.5.20**: Downgrade to previous patch version to rule out version-specific bug
+2. **Test React 18.3 instead of 19**: Check if React 19 has a regression in serialization
+3. **Investigate Pages Functions routing**: Can Pages Functions serve standalone Next.js app without static export?
+4. **Report to Next.js/Vercel**: If confirmed as framework bug, report with minimal reproduction case
+5. **Consider hybrid rendering**: Mix static and server-side rendering to avoid pre-rendering error pages
+
+**Development Unblocked:** `npm run dev:web` works perfectly. Local development and testing can proceed. Static export blocker only affects GitHub Actions deployment pipeline.
+
+**Sprint 14 Status:** Multi-database configuration work (S14.1–S14.3) is complete and code is ready. Cannot merge to main due to this build blocker. Code is committed locally; awaiting build fix to push to origin.
+
 
