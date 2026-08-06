@@ -945,6 +945,411 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 **Next phase:** Integrate UI into Settings page sidebar, then deploy to live.
 
+---
+
+## Sprint 14 — Multi-Database Integration & Settings UI
+
+**Date:** 2026-08-06 (Next)  
+**Status:** `next`  
+**Priority:** P0 - Blocks client on-premise/cloud choice
+
+### Task List (Detailed for Follow-up)
+
+| ID | Task | Subtasks | Status | Notes |
+|----|------|----------|--------|-------|
+| S14.1 | **Integrate DatabaseConfigPage into Settings sidebar** | • Import component in Settings layout<br/>• Add sidebar nav link (only for Owner/Admin)<br/>• Style to match existing settings sections<br/>• Test navigation from main settings page | `todo` | Location: `apps/web/src/app/app/settings/page.tsx`<br/>Component ready at: `apps/web/src/app/app/settings/DatabaseConfigPage.tsx` |
+| S14.2 | **Backend database switcher service** | • Create `DatabaseSwitcherService` in NestJS<br/>• Implement connection pool management<br/>• Add runtime database detection (which DB is primary)<br/>• Cache active connection for performance | `todo` | File: `services/identity/src/database/database-switcher.service.ts`<br/>Must handle: PostgreSQL, Supabase, custom servers |
+| S14.3 | **Wire database switching to all queries** | • Update Prisma client initialization<br/>• Make database selection automatic per organization<br/>• Ensure all repositories use switched database<br/>• No code changes needed in controllers | `todo` | Pattern: Get org from JWT → look up primary DB → use that connection<br/>Fallback to localhost:5432 if none configured |
+| S14.4 | **Test database switching locally** | • Setup: Local PostgreSQL on localhost:5432<br/>• Create second test database on 5433<br/>• Add first config to Admin UI (localhost:5432)<br/>• Add second config (localhost:5433)<br/>• Switch between them, verify data persists in each | `todo` | Commands:<br/>`createdb -p 5432 test_db_1`<br/>`createdb -p 5433 test_db_2`<br/>Then switch via UI |
+| S14.5 | **Test with Supabase (optional)** | • Create free Supabase account<br/>• Create test project<br/>• Add Supabase config via Admin UI<br/>• Test connection validation<br/>• Do NOT switch primary yet | `todo` | Supabase free tier: 2 projects<br/>URL: https://supabase.com<br/>Keep credentials safe! |
+| S14.6 | **Document setup guide for clients** | • Create `docs/14_Database_Configuration_Guide.md`<br/>• Show: Local setup, Supabase setup, switching<br/>• Include: troubleshooting, security (encrypt passwords)<br/>• Add: Step-by-step screenshots/examples | `todo` | Audiences:<br/>- IT Admin (how to configure)<br/>- Developers (how it works)<br/>- Clients (on-premise vs cloud) |
+| S14.7 | **Security: Encrypt database passwords** | • Replace btoa() with proper encryption in API<br/>• Use org's encryption key for passwords<br/>• Decrypt only when needed for connections<br/>• Never return plaintext in API responses | `todo` | Current: btoa() (BASE64 - NOT SECURE)<br/>TODO: Use libsodium/NaCl<br/>Keys: stored in Supabase settings |
+| S14.8 | **Build & verify** | • `npm run verify:pages-functions` (121+ functions)<br/>• `npm run build:shared` (all packages)<br/>• `npm run build -w @ellines-eip/identity` (NestJS)<br/>• Fix any TypeScript errors | `todo` | Must pass all builds before merging<br/>Note: Web build has pre-existing React #31 issue |
+| S14.9 | **Commit & push** | • Stage all changes<br/>• Commit with message: "feat(S14): integrate database configuration..."<br/>• Push to main → triggers GitHub Actions deploy | `todo` | Commits go to GitHub main branch<br/>Pages Functions auto-deploy<br/>Identity API auto-deploy (if touched) |
+
+---
+
+## Sprint 14 Implementation Guide
+
+### Step-by-Step Execution
+
+#### **S14.1: Integrate DatabaseConfigPage into Settings**
+
+**File: `apps/web/src/app/app/settings/page.tsx`**
+
+```typescript
+// Add to imports at top
+import DatabaseConfigPage from './DatabaseConfigPage';
+
+// Add to the settings sections (somewhere in JSX)
+export default function SettingsPage() {
+  return (
+    <div>
+      {/* existing sections... */}
+      
+      {/* NEW: Database Configuration */}
+      {isOwnerOrAdmin && <DatabaseConfigPage />}
+      
+      {/* existing sections... */}
+    </div>
+  );
+}
+```
+
+**Expected behavior:**
+- Only Owner/Admin can see the section
+- Can list, add, test, switch databases
+- Changes take effect immediately
+
+---
+
+#### **S14.2: Create DatabaseSwitcherService**
+
+**File: `services/identity/src/database/database-switcher.service.ts`**
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
+import { DataSource } from 'typeorm';
+
+@Injectable()
+export class DatabaseSwitcherService {
+  private dataSources: Map<string, DataSource> = new Map();
+
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Get active database for organization
+   * Lookup: org JWT → DatabaseConfiguration with isPrimary=true → return connection
+   */
+  async getActiveDatabase(organizationId: string) {
+    const config = await this.prisma.databaseConfiguration.findFirst({
+      where: {
+        organizationId,
+        isPrimary: true,
+        isActive: true,
+      },
+    });
+
+    if (!config) {
+      // Fallback to default
+      return { host: 'localhost', port: 5432, database: 'ellines_eip' };
+    }
+
+    return {
+      host: config.host || 'localhost',
+      port: config.port,
+      database: config.databaseName,
+      type: config.type,
+    };
+  }
+
+  /**
+   * Test connection to database
+   */
+  async testConnection(config: any): Promise<boolean> {
+    try {
+      // Implementation: try to connect, return true/false
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+```
+
+**Wire into app:**
+```typescript
+// In AppModule
+import { DatabaseSwitcherService } from './database/database-switcher.service';
+
+@Module({
+  providers: [DatabaseSwitcherService],
+})
+export class AppModule {}
+```
+
+---
+
+#### **S14.3: Make Database Selection Automatic**
+
+**Pattern in every repository:**
+
+```typescript
+// Before (hardcoded database):
+const users = await this.prisma.user.findMany();
+
+// After (switch per org):
+async findUsersByOrg(organizationId: string) {
+  // 1. Get active database for org
+  const dbConfig = await this.dbSwitcher.getActiveDatabase(organizationId);
+  
+  // 2. Prisma client already uses the right database
+  // (switched at connection time based on org)
+  const users = await this.prisma.user.findMany();
+  
+  return users;
+}
+```
+
+**Key insight:** Switch the Prisma connection at request time, not per query.
+
+---
+
+#### **S14.4: Local Testing**
+
+**Terminal 1: Setup test databases**
+```bash
+# Database 1 (primary)
+createdb -p 5432 test_db_1
+
+# Database 2 (for switching)
+createdb -p 5433 test_db_2
+
+# Verify
+psql -p 5432 -l  # list databases
+```
+
+**Terminal 2-3: Run app normally**
+```bash
+npm run dev:identity
+npm run dev:web
+```
+
+**Testing flow:**
+```
+1. Open http://localhost:3100
+2. Login as Owner
+3. Go to Settings → Database Configuration
+4. Add config: name="Local DB 1", host=localhost, port=5432, db=test_db_1
+5. Add config: name="Local DB 2", host=localhost, port=5433, db=test_db_2
+6. Test each connection (should succeed)
+7. Click "Set as Primary" on DB 1
+8. Create test organization/data
+9. Switch to DB 2
+10. Verify: data is now on DB 2, DB 1 is empty
+11. Switch back to DB 1
+12. Verify: data is back
+```
+
+---
+
+#### **S14.5: Optional Supabase Testing**
+
+**Setup (5 minutes):**
+```
+1. Go to supabase.com
+2. Sign up (free account)
+3. Create project (wait for provisioning)
+4. Copy connection URL and API key
+5. In Admin UI: Add config
+   - Name: "Supabase Test"
+   - Type: "supabase"
+   - URL: https://xxx.supabase.co
+   - Key: (your API key)
+6. Click "Test Connection"
+7. Should see: "Supabase credentials validated"
+```
+
+**Do NOT switch primary to Supabase yet** - just verify connection works.
+
+---
+
+#### **S14.6: Documentation**
+
+**File: `docs/14_Database_Configuration_Guide.md`**
+
+```markdown
+# Database Configuration Guide
+
+## Overview
+Organizations can use:
+- Local PostgreSQL (on-premise)
+- Supabase (cloud)
+- Custom PostgreSQL server
+
+No code changes needed to switch.
+
+## For IT Admin
+
+### Local Setup
+1. Install PostgreSQL
+2. Create database: `createdb ellines_eip`
+3. In Settings → Database Configuration
+4. Add config: localhost, 5432, ellines_eip
+5. Test connection
+6. Set as primary
+
+### Supabase Setup
+1. Create account at supabase.com
+2. Create project
+3. Copy connection URL
+4. In Settings → Database Configuration
+5. Add Supabase config
+6. Paste URL and API key
+7. Test connection
+8. Set as primary
+
+## Security
+- All passwords encrypted at rest
+- Never shown in UI after creation
+- Only Owner/Admin can configure
+- All switches logged in audit trail
+
+## Troubleshooting
+- Connection refused? Check firewall/port
+- Wrong credentials? Test before switching
+- Data lost? Check audit log to see which DB was active
+```
+
+---
+
+#### **S14.7: Password Encryption**
+
+**Replace in `apps/web/functions/api/v1/orgs/me/database-config.ts`:**
+
+```typescript
+// CURRENT (INSECURE):
+password_encrypted: password ? btoa(password) : null,
+
+// SHOULD BE (SECURE):
+import { encrypt } from '../../../../../shared/encryption'; // create this module
+
+password_encrypted: password ? encrypt(password, orgId) : null,
+```
+
+**Create: `apps/web/functions/shared/encryption.ts`**
+
+```typescript
+// Simple encryption using crypto
+export function encrypt(plaintext: string, key: string): string {
+  // TODO: implement with libsodium or similar
+  // For now, use btoa as placeholder
+  return btoa(plaintext);
+}
+
+export function decrypt(encrypted: string, key: string): string {
+  return atob(encrypted);
+}
+```
+
+---
+
+#### **S14.8: Build Verification**
+
+```bash
+# 1. Pages Functions
+npm run verify:pages-functions
+# Expected: "Pages Functions import check OK (121+ files)"
+
+# 2. Shared packages
+npm run build:shared
+# Expected: All packages build without errors
+
+# 3. Identity API (if touched)
+npm run build -w @ellines-eip/identity
+# Expected: NestJS build succeeds
+
+# 4. Fix any TypeScript errors
+# If errors: read error message, fix in code, retry
+```
+
+---
+
+#### **S14.9: Commit & Deploy**
+
+```bash
+# Stage all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat(s14): integrate database configuration ui
+
+- Integrate DatabaseConfigPage into Settings sidebar
+- Add DatabaseSwitcherService for runtime DB switching
+- Wire database selection to all queries
+- Support local, Supabase, custom PostgreSQL
+- Full audit trail of database switches
+- Test connection before creating
+- 121+ Pages Functions verified
+- All builds passing"
+
+# Push to main (triggers GitHub Actions)
+git push origin main
+
+# GitHub Actions will:
+# 1. Run builds
+# 2. Deploy Pages Functions
+# 3. Deploy identity API (if touched)
+```
+
+---
+
+## Success Criteria
+
+When Sprint 14 is done, you should have:
+
+✅ Admin UI integrated into Settings  
+✅ Can add multiple database configs  
+✅ Can test connections  
+✅ Can switch primary database  
+✅ Data persists on the chosen database  
+✅ All switches logged in audit trail  
+✅ Builds passing (121+ functions verified)  
+✅ Code pushed to GitHub main  
+✅ Documentation for clients  
+
+---
+
+## Follow-up Tasks (Sprint 15+)
+
+After S14 completes:
+
+1. **Test Ubuntu server setup**
+   - Install PostgreSQL on Ubuntu
+   - Add via Database Configuration
+   - Make it primary
+   - Access from laptop via SSH tunnel
+
+2. **Prepare for production**
+   - Deploy to Render backend
+   - Use Supabase for cloud database
+   - Test switching between local (for staging) and cloud (for production)
+
+3. **Client onboarding**
+   - Give clients documentation
+   - Help them choose: local vs cloud
+   - Migrate data if switching
+
+---
+
+## Important Notes for Follow-up
+
+**When picking this up later:**
+
+1. **All code is written** - just needs integration
+2. **Database schema is in Prisma** - just needs `npm run db:push`
+3. **API endpoints are ready** - tests connection already implemented
+4. **UI component is complete** - just needs to be added to Settings page
+5. **No external services needed yet** - works fully local for development
+
+**Files created in Sprint 13:**
+- `services/identity/prisma/schema.prisma` (add relations)
+- `apps/web/functions/api/v1/orgs/me/database-config.ts`
+- `apps/web/functions/api/v1/orgs/me/database-config/test-connection.ts`
+- `apps/web/functions/api/v1/orgs/me/database-config/switch-primary.ts`
+- `apps/web/src/lib/api.ts` (new functions)
+- `apps/web/src/app/app/settings/DatabaseConfigPage.tsx`
+
+**Next steps in S14:**
+- Integrate UI into Settings
+- Create backend service
+- Test with local databases
+- Document for clients
+- Build and push
+
+
+
 
 
 **Date:** 2026-08-06  
