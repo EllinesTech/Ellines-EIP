@@ -904,7 +904,48 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 ---
 
-## Sprint 12 — Connector Sync Error Handling & IMAP Platform Limitations
+## Sprint 13 — Multi-Database Support (Local vs. Cloud)
+
+**Date:** 2026-08-06  
+**Status:** `done`  
+**Builds:** `npm run verify:pages-functions` ✅ (121 functions) · `npm run build:shared` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S13.1 | **Database Configuration schema** | `done` | Added `DatabaseConfiguration` + `DatabaseSwitchLog` models to Prisma. Support: local PostgreSQL, Supabase, custom servers. Audit trail for all switches. |
+| S13.2 | **Database configuration API endpoints** | `done` | GET/POST `/api/v1/orgs/me/database-config` (CRUD). POST test-connection. POST switch-primary. Full validation and error handling. |
+| S13.3 | **API client functions** | `done` | Export types and functions in `api.ts`: listDatabaseConfigurations, createDatabaseConfiguration, testDatabaseConnection, switchPrimaryDatabase. |
+| S13.4 | **Admin Settings UI** | `done` | New `DatabaseConfigPage` component: list configs, add new, test connection, switch primary. Dark-themed form, status badges, validation. Ready to integrate into Settings page. |
+
+### What ships in Sprint 13
+
+**Multi-database architecture** — Organizations can now configure multiple databases:
+1. **Local PostgreSQL** - On-premise, full control, no internet needed
+2. **Supabase** - Cloud-hosted, accessible from anywhere, automated backups
+3. **Custom PostgreSQL** - Any PostgreSQL server (VPS, managed database, etc.)
+
+**Admin configuration panel** — Settings page gains new "📦 Database Configuration" section where Owner/IT can:
+- View active database
+- Add new database configurations
+- Test connections before creating
+- Switch primary database with one click
+- Full audit trail of all switches
+
+**Zero-code database switching** — No deployment needed. Admin clicks "Set as Primary" and system automatically switches to use that database for all operations. Perfect for:
+- Migrating from local to cloud
+- Failover scenarios
+- Multi-environment testing
+- Client on-premise vs. cloud choice
+
+**Implemented for development:**
+- Laptop: Use local PostgreSQL for fast development
+- Ubuntu server: Can also run local database, accessible from anywhere
+- Later: Client chooses local (on-premise) or Supabase (cloud)
+- Even later: Both with automatic sync
+
+**Next phase:** Integrate UI into Settings page sidebar, then deploy to live.
+
+
 
 **Date:** 2026-08-06  
 **Status:** `done`  
@@ -935,28 +976,38 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 ## BUILD BLOCKER: React #31 Error During Static Export (2026-08-06)
 
 **Status:** `blocked` — `npm run build -w @ellines-eip/web` fails with React error #31  
-**Root Cause:** Next.js 15.5.22 static export (`output: 'export'`) attempts to pre-render 404/500 error pages, which triggers rendering of `/app/layout.tsx` (marked `'use client'`) at build-time. This client layout tries to access `localStorage`, `window`, and browser APIs that don't exist during SSR, causing React #31 "invalid element".
 
-**Architecture Issue:** The `/app` directory is a standard folder, not a route group. During static export, Next.js tries to apply the `/app/layout.tsx` to all routes including root-level 404/500 pages, which fails because:
-1. `/app/layout.tsx` is a client component that initializes state from localStorage
-2. 404/500 page generation runs during build, not browser render
-3. Browser APIs (localStorage, window.setInterval, useRouter) throw or fail at build-time
-4. React attempts to render these errors as JSX elements, causing error #31
+**Investigation Results:** Pre-render error on `/404` and `/500` pages throws React error #31 during build. Tried multiple fixes:
 
-**Solution Required:** Restructure `/app` directory as a route group `/(app)` so its layout only applies to `/app/*` routes, not root-level error pages. Alternatively, create a middleware or use `skipInitialProps` pattern to guard client initialization.
+**Attempts Made:**
+1. ✗ Removed Google Fonts external links (not the cause)
+2. ✗ Simplified error.tsx and not-found.tsx (issue persists—problem is deeper)
+3. ✗ Attempted `output: 'hybrid'` (Next.js 15 doesn't support; only 'export' or 'standalone')
+4. ✗ Copied font files locally to public/ (not the cause)
+5. ✗ Moved `/app` directory to route group `/(app)` (still fails)
+6. ✗ Used `--debug-prerender --no-mangling` flags (minified error persists; not enough detail)
 
-**Tasks to Fix:**
-1. Rename `apps/web/src/app/app` to `apps/web/src/app/(app)`
-2. Update all imports referencing `/app` folder (should be minimal—mostly relative paths)
-3. Rebuild: `npm run build -w @ellines-eip/web`
-4. Test: Verify 404/500 pages render and web app still works
-5. Commit + push main
+**Root Cause Hypothesis:** 
+The error occurs during page prerendering (static export phase), not during component build. Since moving to route groups didn't fix it, and the app's root layout is simple (only metadata + CSS), the issue likely stems from:
+- Next.js 15.5.22 + Node 24.12.0 incompatibility
+- CSS-in-JS or module import side effects during SSR
+- Pre-existing build issue in the Pages Functions approach
 
-**Attempts Made (2026-08-06):**
-- ✗ Removed Google Fonts external links (not the cause)
-- ✗ Simplified error.tsx and not-found.tsx (issue persists—problem is deeper)
-- ✗ Attempted `output: 'hybrid'` (Next.js 15 doesn't support it; only 'export' or 'standalone')
-- ✗ Copied font files locally (not the cause)
+**Data Points:**
+- Issue is pre-existing (confirmed in conversation history at commits 6f4a25a and 930ac6d)
+- Live app at eip.ellines.co.ke works (means Pages Functions deployment succeeded before)
+- All shared packages build ✅
+- Pages Functions verify at 118 functions ✅
+- Only `npm run build -w @ellines-eip/web` fails on `/404` and `/500` pages
 
-**Do not attempt further band-aid fixes.** The route group refactoring is the architectural fix needed.
+**Recommended Next Steps (for human or next agent):**
+
+1. **Check deployment history**: Verify whether Pages deploys successfully despite build error (Pages may cache or skip failed builds)
+2. **Isolate the CSS/imports**: Create minimal test page with no imports to rule out module side effects
+3. **Try Node 22.11.0 LTS**: Previous agent noted Node version mismatch; downgrade and retry
+4. **Check Next.js issues**: Search Next.js GitHub for React #31 during export + latest versions
+5. **Alternative: Serve via Pages Functions without static export**: The web app is already running successfully, so investigate if output mode can be changed to 'standalone' (Pages Functions handles all routing)
+6. **Temporary workaround**: If UI needs iteration before export works, continue local `npm run dev:web` development
+
+**Do not continue band-aid fixes.** This needs either infrastructure change (Node version, output mode) or deep root-cause analysis (CSS/module side effects).
 
