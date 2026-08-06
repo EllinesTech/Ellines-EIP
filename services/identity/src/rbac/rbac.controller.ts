@@ -15,7 +15,7 @@ function requireOwner(req: AuthRequest) {
   }
 }
 
-@Controller('api/v1/orgs/me/custom-roles')
+@Controller('orgs/me/custom-roles')
 @UseGuards(JwtAuthGuard)
 export class RbacController {
   constructor(private readonly rbac: RbacService) {}

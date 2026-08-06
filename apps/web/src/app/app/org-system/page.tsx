@@ -12,7 +12,7 @@ import { canAccessOrgSystem } from '@/lib/org-ui-policy';
 import styles from '../command.module.css';
 
 const PRODUCT_LEDE =
-  'Ellines EIP sits above your Systems of Record (ERP, CRM, HIS like Hospidia, HR). It connects and observes — it does not replace them. After sync, Organization System surfaces everything connected systems expose for Owner / IT (and work roles when authorized in Settings). Ellinea AI stays in the loop.';
+  'Ellines EIP sits above your Systems of Record (ERP, CRM, HIS, HR). It connects and observes — it does not replace them. After sync, Organization System surfaces everything connected systems expose for Owner / IT (and work roles when authorized in Settings). Ellinea AI stays in the loop.';
 
 export default function OrgSystemHubPage() {
   const router = useRouter();

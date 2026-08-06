@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { TemplateService } from './template.service';
 
-@Controller('api/v1/connectors/templates')
+@Controller('connectors/templates')
 export class TemplateController {
   constructor(private templateService: TemplateService) {}
 

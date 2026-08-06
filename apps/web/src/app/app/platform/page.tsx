@@ -254,13 +254,13 @@ export default function PlatformAdminPage() {
             <span style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} aria-hidden />
             <strong>Platform</strong> {platformHealth.version}
           </span>
-          <span style={{ color: 'var(--text-muted)' }}>Uptime {Math.floor(platformHealth.uptimeSeconds / 60)}m</span>
+          <span style={{ color: 'var(--text-muted)' }}>Uptime {Math.floor((platformHealth.uptimeSeconds ?? 0) / 60)}m</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: platformHealth.email.live ? '#22c55e' : '#f59e0b', display: 'inline-block' }} aria-hidden />
-            Email: {platformHealth.email.live ? `live (${platformHealth.email.provider})` : 'simulated — set RESEND_API_KEY or SMTP_* on Pages'}
+            <span style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: platformHealth.email?.live ? '#22c55e' : '#f59e0b', display: 'inline-block' }} aria-hidden />
+            Email: {platformHealth.email?.live ? `live (${platformHealth.email?.provider})` : 'simulated — set RESEND_API_KEY or SMTP_* on Pages'}
           </span>
           <span style={{ color: 'var(--text-muted)', marginLeft: 'auto', fontFamily: 'monospace', fontSize: '0.75rem' }}>
-            {new Date(platformHealth.ts).toLocaleTimeString()}
+            {platformHealth.ts ? new Date(platformHealth.ts).toLocaleTimeString() : '—'}
           </span>
         </div>
       ) : null}
@@ -370,7 +370,7 @@ export default function PlatformAdminPage() {
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              placeholder="hospidia-read"
+              placeholder="his-read"
             />
           </label>
           <label>
@@ -378,7 +378,7 @@ export default function PlatformAdminPage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Hospidia — Patients / Billing (read)"
+              placeholder="Generic HIS — Patients / Billing (read)"
             />
           </label>
           <label>
@@ -413,7 +413,7 @@ export default function PlatformAdminPage() {
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Read-only sync for Hospidia reporting"
+              placeholder="Read-only sync for HIS reporting"
             />
           </label>
           <button

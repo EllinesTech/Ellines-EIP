@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { RuleService } from './rule.service';
 
-@Controller('api/v1/workflows/rules')
+@Controller('workflows/rules')
 export class RuleController {
   constructor(private ruleService: RuleService) {}
 

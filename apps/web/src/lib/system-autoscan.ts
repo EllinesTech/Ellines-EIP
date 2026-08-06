@@ -108,24 +108,13 @@ export const COMMON_LOCAL_PORTS: { port: number; hint: string; catalogHint?: Pre
  */
 export const SYSTEM_CATALOG: SystemCatalogEntry[] = [
   {
-    id: 'hospidia',
-    name: 'Hospidia',
-    kind: 'his',
-    matchTokens: ['hospidia', 'hospedia', 'mathari'],
-    pathHints: ['/', '/login', '/api', '/swagger', '/openapi.json', '/health'],
-    preferredCatalogId: 'rest-api',
-    blurb: 'Optional hint: keywords look like Hospidia HIS — still connect via REST/OpenAPI to the URL you entered.',
-    nextSteps:
-      'Scan ≠ connect. Click Connect (endpoint prefilled from your URL), enter read-only credentials, then Test & Sync.',
-  },
-  {
     id: 'generic-his',
     name: 'Generic HIS / clinical',
     kind: 'his',
-    matchTokens: ['hospital', 'clinic', 'clinical', 'patient', 'emr', 'ehr', 'his'],
+    matchTokens: ['hospital', 'clinic', 'clinical', 'patient', 'emr', 'ehr', 'his', 'healthcare'],
     pathHints: ['/', '/api', '/swagger', '/openapi.json', '/health'],
     preferredCatalogId: 'rest-api',
-    blurb: 'Optional hint: clinical / HIS keywords in URL or title.',
+    blurb: 'Optional hint: clinical / HIS keywords detected in URL or title.',
     nextSteps:
       'Scan ≠ connect. Connect → REST/OpenAPI with the entered base URL, then Test & Sync read-only.',
   },

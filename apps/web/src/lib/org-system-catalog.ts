@@ -324,7 +324,7 @@ export const ORG_SYSTEM_CAPABILITIES: OrgSystemCapability[] = [
     id: 'clinical-today',
     domain: 'clinical',
     title: 'Clinical / service today',
-    purpose: 'Healthcare today board when HIS keywords (e.g. Hospidia) are detected.',
+    purpose: 'Healthcare today board when HIS / clinical keywords are detected.',
     href: '/app/org-system/clinical-today',
     liveWhen: ['healthcare', 'clients', 'timeline'],
     view: 'timeline',

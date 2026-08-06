@@ -1940,10 +1940,11 @@ export function fetchOrgDataWindow() {
 export interface HealthDto {
   status: string;
   service: string;
-  version: string;
-  ts: string;
-  uptimeSeconds: number;
-  email: {
+  version?: string;
+  ts?: string;
+  timestamp?: string;
+  uptimeSeconds?: number;
+  email?: {
     provider: 'resend' | 'smtp' | 'none';
     live: boolean;
   };

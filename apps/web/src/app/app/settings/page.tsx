@@ -555,7 +555,7 @@ export default function SystemSettingsPage() {
                 flexShrink: 0,
                 background: !health
                   ? '#6b7280'
-                  : health.email.live
+                  : health.email?.live
                     ? '#22c55e'
                     : '#f59e0b',
               }}
@@ -564,7 +564,7 @@ export default function SystemSettingsPage() {
               <strong>Email delivery: </strong>
               {!health
                 ? 'checking…'
-                : health.email.live
+                : health.email?.live
                   ? `Live — ${health.email.provider}`
                   : 'Simulated — set RESEND_API_KEY or SMTP_* on Cloudflare Pages to send real email'}
             </span>

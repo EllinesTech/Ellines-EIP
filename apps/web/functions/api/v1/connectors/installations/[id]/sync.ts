@@ -312,7 +312,7 @@ async function upsertSnapshot(
   } else {
     ({ error } = await supabase.from('enterprise_snapshots').insert(row));
   }
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`enterprise_snapshots write failed: ${error.message} (code: ${error.code})`);
 
   await supabase.from('audit_logs').insert({
     id: crypto.randomUUID(),
@@ -547,8 +547,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     return json(summary);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Sync failed';
+    // Mark installation as error so the UI shows a clear status
+    await supabase
+      .from('connector_installations')
+      .update({
+        status: 'error',
+        last_message: msg.slice(0, 300),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('organization_id', auth.organizationId);
     return json(
-      { statusCode: 500, message: err instanceof Error ? err.message : 'Sync failed' },
+      { statusCode: 500, message: msg },
       500,
     );
   }

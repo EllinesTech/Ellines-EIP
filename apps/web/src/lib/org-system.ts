@@ -98,7 +98,7 @@ export function buildOrgPeriodReport(input: {
       `Period: ${window.label}`,
       '',
       'No live connector sync yet. Open Connectors and run Sync so EIP can observe the System of Record.',
-      'EIP wraps and summarizes — it does not replace or write back to Hospidia / ERP unless a write path already exists.',
+      'EIP wraps and summarizes — it does not replace or write back to connected SoR / ERP unless a write path already exists.',
     ].join('\n');
   }
 

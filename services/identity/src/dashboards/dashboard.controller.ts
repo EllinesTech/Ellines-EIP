@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 
-@Controller('api/v1/dashboards')
+@Controller('dashboards')
 export class DashboardController {
   constructor(private dashboardService: DashboardService) {}
 

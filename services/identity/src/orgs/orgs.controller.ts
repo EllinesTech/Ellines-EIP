@@ -4,8 +4,10 @@ import {
   Post,
   Patch,
   Put,
+  Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   ForbiddenException,
@@ -174,5 +176,129 @@ export class OrgsController {
   @Roles('owner', 'admin')
   getAlertCorrelations(@Request() req: { user: { organizationId: string } }) {
     return this.orgs.getAlertCorrelations(req.user.organizationId);
+  }
+
+  // ── Audit Logs ────────────────────────────────────────────────────────────
+
+  @Get('me/audit-logs')
+  listAuditLogs(
+    @Request() req: { user: { organizationId: string } },
+    @Query('limit') limit?: string,
+  ) {
+    return this.orgs.listAuditLogs(req.user.organizationId, Number(limit) || 80);
+  }
+
+  // ── Webhook Secret ────────────────────────────────────────────────────────
+
+  @Get('me/webhook-secret')
+  @Roles(...ORG_ADMIN_ROLES)
+  getWebhookSecret(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getWebhookSecret(req.user.organizationId);
+  }
+
+  @Post('me/webhook-secret')
+  @Roles(...ORG_ADMIN_ROLES)
+  rotateWebhookSecret(@Request() req: { user: { userId: string; organizationId: string } }) {
+    return this.orgs.rotateWebhookSecret(req.user.organizationId, req.user.userId);
+  }
+
+  // ── Notify Policy ──────────────────────────────────────────────────────────
+
+  @Get('me/notify-policy')
+  getNotifyPolicy(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getNotifyPolicy(req.user.organizationId);
+  }
+
+  @Put('me/notify-policy')
+  @Roles(...ORG_ADMIN_ROLES)
+  saveNotifyPolicy(
+    @Request() req: { user: { userId: string; organizationId: string } },
+    @Body() body: unknown,
+  ) {
+    return this.orgs.saveNotifyPolicy(req.user.organizationId, req.user.userId, body);
+  }
+
+  // ── API Keys ───────────────────────────────────────────────────────────────
+
+  @Get('me/api-keys')
+  @Roles(...ORG_ADMIN_ROLES)
+  listApiKeys(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.listApiKeys(req.user.organizationId);
+  }
+
+  @Post('me/api-keys')
+  @Roles(...ORG_ADMIN_ROLES)
+  createApiKey(
+    @Request() req: { user: { userId: string; email: string; organizationId: string } },
+    @Body() body: { name?: string; expiresInDays?: number },
+  ) {
+    return this.orgs.createApiKey(
+      req.user.organizationId,
+      req.user.userId,
+      req.user.email,
+      body.name || '',
+      body.expiresInDays,
+    );
+  }
+
+  @Delete('me/api-keys')
+  @Roles(...ORG_ADMIN_ROLES)
+  revokeApiKey(
+    @Request() req: { user: { userId: string; organizationId: string } },
+    @Body() body: { id?: string },
+  ) {
+    return this.orgs.revokeApiKey(req.user.organizationId, req.user.userId, body.id || '');
+  }
+
+  // ── Ellinea Learning ───────────────────────────────────────────────────────
+
+  @Get('me/ellinea-learning')
+  getEllineaLearning(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getEllineaLearning(req.user.organizationId);
+  }
+
+  @Put('me/ellinea-learning')
+  @Roles(...ORG_ADMIN_ROLES)
+  saveEllineaLearning(
+    @Request() req: { user: { organizationId: string } },
+    @Body() body: unknown,
+  ) {
+    return this.orgs.saveEllineaLearning(req.user.organizationId, body);
+  }
+
+  // ── Org Status ─────────────────────────────────────────────────────────────
+
+  @Get('me/status')
+  getOrgStatus(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.getOrgStatus(req.user.organizationId);
+  }
+
+  // ── Documents ──────────────────────────────────────────────────────────────
+
+  @Get('me/documents')
+  listDocuments(@Request() req: { user: { organizationId: string } }) {
+    return this.orgs.listDocuments(req.user.organizationId);
+  }
+
+  @Post('me/documents')
+  uploadDocument(
+    @Request() req: { user: { organizationId: string; userId: string; email: string } },
+    @Body() body: { name?: string; mimeType?: string; content?: string; tags?: string[]; branch?: string; department?: string; summary?: string },
+  ) {
+    return this.orgs.uploadDocument(req.user.organizationId, req.user.userId, req.user.email, body);
+  }
+
+  @Delete('me/documents')
+  deleteDocument(
+    @Request() req: { user: { organizationId: string; userId: string; email: string; role: string } },
+    @Body() body: { id?: string },
+  ) {
+    return this.orgs.deleteDocument(
+      req.user.organizationId,
+      req.user.userId,
+      req.user.email,
+      req.user.role,
+      body.id || '',
+    );
   }
 }

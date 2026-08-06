@@ -656,7 +656,7 @@ export default function ConnectorsPage() {
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Hospidia production"
+                    placeholder="e.g. Clinical HIS production"
                   />
                 </label>
               </div>
