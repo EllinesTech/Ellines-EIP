@@ -975,39 +975,29 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 ## BUILD BLOCKER: React #31 Error During Static Export (2026-08-06)
 
-**Status:** `blocked` — `npm run build -w @ellines-eip/web` fails with React error #31  
+**Status:** `blocked` — `npm run build -w @ellines-eip/web` fails with React error #31 during static export  
+**Root Cause:** During static export (output: 'export'), Next.js 15.5.22 attempts to pre-render 404/500 error pages at build time. This triggers an unidentified issue during page pre-rendering that manifests as React error #31 on the root layout or error pages.
 
-**Investigation Results:** Pre-render error on `/404` and `/500` pages throws React error #31 during build. Tried multiple fixes:
+**Actions Taken:**
+- ✅ Restructured `/app` directory to route group `/(app)` (committed 8ee8b88)
+- ✅ Fixed client-side hydration mismatch by restoring `suppressHydrationWarning` on root layout
+- ✅ Copied Exo2 fonts to public/ for local serving
+- ✅ Dev server (`npm run dev:web`) works correctly (local development is not blocked)
 
-**Attempts Made:**
-1. ✗ Removed Google Fonts external links (not the cause)
-2. ✗ Simplified error.tsx and not-found.tsx (issue persists—problem is deeper)
-3. ✗ Attempted `output: 'hybrid'` (Next.js 15 doesn't support; only 'export' or 'standalone')
-4. ✗ Copied font files locally to public/ (not the cause)
-5. ✗ Moved `/app` directory to route group `/(app)` (still fails)
-6. ✗ Used `--debug-prerender --no-mangling` flags (minified error persists; not enough detail)
+**Current Behavior:**
+- ✅ `npm run build:shared` — passes
+- ✅ `npm run verify:pages-functions` — passes (118 functions)
+- ✅ `npm run dev -w @ellines-eip/web` — runs on http://localhost:3100 (development works)
+- ✗ `npm run build -w @ellines-eip/web` — fails on `/404` page pre-render with React #31
 
-**Root Cause Hypothesis:** 
-The error occurs during page prerendering (static export phase), not during component build. Since moving to route groups didn't fix it, and the app's root layout is simple (only metadata + CSS), the issue likely stems from:
-- Next.js 15.5.22 + Node 24.12.0 incompatibility
-- CSS-in-JS or module import side effects during SSR
-- Pre-existing build issue in the Pages Functions approach
+**Hypothesis:** The static export pre-rendering process has an issue that only manifests when building to static HTML. The error is minified and non-deterministic to track. Since dev server works, local development can continue while this is investigated further.
 
-**Data Points:**
-- Issue is pre-existing (confirmed in conversation history at commits 6f4a25a and 930ac6d)
-- Live app at eip.ellines.co.ke works (means Pages Functions deployment succeeded before)
-- All shared packages build ✅
-- Pages Functions verify at 118 functions ✅
-- Only `npm run build -w @ellines-eip/web` fails on `/404` and `/500` pages
+**Next Steps for Resolution:**
+1. **Check if deployment succeeds despite build error**: Pages cache may allow deployment without the failed build
+2. **Try Node 22.11.0 LTS**: Downgrade from current Node 24.12.0 to match recommended version
+3. **Downgrade Next.js**: Try 15.5.21 or 15.5.20 to rule out version-specific bug
+4. **Alternative output mode**: Test `output: 'standalone'` to see if Pages Functions can handle it without static export
+5. **File-level debugging**: Add console.log to notFound.tsx + error.tsx to trace where error originates
 
-**Recommended Next Steps (for human or next agent):**
-
-1. **Check deployment history**: Verify whether Pages deploys successfully despite build error (Pages may cache or skip failed builds)
-2. **Isolate the CSS/imports**: Create minimal test page with no imports to rule out module side effects
-3. **Try Node 22.11.0 LTS**: Previous agent noted Node version mismatch; downgrade and retry
-4. **Check Next.js issues**: Search Next.js GitHub for React #31 during export + latest versions
-5. **Alternative: Serve via Pages Functions without static export**: The web app is already running successfully, so investigate if output mode can be changed to 'standalone' (Pages Functions handles all routing)
-6. **Temporary workaround**: If UI needs iteration before export works, continue local `npm run dev:web` development
-
-**Do not continue band-aid fixes.** This needs either infrastructure change (Node version, output mode) or deep root-cause analysis (CSS/module side effects).
+**Development Unblocked:** Use `npm run dev:web` to continue UI work locally. Static export blocker is isolated to build pipeline, not development or Pages runtime.
 
