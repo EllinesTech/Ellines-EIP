@@ -28,7 +28,6 @@ const nextConfig: NextConfig = {
   output: 'standalone', // Server application for Pages Functions
   images: { unoptimized: true },
   trailingSlash: true,
-  allowedDevOrigins: ['192.168.100.147', '100.110.20.83', '192.168.43.46'],
   typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: true },
 };
