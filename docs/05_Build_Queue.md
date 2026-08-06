@@ -863,3 +863,24 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 **People contact modal** — every person card in the People directory is now clickable. Opening a card shows a full contact sheet: name, role badge, status, source (EIP vs SoR), email (with mailto link), branch, department, member-since date, a call stub, and an "Ask Ellinea" panel that queries Ellinea with context about that person. Fully keyboard-accessible.
 
+---
+
+## Sprint 11 — Identity Service Org Management Endpoints
+
+**Date:** 2026-08-06  
+**Status:** `done`  
+**Builds:** `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `npm run verify:pages-functions` ✅ (118 functions) · `npm run build -w @ellines-eip/identity` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S11.1 | **Add org management endpoints to NestJS Identity** | `done` | All 14 endpoints now live in `orgs.controller.ts` + `orgs.service.ts`: webhook-secret (GET/POST rotate), audit-logs, notify-policy (GET/PUT), api-keys (GET/POST/DELETE), ellinea-learning (GET/PUT), org-status, documents (GET/POST/DELETE). Previously only available as Pages Functions; now unified Identity backend. Controllers + services fully implemented. |
+| S11.2 | **Fix platform health check type errors** | `done` | Fixed TypeScript strict mode errors in platform/page.tsx: added optional chaining for `platformHealth.email?.live` and timestamp check before Date constructor. Platform health badge now safely handles undefined email provider. |
+
+### What ships in Sprint 11
+
+**Unified org management API** — Settings page and other consumers now call the NestJS Identity service for org settings, webhooks, API keys, documents, and notification policies. Previously Pages Functions for org management are now backed by unified, consistent Identity service implementations with proper error handling and audit logging.
+
+**Settings page resilience** — Fixed type errors and null checks in platform health display and Settings pages. All health checks now use optional chaining for safe nested property access.
+
+**Build verification** — All builds pass with zero TypeScript errors. Pages Functions still verified at 118 functions. Complete end-to-end verification before main deployment.
+
