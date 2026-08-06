@@ -36,7 +36,7 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/brand/icon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/brand/icon-180.png" />
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Ellines EIP" />
       </head>
-      <body>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
