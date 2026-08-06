@@ -30,6 +30,7 @@ import {
   type OrgDateTimeSettingsDto,
   type WebhookSecretDto,
 } from '@/lib/api';
+import DatabaseConfigPage from './DatabaseConfigPage';
 import {
   DEFAULT_UI_PREFS,
   readUiPrefs,
@@ -48,7 +49,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import settingsStyles from './settings.module.css';
-
+./DatabaseConfigPage
 // ─── API Keys sub-component ───────────────────────────────────────────────────
 function ApiKeysSection() {
   const [keys, setKeys] = useState<ApiKeyDto[]>([]);
@@ -1119,6 +1120,9 @@ export default function SystemSettingsPage() {
           )}
         </section>
       ) : null}
+
+      {/* Database Configuration — Owner/IT only (Sprint 14) */}
+      {orgAdmin ? <DatabaseConfigPage /> : null}
 
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
