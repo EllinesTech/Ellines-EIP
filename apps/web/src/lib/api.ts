@@ -684,6 +684,88 @@ export function rotateWebhookSecret() {
   });
 }
 
+// ─── Database Configuration (Multi-database Support) ──────────────────────
+
+export type DatabaseConfigurationDto = {
+  id: string;
+  organizationId: string;
+  name: string;
+  type: 'local' | 'supabase' | 'custom_postgres';
+  host?: string;
+  port: number;
+  username?: string;
+  passwordEncrypted?: string;
+  databaseName?: string;
+  supabaseUrl?: string;
+  supabaseKeyEncrypted?: string;
+  sslMode: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  testStatus: 'untested' | 'success' | 'failed';
+  testMessage?: string;
+  lastTestedAt?: string;
+  enableAutoSync: boolean;
+  syncDirection: string;
+  lastSyncAt?: string;
+  syncStatus?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TestConnectionRequest = {
+  type: 'local' | 'supabase' | 'custom_postgres';
+  host?: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  databaseName?: string;
+  supabaseUrl?: string;
+  supabaseKey?: string;
+  sslMode?: string;
+};
+
+export type TestConnectionResponse = {
+  success?: boolean;
+  message: string;
+  canTest?: boolean;
+  advice?: string;
+  suggestion?: string;
+  note?: string;
+};
+
+/** Owner/IT: list all database configurations for organization */
+export function listDatabaseConfigurations() {
+  return request<DatabaseConfigurationDto[]>('/api/v1/orgs/me/database-config');
+}
+
+/** Owner/IT: create new database configuration */
+export function createDatabaseConfiguration(config: Omit<DatabaseConfigurationDto, 'id' | 'organizationId' | 'createdBy' | 'createdAt' | 'updatedAt'>) {
+  return request<DatabaseConfigurationDto>('/api/v1/orgs/me/database-config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
+/** Owner/IT: test database connection */
+export function testDatabaseConnection(config: TestConnectionRequest) {
+  return request<TestConnectionResponse>('/api/v1/orgs/me/database-config/test-connection', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
+/** Owner/IT: switch primary database */
+export function switchPrimaryDatabase(configId: string, reason?: string) {
+  return request<{ success: boolean; message: string; configId: string; previousConfigId?: string }>(
+    '/api/v1/orgs/me/database-config/switch-primary',
+    {
+      method: 'POST',
+      body: JSON.stringify({ configId, reason }),
+    },
+  );
+}
+
 export type EllineaLearningDto = {
   feedback: Record<string, { helpful: number; dismiss: number }>;
   dna: {
