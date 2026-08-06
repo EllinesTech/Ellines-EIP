@@ -24,10 +24,10 @@ import {
   type AlertDto,
   type DashboardExportDto,
 } from '@/lib/api';
+import DashboardBuilder from './DashboardBuilder';
 import styles from '../../command.module.css';
 import adminStyles from '../../admin/admin.module.css';
 
-const WIDGET_TYPES = ['kpi', 'gauge', 'line', 'bar', 'table'] as const;
 const CONDITIONS = ['gt', 'lt', 'eq', 'gte', 'lte'] as const;
 
 export default function DashboardClient() {
@@ -39,11 +39,7 @@ export default function DashboardClient() {
   const [dashboard, setDashboard] = useState<DashboardDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [showAddWidget, setShowAddWidget] = useState(false);
-  const [showAddAlert, setShowAddAlert] = useState<string | null>(null);
   const [exportsList, setExportsList] = useState<DashboardExportDto[]>([]);
-
-  const [widgetForm, setWidgetForm] = useState({ type: 'kpi', title: '', config: '{}', position: 0, size: '{"w":2,"h":2}' });
   const [alertForm, setAlertForm] = useState({ condition: 'gt' as typeof CONDITIONS[number], threshold: 0, active: true });
 
   useEffect(() => {
@@ -95,28 +91,6 @@ export default function DashboardClient() {
       .finally(() => setBusy(false));
   }
 
-  function onCreateWidget(e: FormEvent) {
-    e.preventDefault();
-    if (!dashboard || !orgId || busy) return;
-    setBusy(true);
-    addWidgetApi(dashboard.id, {
-      organizationId: orgId,
-      type: widgetForm.type,
-      title: widgetForm.title,
-      config: JSON.parse(widgetForm.config || '{}'),
-      position: widgetForm.position,
-      size: JSON.parse(widgetForm.size || '{"w":2,"h":2}'),
-    })
-      .then((dto) => {
-        setDashboard((prev) => prev ? { ...prev, widgets: [...(prev.widgets || []), dto] } : prev);
-        setShowAddWidget(false);
-        setWidgetForm({ type: 'kpi', title: '', config: '{}', position: 0, size: '{"w":2,"h":2}' });
-        flash('Widget added.');
-      })
-      .catch((err) => flash(err.message || 'Failed to add widget.'))
-      .finally(() => setBusy(false));
-  }
-
   function onUpdateWidget(widget: WidgetDto, patch: Partial<WidgetDto>) {
     if (!dashboard || !orgId || busy) return;
     setBusy(true);
@@ -160,7 +134,6 @@ export default function DashboardClient() {
           ...prev,
           widgets: (prev.widgets || []).map((w) => w.id === widgetId ? { ...w, alerts: [...(w.alerts || []), dto] } : w),
         } : prev);
-        setShowAddAlert(null);
         flash('Alert added.');
       })
       .catch((err) => flash(err.message || 'Failed to add alert.'))
@@ -264,98 +237,28 @@ export default function DashboardClient() {
 
       <section style={{ marginBottom: '0.65rem' }}>
         <div className={styles.panelLabel}>Widgets · {(dashboard.widgets || []).length}</div>
-        {!dashboard.widgets?.length ? (
-          <p className={styles.lede}>No widgets yet. Add KPI cards, charts, or tables.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.55rem' }}>
-            {(dashboard.widgets || []).map((w) => (
-              <div key={w.id} style={{
-                background: '#161b26',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 10,
-                padding: '0.65rem 0.75rem',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8b95a8' }}>{w.type}</div>
-                    <div style={{ fontWeight: 700, color: '#f4f7fb' }}>{w.title}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    <button type="button" className={adminStyles.ghost} style={{ padding: '0.22rem 0.45rem', fontSize: '0.7rem' }} onClick={() => {
-                      const next = prompt('New title', w.title);
-                      if (next === null) return;
-                      onUpdateWidget(w, { title: next });
-                    }}>Rename</button>
-                    <button type="button" className={adminStyles.ghost} style={{ padding: '0.22rem 0.45rem', fontSize: '0.7rem' }} onClick={() => onDeleteWidget(w.id)}>Remove</button>
-                  </div>
-                </div>
-                <div style={{ marginTop: '0.45rem', fontSize: '0.72rem', color: '#8b95a8' }}>
-                  Size: {(w.size as any)?.w ?? 2}×{(w.size as any)?.h ?? 2} · Position: {w.position}
-                </div>
-                {w.alerts?.length ? (
-                  <div style={{ marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                    {w.alerts.map((a) => (
-                      <span key={a.id} style={{
-                        fontSize: '0.65rem',
-                        padding: '0.18rem 0.45rem',
-                        borderRadius: 6,
-                        background: a.active ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-                        color: a.active ? '#fca5a5' : '#8b95a8',
-                        border: `1px solid ${a.active ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                      }}>
-                        {a.condition} {a.threshold}
-                        <button type="button" onClick={() => onToggleAlert(w.id, a)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.65rem' }}>
-                          {a.active ? '⏻' : '◌'}
-                        </button>
-                        <button type="button" onClick={() => onDeleteAlert(w.id, a.id)} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '0.65rem' }}>✕</button>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                <div style={{ marginTop: '0.4rem' }}>
-                  <button type="button" className={adminStyles.ghost} style={{ padding: '0.22rem 0.45rem', fontSize: '0.7rem' }} onClick={() => setShowAddAlert(showAddAlert === w.id ? null : w.id)}>
-                    + Alert
-                  </button>
-                </div>
-                {showAddAlert === w.id ? (
-                  <form className={adminStyles.form} onSubmit={(e) => onCreateAlert(w.id, e)} style={{ marginTop: '0.4rem' }}>
-                    <select value={alertForm.condition} onChange={(e) => setAlertForm({ ...alertForm, condition: e.target.value as typeof CONDITIONS[number] })}>
-                      {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <input type="number" step="any" value={alertForm.threshold} onChange={(e) => setAlertForm({ ...alertForm, threshold: Number(e.target.value) })} />
-                    <label style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.35rem', paddingTop: '0.2rem' }}>
-                      <input type="checkbox" checked={alertForm.active} onChange={(e) => setAlertForm({ ...alertForm, active: e.target.checked })} />
-                      Active
-                    </label>
-                    <button type="submit" className={adminStyles.primary} disabled={busy} style={{ padding: '0.22rem 0.5rem', fontSize: '0.7rem' }}>Add</button>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className={styles.brief}>
-        <div className={styles.panelLabel}>Add widget</div>
-        {!showAddWidget ? (
-          <button type="button" className={adminStyles.ghost} onClick={() => setShowAddWidget(true)}>+ New widget</button>
-        ) : (
-          <form className={adminStyles.form} onSubmit={onCreateWidget}>
-            <select value={widgetForm.type} onChange={(e) => setWidgetForm({ ...widgetForm, type: e.target.value })}>
-              {WIDGET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input value={widgetForm.title} onChange={(e) => setWidgetForm({ ...widgetForm, title: e.target.value })} placeholder="Widget title" required minLength={2} />
-            <input value={widgetForm.config} onChange={(e) => setWidgetForm({ ...widgetForm, config: e.target.value })} placeholder='{"key":"value"}' />
-            <input type="number" value={widgetForm.position} onChange={(e) => setWidgetForm({ ...widgetForm, position: Number(e.target.value) })} placeholder="Position" />
-            <input value={widgetForm.size} onChange={(e) => setWidgetForm({ ...widgetForm, size: e.target.value })} placeholder='{"w":2,"h":2}' />
-            <button type="submit" className={adminStyles.primary} disabled={busy}>Add widget</button>
-            <button type="button" className={adminStyles.ghost} onClick={() => setShowAddWidget(false)}>Cancel</button>
-          </form>
-        )}
+        <DashboardBuilder
+          dashboard={dashboard}
+          onWidgetAdd={async (type, title) => {
+            const s = getSession();
+            if (!s || !orgId) throw new Error('No session');
+            const widget = await addWidgetApi(dashboard.id, {
+              organizationId: orgId,
+              type,
+              title,
+              config: {},
+              position: (dashboard.widgets || []).length,
+              size: { w: 2, h: 2 },
+            });
+            setDashboard((prev) =>
+              prev ? { ...prev, widgets: [...(prev.widgets || []), widget] } : prev
+            );
+            return widget;
+          }}
+          onWidgetUpdate={(widget, patch) => onUpdateWidget(widget, patch)}
+          onWidgetDelete={(widgetId) => onDeleteWidget(widgetId)}
+          busy={busy}
+        />
       </section>
 
       <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
