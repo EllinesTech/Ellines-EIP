@@ -31,10 +31,15 @@ type SocketLike = {
 };
 
 async function openSocket(host: string, port: number, secure: boolean): Promise<SocketLike> {
-  const mod = (await import('cloudflare:sockets')) as {
-    connect: (opts: { hostname: string; port: number; secureTransport?: 'on' | 'starttls' | 'off' }) => SocketLike;
-  };
-  return mod.connect({ hostname: host, port, secureTransport: secure ? 'on' : 'starttls' });
+  try {
+    const mod = (await import('cloudflare:sockets')) as {
+      connect: (opts: { hostname: string; port: number; secureTransport?: 'on' | 'starttls' | 'off' }) => SocketLike;
+    };
+    return mod.connect({ hostname: host, port, secureTransport: secure ? 'on' : 'starttls' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    throw new Error(`Failed to connect to ${host}:${port} (secure=${secure}): ${msg}`);
+  }
 }
 
 /**
@@ -55,6 +60,17 @@ async function fetchImapMessages(config: InstallConfig, limit = 30): Promise<{
   const secure = config.imapSecure !== false; // default TLS
 
   if (!host || !user || !pass) throw new Error('IMAP host, user, and password are required for sync');
+
+  // Check if cloudflare:sockets is available
+  let mod: { connect: (opts: any) => SocketLike } | null = null;
+  try {
+    mod = (await import('cloudflare:sockets')) as any;
+  } catch {
+    throw new Error(
+      `cloudflare:sockets module not available. This may happen on Cloudflare Pages. ` +
+      `Alternative: use REST API connector or upload sample emails as CSV/JSON.`
+    );
+  }
 
   const socket = await openSocket(host, port, secure);
   await socket.opened;
@@ -479,7 +495,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           400,
         );
       }
-      const messages = await fetchImapMessages(config, 50);
+      
+      let messages: Awaited<ReturnType<typeof fetchImapMessages>> = [];
+      try {
+        messages = await fetchImapMessages(config, 50);
+      } catch (imapErr) {
+        // If IMAP sync fails, provide helpful context
+        const errorMsg = imapErr instanceof Error ? imapErr.message : 'IMAP sync failed';
+        console.error(`[sync] IMAP error for ${config.imapUser}@${config.imapHost}: ${errorMsg}`);
+        
+        // Cloudflare Pages doesn't support persistent TCP connections like Workers do
+        return json(
+          { 
+            statusCode: 503, 
+            message: 'IMAP sync is not currently supported on Cloudflare Pages.',
+            detail: `Error connecting to ${config.imapHost}:${config.imapPort || 993}: ${errorMsg}`,
+            advice: 'Use one of these alternatives instead:\n1. Export emails as REST API (configure OpenAPI endpoint)\n2. Forward reports as POST webhooks to /api/v1/webhooks/enterprise\n3. Upload emails as CSV (one per row, with subject/from/date columns)\n4. Copy/paste JSON samples directly',
+            catalogId: 'email-imap',
+            config: { host: config.imapHost, port: config.imapPort, user: config.imapUser }
+          },
+          503,
+        );
+      }
       const timeline = messages.slice(0, 12).map((m) => ({
         title: m.subject,
         detail: m.from ? `From: ${m.from} · ${m.date}` : m.date,
@@ -548,18 +585,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json(summary);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Sync failed';
+    const stack = err instanceof Error ? err.stack : '';
+    console.error(`[sync] Error syncing ${catalogId} connector ${id}:`, msg, stack?.slice(0, 200));
+    
     // Mark installation as error so the UI shows a clear status
-    await supabase
-      .from('connector_installations')
-      .update({
-        status: 'error',
-        last_message: msg.slice(0, 300),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('organization_id', auth.organizationId);
+    try {
+      await supabase
+        .from('connector_installations')
+        .update({
+          status: 'error',
+          last_message: msg.slice(0, 300),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('organization_id', auth.organizationId);
+    } catch (updateErr) {
+      console.error('[sync] Failed to mark connector as error:', updateErr);
+    }
+    
     return json(
-      { statusCode: 500, message: msg },
+      { 
+        statusCode: 500, 
+        message: msg,
+        catalogId,
+        installationId: id
+      },
       500,
     );
   }

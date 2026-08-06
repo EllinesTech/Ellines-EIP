@@ -644,6 +644,12 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 
 **v2.0 Phase A Complete:** ✅ Autonomous AI Agents framework, templates, execution engine, webhooks, audit trail, feedback loop, cohort learning, and alert correlation all done.
 
+**Connector Sync Hardening:** ✅ Added improved error handling and logging for connector sync failures:
+- Better error messages for IMAP connection failures (clear about Cloudflare Pages TCP socket limitations)
+- Alternative suggestions: REST API, webhooks, CSV upload, or JSON sample data
+- Enhanced logging and error tracking in sync failures
+- Graceful error status updates for failed syncs
+
 **Build System Issue:** ⚠️ React error #31 during static export. This is a pre-existing environment issue unrelated to current implementation work. The issue occurs during 404 page generation and requires:
 - Investigation of Next.js static export configuration
 - Verification of Node.js/Next.js version compatibility
@@ -895,4 +901,30 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 **Settings page resilience** — Fixed type errors and null checks in platform health display and Settings pages. All health checks now use optional chaining for safe nested property access.
 
 **Build verification** — All builds pass with zero TypeScript errors. Pages Functions still verified at 118 functions. Complete end-to-end verification before main deployment.
+
+---
+
+## Sprint 12 — Connector Sync Error Handling & IMAP Platform Limitations
+
+**Date:** 2026-08-06  
+**Status:** `done`  
+**Builds:** `npm run verify:pages-functions` ✅ (118 functions) · `npm run build:shared` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| S12.1 | **Improve connector sync error handling** | `done` | Added try-catch wrapper around IMAP sync with detailed error context; enhanced catch block to log sync errors with debug info; better error status updates to DB |
+| S12.2 | **IMAP platform limitation clarity** | `done` | When IMAP sync fails on Cloudflare Pages, return 503 with clear message explaining TCP socket limitations + alternatives (REST API, webhooks, CSV, JSON). Helps IT understand why IMAP doesn't work and suggests working paths. |
+| S12.3 | **Socket connection error wrapping** | `done` | Added try-catch in `openSocket()` to provide meaningful error messages. Check for `cloudflare:sockets` module availability with helpful fallback message. |
+| S12.4 | **Graceful error tracking** | `done` | Wrapped connector status update in try-catch to prevent cascade failures. All sync errors now logged to console for troubleshooting. Installation marked with error status + truncated message for UI visibility. |
+
+### What ships in Sprint 12
+
+**Better connector error diagnostics** — when a connector sync fails (e.g. IMAP on Pages, REST endpoint timeout, CSV parse error), the response now includes:
+- Descriptive error message with root cause
+- Catalog ID and installation ID for tracing
+- For IMAP specifically: clear explanation that Cloudflare Pages doesn't support persistent TCP connections
+- Four alternative paths: REST API endpoint, webhook pushes, CSV upload, or JSON samples
+- Console logging for server-side debugging
+
+**Enhanced resilience** — sync failures now gracefully update connector status to 'error' with a message. If the status update itself fails, it's logged but doesn't crash the request.
 
