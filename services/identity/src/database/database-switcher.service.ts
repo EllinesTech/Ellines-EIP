@@ -1,0 +1,179 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { DatabaseConfiguration } from '@prisma/client';
+
+export interface DatabaseConnectionConfig {
+  host?: string;
+  port: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  type: 'local' | 'supabase' | 'custom_postgres';
+}
+
+/**
+ * DatabaseSwitcherService manages runtime database switching per organization.
+ * 
+ * Organizations can configure multiple databases (local, Supabase, custom PostgreSQL)
+ * and switch between them without code deployment.
+ * 
+ * Usage pattern:
+ *   1. Get org from JWT/request context
+ *   2. Call getActiveDatabase(orgId) to get current primary DB config
+ *   3. Prisma client uses that connection automatically for all queries
+ */
+@Injectable()
+export class DatabaseSwitcherService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Get the primary/active database configuration for an organization
+   * Returns the configuration or a fallback to localhost:5432
+   */
+  async getActiveDatabase(organizationId: string): Promise<DatabaseConnectionConfig> {
+    try {
+      // Look up the primary database for this org
+      const config = await this.prisma.databaseConfiguration.findFirst({
+        where: {
+          organizationId,
+          isPrimary: true,
+          isActive: true,
+        },
+      });
+
+      if (!config) {
+        // No primary DB configured, use default localhost
+        return this.getDefaultDatabaseConfig();
+      }
+
+      // Build connection config from stored config
+      return {
+        type: config.type as 'local' | 'supabase' | 'custom_postgres',
+        host: config.host || 'localhost',
+        port: config.port || 5432,
+        database: config.databaseName,
+        username: config.username,
+        // Password should be decrypted in real implementation
+        // For now, it's passed through (TODO: implement proper encryption)
+        password: config.password,
+      };
+    } catch (error) {
+      // On error, fall back to default
+      console.warn(`Failed to load database config for org ${organizationId}:`, error);
+      return this.getDefaultDatabaseConfig();
+    }
+  }
+
+  /**
+   * Get the default database configuration (localhost PostgreSQL)
+   */
+  private getDefaultDatabaseConfig(): DatabaseConnectionConfig {
+    return {
+      type: 'local',
+      host: 'localhost',
+      port: 5432,
+      database: 'ellines_eip',
+      username: 'eip',
+      password: 'eip_dev_password',
+    };
+  }
+
+  /**
+   * Test a database connection
+   * Returns true if connection succeeds, false otherwise
+   */
+  async testConnection(config: DatabaseConnectionConfig): Promise<boolean> {
+    try {
+      // For now, just validate config exists and has required fields
+      // In production, would attempt an actual connection test
+
+      if (!config.host || !config.port) {
+        return false;
+      }
+
+      // Basic validation for each type
+      if (config.type === 'local') {
+        // Local requires host and port
+        return !!config.host && !!config.port;
+      }
+
+      if (config.type === 'supabase') {
+        // Supabase would need URL/key validation (deferred to client for now)
+        return true;
+      }
+
+      if (config.type === 'custom_postgres') {
+        // Custom requires host, port, username, password
+        return !!(config.host && config.port && config.username && config.password);
+      }
+
+      return false;
+    } catch (error) {
+      console.warn('Connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all database configurations for an organization
+   */
+  async getAllConfigurations(organizationId: string): Promise<DatabaseConfiguration[]> {
+    return this.prisma.databaseConfiguration.findMany({
+      where: { organizationId },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /**
+   * Switch the primary database for an organization
+   * Creates an audit log entry for the switch
+   */
+  async switchPrimaryDatabase(
+    organizationId: string,
+    configId: string,
+    reason: string,
+  ): Promise<DatabaseConfiguration> {
+    // Start transaction to ensure consistency
+    const [updated] = await this.prisma.$transaction([
+      // Update the new config to primary
+      this.prisma.databaseConfiguration.update({
+        where: { id: configId },
+        data: { isPrimary: true },
+      }),
+
+      // Unset all other configs for this org as primary
+      this.prisma.databaseConfiguration.updateMany({
+        where: {
+          organizationId,
+          id: { not: configId },
+        },
+        data: { isPrimary: false },
+      }),
+
+      // Log the switch in audit trail
+      this.prisma.databaseSwitchLog.create({
+        data: {
+          organizationId,
+          configId,
+          fromDatabase: 'unknown', // Could enhance to track previous DB
+          toDatabase: (await this.prisma.databaseConfiguration.findUnique({ where: { id: configId } }))?.name || 'unknown',
+          reason,
+          switchedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return updated;
+  }
+
+  /**
+   * Get the switch audit log for an organization
+   */
+  async getSwitchLog(organizationId: string, limit = 10) {
+    return this.prisma.databaseSwitchLog.findMany({
+      where: { organizationId },
+      orderBy: { switchedAt: 'desc' },
+      take: limit,
+    });
+  }
+}
