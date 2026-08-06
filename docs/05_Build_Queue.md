@@ -949,22 +949,22 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 ## Sprint 14 — Multi-Database Integration & Settings UI
 
-**Date:** 2026-08-06 (Next)  
-**Status:** `next`  
+**Date:** 2026-08-06  
+**Status:** `in_progress`  
 **Priority:** P0 - Blocks client on-premise/cloud choice
 
 ### Task List (Detailed for Follow-up)
 
 | ID | Task | Subtasks | Status | Notes |
 |----|------|----------|--------|-------|
-| S14.1 | **Integrate DatabaseConfigPage into Settings sidebar** | • Import component in Settings layout<br/>• Add sidebar nav link (only for Owner/Admin)<br/>• Style to match existing settings sections<br/>• Test navigation from main settings page | `todo` | Location: `apps/web/src/app/app/settings/page.tsx`<br/>Component ready at: `apps/web/src/app/app/settings/DatabaseConfigPage.tsx` |
-| S14.2 | **Backend database switcher service** | • Create `DatabaseSwitcherService` in NestJS<br/>• Implement connection pool management<br/>• Add runtime database detection (which DB is primary)<br/>• Cache active connection for performance | `todo` | File: `services/identity/src/database/database-switcher.service.ts`<br/>Must handle: PostgreSQL, Supabase, custom servers |
+| S14.1 | **Integrate DatabaseConfigPage into Settings sidebar** | • Import component in Settings layout<br/>• Add sidebar nav link (only for Owner/Admin)<br/>• Style to match existing settings sections<br/>• Test navigation from main settings page | `done` | Commit: 7dd790e - Component moved to correct dir and integrated |
+| S14.2 | **Backend database switcher service** | • Create `DatabaseSwitcherService` in NestJS<br/>• Implement connection pool management<br/>• Add runtime database detection (which DB is primary)<br/>• Cache active connection for performance | `done` | Commit: 1b481e6 - Service created, module registered in AppModule |
 | S14.3 | **Wire database switching to all queries** | • Update Prisma client initialization<br/>• Make database selection automatic per organization<br/>• Ensure all repositories use switched database<br/>• No code changes needed in controllers | `todo` | Pattern: Get org from JWT → look up primary DB → use that connection<br/>Fallback to localhost:5432 if none configured |
 | S14.4 | **Test database switching locally** | • Setup: Local PostgreSQL on localhost:5432<br/>• Create second test database on 5433<br/>• Add first config to Admin UI (localhost:5432)<br/>• Add second config (localhost:5433)<br/>• Switch between them, verify data persists in each | `todo` | Commands:<br/>`createdb -p 5432 test_db_1`<br/>`createdb -p 5433 test_db_2`<br/>Then switch via UI |
 | S14.5 | **Test with Supabase (optional)** | • Create free Supabase account<br/>• Create test project<br/>• Add Supabase config via Admin UI<br/>• Test connection validation<br/>• Do NOT switch primary yet | `todo` | Supabase free tier: 2 projects<br/>URL: https://supabase.com<br/>Keep credentials safe! |
 | S14.6 | **Document setup guide for clients** | • Create `docs/14_Database_Configuration_Guide.md`<br/>• Show: Local setup, Supabase setup, switching<br/>• Include: troubleshooting, security (encrypt passwords)<br/>• Add: Step-by-step screenshots/examples | `todo` | Audiences:<br/>- IT Admin (how to configure)<br/>- Developers (how it works)<br/>- Clients (on-premise vs cloud) |
 | S14.7 | **Security: Encrypt database passwords** | • Replace btoa() with proper encryption in API<br/>• Use org's encryption key for passwords<br/>• Decrypt only when needed for connections<br/>• Never return plaintext in API responses | `todo` | Current: btoa() (BASE64 - NOT SECURE)<br/>TODO: Use libsodium/NaCl<br/>Keys: stored in Supabase settings |
-| S14.8 | **Build & verify** | • `npm run verify:pages-functions` (121+ functions)<br/>• `npm run build:shared` (all packages)<br/>• `npm run build -w @ellines-eip/identity` (NestJS)<br/>• Fix any TypeScript errors | `todo` | Must pass all builds before merging<br/>Note: Web build has pre-existing React #31 issue |
+| S14.8 | **Build & verify** | • `npm run verify:pages-functions` (121+ functions)<br/>• `npm run build:shared` (all packages)<br/>• `npm run build -w @ellines-eip/identity` (NestJS)<br/>• Fix any TypeScript errors | `in_progress` | Pages Functions: ✅ 121 verified<br/>Shared: ✅ All packages build<br/>Identity: Prisma lock issue - retry needed |
 | S14.9 | **Commit & push** | • Stage all changes<br/>• Commit with message: "feat(S14): integrate database configuration..."<br/>• Push to main → triggers GitHub Actions deploy | `todo` | Commits go to GitHub main branch<br/>Pages Functions auto-deploy<br/>Identity API auto-deploy (if touched) |
 
 ---

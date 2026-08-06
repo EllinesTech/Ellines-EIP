@@ -17,10 +17,24 @@ export interface DatabaseConnectionConfig {
  * Organizations can configure multiple databases (local, Supabase, custom PostgreSQL)
  * and switch between them without code deployment.
  * 
- * Usage pattern:
- *   1. Get org from JWT/request context
- *   2. Call getActiveDatabase(orgId) to get current primary DB config
- *   3. Prisma client uses that connection automatically for all queries
+ * How it works:
+ * 1. Each organization has a primary database configuration (isPrimary: true)
+ * 2. On each request, the DatabaseContextInterceptor calls getActiveDatabase(orgId)
+ * 3. Interceptor stores result in request.dbContext for repository access
+ * 4. Repositories check request.dbContext to know which database to use
+ * 5. For Prisma queries: use the PrismaService normally (it auto-connects to configured DB)
+ * 
+ * Architecture note:
+ * - Prisma connection is configured via DATABASE_URL environment variable
+ * - For true dynamic switching, would need separate PrismaClient per database
+ * - Current MVP: Prisma connects to configured DATABASE_URL on startup
+ * - Organization database switching happens at configuration level
+ * - When client changes primary database, next request uses that config
+ * 
+ * Future enhancement:
+ * - Maintain pool of PrismaClient instances (one per active database)
+ * - Switch client per request based on dbContext
+ * - Requires careful connection pooling and lifecycle management
  */
 @Injectable()
 export class DatabaseSwitcherService {
@@ -76,6 +90,31 @@ export class DatabaseSwitcherService {
       username: 'eip',
       password: 'eip_dev_password',
     };
+  }
+
+  /**
+   * Build a Prisma database URL from configuration
+   * Used to establish connections dynamically
+   */
+  buildDatabaseUrl(config: DatabaseConnectionConfig): string {
+    if (config.type === 'supabase') {
+      // Supabase URL format (simplified)
+      return config.host || '';
+    }
+
+    if (config.type === 'local' || config.type === 'custom_postgres') {
+      // PostgreSQL connection string
+      const user = config.username || 'postgres';
+      const pass = config.password || '';
+      const host = config.host || 'localhost';
+      const port = config.port || 5432;
+      const db = config.database || 'postgres';
+
+      const auth = pass ? `${user}:${pass}` : user;
+      return `postgresql://${auth}@${host}:${port}/${db}?schema=public`;
+    }
+
+    return '';
   }
 
   /**
