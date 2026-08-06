@@ -928,3 +928,35 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 
 **Enhanced resilience** — sync failures now gracefully update connector status to 'error' with a message. If the status update itself fails, it's logged but doesn't crash the request.
 
+
+
+---
+
+## BUILD BLOCKER: React #31 Error During Static Export (2026-08-06)
+
+**Status:** `blocked` — `npm run build -w @ellines-eip/web` fails with React error #31  
+**Root Cause:** Next.js 15.5.22 static export (`output: 'export'`) attempts to pre-render 404/500 error pages, which triggers rendering of `/app/layout.tsx` (marked `'use client'`) at build-time. This client layout tries to access `localStorage`, `window`, and browser APIs that don't exist during SSR, causing React #31 "invalid element".
+
+**Architecture Issue:** The `/app` directory is a standard folder, not a route group. During static export, Next.js tries to apply the `/app/layout.tsx` to all routes including root-level 404/500 pages, which fails because:
+1. `/app/layout.tsx` is a client component that initializes state from localStorage
+2. 404/500 page generation runs during build, not browser render
+3. Browser APIs (localStorage, window.setInterval, useRouter) throw or fail at build-time
+4. React attempts to render these errors as JSX elements, causing error #31
+
+**Solution Required:** Restructure `/app` directory as a route group `/(app)` so its layout only applies to `/app/*` routes, not root-level error pages. Alternatively, create a middleware or use `skipInitialProps` pattern to guard client initialization.
+
+**Tasks to Fix:**
+1. Rename `apps/web/src/app/app` to `apps/web/src/app/(app)`
+2. Update all imports referencing `/app` folder (should be minimal—mostly relative paths)
+3. Rebuild: `npm run build -w @ellines-eip/web`
+4. Test: Verify 404/500 pages render and web app still works
+5. Commit + push main
+
+**Attempts Made (2026-08-06):**
+- ✗ Removed Google Fonts external links (not the cause)
+- ✗ Simplified error.tsx and not-found.tsx (issue persists—problem is deeper)
+- ✗ Attempted `output: 'hybrid'` (Next.js 15 doesn't support it; only 'export' or 'standalone')
+- ✗ Copied font files locally (not the cause)
+
+**Do not attempt further band-aid fixes.** The route group refactoring is the architectural fix needed.
+

@@ -3,20 +3,20 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(https://fonts.gstatic.com/s/exo2/v26/7cH1v4okm5zmbvwkAx_sfcEuiD8jvvKcPg.ttf) format('truetype');
+  src: url(/fonts/Exo2-Regular.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Exo 2';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(https://fonts.gstatic.com/s/exo2/v26/7cH1v4okm5zmbvwkAx_sfcEuiD8jYPWcPg.ttf) format('truetype');
+  src: url(/fonts/Exo2-SemiBold.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Exo 2';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url(https://fonts.gstatic.com/s/exo2/v26/7cH1v4okm5zmbvwkAx_sfcEuiD8jWfWcPg.ttf) format('truetype');
+  src: url(/fonts/Exo2-Bold.ttf) format('truetype');
 }
 
