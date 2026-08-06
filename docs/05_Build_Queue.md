@@ -26,7 +26,7 @@ while queue has next/in_progress and not blocked:
 
 ---
 
-## Where we are (2026-08-01)
+## Where we are (2026-08-06)
 
 ### What we are building (do not drift)
 
@@ -959,7 +959,7 @@ EIP connects and observes SoR. It never writes back. The Data Window makes SoR d
 |----|------|----------|--------|-------|
 | S14.1 | **Integrate DatabaseConfigPage into Settings sidebar** | • Import component in Settings layout<br/>• Add sidebar nav link (only for Owner/Admin)<br/>• Style to match existing settings sections<br/>• Test navigation from main settings page | `done` | Commit: 7dd790e - Component moved to correct dir and integrated |
 | S14.2 | **Backend database switcher service** | • Create `DatabaseSwitcherService` in NestJS<br/>• Implement connection pool management<br/>• Add runtime database detection (which DB is primary)<br/>• Cache active connection for performance | `done` | Commit: 1b481e6 - Service created, module registered in AppModule |
-| S14.3 | **Wire database switching to all queries** | • Update Prisma client initialization<br/>• Make database selection automatic per organization<br/>• Ensure all repositories use switched database<br/>• No code changes needed in controllers | `todo` | Pattern: Get org from JWT → look up primary DB → use that connection<br/>Fallback to localhost:5432 if none configured |
+| S14.3 | **Wire database switching to all queries** | • Update Prisma client initialization<br/>• Make database selection automatic per organization<br/>• Ensure all repositories use switched database<br/>• No code changes needed in controllers | `done` | Commit: 0426c17 - Interceptor + service wired<br/>Pattern: Get org from JWT → look up primary DB → use that connection<br/>Fallback to localhost:5432 if none configured |
 | S14.4 | **Test database switching locally** | • Setup: Local PostgreSQL on localhost:5432<br/>• Create second test database on 5433<br/>• Add first config to Admin UI (localhost:5432)<br/>• Add second config (localhost:5433)<br/>• Switch between them, verify data persists in each | `todo` | Commands:<br/>`createdb -p 5432 test_db_1`<br/>`createdb -p 5433 test_db_2`<br/>Then switch via UI |
 | S14.5 | **Test with Supabase (optional)** | • Create free Supabase account<br/>• Create test project<br/>• Add Supabase config via Admin UI<br/>• Test connection validation<br/>• Do NOT switch primary yet | `todo` | Supabase free tier: 2 projects<br/>URL: https://supabase.com<br/>Keep credentials safe! |
 | S14.6 | **Document setup guide for clients** | • Create `docs/14_Database_Configuration_Guide.md`<br/>• Show: Local setup, Supabase setup, switching<br/>• Include: troubleshooting, security (encrypt passwords)<br/>• Add: Step-by-step screenshots/examples | `done` | Created comprehensive guide for admins/devs/clients<br/>Covers: Local, Supabase, custom PostgreSQL setups<br/>Troubleshooting section with common issues
