@@ -6,6 +6,7 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../../shared/auth';
+import { encrypt } from '../../../../shared/encryption';
 
 /**
  * Database Configuration API
@@ -84,6 +85,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       );
     }
 
+    // Encrypt password and Supabase key
+    const encryptedPassword = password 
+      ? await encrypt(password, auth.organizationId) 
+      : null;
+    const encryptedSupabaseKey = supabaseKey 
+      ? await encrypt(supabaseKey, auth.organizationId) 
+      : null;
+
     // Create config
     const { data: newConfig, error: insertErr } = await supabase
       .from('database_configurations')
@@ -95,10 +104,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         host: host || (type === 'local' ? 'localhost' : null),
         port: port || 5432,
         username,
-        password_encrypted: password ? btoa(password) : null, // TODO: proper encryption
+        password_encrypted: encryptedPassword,
         database_name: databaseName,
         supabase_url: supabaseUrl || null,
-        supabase_key_encrypted: supabaseKey ? btoa(supabaseKey) : null, // TODO: proper encryption
+        supabase_key_encrypted: encryptedSupabaseKey,
         ssl_mode: sslMode || 'require',
         is_primary: false,
         is_active: true,
