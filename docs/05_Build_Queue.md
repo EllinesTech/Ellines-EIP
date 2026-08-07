@@ -656,13 +656,25 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 - Potential resolution: switch from static export to hybrid rendering or investigate build cache issues
 
 **Next Steps:**
-1. Resolve build issue (blocked for now)
-2. B.1.2 Dashboard chart rendering - ready to implement once build works
-3. Continue B.1.3, B.1.4 in Phase B
+1. ~~Resolve build issue~~ ✅ (Next.js 15.1.3)
+2. ~~B.1.2 Dashboard chart rendering~~ ✅
+3. **B.1.3 Real-time dashboard refresh** — `next`
+4. Continue B.1.4 in Phase B
 
 ---
 
-## Sprint 6 — Product Maturity, Invite Magic Link & Organization Data Window
+## v2.0 Phase B — Reporting & BI (active)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| B.1.1 | Dashboard builder (drag-and-drop) | `done` | Track B canvas + palette; pie/heatmap added |
+| B.1.2 | Dashboard chart rendering | `done` | `WidgetRenderer` + Recharts (line/bar/pie/heatmap/KPI/gauge/table) on `/app/dashboards/[id]` |
+| B.1.3 | Real-time dashboard refresh | `next` | Poll or WebSocket using dashboard `refreshRate` |
+| B.1.4 | Dashboard export & sharing | `todo` | PDF export polish + org-scoped public links |
+
+---
+
+## Sprint 14 — Multi-Database Configuration ✅ COMPLETE
 
 **Date:** 2026-08-04  
 **Status:** `done`  

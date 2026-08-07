@@ -239,7 +239,7 @@ export default function DashboardClient() {
         <div className={styles.panelLabel}>Widgets · {(dashboard.widgets || []).length}</div>
         <DashboardBuilder
           dashboard={dashboard}
-          onWidgetAdd={async (type, title) => {
+          onWidgetAdd={async (type, title, size) => {
             const s = getSession();
             if (!s || !orgId) throw new Error('No session');
             const widget = await addWidgetApi(dashboard.id, {
@@ -248,7 +248,7 @@ export default function DashboardClient() {
               title,
               config: {},
               position: (dashboard.widgets || []).length,
-              size: { w: 2, h: 2 },
+              size: size ?? { w: 2, h: 2 },
             });
             setDashboard((prev) =>
               prev ? { ...prev, widgets: [...(prev.widgets || []), widget] } : prev

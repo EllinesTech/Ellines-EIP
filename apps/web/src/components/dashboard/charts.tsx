@@ -23,7 +23,8 @@ const AMBER = '#f59e0b';
 const RED = '#ef4444';
 const MUTED = '#8b95a8';
 
-type Point = { name: string; value: number };
+export type ChartPoint = { name: string; value: number };
+type Point = ChartPoint;
 
 export function sparkSeries(seed: number, points = 8): Point[] {
   const out: Point[] = [];
@@ -169,6 +170,69 @@ export function DonutStatus({
             {center}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Compact intensity grid for dashboard heatmap widgets (no heavy chart lib). */
+export function HeatmapGrid({
+  seed,
+  rows = 4,
+  cols = 7,
+}: {
+  seed: number;
+  rows?: number;
+  cols?: number;
+}) {
+  const cells: number[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      cells.push(((seed * 17 + r * 13 + c * 7) % 100) / 100);
+    }
+  }
+  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].slice(0, cols);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gap: 4,
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        {cells.map((intensity, i) => {
+          const alpha = 0.12 + intensity * 0.78;
+          return (
+            <div
+              key={i}
+              title={`${Math.round(intensity * 100)}`}
+              style={{
+                borderRadius: 4,
+                background: `rgba(37, 99, 235, ${alpha.toFixed(3)})`,
+                minHeight: 10,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gap: 4,
+          color: MUTED,
+          fontSize: 10,
+          textAlign: 'center',
+          fontWeight: 600,
+        }}
+      >
+        {dayLabels.map((d, i) => (
+          <span key={`${d}-${i}`}>{d}</span>
+        ))}
       </div>
     </div>
   );
