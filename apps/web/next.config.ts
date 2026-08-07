@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: true },
+
+
 };
 
 export default nextConfig;
