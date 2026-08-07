@@ -4,12 +4,7 @@ import { useState, useCallback } from 'react';
 import styles from '../../command.module.css';
 import adminStyles from '../../admin/admin.module.css';
 import type { DashboardDto, WidgetDto } from '@/lib/api';
-
-interface DraggedWidget {
-  id: string;
-  position: { x: number; y: number };
-  size: { w: number; h: number };
-}
+import WidgetRenderer from '@/components/dashboard/WidgetRenderer';
 
 interface WidgetPaletteItem {
   type: string;
@@ -23,41 +18,55 @@ const WIDGET_PALETTE: WidgetPaletteItem[] = [
   {
     type: 'kpi',
     label: 'KPI',
-    icon: '📊',
+    icon: 'KPI',
     defaultSize: { w: 2, h: 1 },
-    description: 'Single value with label',
+    description: 'Single value with sparkline',
   },
   {
     type: 'gauge',
     label: 'Gauge',
-    icon: '🎯',
+    icon: '◎',
     defaultSize: { w: 2, h: 2 },
     description: 'Circular progress indicator',
   },
   {
     type: 'line',
-    label: 'Line Chart',
-    icon: '📈',
+    label: 'Line',
+    icon: '/',
     defaultSize: { w: 3, h: 2 },
-    description: 'Trend visualization',
+    description: 'Trend line / area chart',
   },
   {
     type: 'bar',
-    label: 'Bar Chart',
-    icon: '📊',
+    label: 'Bar',
+    icon: '▮',
     defaultSize: { w: 3, h: 2 },
-    description: 'Category comparison',
+    description: 'Category comparison bars',
+  },
+  {
+    type: 'pie',
+    label: 'Pie',
+    icon: '◯',
+    defaultSize: { w: 2, h: 2 },
+    description: 'Distribution donut',
+  },
+  {
+    type: 'heatmap',
+    label: 'Heatmap',
+    icon: '▦',
+    defaultSize: { w: 3, h: 2 },
+    description: 'Intensity grid by day',
   },
   {
     type: 'table',
     label: 'Table',
-    icon: '📋',
+    icon: '▤',
     defaultSize: { w: 4, h: 3 },
     description: 'Tabular data view',
   },
 ];
 
-const GRID_SIZE = 20; // pixels per grid unit
+const GRID_SIZE = 96; // pixels per grid unit (charts need room to render)
 const MIN_SIZE = { w: 1, h: 1 };
 const MAX_SIZE = { w: 6, h: 4 };
 
@@ -71,10 +80,13 @@ interface CanvasWidgetProps {
 }
 
 function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onDragEnd }: CanvasWidgetProps) {
-  const position = (widget.position || 0) * GRID_SIZE;
-  const size = widget.size as any || { w: 2, h: 2 };
-  const width = size.w * GRID_SIZE;
-  const height = size.h * GRID_SIZE;
+  const size = (widget.size as { w?: number; h?: number }) || { w: 2, h: 2 };
+  const col = typeof widget.position === 'number' ? widget.position % 4 : 0;
+  const row = typeof widget.position === 'number' ? Math.floor(widget.position / 4) : 0;
+  const left = col * (GRID_SIZE + 12);
+  const top = row * (GRID_SIZE + 12);
+  const width = (size.w ?? 2) * GRID_SIZE;
+  const height = (size.h ?? 2) * GRID_SIZE;
 
   const handleResizeStart = (corner: string) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -89,8 +101,8 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
 
-      let newW = size.w;
-      let newH = size.h;
+      let newW = size.w ?? 2;
+      let newH = size.h ?? 2;
 
       if (corner.includes('e')) {
         newW = Math.round((startWidth + deltaX) / GRID_SIZE);
@@ -102,7 +114,7 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
       newW = Math.max(MIN_SIZE.w, Math.min(newW, MAX_SIZE.w));
       newH = Math.max(MIN_SIZE.h, Math.min(newH, MAX_SIZE.h));
 
-      if (newW !== size.w || newH !== size.h) {
+      if (newW !== (size.w ?? 2) || newH !== (size.h ?? 2)) {
         onResize(widget.id, { w: newW, h: newH });
       }
     };
@@ -121,18 +133,19 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
     <div
       style={{
         position: 'absolute',
-        left: `${position}px`,
-        top: 0,
+        left: `${left}px`,
+        top: `${top}px`,
         width: `${width}px`,
         height: `${height}px`,
-        background: isSelected ? 'rgba(59, 130, 246, 0.08)' : '#161b26',
-        border: isSelected ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
+        background: isSelected ? 'rgba(37, 99, 235, 0.08)' : '#161b26',
+        border: isSelected ? '2px solid #2563EB' : '1px solid rgba(255,255,255,0.08)',
         borderRadius: 10,
         padding: '0.65rem',
         cursor: 'move',
         display: 'flex',
         flexDirection: 'column',
         transition: isSelected ? 'border-color 0.2s' : 'all 0.2s',
+        overflow: 'hidden',
       }}
       onMouseDown={(e) => {
         onSelect(widget.id);
@@ -140,13 +153,17 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
       }}
       onClick={() => onSelect(widget.id)}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.3rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.3rem', flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8b95a8' }}>
             {widget.type}
           </div>
-          <div style={{ fontWeight: 700, color: '#f4f7fb', marginTop: '0.2rem' }}>{widget.title}</div>
+          <div style={{ fontWeight: 700, color: '#f4f7fb', marginTop: '0.2rem', fontSize: '0.85rem' }}>{widget.title}</div>
         </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, marginTop: 4, pointerEvents: 'none' }}>
+        <WidgetRenderer widget={widget} />
       </div>
 
       {/* Resize handles */}
@@ -170,7 +187,7 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
 
 interface DashboardBuilderProps {
   dashboard: DashboardDto;
-  onWidgetAdd: (type: string, title: string) => Promise<WidgetDto>;
+  onWidgetAdd: (type: string, title: string, size?: { w: number; h: number }) => Promise<WidgetDto>;
   onWidgetUpdate: (widget: WidgetDto, patch: Partial<WidgetDto>) => void;
   onWidgetDelete: (widgetId: string) => void;
   busy: boolean;
@@ -190,8 +207,8 @@ export default function DashboardBuilder({
   const [addingWidget, setAddingWidget] = useState<WidgetPaletteItem | null>(null);
   const [newWidgetTitle, setNewWidgetTitle] = useState('');
 
-  const canvasHeight = 400; // pixels
-  const canvasWidth = 1200; // pixels
+  const canvasHeight = 720;
+  const canvasWidth = 1200;
 
   const handleDragStart = useCallback((e: React.MouseEvent, widgetId: string) => {
     setDraggingWidget(widgetId);
@@ -217,7 +234,7 @@ export default function DashboardBuilder({
     async (item: WidgetPaletteItem) => {
       if (!newWidgetTitle.trim()) return;
       try {
-        await onWidgetAdd(item.type, newWidgetTitle);
+        await onWidgetAdd(item.type, newWidgetTitle, item.defaultSize);
         setAddingWidget(null);
         setNewWidgetTitle('');
       } catch (err) {
