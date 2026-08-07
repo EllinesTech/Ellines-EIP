@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { DatabaseConfiguration } from '@prisma/client';
 
 export interface DatabaseConnectionConfig {
   host?: string;
   port: number;
-  database?: string;
-  username?: string;
+  database?: string | null;
+  username?: string | null;
   password?: string;
+  supabaseKey?: string;
   type: 'local' | 'supabase' | 'custom_postgres';
 }
 
@@ -38,7 +40,10 @@ export interface DatabaseConnectionConfig {
  */
 @Injectable()
 export class DatabaseSwitcherService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private encryption: EncryptionService,
+  ) {}
 
   /**
    * Get the primary/active database configuration for an organization
@@ -60,6 +65,24 @@ export class DatabaseSwitcherService {
         return this.getDefaultDatabaseConfig();
       }
 
+      // Decrypt password if encrypted
+      let decryptedPassword: string | undefined;
+      if (config.passwordEncrypted) {
+        decryptedPassword = await this.encryption.decrypt(
+          config.passwordEncrypted,
+          organizationId,
+        );
+      }
+
+      // Decrypt Supabase key if encrypted
+      let decryptedSupabaseKey: string | undefined;
+      if (config.supabaseKeyEncrypted) {
+        decryptedSupabaseKey = await this.encryption.decrypt(
+          config.supabaseKeyEncrypted,
+          organizationId,
+        );
+      }
+
       // Build connection config from stored config
       return {
         type: config.type as 'local' | 'supabase' | 'custom_postgres',
@@ -67,9 +90,8 @@ export class DatabaseSwitcherService {
         port: config.port || 5432,
         database: config.databaseName,
         username: config.username,
-        // Password should be decrypted in real implementation
-        // For now, it's passed through (TODO: implement proper encryption)
-        password: config.password,
+        password: decryptedPassword,
+        supabaseKey: decryptedSupabaseKey,
       };
     } catch (error) {
       // On error, fall back to default
@@ -172,6 +194,23 @@ export class DatabaseSwitcherService {
     configId: string,
     reason: string,
   ): Promise<DatabaseConfiguration> {
+    // First get the config to make sure it exists
+    const config = await this.prisma.databaseConfiguration.findUnique({
+      where: { id: configId },
+    });
+
+    if (!config) {
+      throw new Error(`Database configuration ${configId} not found`);
+    }
+
+    // Get current primary config before switching
+    const currentPrimary = await this.prisma.databaseConfiguration.findFirst({
+      where: {
+        organizationId,
+        isPrimary: true,
+      },
+    });
+
     // Start transaction to ensure consistency
     const [updated] = await this.prisma.$transaction([
       // Update the new config to primary
@@ -194,10 +233,9 @@ export class DatabaseSwitcherService {
         data: {
           organizationId,
           configId,
-          fromDatabase: 'unknown', // Could enhance to track previous DB
-          toDatabase: (await this.prisma.databaseConfiguration.findUnique({ where: { id: configId } }))?.name || 'unknown',
-          reason,
-          switchedAt: new Date(),
+          previousConfigId: currentPrimary?.id || null,
+          switchedBy: 'system', // Would come from request context in real usage
+          reason: reason || null,
         },
       }),
     ]);
@@ -211,7 +249,7 @@ export class DatabaseSwitcherService {
   async getSwitchLog(organizationId: string, limit = 10) {
     return this.prisma.databaseSwitchLog.findMany({
       where: { organizationId },
-      orderBy: { switchedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: limit,
     });
   }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { DatabaseSwitcherService } from './database-switcher.service';
 import { DatabaseContextInterceptor } from './database-context.interceptor';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 /**
  * DatabaseModule provides services for runtime database switching
@@ -12,6 +13,7 @@ import { DatabaseContextInterceptor } from './database-context.interceptor';
  * - DatabaseContextInterceptor: Global interceptor for request context
  */
 @Module({
+  imports: [EncryptionModule],
   providers: [
     DatabaseSwitcherService,
     {
