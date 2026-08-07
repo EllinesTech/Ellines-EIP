@@ -2,13 +2,6 @@ import type { Metadata } from 'next';
 import '@/fonts/exo2.css';
 import './globals.css';
 
-/**
- * Disable static generation to prevent React error #31 during build.
- * With 'force-dynamic', pages are rendered on-demand in server runtime
- * instead of being pre-generated at build time.
- */
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: 'Ellines EIP — Enterprise Intelligence Platform',
   description: 'Where Enterprise Systems Think Together. Powered by Ellinea AI.',
