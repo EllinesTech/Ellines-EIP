@@ -101,8 +101,8 @@ function CanvasWidget({ widget, isSelected, onSelect, onResize, onDragStart, onD
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
 
-      let newW = size.w;
-      let newH = size.h;
+      let newW = size.w ?? 2;
+      let newH = size.h ?? 2;
 
       if (corner.includes('e')) {
         newW = Math.round((startWidth + deltaX) / GRID_SIZE);
