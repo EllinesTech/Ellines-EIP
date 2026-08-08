@@ -44,7 +44,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   return json([
     item('demo-json', 'Demo JSON Systems', 'file', 'Built-in seed — Sync now for live KPIs'),
     item('rest-api', 'REST API Systems', 'api', 'JSON HTTPS URL when the system exposes an API'),
+    item('graphql', 'GraphQL API', 'api', 'Modern GraphQL queries, mutations & subscriptions — flexible data fetching'),
     item('openapi', 'OpenAPI / Swagger', 'api', 'Upload OpenAPI — pick capabilities to sync'),
+    item('webhook-inbound', 'Webhook Receiver', 'api', 'Real-time push from external systems with HMAC security'),
     item(
       'csv-file',
       'CSV / File Import',

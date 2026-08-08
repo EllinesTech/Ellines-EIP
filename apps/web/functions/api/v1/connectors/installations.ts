@@ -66,6 +66,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const catalogId = (body.catalogId || '').trim();
     const allowed = [
       'rest-api',
+      'graphql',
       'openapi',
       'csv-file',
       'postgres',
@@ -74,6 +75,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       'demo-json',
       'email-imap',
       'sftp',
+      'webhook-inbound',
     ];
     if (!allowed.includes(catalogId)) {
       return json({ statusCode: 400, message: 'Unsupported catalogId' }, 400);
