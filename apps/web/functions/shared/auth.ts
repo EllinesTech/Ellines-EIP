@@ -65,7 +65,7 @@ export function getAdminClient(env: Env): SupabaseClient {
   });
 }
 
-export function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -74,6 +74,7 @@ export function json(data: unknown, status = 200): Response {
       'access-control-allow-headers':
         'Content-Type, Authorization, X-EIP-Organization-Id, X-EIP-Webhook-Secret',
       'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      ...extraHeaders,
     },
   });
 }

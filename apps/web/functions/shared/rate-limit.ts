@@ -3,10 +3,168 @@
  * 
  * Wraps API endpoints with rate limiting checks.
  * Reads tier from organization settings and enforces limits.
+ *
+ * Also exports a lightweight IP-based rate limiter for auth endpoints
+ * (no org context required) and a rateLimitResponse helper.
  */
 
 import type { Env } from './auth';
-import { getAdminClient } from './auth';
+import { getAdminClient, json } from './auth';
+
+// ---------------------------------------------------------------------------
+// IP-based rate limiter (used by auth endpoints like login / register)
+// ---------------------------------------------------------------------------
+
+export interface IpRateLimitOptions {
+  /** Maximum requests allowed in the window */
+  maxRequests: number;
+  /** Window duration in milliseconds */
+  windowMs: number;
+  /** KV key prefix to namespace different endpoints */
+  keyPrefix: string;
+}
+
+export interface IpRateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  /** Timestamp (ms) when the window resets */
+  resetAt: number;
+}
+
+interface IpRateLimitRecord {
+  count: number;
+  resetAt: number;
+}
+
+/**
+ * Lightweight IP-based rate limiter backed by Cloudflare KV.
+ * Falls back to "allow" if KV is not configured so the app stays functional
+ * in environments without KV bindings.
+ *
+ * @param context  - Pages Function EventContext (provides env + KV)
+ * @param options  - maxRequests / windowMs / keyPrefix
+ * @param ip       - Client IP address to key on
+ */
+export async function checkRateLimit(
+  context: { env: Env & { RATE_LIMIT_KV?: KVNamespace } },
+  options: IpRateLimitOptions,
+  ip: string,
+): Promise<IpRateLimitResult>;
+
+/**
+ * Org-tier rate limiter (overload for internal org-scoped API routes).
+ */
+export async function checkRateLimit(
+  env: Env,
+  organizationId: string,
+  userId: string | null,
+  endpoint: string,
+  method: string,
+): Promise<RateLimitResult>;
+
+// Implementation — handles both overloads
+export async function checkRateLimit(
+  envOrContext: unknown,
+  optionsOrOrgId: unknown,
+  ipOrUserId?: unknown,
+  endpoint?: string,
+  method?: string,
+): Promise<IpRateLimitResult | RateLimitResult> {
+  // Detect which overload was called by checking the second argument type
+  if (
+    optionsOrOrgId !== null &&
+    typeof optionsOrOrgId === 'object' &&
+    'maxRequests' in (optionsOrOrgId as object)
+  ) {
+    // IP-based path
+    const context = envOrContext as { env: Env & { RATE_LIMIT_KV?: KVNamespace } };
+    const options = optionsOrOrgId as IpRateLimitOptions;
+    const ip = ipOrUserId as string;
+    return _checkIpRateLimit(context, options, ip);
+  }
+
+  // Org-tier path
+  return _checkOrgRateLimit(
+    envOrContext as Env,
+    optionsOrOrgId as string,
+    ipOrUserId as string | null,
+    endpoint as string,
+    method as string,
+  );
+}
+
+async function _checkIpRateLimit(
+  context: { env: Env & { RATE_LIMIT_KV?: KVNamespace } },
+  options: IpRateLimitOptions,
+  ip: string,
+): Promise<IpRateLimitResult> {
+  const kv: KVNamespace | undefined = context.env.RATE_LIMIT_KV;
+
+  if (!kv) {
+    // KV not configured — allow all requests (fail open)
+    return { allowed: true, remaining: options.maxRequests - 1, resetAt: Date.now() + options.windowMs };
+  }
+
+  const key = `${options.keyPrefix}:${ip}`;
+  const now = Date.now();
+
+  try {
+    const raw = await kv.get(key);
+    let record: IpRateLimitRecord;
+
+    if (raw) {
+      record = JSON.parse(raw) as IpRateLimitRecord;
+      if (now >= record.resetAt) {
+        // Window expired — reset
+        record = { count: 0, resetAt: now + options.windowMs };
+      }
+    } else {
+      record = { count: 0, resetAt: now + options.windowMs };
+    }
+
+    const allowed = record.count < options.maxRequests;
+    record.count += 1;
+
+    // TTL in seconds for KV expiry (align with window)
+    const ttlSeconds = Math.ceil((record.resetAt - now) / 1000);
+    await kv.put(key, JSON.stringify(record), { expirationTtl: Math.max(ttlSeconds, 1) });
+
+    return {
+      allowed,
+      remaining: Math.max(0, options.maxRequests - record.count),
+      resetAt: record.resetAt,
+    };
+  } catch (err) {
+    console.error('[checkRateLimit] KV error:', err);
+    // Fail open on KV errors
+    return { allowed: true, remaining: options.maxRequests - 1, resetAt: now + options.windowMs };
+  }
+}
+
+/**
+ * Build a 429 Too Many Requests response for IP-based rate limiting.
+ *
+ * @param remaining - Remaining requests in window (usually 0)
+ * @param resetAt   - Timestamp (ms) when the window resets
+ */
+export function rateLimitResponse(remaining: number, resetAt: number): Response {
+  const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  return json(
+    {
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
+      remaining,
+      resetAt: new Date(resetAt).toISOString(),
+    },
+    429,
+    { 'Retry-After': String(retryAfter), 'X-RateLimit-Remaining': String(remaining) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Org-tier rate limiter (original implementation below)
+// ---------------------------------------------------------------------------
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -57,9 +215,9 @@ const DEFAULT_TIERS: Record<string, RateLimitTier> = {
 };
 
 /**
- * Check rate limit for organization
+ * Check rate limit for organization (internal implementation)
  */
-export async function checkRateLimit(
+async function _checkOrgRateLimit(
   env: Env,
   organizationId: string,
   userId: string | null,
@@ -287,7 +445,7 @@ export async function withRateLimit(
   const endpoint = url.pathname;
   const method = request.method;
 
-  const result = await checkRateLimit(env, organizationId, userId, endpoint, method);
+  const result = await _checkOrgRateLimit(env, organizationId, userId, endpoint, method);
 
   // Add rate limit headers
   const headers = new Headers();
