@@ -12,11 +12,19 @@ import {
   type Env,
 } from '../../../../../../shared/auth';
 import { sendOutboundEmail, resolveMailConfig } from '../../../../../../shared/mail';
+import {
+  deliveryFromStored,
+  nextRunHintFor,
+} from '../../../../../../shared/report-delivery';
 
 type ScheduledReport = {
   id: string; title: string; cadence: string; template?: string; enabled: boolean;
   lastRunAt: string | null; nextRunHint: string; createdAt: string;
   lastEmailStatus?: string;
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  sendHour?: number | null;
 };
 
 type MemoryNote = { id: string; title: string; body: string };
@@ -400,25 +408,44 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     template: report.template,
   }, format);
 
-  // Attempt email delivery
+  // Attempt multi-recipient email delivery (To / Cc / Bcc)
+  const delivery = deliveryFromStored(report);
+  const toList = delivery.recipients.length
+    ? delivery.recipients
+    : auth.email
+      ? [auth.email]
+      : [];
   let emailStatus = 'not_configured';
   const mailConfig = resolveMailConfig(context.env);
-  if (mailConfig) {
+  if (!toList.length) {
+    emailStatus = 'failed: no recipients';
+  } else if (mailConfig) {
     const emailResult = await sendOutboundEmail(context.env, {
-      to: auth.email,
+      to: toList,
+      cc: delivery.cc,
+      bcc: delivery.bcc,
       subject: `${report.title} — ${orgName} (${new Date(now).toLocaleDateString()})`,
       text: reportBody,
-    }).catch((err) => ({ ok: false, error: err instanceof Error ? err.message : 'Send failed', provider: 'none' as const, id: undefined }));
-    emailStatus = emailResult.ok ? `delivered_via_${emailResult.provider}` : `failed: ${emailResult.error}`;
+    }).catch((err) => ({
+      ok: false,
+      error: err instanceof Error ? err.message : 'Send failed',
+      provider: 'none' as const,
+      id: undefined,
+    }));
+    emailStatus = emailResult.ok
+      ? `delivered_via_${emailResult.provider}`
+      : `failed: ${emailResult.error}`;
   }
 
   const updated: ScheduledReport = {
     ...report,
+    recipients: delivery.recipients,
+    cc: delivery.cc,
+    bcc: delivery.bcc,
+    sendHour: delivery.sendHour,
     lastRunAt: now,
     lastEmailStatus: emailStatus,
-    nextRunHint: report.enabled
-      ? report.cadence === 'daily' ? 'Tomorrow morning' : 'Next Monday'
-      : 'Paused',
+    nextRunHint: nextRunHintFor(report.cadence, report.enabled, delivery.sendHour),
   };
 
   const next = reports.map((r, i) => (i === idx ? updated : r));
@@ -435,8 +462,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     user_id: auth.sub,
     action: 'workflow.report_run',
     resource: 'scheduled_report',
-    metadata: { id: reportId, title: updated.title, emailStatus },
+    metadata: {
+      id: reportId,
+      title: updated.title,
+      emailStatus,
+      toCount: toList.length,
+      ccCount: delivery.cc.length,
+      bccCount: delivery.bcc.length,
+    },
   });
 
-  return json({ ...updated, emailStatus, reportChars: reportBody.length });
+  return json({
+    ...updated,
+    emailStatus,
+    reportChars: reportBody.length,
+    deliveredTo: toList,
+    deliveredCc: delivery.cc,
+    deliveredBccCount: delivery.bcc.length,
+  });
 };

@@ -671,6 +671,10 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 | B.1.2 | Dashboard chart rendering | `done` | `WidgetRenderer` + Recharts (line/bar/pie/heatmap/KPI/gauge/table) on `/app/dashboards/[id]` |
 | B.1.3 | Real-time dashboard refresh | `done` | Poll interval from `dashboard.refreshRate`; manual ↻ Refresh button; last-refreshed timestamp in header; auto-refresh stops when rate=0 |
 | B.1.4 | Dashboard export & sharing | `done` | CSV client-side download (immediate); PDF/Excel server-scheduled placeholders; 🔗 copy share link with Public/Private badge; `isPublic` now saved on settings form |
+| B.2.1 | Report templates & customization | `done` | Template picker + server-persisted template field |
+| B.2.2 | Report PDF generation | `done` | HTML print-to-PDF endpoint + UI button |
+| B.2.3 | Multi-recipient delivery | `done` | To/Cc/Bcc + sendHour UTC; Pages mail + `/app/reports` recipients editor |
+| B.2.4 | Report history & re-send | `next` | View past reports, download, resend |
 
 ---
 
