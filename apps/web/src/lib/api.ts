@@ -1250,10 +1250,7 @@ export async function exportOrgData(type: ExportType, format: ExportFormat): Pro
 
 export type ComplianceTemplate = 'soc2' | 'hipaa' | 'gdpr' | 'pci' | 'all';
 
-/**
- * Export compliance audit report (SOC 2, HIPAA, GDPR, PCI-DSS or all)
- * Downloads as file (CSV or JSON)
- */
+/** Owner/IT: export compliance audit report */
 export async function exportComplianceReport(opts: {
   template: ComplianceTemplate;
   format: ExportFormat;
@@ -1280,6 +1277,77 @@ export async function exportComplianceReport(opts: {
     throw new Error(err.message || `Compliance export failed (${res.status})`);
   }
 
+  return res.blob();
+}
+
+// ─── Data Access Log (D.2.2) ─────────────────────────────────────────────────
+
+export type DataAccessResourceCategory =
+  | 'connector' | 'report' | 'document' | 'export' | 'api_key'
+  | 'authentication' | 'org_data' | 'other';
+
+export type DataAccessSensitivity = 'high' | 'medium' | 'low';
+
+export type DataAccessLogEntry = {
+  id: string;
+  timestamp: string;
+  actorUserId: string;
+  actorEmail: string;
+  actorName: string;
+  action: string;
+  resource: string;
+  resourceCategory: DataAccessResourceCategory;
+  sensitivity: DataAccessSensitivity;
+  metadata: Record<string, unknown>;
+};
+
+export type DataAccessLogDto = {
+  logs: DataAccessLogEntry[];
+  total: number;
+  fromDate: string;
+  toDate: string;
+  summary: {
+    byCategory: Record<string, number>;
+    byActor: Record<string, number>;
+    highSensitivity: number;
+    mediumSensitivity: number;
+  };
+};
+
+/** Owner/IT: fetch structured data access log. */
+export function fetchDataAccessLog(opts?: {
+  limit?: number;
+  resource?: string;
+  userId?: string;
+  from?: string;
+  to?: string;
+}) {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.resource) params.set('resource', opts.resource);
+  if (opts?.userId) params.set('userId', opts.userId);
+  if (opts?.from) params.set('from', opts.from);
+  if (opts?.to) params.set('to', opts.to);
+  const qs = params.toString();
+  return request<DataAccessLogDto>(`/api/v1/orgs/me/data-access-log${qs ? `?${qs}` : ''}`);
+}
+
+/** Owner/IT: download data access log as CSV. */
+export async function downloadDataAccessLog(opts?: {
+  resource?: string;
+  from?: string;
+  to?: string;
+}): Promise<Blob> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+  const params = new URLSearchParams({ format: 'csv' });
+  if (opts?.resource) params.set('resource', opts.resource);
+  if (opts?.from) params.set('from', opts.from);
+  if (opts?.to) params.set('to', opts.to);
+  const res = await fetch(`${API_URL}/api/v1/orgs/me/data-access-log?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
   return res.blob();
 }
 
