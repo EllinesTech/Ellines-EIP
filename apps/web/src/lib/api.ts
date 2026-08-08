@@ -1066,6 +1066,7 @@ export type ScheduledReportDto = {
   id: string;
   title: string;
   cadence: 'daily' | 'weekly';
+  template: 'executive' | 'operational' | 'department' | 'custom';
   enabled: boolean;
   lastRunAt: string | null;
   nextRunHint: string;
@@ -1076,7 +1077,7 @@ export function listReportsApi() {
   return request<ScheduledReportDto[]>('/api/v1/orgs/me/reports');
 }
 
-export function createReportApi(payload: { title: string; cadence: 'daily' | 'weekly' }) {
+export function createReportApi(payload: { title: string; cadence: 'daily' | 'weekly'; template?: 'executive' | 'operational' | 'department' | 'custom' }) {
   return request<ScheduledReportDto>('/api/v1/orgs/me/reports', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -1228,6 +1229,7 @@ export type ScheduledReportRunDto = {
   id: string;
   title: string;
   cadence: 'daily' | 'weekly';
+  template: 'executive' | 'operational' | 'department' | 'custom';
   enabled: boolean;
   lastRunAt: string | null;
   nextRunHint: string;

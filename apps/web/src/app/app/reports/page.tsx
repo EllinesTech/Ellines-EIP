@@ -8,7 +8,9 @@ import {
   buildReportPreview,
   readScheduledReports,
   writeScheduledReports,
+  REPORT_TEMPLATES,
   type ReportCadence,
+  type ReportTemplate,
   type ScheduledReport,
 } from '@/lib/scheduled-reports';
 import {
@@ -30,6 +32,7 @@ function fromDto(dto: ScheduledReportDto): ScheduledReport {
     id: dto.id,
     title: dto.title,
     cadence: dto.cadence as ReportCadence,
+    template: (dto.template as ReportTemplate) || 'custom',
     enabled: dto.enabled,
     lastRunAt: dto.lastRunAt,
     nextRunHint: dto.nextRunHint,
@@ -43,7 +46,8 @@ export default function ReportsPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState('');
   const [items, setItems] = useState<ScheduledReport[]>([]);
-  const [title, setTitle] = useState('CEO Daily Brief pack');
+  const [template, setTemplate] = useState<ReportTemplate>('executive');
+  const [title, setTitle] = useState('CEO Daily Brief');
   const [cadence, setCadence] = useState<ReportCadence>('daily');
   const [preview, setPreview] = useState('');
   const [serverSync, setServerSync] = useState(false);
@@ -82,6 +86,7 @@ export default function ReportsPage() {
           briefHighlight: summary.status === 'synced'
             ? summary.briefHighlight
             : 'No live snapshot yet — sync connectors first.',
+          template,
         }));
       })
       .catch(() => {
@@ -89,9 +94,10 @@ export default function ReportsPage() {
           orgName: s.organization.name,
           healthScore: 0, openAlerts: 0, openDecisions: 0, connectedSystems: 0,
           briefHighlight: 'Snapshot unavailable.',
+          template,
         }));
       });
-  }, [router]);
+  }, [router, template]);
 
   function localPersist(next: ScheduledReport[]) {
     if (!orgId) return;
@@ -105,33 +111,37 @@ export default function ReportsPage() {
     setBusy(true);
 
     if (serverSync) {
-      createReportApi({ title: title.trim(), cadence })
+      createReportApi({ title: title.trim(), cadence, template })
         .then((dto) => {
           setItems((prev) => [fromDto(dto), ...prev]);
-          setTitle('CEO Daily Brief pack');
+          // Reset to executive default
+          setTemplate('executive');
+          setTitle('CEO Daily Brief');
         })
         .catch(() => {
           const next: ScheduledReport = {
-            id: `rpt_${Date.now()}`, title: title.trim(), cadence, enabled: true,
+            id: `rpt_${Date.now()}`, title: title.trim(), cadence, template, enabled: true,
             lastRunAt: null,
             nextRunHint: cadence === 'daily' ? 'Tomorrow morning (local)' : 'Next Monday (local)',
             createdAt: new Date().toISOString(),
           };
           localPersist([next, ...items]);
-          setTitle('CEO Daily Brief pack');
+          setTemplate('executive');
+          setTitle('CEO Daily Brief');
         })
         .finally(() => setBusy(false));
       return;
     }
 
     const next: ScheduledReport = {
-      id: `rpt_${Date.now()}`, title: title.trim(), cadence, enabled: true,
+      id: `rpt_${Date.now()}`, title: title.trim(), cadence, template, enabled: true,
       lastRunAt: null,
       nextRunHint: cadence === 'daily' ? 'Tomorrow morning (local stub)' : 'Next Monday (local stub)',
       createdAt: new Date().toISOString(),
     };
     localPersist([next, ...items]);
-    setTitle('CEO Daily Brief pack');
+    setTemplate('executive');
+    setTitle('CEO Daily Brief');
     setBusy(false);
   }
 
@@ -202,6 +212,14 @@ export default function ReportsPage() {
     localPersist(items.filter((r) => r.id !== id));
   }
 
+  function handleTemplateChange(newTemplate: ReportTemplate) {
+    setTemplate(newTemplate);
+    const templateMeta = REPORT_TEMPLATES.find((t) => t.value === newTemplate);
+    if (templateMeta) {
+      setTitle(templateMeta.defaultTitle);
+    }
+  }
+
   if (!allowed) return <div className={styles.page}><p className={styles.lede}>Checking access…</p></div>;
 
   return (
@@ -224,6 +242,24 @@ export default function ReportsPage() {
       <section className={styles.brief}>
         <div className={styles.panelLabel}>Schedule</div>
         <form className={adminStyles.form} onSubmit={onAdd}>
+          <label>
+            Template
+            <select
+              value={template}
+              onChange={(e) => {
+                const newTemplate = e.target.value as ReportTemplate;
+                setTemplate(newTemplate);
+                const templateMeta = REPORT_TEMPLATES.find((t) => t.value === newTemplate);
+                if (templateMeta) setTitle(templateMeta.defaultTitle);
+              }}
+            >
+              {REPORT_TEMPLATES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label} — {t.description}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Title
             <input value={title} onChange={(e) => setTitle(e.target.value)} required minLength={3} />
@@ -249,17 +285,20 @@ export default function ReportsPage() {
           <table className={adminStyles.table}>
             <thead>
               <tr>
-                <th>Title</th><th>Cadence</th><th>Next</th><th>Last run</th><th />
+                <th>Template</th><th>Title</th><th>Cadence</th><th>Next</th><th>Last run</th><th />
               </tr>
             </thead>
             <tbody>
-              {items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.title}</td>
-                  <td>{r.cadence}</td>
-                  <td>{r.enabled ? r.nextRunHint : 'Paused'}</td>
-                  <td>{r.lastRunAt ? new Date(r.lastRunAt).toLocaleString() : '—'}</td>
-                  <td>
+              {items.map((r) => {
+                const templateMeta = REPORT_TEMPLATES.find((t) => t.value === r.template);
+                return (
+                  <tr key={r.id}>
+                    <td>{templateMeta?.label || '✏️ Custom'}</td>
+                    <td>{r.title}</td>
+                    <td>{r.cadence}</td>
+                    <td>{r.enabled ? r.nextRunHint : 'Paused'}</td>
+                    <td>{r.lastRunAt ? new Date(r.lastRunAt).toLocaleString() : '—'}</td>
+                    <td>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
                       <button
                         type="button" className={adminStyles.primary}
@@ -279,7 +318,8 @@ export default function ReportsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         )}

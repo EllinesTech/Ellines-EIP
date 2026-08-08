@@ -1,9 +1,11 @@
 export type ReportCadence = 'daily' | 'weekly';
+export type ReportTemplate = 'executive' | 'operational' | 'department' | 'custom';
 
 export type ScheduledReport = {
   id: string;
   title: string;
   cadence: ReportCadence;
+  template: ReportTemplate;
   enabled: boolean;
   lastRunAt: string | null;
   nextRunHint: string;
@@ -39,12 +41,78 @@ export function buildReportPreview(input: {
   openDecisions: number;
   connectedSystems: number;
   briefHighlight: string;
+  template?: ReportTemplate;
 }): string {
-  return [
-    `Ellines EIP · Executive report — ${input.orgName}`,
+  const base = [
     `Health ${input.healthScore}/100 · ${input.connectedSystems} system(s)`,
     `Alerts ${input.openAlerts} · Open decisions ${input.openDecisions}`,
     input.briefHighlight,
-    'Generated locally until email/PDF service ships.',
-  ].join('\n');
+  ];
+
+  switch (input.template) {
+    case 'executive':
+      return [
+        `── Executive Report · ${input.orgName} ──`,
+        ...base,
+        '',
+        'Sections: Enterprise Health · Open Decisions · Ellinea Brief · Key KPIs',
+        'Audience: CEO, Board, Owner',
+      ].join('\n');
+    case 'operational':
+      return [
+        `── Operational Report · ${input.orgName} ──`,
+        ...base,
+        '',
+        'Sections: Connector Status · Sync Health · Active Alerts · Workflow Queue',
+        'Audience: IT Admin, Operations Manager',
+      ].join('\n');
+    case 'department':
+      return [
+        `── Department Report · ${input.orgName} ──`,
+        ...base,
+        '',
+        'Sections: Dept KPIs · Branch Activity · People Summary · Document Count',
+        'Audience: Department Managers, HR',
+      ].join('\n');
+    default:
+      return [
+        `── Custom Report · ${input.orgName} ──`,
+        ...base,
+        '',
+        'All sections included. Customize title to match your use case.',
+      ].join('\n');
+  }
 }
+
+/** Default titles and descriptions per template type */
+export const REPORT_TEMPLATES: {
+  value: ReportTemplate;
+  label: string;
+  defaultTitle: string;
+  description: string;
+}[] = [
+  {
+    value: 'executive',
+    label: '📊 Executive',
+    defaultTitle: 'CEO Daily Brief',
+    description: 'Health score, open decisions, Ellinea brief. For CEO / Board.',
+  },
+  {
+    value: 'operational',
+    label: '⚙️ Operational',
+    defaultTitle: 'IT Operations Report',
+    description: 'Connector status, sync health, alert queue. For IT Admin.',
+  },
+  {
+    value: 'department',
+    label: '🏢 Department',
+    defaultTitle: 'Department Summary',
+    description: 'Branch activity, people, documents. For Dept Managers.',
+  },
+  {
+    value: 'custom',
+    label: '✏️ Custom',
+    defaultTitle: 'Custom Report',
+    description: 'All sections. Set your own title and schedule.',
+  },
+];

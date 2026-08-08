@@ -12,7 +12,7 @@ import {
 } from '../../../../shared/auth';
 
 type ScheduledReport = {
-  id: string; title: string; cadence: string; enabled: boolean;
+  id: string; title: string; cadence: string; template: string; enabled: boolean;
   lastRunAt: string | null; nextRunHint: string; createdAt: string;
 };
 
@@ -85,7 +85,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   }
 
-  let body: { title?: string; cadence?: string };
+  let body: { title?: string; cadence?: string; template?: string };
   try {
     body = (await context.request.json()) as typeof body;
   } catch {
@@ -98,11 +98,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const cadence = body.cadence === 'weekly' ? 'weekly' : 'daily';
+  const validTemplates = ['executive', 'operational', 'department', 'custom'];
+  const template = validTemplates.includes(body.template || '') ? (body.template as string) : 'custom';
 
   const newReport: ScheduledReport = {
     id: cuid(),
     title,
     cadence,
+    template,
     enabled: true,
     lastRunAt: null,
     nextRunHint: nextRunHint(cadence, true),
