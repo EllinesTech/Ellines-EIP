@@ -684,6 +684,91 @@ export function rotateWebhookSecret() {
   });
 }
 
+// ─── Webhook Delivery (B.3.4) ─────────────────────────────────────────────
+
+export type WebhookDeliveryStatus = 'success' | 'failure' | 'pending' | 'permanently_failed';
+
+export type WebhookDeliveryDto = {
+  id: string;
+  webhookId: string;
+  webhookUrl: string;
+  event: string;
+  status: WebhookDeliveryStatus;
+  statusCode: number | null;
+  latencyMs: number | null;
+  attempt: number;
+  nextRetryAt: string | null;
+  error: string | null;
+  deliveredAt: string;
+};
+
+export type WebhookDeliveryListDto = {
+  deliveries: WebhookDeliveryDto[];
+  total: number;
+  successCount: number;
+  failureCount: number;
+  limit: number;
+};
+
+export type WebhookTestResultDto = {
+  deliveryId: string;
+  webhookUrl: string;
+  event: string;
+  success: boolean;
+  statusCode: number | null;
+  latencyMs: number | null;
+  responseBody: string | null;
+  error: string | null;
+  deliveredAt: string;
+  signature: string | null;
+  message: string;
+};
+
+export type WebhookRetryResultDto = {
+  deliveryId: string;
+  webhookUrl: string;
+  event: string;
+  success: boolean;
+  statusCode: number | null;
+  latencyMs: number | null;
+  attempt: number;
+  nextRetryAt: string | null;
+  error: string | null;
+  deliveredAt: string;
+  message: string;
+};
+
+/** Owner/IT: list webhook delivery logs. */
+export function listWebhookDeliveries(opts?: { limit?: number; status?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.status) params.set('status', opts.status);
+  const qs = params.toString();
+  return request<WebhookDeliveryListDto>(
+    `/api/v1/orgs/me/webhook-deliveries${qs ? `?${qs}` : ''}`,
+  );
+}
+
+/** Owner/IT: send a test webhook delivery to a URL. */
+export function testWebhookDelivery(payload: {
+  url: string;
+  secret?: string;
+  event?: string;
+}) {
+  return request<WebhookTestResultDto>('/api/v1/orgs/me/webhook-test', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Owner/IT: retry a failed webhook delivery by ID. */
+export function retryWebhookDelivery(deliveryId: string) {
+  return request<WebhookRetryResultDto>('/api/v1/orgs/me/webhook-retry', {
+    method: 'POST',
+    body: JSON.stringify({ deliveryId }),
+  });
+}
+
 // ─── Database Configuration (Multi-database Support) ──────────────────────
 
 export type DatabaseConfigurationDto = {

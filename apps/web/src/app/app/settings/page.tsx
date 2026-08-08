@@ -23,12 +23,18 @@ import {
   revokeApiKey,
   fetchHealth,
   sendEllineaDigest,
+  listWebhookDeliveries,
+  testWebhookDelivery,
+  retryWebhookDelivery,
   type ApiKeyDto,
   type ApiKeyCreatedDto,
   type AuditLogDto,
   type HealthDto,
   type OrgDateTimeSettingsDto,
   type WebhookSecretDto,
+  type WebhookDeliveryDto,
+  type WebhookDeliveryListDto,
+  type WebhookTestResultDto,
 } from '@/lib/api';
 import DatabaseConfigPage from './DatabaseConfigPage';
 import {
@@ -49,6 +55,221 @@ import { FormEvent, useEffect, useState } from 'react';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 import settingsStyles from './settings.module.css';
+
+// ─── Webhook Delivery sub-component (B.3.4) ──────────────────────────────────
+function WebhookDeliverySection() {
+  const [deliveries, setDeliveries] = useState<WebhookDeliveryDto[]>([]);
+  const [stats, setStats] = useState<Pick<WebhookDeliveryListDto, 'successCount' | 'failureCount'>>({ successCount: 0, failureCount: 0 });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [testUrl, setTestUrl] = useState('');
+  const [testSecret, setTestSecret] = useState('');
+  const [testEvent, setTestEvent] = useState('webhook.test');
+  const [testResult, setTestResult] = useState<WebhookTestResultDto | null>(null);
+  const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  function loadDeliveries(status?: string) {
+    setLoading(true);
+    listWebhookDeliveries({ limit: 50, status: status || undefined })
+      .then((d) => {
+        setDeliveries(d.deliveries);
+        setStats({ successCount: d.successCount, failureCount: d.failureCount });
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { loadDeliveries(); }, []);
+
+  async function onTest(e: FormEvent) {
+    e.preventDefault();
+    if (!testUrl.trim()) { setError('Webhook URL is required'); return; }
+    setBusy(true); setError(''); setTestResult(null);
+    try {
+      const result = await testWebhookDelivery({
+        url: testUrl.trim(),
+        secret: testSecret.trim() || undefined,
+        event: testEvent.trim() || 'webhook.test',
+      });
+      setTestResult(result);
+      loadDeliveries(statusFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test failed');
+    } finally { setBusy(false); }
+  }
+
+  async function onRetry(deliveryId: string) {
+    setBusy(true); setError('');
+    try {
+      await retryWebhookDelivery(deliveryId);
+      loadDeliveries(statusFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retry failed');
+    } finally { setBusy(false); }
+  }
+
+  function statusColor(status: string) {
+    if (status === 'success') return '#6ee7b7';
+    if (status === 'permanently_failed') return '#f87171';
+    if (status === 'failure') return '#fbbf24';
+    return '#94a3b8';
+  }
+
+  return (
+    <section className={settingsStyles.card}>
+      <div className={settingsStyles.cardHead}>
+        <p className={settingsStyles.cardEyebrow}>Integration</p>
+        <h2 className={settingsStyles.cardTitle}>Webhook delivery logs</h2>
+        <p className={settingsStyles.cardHint}>
+          Test outbound webhook deliveries, view delivery logs, and retry failures.
+          Retries use exponential backoff (1&nbsp;min&nbsp;→&nbsp;5&nbsp;min&nbsp;→&nbsp;30&nbsp;min&nbsp;→&nbsp;2&nbsp;h, max&nbsp;5&nbsp;attempts).
+        </p>
+      </div>
+
+      {error ? <p className={adminStyles.error} style={{ marginBottom: '0.75rem' }}>{error}</p> : null}
+
+      {/* Stats strip */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Successful', value: stats.successCount, color: '#6ee7b7' },
+          { label: 'Failed', value: stats.failureCount, color: '#fbbf24' },
+          { label: 'Total', value: deliveries.length, color: '#94a3b8' },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '0.5rem 0.9rem', minWidth: 90 }}>
+            <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--c-muted)', marginBottom: '0.15rem' }}>{label}</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Test delivery form */}
+      <form onSubmit={onTest} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
+        <div className={settingsStyles.fieldLabel} style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--c-muted)' }}>Test delivery</div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <input
+            className={adminStyles.input}
+            placeholder="https://your-endpoint.example.com/webhook"
+            value={testUrl}
+            onChange={(e) => setTestUrl(e.target.value)}
+            style={{ flex: 2, minWidth: 220 }}
+            type="url"
+          />
+          <input
+            className={adminStyles.input}
+            placeholder="Secret (optional, for HMAC)"
+            value={testSecret}
+            onChange={(e) => setTestSecret(e.target.value)}
+            style={{ flex: 1, minWidth: 140 }}
+            type="text"
+          />
+          <input
+            className={adminStyles.input}
+            placeholder="Event name"
+            value={testEvent}
+            onChange={(e) => setTestEvent(e.target.value)}
+            style={{ flex: 1, minWidth: 120 }}
+          />
+          <button type="submit" className={adminStyles.primary} disabled={busy || !testUrl.trim()}>
+            {busy ? 'Sending…' : 'Send test'}
+          </button>
+        </div>
+      </form>
+
+      {/* Test result */}
+      {testResult ? (
+        <div style={{
+          background: testResult.success ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.07)',
+          border: `1px solid ${testResult.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+          borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem',
+        }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 700, color: testResult.success ? '#6ee7b7' : '#f87171' }}>
+              {testResult.success ? '✓ Delivered' : '✕ Failed'}
+            </span>
+            {testResult.statusCode ? <code style={{ color: 'var(--c-muted)' }}>HTTP {testResult.statusCode}</code> : null}
+            {testResult.latencyMs ? <span style={{ color: 'var(--c-muted)' }}>{testResult.latencyMs}ms</span> : null}
+          </div>
+          <p style={{ color: 'var(--c-muted)', margin: 0 }}>{testResult.message}</p>
+          {testResult.responseBody ? (
+            <details style={{ marginTop: '0.4rem' }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--c-muted)', fontSize: '0.75rem' }}>Response body</summary>
+              <pre style={{ margin: '0.25rem 0 0', fontSize: '0.72rem', color: '#94a3b8', overflowX: 'auto' }}>{testResult.responseBody}</pre>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Filter + delivery log table */}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--c-muted)' }}>Delivery log</span>
+        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+          {['', 'success', 'failure', 'permanently_failed'].map((s) => (
+            <button key={s} type="button"
+              onClick={() => { setStatusFilter(s); loadDeliveries(s || undefined); }}
+              style={{
+                padding: '0.15rem 0.55rem', borderRadius: 99, fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                background: statusFilter === s ? 'rgba(111,45,141,0.25)' : 'transparent',
+                borderColor: statusFilter === s ? 'rgba(111,45,141,0.6)' : 'rgba(255,255,255,0.1)',
+                color: statusFilter === s ? '#c4b5fd' : 'var(--c-muted)',
+              }}>
+              {s || 'All'}
+            </button>
+          ))}
+          <button type="button" onClick={() => loadDeliveries(statusFilter || undefined)}
+            style={{ padding: '0.15rem 0.55rem', borderRadius: 99, fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--c-muted)' }}>
+            ↻
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p style={{ color: 'var(--c-muted)', fontSize: '0.82rem' }}>Loading deliveries…</p>
+      ) : deliveries.length === 0 ? (
+        <p style={{ color: 'var(--c-muted)', fontSize: '0.82rem' }}>
+          No delivery logs yet. Send a test delivery above to get started.
+        </p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                {['Status', 'Event', 'URL', 'Code', 'Latency', 'Attempt', 'Delivered at', ''].map((h) => (
+                  <th key={h} style={{ padding: '0.35rem 0.5rem', textAlign: 'left', color: 'var(--c-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.map((d) => (
+                <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '0.4rem 0.5rem' }}>
+                    <span style={{ padding: '0.1rem 0.45rem', borderRadius: 99, fontWeight: 700, fontSize: '0.68rem', color: statusColor(d.status), background: 'rgba(255,255,255,0.05)', border: `1px solid ${statusColor(d.status)}33` }}>
+                      {d.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: '#f4f7fb', whiteSpace: 'nowrap' }}>{d.event}</td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: 'var(--c-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.webhookUrl}>{d.webhookUrl}</td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: d.statusCode && d.statusCode >= 200 && d.statusCode < 300 ? '#6ee7b7' : '#f87171' }}>{d.statusCode ?? '—'}</td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>{d.latencyMs != null ? `${d.latencyMs}ms` : '—'}</td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: 'var(--c-muted)', textAlign: 'center' }}>{d.attempt}</td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>{new Date(d.deliveredAt).toLocaleString()}</td>
+                  <td style={{ padding: '0.4rem 0.5rem' }}>
+                    {(d.status === 'failure' || d.status === 'pending') && d.attempt < 5 ? (
+                      <button type="button" onClick={() => void onRetry(d.id)} disabled={busy}
+                        style={{ padding: '0.15rem 0.5rem', borderRadius: 5, fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.08)', color: '#fbbf24' }}>
+                        Retry
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 // ─── API Keys sub-component ───────────────────────────────────────────────────
 function ApiKeysSection() {
@@ -1123,6 +1344,9 @@ export default function SystemSettingsPage() {
 
       {/* Database Configuration — Owner/IT only (Sprint 14) */}
       {orgAdmin ? <DatabaseConfigPage /> : null}
+
+      {/* Webhook delivery logs — Owner/IT only (B.3.4) */}
+      {orgAdmin ? <WebhookDeliverySection /> : null}
 
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
