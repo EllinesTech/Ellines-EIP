@@ -41,6 +41,8 @@ export default function DashboardClient() {
   const [notice, setNotice] = useState('');
   const [exportsList, setExportsList] = useState<DashboardExportDto[]>([]);
   const [alertForm, setAlertForm] = useState({ condition: 'gt' as typeof CONDITIONS[number], threshold: 0, active: true });
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const s = getSession();
@@ -51,15 +53,43 @@ export default function DashboardClient() {
     load(id);
   }, [router, id]);
 
+  // Auto-refresh: poll based on dashboard.refreshRate (seconds, 0 = disabled)
+  useEffect(() => {
+    if (!dashboard || !orgId) return;
+    const rate = dashboard.refreshRate;
+    if (!rate || rate < 30) return; // min 30s, 0 = off
+    const intervalMs = rate * 1000;
+    const timer = setInterval(() => {
+      setRefreshing(true);
+      getDashboardApi(dashboard.id, orgId)
+        .then((dto) => {
+          setDashboard(dto);
+          setLastRefreshed(new Date());
+        })
+        .catch(() => { /* silent — don't flash on background poll */ })
+        .finally(() => setRefreshing(false));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [dashboard?.id, dashboard?.refreshRate, orgId]);
+
   function load(dashboardId: string) {
     const s = getSession();
     if (!s || !s.organization.id) return;
     getDashboardApi(dashboardId, s.organization.id)
-      .then((dto) => setDashboard(dto))
+      .then((dto) => { setDashboard(dto); setLastRefreshed(new Date()); })
       .catch(() => router.replace('/app/dashboards'));
     listExportsApi(dashboardId, s.organization.id)
       .then((data) => setExportsList(data))
       .catch(() => setExportsList([]));
+  }
+
+  function manualRefresh() {
+    if (!dashboard || !orgId || refreshing) return;
+    setRefreshing(true);
+    getDashboardApi(dashboard.id, orgId)
+      .then((dto) => { setDashboard(dto); setLastRefreshed(new Date()); })
+      .catch((err) => flash(err.message || 'Refresh failed.'))
+      .finally(() => setRefreshing(false));
   }
 
   function flash(msg: string) {
@@ -73,9 +103,10 @@ export default function DashboardClient() {
     const fd = new FormData(e.target as HTMLFormElement);
     const name = String(fd.get('name') || '').trim();
     const description = String(fd.get('description') || '').trim();
+    const refreshRate = Number(fd.get('refreshRate') || 0);
     if (!name) return;
     setBusy(true);
-    updateDashboardApi(dashboard.id, { organizationId: orgId, name, description })
+    updateDashboardApi(dashboard.id, { organizationId: orgId, name, description, refreshRate })
       .then((dto) => { setDashboard(dto); flash('Saved.'); })
       .catch((err) => flash(err.message || 'Failed to save.'))
       .finally(() => setBusy(false));
@@ -205,6 +236,29 @@ export default function DashboardClient() {
           <p className={styles.lede}>{dashboard.description || 'Custom KPI dashboard'}</p>
         </div>
         <div className={styles.headerActions}>
+          {/* Refresh indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+            {dashboard.refreshRate > 0 && (
+              <span title={`Auto-refresh every ${dashboard.refreshRate}s`}>
+                ⟳ {dashboard.refreshRate}s
+              </span>
+            )}
+            {lastRefreshed && (
+              <span title={`Last refreshed at ${lastRefreshed.toLocaleTimeString()}`}>
+                · {lastRefreshed.toLocaleTimeString()}
+              </span>
+            )}
+            {refreshing && <span style={{ color: '#6F2D8D' }}>↻</span>}
+          </div>
+          <button
+            type="button"
+            className={adminStyles.ghost}
+            onClick={manualRefresh}
+            disabled={refreshing || busy}
+            title="Refresh dashboard data now"
+          >
+            {refreshing ? '↻ Refreshing…' : '↻ Refresh'}
+          </button>
           <Link href="/app/dashboards" className={styles.ghostBtn}>All dashboards</Link>
           <button type="button" className={adminStyles.ghost} onClick={onDelete} disabled={busy}>Delete</button>
         </div>

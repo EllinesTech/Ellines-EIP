@@ -658,8 +658,8 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 **Next Steps:**
 1. ~~Resolve build issue~~ ✅ (Next.js 15.1.3)
 2. ~~B.1.2 Dashboard chart rendering~~ ✅
-3. **B.1.3 Real-time dashboard refresh** — `next`
-4. Continue B.1.4 in Phase B
+3. ~~B.1.3 Real-time dashboard refresh~~ ✅
+4. **B.1.4 Dashboard export & sharing** — `next`
 
 ---
 
@@ -669,8 +669,8 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 |----|------|--------|-------|
 | B.1.1 | Dashboard builder (drag-and-drop) | `done` | Track B canvas + palette; pie/heatmap added |
 | B.1.2 | Dashboard chart rendering | `done` | `WidgetRenderer` + Recharts (line/bar/pie/heatmap/KPI/gauge/table) on `/app/dashboards/[id]` |
-| B.1.3 | Real-time dashboard refresh | `next` | Poll or WebSocket using dashboard `refreshRate` |
-| B.1.4 | Dashboard export & sharing | `todo` | PDF export polish + org-scoped public links |
+| B.1.3 | Real-time dashboard refresh | `done` | Poll interval from `dashboard.refreshRate`; manual ↻ Refresh button; last-refreshed timestamp in header; auto-refresh stops when rate=0 |
+| B.1.4 | Dashboard export & sharing | `next` | PDF export polish + org-scoped public links |
 
 ---
 
