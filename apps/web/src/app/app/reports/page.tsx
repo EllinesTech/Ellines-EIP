@@ -25,6 +25,19 @@ import {
   updateReportDeliveryApi,
   type ScheduledReportDto,
 } from '@/lib/api';
+
+type ReportRun = {
+  id: string;
+  reportId: string;
+  reportTitle: string;
+  reportTemplate: string;
+  runAt: string;
+  status: 'queued' | 'sent' | 'failed';
+  emailStatus: string;
+  recipientCount: number;
+  reportChars: number;
+  reportBody?: string;
+};
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 
@@ -73,6 +86,13 @@ export default function ReportsPage() {
   const [editCc, setEditCc] = useState('');
   const [editBcc, setEditBcc] = useState('');
   const [editSendHour, setEditSendHour] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ReportRun[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<string>('');
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<ReportRun | null>(null);
+  const [runContent, setRunContent] = useState<string>('');
+  const [resendRecipients, setResendRecipients] = useState('');
 
   useEffect(() => {
     const s = getSession();
@@ -352,6 +372,111 @@ export default function ReportsPage() {
     setEditId(null);
   }
 
+  async function loadHistory(reportId?: string) {
+    setLoadingHistory(true);
+    try {
+      const token = getSession()?.accessToken;
+      if (!token) return;
+
+      const url = reportId
+        ? `/api/v1/orgs/me/reports/history?reportId=${reportId}&limit=50`
+        : '/api/v1/orgs/me/reports/history?limit=50';
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as ReportRun[];
+        setHistory(data);
+      }
+    } catch {
+      // Ignore errors
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  async function viewRunContent(run: ReportRun) {
+    try {
+      const token = getSession()?.accessToken;
+      if (!token) return;
+
+      const res = await fetch(`/api/v1/orgs/me/reports/history/${run.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { content: string; format: string };
+        setRunContent(data.content);
+        setSelectedRun(run);
+      }
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  async function resendReport(runId: string) {
+    if (busy) return;
+    setBusy(true);
+
+    try {
+      const token = getSession()?.accessToken;
+      if (!token) return;
+
+      const recipients = parseEmailList(resendRecipients);
+      const res = await fetch(`/api/v1/orgs/me/reports/history/${runId}/resend`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ recipients: recipients.length ? recipients : undefined }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { ok: boolean; sentCount: number; emailStatus: string };
+        alert(
+          data.ok
+            ? `✓ Report resent to ${data.sentCount} recipient${data.sentCount !== 1 ? 's' : ''}`
+            : `Failed to resend report: ${data.emailStatus}`,
+        );
+        setResendRecipients('');
+        setSelectedRun(null);
+      } else {
+        alert('Failed to resend report');
+      }
+    } catch {
+      alert('Failed to resend report');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadRunContent(runId: string, title: string) {
+    try {
+      const token = getSession()?.accessToken;
+      if (!token) return;
+
+      const res = await fetch(`/api/v1/orgs/me/reports/history/${runId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { content: string };
+        const blob = new Blob([data.content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      alert('Failed to download report');
+    }
+  }
+
   if (!allowed) return <div className={styles.page}><p className={styles.lede}>Checking access…</p></div>;
 
   return (
@@ -366,13 +491,24 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            onClick={() => {
+              if (!showHistory) loadHistory();
+              setShowHistory(!showHistory);
+            }}
+          >
+            {showHistory ? 'Back to Schedules' : '📜 History'}
+          </button>
           <Link href="/app/rules" className={styles.ghostBtn}>Rules</Link>
           <Link href="/app/ellinea" className={styles.ghostBtn}>Ask Ellinea</Link>
         </div>
       </header>
 
-      <section className={styles.brief}>
-        <div className={styles.panelLabel}>Schedule</div>
+      {!showHistory && (
+        <section className={styles.brief}>
+          <div className={styles.panelLabel}>Schedule</div>
         <form className={adminStyles.form} onSubmit={onAdd}>
           <label>
             Template
@@ -449,8 +585,10 @@ export default function ReportsPage() {
           </button>
         </form>
       </section>
+      )}
 
-      <section className={adminStyles.tableWrap}>
+      {!showHistory && (
+        <section className={adminStyles.tableWrap}>
         <div className={styles.panelLabel}>Schedules · {items.length}</div>
         {!items.length ? (
           <p className={styles.lede}>No schedules yet.</p>
@@ -584,13 +722,305 @@ export default function ReportsPage() {
           </table>
         )}
       </section>
+      )}
 
-      <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
-        <div className={styles.panelLabel}>Preview</div>
-        <pre className={adminStyles.actionCode} style={{ whiteSpace: 'pre-wrap', marginTop: '0.45rem' }}>
-          {preview || 'Loading…'}
-        </pre>
-      </section>
+      {!showHistory && (
+        <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
+          <div className={styles.panelLabel}>Preview</div>
+          <pre className={adminStyles.actionCode} style={{ whiteSpace: 'pre-wrap', marginTop: '0.45rem' }}>
+            {preview || 'Loading…'}
+          </pre>
+        </section>
+      )}
+
+      {showHistory && (
+        <section className={adminStyles.tableWrap} style={{ marginTop: '0.65rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div className={styles.panelLabel}>Report History · {history.length}</div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select
+                value={historyFilter}
+                onChange={(e) => {
+                  setHistoryFilter(e.target.value);
+                  loadHistory(e.target.value || undefined);
+                }}
+                className={adminStyles.ghost}
+                disabled={loadingHistory}
+              >
+                <option value="">All reports</option>
+                {items.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className={adminStyles.ghost}
+                onClick={() => loadHistory(historyFilter || undefined)}
+                disabled={loadingHistory}
+              >
+                ↻ Refresh
+              </button>
+            </div>
+          </div>
+
+          {loadingHistory ? (
+            <p className={styles.lede}>Loading history…</p>
+          ) : !history.length ? (
+            <p className={styles.lede}>No report runs yet. Schedule a report and click "Run now" to see history.</p>
+          ) : (
+            <table className={adminStyles.table}>
+              <thead>
+                <tr>
+                  <th>Report</th>
+                  <th>Template</th>
+                  <th>Run at</th>
+                  <th>Status</th>
+                  <th>Recipients</th>
+                  <th>Size</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((run) => (
+                  <tr key={run.id}>
+                    <td>{run.reportTitle}</td>
+                    <td>{REPORT_TEMPLATES.find((t) => t.value === run.reportTemplate)?.label || run.reportTemplate}</td>
+                    <td>{new Date(run.runAt).toLocaleString()}</td>
+                    <td>
+                      <span
+                        style={{
+                          color:
+                            run.status === 'sent'
+                              ? '#6ee7b7'
+                              : run.status === 'failed'
+                                ? '#fca5a5'
+                                : '#94a3b8',
+                        }}
+                      >
+                        {run.status === 'sent' ? '✓ Sent' : run.status === 'failed' ? '✗ Failed' : '⏳ Queued'}
+                      </span>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {run.emailStatus}
+                      </div>
+                    </td>
+                    <td>{run.recipientCount || 1}</td>
+                    <td>{run.reportChars ? `${(run.reportChars / 1024).toFixed(1)} KB` : '—'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className={adminStyles.ghost}
+                          onClick={() => viewRunContent(run)}
+                          disabled={busy}
+                        >
+                          👁 View
+                        </button>
+                        <button
+                          type="button"
+                          className={adminStyles.ghost}
+                          onClick={() => downloadRunContent(run.id, run.reportTitle)}
+                          disabled={busy}
+                        >
+                          ↓ Download
+                        </button>
+                        <button
+                          type="button"
+                          className={adminStyles.ghost}
+                          onClick={() => {
+                            setSelectedRun(run);
+                            setResendRecipients('');
+                          }}
+                          disabled={busy}
+                        >
+                          ✉ Resend
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+
+      {selectedRun && !runContent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setSelectedRun(null)}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              padding: '1.5rem',
+              borderRadius: '0.5rem',
+              maxWidth: '500px',
+              width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginTop: 0 }}>Resend Report</h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+              {selectedRun.reportTitle} · {new Date(selectedRun.runAt).toLocaleString()}
+            </p>
+            <label className={adminStyles.form} style={{ display: 'block', marginTop: '1rem' }}>
+              Recipients (leave empty to send to yourself)
+              <input
+                value={resendRecipients}
+                onChange={(e) => setResendRecipients(e.target.value)}
+                placeholder="email1@example.com, email2@example.com"
+                autoComplete="off"
+              />
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                className={adminStyles.primary}
+                onClick={() => resendReport(selectedRun.id)}
+                disabled={busy}
+              >
+                Send
+              </button>
+              <button
+                type="button"
+                className={adminStyles.ghost}
+                onClick={() => {
+                  setSelectedRun(null);
+                  setResendRecipients('');
+                }}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedRun && runContent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem',
+          }}
+          onClick={() => {
+            setSelectedRun(null);
+            setRunContent('');
+          }}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              padding: '1.5rem',
+              borderRadius: '0.5rem',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h2 style={{ marginTop: 0 }}>{selectedRun.reportTitle}</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0.5rem 0 1rem' }}>
+                  {new Date(selectedRun.runAt).toLocaleString()} · {selectedRun.reportChars ? `${(selectedRun.reportChars / 1024).toFixed(1)} KB` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRun(null);
+                  setRunContent('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.5rem',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <pre
+              style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                background: '#0f172a',
+                padding: '1rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.85rem',
+                lineHeight: 1.5,
+                maxHeight: '60vh',
+                overflow: 'auto',
+              }}
+            >
+              {runContent}
+            </pre>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                className={adminStyles.primary}
+                onClick={() => {
+                  const blob = new Blob([runContent], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${selectedRun.reportTitle.replace(/[^a-z0-9]/gi, '_')}_${new Date(selectedRun.runAt).toISOString().slice(0, 10)}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                ↓ Download
+              </button>
+              <button
+                type="button"
+                className={adminStyles.ghost}
+                onClick={() => {
+                  setRunContent('');
+                }}
+              >
+                ✉ Resend
+              </button>
+              <button
+                type="button"
+                className={adminStyles.ghost}
+                onClick={() => {
+                  setSelectedRun(null);
+                  setRunContent('');
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

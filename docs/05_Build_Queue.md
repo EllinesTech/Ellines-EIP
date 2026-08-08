@@ -674,7 +674,7 @@ curl -X POST http://localhost:3001/api/v1/auth/register \
 | B.2.1 | Report templates & customization | `done` | Template picker + server-persisted template field |
 | B.2.2 | Report PDF generation | `done` | HTML print-to-PDF endpoint + UI button |
 | B.2.3 | Multi-recipient delivery | `done` | To/Cc/Bcc + sendHour UTC; Pages mail + `/app/reports` recipients editor |
-| B.2.4 | Report history & re-send | `next` | View past reports, download, resend |
+| B.2.4 | Report history & re-send | `done` | View past reports table with filter by report; view content modal; download .txt; resend to custom recipients; 📜 History button toggles schedule ↔ history view |
 
 ---
 
