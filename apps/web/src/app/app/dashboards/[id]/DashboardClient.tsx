@@ -104,9 +104,10 @@ export default function DashboardClient() {
     const name = String(fd.get('name') || '').trim();
     const description = String(fd.get('description') || '').trim();
     const refreshRate = Number(fd.get('refreshRate') || 0);
+    const isPublic = fd.get('isPublic') === 'on';
     if (!name) return;
     setBusy(true);
-    updateDashboardApi(dashboard.id, { organizationId: orgId, name, description, refreshRate })
+    updateDashboardApi(dashboard.id, { organizationId: orgId, name, description, refreshRate, isPublic })
       .then((dto) => { setDashboard(dto); flash('Saved.'); })
       .catch((err) => flash(err.message || 'Failed to save.'))
       .finally(() => setBusy(false));
@@ -203,14 +204,56 @@ export default function DashboardClient() {
 
   function onExport(format: 'pdf' | 'csv' | 'excel') {
     if (!dashboard || !orgId || busy) return;
+
+    // CSV: generate client-side and download immediately
+    if (format === 'csv') {
+      const widgets = dashboard.widgets || [];
+      const rows: string[] = ['Widget,Type,Title'];
+      widgets.forEach((w) => {
+        const configStr = JSON.stringify(w.config || {}).replace(/"/g, '""');
+        rows.push(`"${w.id}","${w.type}","${(w.title || '').replace(/"/g, '""')}"`);
+        // Add config data rows if present
+        const cfg = w.config as Record<string, unknown>;
+        if (cfg?.data && Array.isArray(cfg.data)) {
+          rows.push(`,,`);
+          rows.push(`,,--- ${w.title} data ---`);
+          const data = cfg.data as Record<string, unknown>[];
+          if (data.length > 0) {
+            rows.push(`,,"${Object.keys(data[0]).join('","')}"`);
+            data.forEach((row) => {
+              rows.push(`,,${Object.values(row).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')}`);
+            });
+          }
+        }
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dashboard.name.replace(/[^a-z0-9]/gi, '_')}_export.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash('CSV downloaded.');
+      return;
+    }
+
+    // PDF / Excel: queue server-side record (placeholder for future full rendering)
     setBusy(true);
     exportDashboardApi(dashboard.id, { organizationId: orgId, format })
       .then(() => {
-        flash(`Export (${format}) queued.`);
+        flash(`Export (${format}) scheduled. Check back for download links once implemented.`);
         load(dashboard.id);
       })
-      .catch((err) => flash(err.message || 'Failed to export.'))
+      .catch((err) => flash(err.message || 'Failed to schedule export.'))
       .finally(() => setBusy(false));
+  }
+
+  function copyShareLink() {
+    if (!dashboard) return;
+    const url = `${window.location.origin}/app/dashboards/${dashboard.id}`;
+    navigator.clipboard.writeText(url)
+      .then(() => flash(dashboard.isPublic ? '🔗 Share link copied!' : '⚠ Link copied — mark dashboard as Public so others can view it.'))
+      .catch(() => flash('Could not copy link — please copy it manually from the address bar.'));
   }
 
   function onDeleteExport(exportId: string) {
@@ -316,13 +359,69 @@ export default function DashboardClient() {
       </section>
 
       <section className={styles.brief} style={{ marginTop: '0.65rem' }}>
-        <div className={styles.panelLabel}>Exports</div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-          <button type="button" className={adminStyles.primary} disabled={busy} onClick={() => onExport('pdf')}>Export PDF</button>
-          <button type="button" className={adminStyles.primary} disabled={busy} onClick={() => onExport('csv')}>Export CSV</button>
-          <button type="button" className={adminStyles.primary} disabled={busy} onClick={() => onExport('excel')}>Export Excel</button>
+        <div className={styles.panelLabel}>Export & Share</div>
+
+        {/* Share link */}
+        <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: '#1e293b', borderRadius: '6px', border: '1px solid #334155' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 500, marginBottom: '0.2rem' }}>
+                🔗 Share link
+                {dashboard.isPublic
+                  ? <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#10b981', background: '#0f2a1e', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Public</span>
+                  : <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#f59e0b', background: '#2a1f0a', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Private</span>
+                }
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                {dashboard.isPublic
+                  ? 'Anyone with the link can view this dashboard.'
+                  : 'Mark as Public in Settings to allow link sharing.'}
+              </div>
+            </div>
+            <button
+              type="button"
+              className={adminStyles.ghost}
+              onClick={copyShareLink}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              📋 Copy link
+            </button>
+          </div>
         </div>
-        {exportsList.length ? (
+
+        {/* Export buttons */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={adminStyles.primary}
+            disabled={busy}
+            onClick={() => onExport('csv')}
+            title="Download widget data as CSV"
+          >
+            ⬇ CSV
+          </button>
+          <button
+            type="button"
+            className={adminStyles.ghost}
+            disabled={busy}
+            onClick={() => onExport('pdf')}
+            title="Schedule PDF export (coming soon)"
+          >
+            PDF (scheduled)
+          </button>
+          <button
+            type="button"
+            className={adminStyles.ghost}
+            disabled={busy}
+            onClick={() => onExport('excel')}
+            title="Schedule Excel export (coming soon)"
+          >
+            Excel (scheduled)
+          </button>
+        </div>
+
+        {/* Export schedule records */}
+        {exportsList.length > 0 && (
           <table className={adminStyles.table}>
             <thead>
               <tr><th>Format</th><th>Schedule</th><th>Last run</th><th>Next run</th><th /></tr>
@@ -341,8 +440,6 @@ export default function DashboardClient() {
               ))}
             </tbody>
           </table>
-        ) : (
-          <p className={styles.lede}>No export schedules yet.</p>
         )}
       </section>
     </div>
