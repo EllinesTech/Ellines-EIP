@@ -1641,3 +1641,77 @@ X-RateLimit-Tier: Starter
 ---
 
 *Last update: 2026-08-08*
+
+
+---
+
+## Sprint 17 — API Documentation & Swagger UI ✅ COMPLETE
+
+**Date:** 2026-08-08  
+**Status:** `done`  
+**Builds:** `npm run verify:pages-functions` ✅ (130 functions) · `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| B.3.3 | **API documentation & Swagger UI** | `done` | Comprehensive OpenAPI 3.0 specification auto-generated from NestJS controllers using @nestjs/swagger decorators. Interactive Swagger UI hosted at `/api/docs` with try-it-out functionality, Bearer JWT authentication, request/response examples, and schema validation. 11 API tags organize 100+ endpoints: Authentication, Organizations, Users, Connectors, Dashboards, Workflows, Agents, RBAC, Rate Limits, Platform, Ellinea AI. Complete API Documentation Guide (35_API_Documentation_Guide.md) includes authentication flow, rate limiting details, common patterns, error responses, webhook configuration, and SDK generation instructions. Web app `/api-docs` page redirects to Swagger UI. Export endpoints for JSON/YAML format enable SDK generation in any language via OpenAPI Generator. All endpoints include detailed descriptions, parameter validation, response schemas, and example payloads. Rate limit headers documented. 130 Pages Functions verified ✅ |
+
+### What ships in Sprint 17
+
+**Interactive API documentation** — Full Swagger UI at `/api/docs` provides:
+
+- **Try it out**: Test any endpoint directly from the browser
+- **JWT authentication**: Authorize once, use for all requests
+- **Live examples**: See actual request/response payloads
+- **Schema validation**: View all DTOs and their properties
+- **Error examples**: See what error responses look like
+
+**Organized by category:**
+- Authentication (8 endpoints) - register, login, password management
+- Organizations (10+ endpoints) - org management, users, settings
+- Connectors (15+ endpoints) - installation, sync, testing
+- Dashboards (8 endpoints) - BI dashboard CRUD
+- Workflows (12 endpoints) - approvals, rules, reports
+- Agents (10 endpoints) - autonomous AI agents
+- RBAC (8 endpoints) - custom roles and permissions
+- Rate Limits (4 endpoints) - tier management and usage
+- Platform (5+ endpoints) - platform administration
+- Ellinea AI (6 endpoints) - AI insights and memory
+
+**Developer-friendly features:**
+- Bearer token authentication with one-click authorize
+- Request duration tracking for performance monitoring
+- Filter endpoints by name or tag
+- Persistent authorization across page reloads
+- Copy curl commands for any request
+- Download OpenAPI spec as JSON or YAML
+
+**SDK generation ready:**
+Generate client libraries in any language:
+```bash
+# TypeScript
+npx @openapitools/openapi-generator-cli generate \
+  -i http://localhost:3001/api/docs-json \
+  -g typescript-fetch -o ./sdk/typescript
+
+# Python
+npx @openapitools/openapi-generator-cli generate \
+  -i http://localhost:3001/api/docs-json \
+  -g python -o ./sdk/python
+
+# Java, C#, Go, PHP, Ruby, etc.
+```
+
+**Files created:**
+- `services/identity/src/main.ts` — Swagger configuration
+- `services/identity/src/rate-limit/rate-limit.controller.ts` — Added Swagger decorators
+- `apps/web/src/app/api-docs/page.tsx` — API docs redirect page
+- `docs/35_API_Documentation_Guide.md` — Comprehensive guide (3000+ words)
+
+**Access:**
+- Local: `http://localhost:3001/api/docs`
+- Production: `https://eip.ellines.co.ke/api/docs`
+- From web app: Navigate to `/api-docs`
+
+---
+
+*Last update: 2026-08-08 - Sprints 15, 16, 17 complete (Data Export, Rate Limiting, API Docs)*
