@@ -1,8 +1,8 @@
 /**
- * Pages Function: PATCH/DELETE/POST(run) /api/v1/orgs/me/reports/:id
+ * Pages Function: PATCH/DELETE /api/v1/orgs/me/reports/:id
  *
  * POST /api/v1/orgs/me/reports/:id/run  → handled by [id]/run.ts
- * PATCH  → toggle enabled
+ * PATCH  → toggle enabled + update delivery (recipients / cc / bcc / sendHour)
  * DELETE → remove
  */
 import {
@@ -13,10 +13,26 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../../../shared/auth';
+import {
+  nextRunHintFor,
+  parseDeliveryFromBody,
+  parseSendHour,
+} from '../../../../../shared/report-delivery';
+import { normalizeAddressList } from '../../../../../shared/mail';
 
 type ScheduledReport = {
-  id: string; title: string; cadence: string; enabled: boolean;
-  lastRunAt: string | null; nextRunHint: string; createdAt: string;
+  id: string;
+  title: string;
+  cadence: string;
+  template?: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunHint: string;
+  createdAt: string;
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  sendHour?: number | null;
 };
 
 function asObj(raw: unknown): Record<string, unknown> {
@@ -28,9 +44,9 @@ function asObj(raw: unknown): Record<string, unknown> {
 
 function normalize(raw: unknown): ScheduledReport[] {
   if (!Array.isArray(raw)) return [];
-  return (raw as ScheduledReport[]).filter(
-    (x) => x && typeof x === 'object' && typeof x.id === 'string',
-  ).slice(0, 40);
+  return (raw as ScheduledReport[])
+    .filter((x) => x && typeof x === 'object' && typeof x.id === 'string')
+    .slice(0, 40);
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -61,19 +77,69 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   let result: ScheduledReport | { ok: boolean };
 
   if (context.request.method === 'PATCH') {
-    let body: { enabled?: boolean };
+    let body: {
+      enabled?: boolean;
+      title?: string;
+      cadence?: string;
+      recipients?: unknown;
+      cc?: unknown;
+      bcc?: unknown;
+      sendHour?: unknown;
+    };
     try {
       body = (await context.request.json()) as typeof body;
     } catch {
       return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
     }
-    const enabled = Boolean(body.enabled);
-    const updated = {
-      ...reports[idx],
+
+    const current = reports[idx];
+    const enabled =
+      typeof body.enabled === 'boolean' ? Boolean(body.enabled) : current.enabled;
+    const cadence =
+      body.cadence === 'weekly' || body.cadence === 'daily'
+        ? body.cadence
+        : current.cadence;
+
+    const hasDeliveryPatch =
+      body.recipients !== undefined ||
+      body.cc !== undefined ||
+      body.bcc !== undefined ||
+      body.sendHour !== undefined;
+
+    let recipients = Array.isArray(current.recipients) ? current.recipients : [];
+    let cc = Array.isArray(current.cc) ? current.cc : [];
+    let bcc = Array.isArray(current.bcc) ? current.bcc : [];
+    let sendHour =
+      typeof current.sendHour === 'number' ? current.sendHour : null;
+
+    if (hasDeliveryPatch) {
+      const parsed = parseDeliveryFromBody(body);
+      if (body.recipients !== undefined) recipients = parsed.recipients;
+      if (body.cc !== undefined) cc = parsed.cc;
+      if (body.bcc !== undefined) bcc = parsed.bcc;
+      if (body.sendHour !== undefined) sendHour = parseSendHour(body.sendHour);
+    }
+
+    // Keep address lists normalized even for legacy rows
+    recipients = normalizeAddressList(recipients);
+    cc = normalizeAddressList(cc);
+    bcc = normalizeAddressList(bcc);
+
+    const title =
+      typeof body.title === 'string' && body.title.trim().length >= 3
+        ? body.title.trim()
+        : current.title;
+
+    const updated: ScheduledReport = {
+      ...current,
+      title,
+      cadence,
       enabled,
-      nextRunHint: enabled
-        ? reports[idx].cadence === 'daily' ? 'Tomorrow morning' : 'Next Monday'
-        : 'Paused',
+      recipients,
+      cc,
+      bcc,
+      sendHour,
+      nextRunHint: nextRunHintFor(cadence, enabled, sendHour),
     };
     next = reports.map((r, i) => (i === idx ? updated : r));
     result = updated;

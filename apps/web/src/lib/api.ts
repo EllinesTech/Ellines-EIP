@@ -1071,13 +1071,27 @@ export type ScheduledReportDto = {
   lastRunAt: string | null;
   nextRunHint: string;
   createdAt: string;
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  sendHour?: number | null;
+};
+
+export type ReportDeliveryPayload = {
+  title: string;
+  cadence: 'daily' | 'weekly';
+  template?: 'executive' | 'operational' | 'department' | 'custom';
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  sendHour?: number | null;
 };
 
 export function listReportsApi() {
   return request<ScheduledReportDto[]>('/api/v1/orgs/me/reports');
 }
 
-export function createReportApi(payload: { title: string; cadence: 'daily' | 'weekly'; template?: 'executive' | 'operational' | 'department' | 'custom' }) {
+export function createReportApi(payload: ReportDeliveryPayload) {
   return request<ScheduledReportDto>('/api/v1/orgs/me/reports', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -1095,6 +1109,16 @@ export function toggleReportApi(id: string, enabled: boolean) {
   return request<ScheduledReportDto>(`/api/v1/orgs/me/reports/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ enabled }),
+  });
+}
+
+export function updateReportDeliveryApi(
+  id: string,
+  payload: Partial<ReportDeliveryPayload> & { enabled?: boolean },
+) {
+  return request<ScheduledReportDto>(`/api/v1/orgs/me/reports/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
   });
 }
 
@@ -1237,6 +1261,13 @@ export type ScheduledReportRunDto = {
   lastEmailStatus?: string;
   emailStatus?: string;
   reportChars?: number;
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  sendHour?: number | null;
+  deliveredTo?: string[];
+  deliveredCc?: string[];
+  deliveredBccCount?: number;
 };
 
 export function runReportFullApi(id: string) {

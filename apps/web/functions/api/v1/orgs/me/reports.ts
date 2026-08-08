@@ -10,10 +10,24 @@ import {
   requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
+import {
+  nextRunHintFor,
+  parseDeliveryFromBody,
+} from '../../../../shared/report-delivery';
 
 type ScheduledReport = {
-  id: string; title: string; cadence: string; template: string; enabled: boolean;
-  lastRunAt: string | null; nextRunHint: string; createdAt: string;
+  id: string;
+  title: string;
+  cadence: string;
+  template: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunHint: string;
+  createdAt: string;
+  recipients: string[];
+  cc: string[];
+  bcc: string[];
+  sendHour: number | null;
 };
 
 function asObj(raw: unknown): Record<string, unknown> {
@@ -25,14 +39,19 @@ function asObj(raw: unknown): Record<string, unknown> {
 
 function normalize(raw: unknown): ScheduledReport[] {
   if (!Array.isArray(raw)) return [];
-  return (raw as ScheduledReport[]).filter(
-    (x) => x && typeof x === 'object' && typeof x.id === 'string',
-  ).slice(0, 40);
-}
-
-function nextRunHint(cadence: string, enabled: boolean): string {
-  if (!enabled) return 'Paused';
-  return cadence === 'daily' ? 'Tomorrow morning' : 'Next Monday';
+  return (raw as ScheduledReport[])
+    .filter((x) => x && typeof x === 'object' && typeof x.id === 'string')
+    .map((x) => ({
+      ...x,
+      recipients: Array.isArray(x.recipients) ? x.recipients : [],
+      cc: Array.isArray(x.cc) ? x.cc : [],
+      bcc: Array.isArray(x.bcc) ? x.bcc : [],
+      sendHour:
+        typeof x.sendHour === 'number' && x.sendHour >= 0 && x.sendHour <= 23
+          ? x.sendHour
+          : null,
+    }))
+    .slice(0, 40);
 }
 
 function cuid(): string {
@@ -85,7 +104,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   }
 
-  let body: { title?: string; cadence?: string; template?: string };
+  let body: {
+    title?: string;
+    cadence?: string;
+    template?: string;
+    recipients?: unknown;
+    cc?: unknown;
+    bcc?: unknown;
+    sendHour?: unknown;
+  };
   try {
     body = (await context.request.json()) as typeof body;
   } catch {
@@ -99,7 +126,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const cadence = body.cadence === 'weekly' ? 'weekly' : 'daily';
   const validTemplates = ['executive', 'operational', 'department', 'custom'];
-  const template = validTemplates.includes(body.template || '') ? (body.template as string) : 'custom';
+  const template = validTemplates.includes(body.template || '')
+    ? (body.template as string)
+    : 'custom';
+  const delivery = parseDeliveryFromBody(body);
 
   const newReport: ScheduledReport = {
     id: cuid(),
@@ -108,8 +138,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     template,
     enabled: true,
     lastRunAt: null,
-    nextRunHint: nextRunHint(cadence, true),
+    nextRunHint: nextRunHintFor(cadence, true, delivery.sendHour),
     createdAt: new Date().toISOString(),
+    recipients: delivery.recipients,
+    cc: delivery.cc,
+    bcc: delivery.bcc,
+    sendHour: delivery.sendHour,
   };
 
   const { data: existing, error: readErr } = await supabase
@@ -135,7 +169,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     user_id: auth.sub,
     action: 'workflow.report_created',
     resource: 'scheduled_report',
-    metadata: { id: newReport.id, title: newReport.title, cadence: newReport.cadence },
+    metadata: {
+      id: newReport.id,
+      title: newReport.title,
+      cadence: newReport.cadence,
+      recipientCount: newReport.recipients.length,
+      ccCount: newReport.cc.length,
+      bccCount: newReport.bcc.length,
+      sendHour: newReport.sendHour,
+    },
   });
 
   return json(newReport);

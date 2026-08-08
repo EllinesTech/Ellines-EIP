@@ -10,7 +10,26 @@ export type ScheduledReport = {
   lastRunAt: string | null;
   nextRunHint: string;
   createdAt: string;
+  /** Primary To recipients (empty → actor email on run). */
+  recipients: string[];
+  cc: string[];
+  bcc: string[];
+  /** Preferred send hour UTC (0–23), null = morning default. */
+  sendHour: number | null;
 };
+
+/** Parse comma / semicolon / whitespace separated emails. */
+export function parseEmailList(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[,;\s]+/)) {
+    const email = part.trim().toLowerCase();
+    if (!email || !email.includes('@') || seen.has(email)) continue;
+    seen.add(email);
+    out.push(email);
+  }
+  return out.slice(0, 40);
+}
 
 const PREFIX = 'eip_scheduled_reports_';
 
@@ -24,7 +43,14 @@ export function readScheduledReports(organizationId: string): ScheduledReport[] 
     const raw = localStorage.getItem(reportsKey(organizationId));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ScheduledReport[];
-    return Array.isArray(parsed) ? parsed.slice(0, 40) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 40).map((r) => ({
+      ...r,
+      recipients: Array.isArray(r.recipients) ? r.recipients : [],
+      cc: Array.isArray(r.cc) ? r.cc : [],
+      bcc: Array.isArray(r.bcc) ? r.bcc : [],
+      sendHour: typeof r.sendHour === 'number' ? r.sendHour : null,
+    }));
   } catch {
     return [];
   }

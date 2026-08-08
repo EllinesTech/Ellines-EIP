@@ -22,10 +22,34 @@ export type MailEnv = {
 };
 
 export type MailMessage = {
-  to: string;
+  /** Primary recipient(s). Single address or list. */
+  to: string | string[];
   subject: string;
   text: string;
+  /** Carbon-copy recipients (optional). */
+  cc?: string[];
+  /** Blind carbon-copy recipients (optional). */
+  bcc?: string[];
 };
+
+/** Normalize to/cc/bcc into trimmed unique email lists. */
+export function normalizeAddressList(
+  input: string | string[] | undefined | null,
+): string[] {
+  if (input == null) return [];
+  const parts = Array.isArray(input) ? input : [input];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of parts) {
+    for (const raw of String(part).split(/[,;\s]+/)) {
+      const email = raw.trim().toLowerCase();
+      if (!email || !email.includes('@') || seen.has(email)) continue;
+      seen.add(email);
+      out.push(email);
+    }
+  }
+  return out.slice(0, 40);
+}
 
 export type MailConfig =
   | { provider: 'resend'; apiKey: string; from: string }
@@ -78,18 +102,28 @@ async function sendViaResend(
   config: Extract<MailConfig, { provider: 'resend' }>,
   message: MailMessage,
 ): Promise<MailSendResult> {
+  const to = normalizeAddressList(message.to);
+  if (!to.length) {
+    return { ok: false, provider: 'resend', error: 'No valid To recipients' };
+  }
+  const cc = normalizeAddressList(message.cc);
+  const bcc = normalizeAddressList(message.bcc);
+  const payload: Record<string, unknown> = {
+    from: config.from,
+    to,
+    subject: message.subject,
+    text: message.text,
+  };
+  if (cc.length) payload.cc = cc;
+  if (bcc.length) payload.bcc = bcc;
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: config.from,
-      to: [message.to],
-      subject: message.subject,
-      text: message.text,
-    }),
+    body: JSON.stringify(payload),
   });
   const raw = await res.text();
   let parsed: { id?: string; message?: string } = {};
@@ -197,16 +231,34 @@ async function sendViaSmtp(
     const fromAddr = config.from.includes('<')
       ? config.from.match(/<([^>]+)>/)?.[1] || config.from
       : config.from;
+    const to = normalizeAddressList(message.to);
+    if (!to.length) {
+      return { ok: false, provider: 'smtp', error: 'No valid To recipients' };
+    }
+    const cc = normalizeAddressList(message.cc);
+    const bcc = normalizeAddressList(message.bcc);
+    const rcpt = [...to, ...cc, ...bcc];
+
     await cmd(`MAIL FROM:<${fromAddr}>`, [250]);
-    await cmd(`RCPT TO:<${message.to}>`, [250, 251]);
+    for (const addr of rcpt) {
+      await cmd(`RCPT TO:<${addr}>`, [250, 251]);
+    }
     await cmd('DATA', [354]);
 
-    const payload = [
+    const headers = [
       `From: ${config.from}`,
-      `To: ${message.to}`,
+      `To: ${to.join(', ')}`,
+    ];
+    if (cc.length) headers.push(`Cc: ${cc.join(', ')}`);
+    // BCC intentionally omitted from headers
+    headers.push(
       `Subject: ${message.subject.replace(/[\r\n]/g, ' ')}`,
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset=utf-8',
+    );
+
+    const payload = [
+      ...headers,
       '',
       message.text.replace(/\r?\n\./g, '\n..'),
       '.',
