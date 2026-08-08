@@ -1351,6 +1351,58 @@ export async function downloadDataAccessLog(opts?: {
   return res.blob();
 }
 
+// ─── Compliance Report Templates (D.2.3) ─────────────────────────────────────
+
+export type ComplianceControlStatus = 'pass' | 'partial' | 'missing';
+
+export type ComplianceControl = {
+  id: string;
+  title: string;
+  description: string;
+  evidenceActions: string[];
+  evidenceCount: number;
+  status: ComplianceControlStatus;
+  lastEvidenceAt: string | null;
+  remediation: string;
+};
+
+export type ComplianceReportDto = {
+  template: ComplianceTemplate;
+  templateTitle: string;
+  organizationId: string;
+  organizationName: string;
+  generatedAt: string;
+  periodDays: number;
+  overallScore: number;
+  passCount: number;
+  partialCount: number;
+  missingCount: number;
+  controls: ComplianceControl[];
+  summary: string;
+};
+
+/** Owner/IT: fetch compliance readiness report as JSON. */
+export function fetchComplianceReport(template: ComplianceTemplate, periodDays = 90) {
+  return request<ComplianceReportDto>(
+    `/api/v1/orgs/me/compliance-report?template=${template}&periodDays=${periodDays}`,
+  );
+}
+
+/** Owner/IT: download compliance report as printable HTML. */
+export async function downloadComplianceReport(
+  template: ComplianceTemplate,
+  periodDays = 90,
+): Promise<Blob> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+  const res = await fetch(
+    `${API_URL}/api/v1/orgs/me/compliance-report?template=${template}&format=html&periodDays=${periodDays}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Report download failed (${res.status})`);
+  return res.blob();
+}
+
 export type ReportRunHistoryDto = {
   id: string;
   reportId: string;
