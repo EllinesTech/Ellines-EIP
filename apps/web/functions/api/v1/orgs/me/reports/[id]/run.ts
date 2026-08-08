@@ -449,7 +449,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   };
 
   const next = reports.map((r, i) => (i === idx ? updated : r));
-  const nextSettings = { ...settings, workflowReports: next };
+  
+  // Save to report history
+  const historyEntry = {
+    id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    reportId: report.id,
+    reportTitle: report.title,
+    reportTemplate: report.template || 'custom',
+    runAt: now,
+    status: emailStatus.startsWith('delivered') ? 'sent' : emailStatus === 'not_configured' ? 'queued' : 'failed',
+    emailStatus,
+    recipientCount: toList.length + delivery.cc.length + delivery.bcc.length,
+    reportBody,
+    htmlBody: format === 'html' ? reportBody : undefined,
+    reportChars: reportBody.length,
+  };
+  
+  const existingHistory = Array.isArray(settings.reportHistory)
+    ? (settings.reportHistory as typeof historyEntry[])
+    : [];
+  const newHistory = [historyEntry, ...existingHistory].slice(0, 200); // Keep last 200 runs
+  
+  const nextSettings = { ...settings, workflowReports: next, reportHistory: newHistory };
 
   const { error: writeErr } = await supabase
     .from('organizations')

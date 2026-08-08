@@ -1,3 +1,16 @@
+export type ReportRun = {
+  id: string;
+  reportId: string;
+  reportTitle: string;
+  reportTemplate: ReportTemplate;
+  runAt: string;
+  status: 'queued' | 'sent' | 'failed';
+  emailStatus: string;
+  recipientCount: number;
+  reportBody: string; // Full text content
+  htmlBody?: string; // HTML version if generated
+};
+
 export type ReportCadence = 'daily' | 'weekly';
 export type ReportTemplate = 'executive' | 'operational' | 'department' | 'custom';
 

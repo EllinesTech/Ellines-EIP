@@ -1128,6 +1128,36 @@ export function deleteReportApi(id: string) {
   });
 }
 
+export type ReportRunHistoryDto = {
+  id: string;
+  reportId: string;
+  reportTitle: string;
+  reportTemplate: string;
+  runAt: string;
+  status: 'queued' | 'sent' | 'failed';
+  emailStatus: string;
+  recipientCount: number;
+  reportChars: number;
+};
+
+export function listReportHistory(reportId?: string, limit = 50) {
+  const params = new URLSearchParams();
+  if (reportId) params.set('reportId', reportId);
+  params.set('limit', String(limit));
+  return request<ReportRunHistoryDto[]>(`/api/v1/orgs/me/reports/history?${params}`);
+}
+
+export function getReportRunContent(runId: string, format: 'text' | 'html' = 'text') {
+  return request<{ content: string; format: 'text' | 'html' }>(`/api/v1/orgs/me/reports/history/${runId}?format=${format}`);
+}
+
+export function resendReportRun(runId: string, recipients?: string[]) {
+  return request<{ ok: boolean; sentCount: number; emailStatus: string }>(`/api/v1/orgs/me/reports/history/${runId}/resend`, {
+    method: 'POST',
+    body: JSON.stringify({ recipients }),
+  });
+}
+
 export type EnterpriseEventDto = {
   id: string;
   type: string;
