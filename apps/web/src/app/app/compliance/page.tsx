@@ -9,6 +9,7 @@ import {
   downloadDataAccessLog,
   fetchComplianceReport,
   downloadComplianceReport,
+  downloadEvidencePack,
   type ComplianceTemplate,
   type ExportFormat,
   type DataAccessLogEntry,
@@ -71,6 +72,13 @@ export default function CompliancePage() {
   const [reportError, setReportError] = useState('');
   const [reportDlBusy, setReportDlBusy] = useState(false);
 
+  // Evidence pack
+  const [packFrameworks, setPackFrameworks] = useState<Exclude<ComplianceTemplate,'all'>[]>(['soc2']);
+  const [packDays, setPackDays] = useState(90);
+  const [packNote, setPackNote] = useState('');
+  const [packBusy, setPackBusy] = useState(false);
+  const [packError, setPackError] = useState('');
+
   const loadLog = useCallback(() => {
     setLogLoading(true); setLogError('');
     fetchDataAccessLog({ limit: 200, resource: catFilter || undefined, from: logFrom, to: logTo })
@@ -125,6 +133,17 @@ export default function CompliancePage() {
       URL.revokeObjectURL(url);
     } catch (e) { setReportError(e instanceof Error ? e.message : 'Download failed'); }
     finally { setReportDlBusy(false); }
+  }
+
+  async function doDownloadPack() {
+    setPackBusy(true); setPackError('');
+    try {
+      const blob = await downloadEvidencePack({ frameworks: packFrameworks, periodDays: packDays, auditorNote: packNote || undefined });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `evidence_pack_${new Date().toISOString().split('T')[0]}.html`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setPackError(e instanceof Error ? e.message : 'Pack generation failed'); }
+    finally { setPackBusy(false); }
   }
 
   const selectedLabel = FRAMEWORKS.find(f => f.id === template)!.label;
@@ -197,6 +216,45 @@ export default function CompliancePage() {
 
             {exportError ? <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{exportError}</p> : null}
             {lastExport ? <div style={{ padding: '0.55rem 0.9rem', borderRadius: 8, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', marginBottom: '1rem', fontSize: '0.8rem', color: '#6ee7b7' }}>✓ {lastExport} — logged in audit trail.</div> : null}
+
+            {/* Evidence pack builder */}
+            <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(111,45,141,0.07)', border: '1px solid rgba(111,45,141,0.25)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#c4b5fd', marginBottom: '0.65rem' }}>Evidence Pack — bundle all selected frameworks into one printable file for auditors</div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.67rem', fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Frameworks</label>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    {(['soc2', 'hipaa', 'gdpr', 'pci'] as Exclude<ComplianceTemplate,'all'>[]).map(f => {
+                      const on = packFrameworks.includes(f);
+                      return (
+                        <button key={f} type="button"
+                          onClick={() => setPackFrameworks(prev => on ? prev.filter(x => x !== f) : [...prev, f])}
+                          style={{ padding: '0.22rem 0.65rem', borderRadius: 6, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', border: `1px solid ${on ? 'rgba(111,45,141,0.7)' : 'rgba(255,255,255,0.1)'}`, background: on ? 'rgba(111,45,141,0.25)' : 'transparent', color: on ? '#c4b5fd' : 'var(--c-muted)' }}>
+                          {f.toUpperCase()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.67rem', fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Period</label>
+                  <select value={packDays} onChange={e => setPackDays(Number(e.target.value))}
+                    style={{ padding: '0.28rem 0.55rem', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.3)', color: '#f4f7fb', fontSize: '0.78rem' }}>
+                    {[30, 60, 90, 180, 365].map(d => <option key={d} value={d}>Last {d} days</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minWidth: 180 }}>
+                  <label style={{ fontSize: '0.67rem', fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Auditor note (optional)</label>
+                  <input value={packNote} onChange={e => setPackNote(e.target.value)} placeholder="e.g. Prepared for Q3 2026 SOC 2 audit"
+                    style={{ padding: '0.28rem 0.55rem', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.3)', color: '#f4f7fb', fontSize: '0.78rem' }} />
+                </div>
+                <button type="button" onClick={doDownloadPack} disabled={packBusy || packFrameworks.length === 0}
+                  style={{ padding: '0.38rem 1.1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', background: packBusy ? 'rgba(111,45,141,0.3)' : 'rgba(111,45,141,0.85)', border: '1px solid rgba(111,45,141,0.6)', color: '#f4f7fb', cursor: packBusy || packFrameworks.length === 0 ? 'not-allowed' : 'pointer' }}>
+                  {packBusy ? 'Building…' : 'Download Pack'}
+                </button>
+              </div>
+              {packError ? <p style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '0.5rem', marginBottom: 0 }}>{packError}</p> : null}
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.65rem' }}>
               {[

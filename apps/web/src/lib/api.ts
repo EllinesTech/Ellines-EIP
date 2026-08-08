@@ -1403,6 +1403,27 @@ export async function downloadComplianceReport(
   return res.blob();
 }
 
+// ─── Evidence Pack (D.2.4) ───────────────────────────────────────────────────
+
+/** Owner/IT: generate and download a full compliance evidence pack as HTML. */
+export async function downloadEvidencePack(opts: {
+  frameworks: ComplianceTemplate[];
+  periodDays?: number;
+  auditorNote?: string;
+  includeRawLog?: boolean;
+  includeAccessLog?: boolean;
+}): Promise<Blob> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+  const res = await fetch(`${API_URL}/api/v1/orgs/me/evidence-pack`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) throw new Error(`Evidence pack failed (${res.status})`);
+  return res.blob();
+}
+
 export type ReportRunHistoryDto = {
   id: string;
   reportId: string;
