@@ -13,13 +13,14 @@
     "deploy:pages": "npm run build && npx wrangler pages deploy out --project-name=ellines-eip --commit-dirty=true --branch=main"
   },
   "dependencies": {
-    "@ellines-eip/shared": "*",
     "@ellines-eip/ellinea-ai": "*",
+    "@ellines-eip/shared": "*",
     "@supabase/supabase-js": "^2.111.0",
     "bcryptjs": "^3.0.3",
     "itty-router": "^5.0.24",
     "jose": "^6.2.5",
-    "next": "15.1.3",
+    "nanoid": "^6.0.1",
+    "next": "^15.5.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.10.1"

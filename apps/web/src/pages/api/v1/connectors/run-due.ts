@@ -3,7 +3,7 @@
  * Pages Router API routes are IGNORED during static export builds.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { devJson, getDevSupabase, requireDevAuth, isOrgAdmin } from '../_dev-auth';
+import { devJson, getDevSupabase, requireDevAuth, isOrgAdmin } from '../../../../lib/dev-authlib/dev-auth';
 
 type InstallConfig = { syncIntervalMinutes?: number; lastSyncedAt?: string | null };
 

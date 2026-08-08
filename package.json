@@ -33,6 +33,7 @@
     "deploy:identity": "flyctl deploy --config services/identity/fly.toml --dockerfile services/identity/Dockerfile --app ellines-eip-identity",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "security:audit": "node scripts/security-audit.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down"

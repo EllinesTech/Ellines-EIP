@@ -4,7 +4,7 @@
  * This only runs locally — production uses the real Cloudflare Pages Function.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { devJson, getDevSupabase, requireDevAuth, isOrgAdmin } from '../../_dev-auth';
+import { devJson, getDevSupabase, requireDevAuth, isOrgAdmin } from '../../../../../lib/dev-authlib/dev-auth';
 
 const INVITE_TTL_MS = 72 * 60 * 60 * 1000;
 const inviteKey = (orgId: string) => `eip_pending_invites_${orgId}`;
