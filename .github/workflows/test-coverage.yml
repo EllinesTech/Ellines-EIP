@@ -1,0 +1,122 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests & Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip if commit message contains [skip ci] or [skip test]
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip test]')"
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eip
+          POSTGRES_PASSWORD: eip_dev_password
+          POSTGRES_DB: ellines_eip_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      DIRECT_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      JWT_SECRET: test-jwt-secret-for-ci
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:shared
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Push schema to test DB
+        run: npx dotenv-cli -e /dev/null -- env DATABASE_URL="postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test" DIRECT_URL="postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test" npx prisma db push --schema services/identity/prisma/schema.prisma --skip-generate
+
+      # Run shared package tests
+      - name: Test @ellines-eip/shared
+        run: npm run test:coverage -w @ellines-eip/shared
+        continue-on-error: false
+
+      # Run identity service tests
+      - name: Test @ellines-eip/identity
+        run: npm run test:coverage -w @ellines-eip/identity
+        continue-on-error: false
+
+      # Upload shared coverage
+      - name: Upload shared coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-shared
+          path: packages/shared/coverage/
+          retention-days: 14
+
+      # Upload identity coverage
+      - name: Upload identity coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-identity
+          path: services/identity/coverage/
+          retention-days: 14
+
+      # Coverage summary comment on PRs
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### @ellines-eip/shared" >> $GITHUB_STEP_SUMMARY
+          if [ -f "packages/shared/coverage/coverage-summary.json" ]; then
+            node -e "
+              const c = require('./packages/shared/coverage/coverage-summary.json').total;
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              console.log('| Statements | ' + c.statements.pct + '% (' + c.statements.covered + '/' + c.statements.total + ') |');
+              console.log('| Branches | ' + c.branches.pct + '% (' + c.branches.covered + '/' + c.branches.total + ') |');
+              console.log('| Functions | ' + c.functions.pct + '% (' + c.functions.covered + '/' + c.functions.total + ') |');
+              console.log('| Lines | ' + c.lines.pct + '% (' + c.lines.covered + '/' + c.lines.total + ') |');
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No coverage data" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### @ellines-eip/identity" >> $GITHUB_STEP_SUMMARY
+          if [ -f "services/identity/coverage/coverage-summary.json" ]; then
+            node -e "
+              const c = require('./services/identity/coverage/coverage-summary.json').total;
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              console.log('| Statements | ' + c.statements.pct + '% (' + c.statements.covered + '/' + c.statements.total + ') |');
+              console.log('| Branches | ' + c.branches.pct + '% (' + c.branches.covered + '/' + c.branches.total + ') |');
+              console.log('| Functions | ' + c.functions.pct + '% (' + c.functions.covered + '/' + c.functions.total + ') |');
+              console.log('| Lines | ' + c.lines.pct + '% (' + c.lines.covered + '/' + c.lines.total + ') |');
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No coverage data" >> $GITHUB_STEP_SUMMARY
+          fi

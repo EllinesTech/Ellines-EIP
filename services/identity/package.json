@@ -7,8 +7,13 @@
     "dev": "nest start --watch",
     "start": "node dist/main.js",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "dotenv -e ../../.env --override -- prisma migrate dev",
+    "prisma:migrate:dev": "dotenv -e ../../.env --override -- prisma migrate dev",
+    "prisma:migrate:deploy": "dotenv -e ../../.env --override -- prisma migrate deploy",
+    "prisma:migrate:status": "dotenv -e ../../.env --override -- prisma migrate status",
     "prisma:push": "dotenv -e ../../.env --override -- prisma db push",
     "prisma:studio": "dotenv -e ../../.env --override -- prisma studio",
     "seed:demo": "dotenv -e ../../.env --override -- ts-node --transpile-only prisma/seed-demo.ts"
@@ -78,9 +83,20 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.module.ts",
+      "!**/main.ts",
+      "!**/index.ts"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "branches": 5,
+        "functions": 5,
+        "lines": 5,
+        "statements": 5
+      }
+    },
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@ellines-eip/shared$": "<rootDir>/../../../packages/shared/src/index.ts"

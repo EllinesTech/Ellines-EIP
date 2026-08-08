@@ -180,8 +180,8 @@ export default function CompliancePage() {
                 <button key={f.id} type="button" onClick={() => setTemplate(f.id)}
                   style={{ textAlign: 'left', padding: '0.8rem 0.9rem', borderRadius: 10, border: `2px solid ${template === f.id ? 'rgba(111,45,141,0.7)' : 'rgba(255,255,255,0.08)'}`, background: template === f.id ? 'rgba(111,45,141,0.12)' : 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: template === f.id ? '#c4b5fd' : '#f4f7fb', marginBottom: '0.2rem' }}>{f.label}</div>
-                  <div style={{ fontSize: '0.66rem', color: 'var(--c-muted)', marginBottom: '0.25rem', lineHeight: 1.4 }}>{f.desc}</div>
-                  <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: template === f.id ? '#a78bfa' : '#475569' }}>{f.controls}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem', lineHeight: 1.45 }}>{f.desc}</div>
+                  <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', color: template === f.id ? '#a78bfa' : '#64748b' }}>{f.controls}</div>
                 </button>
               ))}
             </div>

@@ -20,6 +20,9 @@
     "set-pages-secrets": "node scripts/set-pages-secrets.mjs",
     "deploy:pages": "npm run verify:pages-functions && npm run build:web && npm run deploy:pages -w @ellines-eip/web",
     "db:push": "npm run prisma:push -w @ellines-eip/identity",
+    "db:migrate:dev": "npm run prisma:migrate:dev -w @ellines-eip/identity",
+    "db:migrate:deploy": "npm run prisma:migrate:deploy -w @ellines-eip/identity",
+    "db:migrate:status": "npm run prisma:migrate:status -w @ellines-eip/identity",
     "db:generate": "npm run prisma:generate -w @ellines-eip/identity",
     "db:studio": "npm run prisma:studio -w @ellines-eip/identity",
     "db:local": "node scripts/db-switch.mjs local",
@@ -29,6 +32,7 @@
     "seed:local": "npm run db:local && npm run seed:demo && npm run db:cloud",
     "deploy:identity": "flyctl deploy --config services/identity/fly.toml --dockerfile services/identity/Dockerfile --app ellines-eip-identity",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down"

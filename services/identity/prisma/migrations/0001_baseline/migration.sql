@@ -1,0 +1,22 @@
+-- Baseline migration (2026-08-08)
+-- This file represents the initial schema state when Prisma migrations were introduced.
+-- The database already has these tables — this migration is marked as applied without
+-- running SQL, using: npx prisma migrate resolve --applied 0001_baseline
+--
+-- All future schema changes should be made via:
+--   1. Edit prisma/schema.prisma
+--   2. npx prisma migrate dev --name <description>     (local dev)
+--   3. npx prisma migrate deploy                        (production)
+--
+-- DO NOT run this file directly. Use Prisma CLI only.
+
+-- Tables in baseline (created via db:push before migrations were introduced):
+-- organizations, users, audit_logs, branches, departments, organization_memberships,
+-- enterprise_snapshots, connector_installations, connector_templates, connector_packs,
+-- sso_providers, sso_provider_users, custom_roles, role_audit_logs,
+-- approval_requests, approval_steps, business_rules, scheduled_reports, enterprise_events,
+-- ellinea_agents, agent_executions, agent_audit_logs, agent_templates, agent_webhook_subscriptions,
+-- dashboards, widgets, dashboard_alerts, dashboard_exports,
+-- workflow_rules, rule_executions, rule_schedules, rule_templates,
+-- database_configurations, database_switch_logs, organization_tiers,
+-- api_usage, rate_limit_tiers, rate_limit_violations, password_reset_tokens
