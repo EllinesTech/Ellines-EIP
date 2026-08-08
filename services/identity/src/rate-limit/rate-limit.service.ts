@@ -6,7 +6,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface RateLimitCheck {
   allowed: boolean;
@@ -55,7 +55,12 @@ export class RateLimitService {
     });
 
     // Default to free tier if no tier assigned
-    const tier = orgTier?.tier || (await this.getFreeTier());
+    const tier = orgTier?.tier ?? (await this.getFreeTier());
+
+    // Hard fallback if DB has no tiers seeded yet
+    if (!tier) {
+      return { allowed: true, limit: 100, remaining: 99, reset: new Date(), tierName: 'free' };
+    }
 
     // Check minute limit (most restrictive)
     const minuteCheck = await this.checkWindow(
@@ -317,13 +322,10 @@ export class RateLimitService {
       include: { tier: true },
     });
 
-    if (!orgTier) {
-      const freeTier = await this.getFreeTier();
-      if (!freeTier) return null;
-      return this.mapTierToDto(freeTier);
-    }
-
-    return this.mapTierToDto(orgTier.tier);
+    const freeTier = await this.getFreeTier();
+    const resolved = orgTier?.tier ?? freeTier;
+    if (!resolved) return null;
+    return this.mapTierToDto(resolved);
   }
 
   /**

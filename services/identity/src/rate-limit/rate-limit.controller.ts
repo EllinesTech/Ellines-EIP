@@ -13,7 +13,7 @@ import { Roles } from '../auth/roles.decorator';
 import { SkipRateLimit } from './rate-limit.guard';
 
 @ApiTags('Rate Limits')
-@Controller('api/v1/rate-limits')
+@Controller('rate-limits')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth('JWT-auth')
 export class RateLimitController {
@@ -108,7 +108,7 @@ export class RateLimitController {
    * Platform admin only
    */
   @Post('orgs/:orgId/tier')
-  @Roles('platform_admin')
+  @Roles('owner')
   @SkipRateLimit()
   @ApiOperation({
     summary: 'Assign tier to organization',
