@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-08-08T18:47:29.300Z",
+  "buildId": "iDhXPWWdg1XDKttG_WuKD",
+  "commit": "local",
+  "branch": "local",
+  "totalStaticBytes": 2109093,
+  "totalServerBytes": 3203168,
+  "chunkCount": 64,
+  "frameworkBytes": 189782,
+  "appBytes": 1493,
+  "largestPageBytes": 422845,
+  "largestPageName": "5534-8f241fe17d78f17b.js",
+  "top10": [
+    {
+      "name": "5534-8f241fe17d78f17b.js",
+      "bytes": 422845
+    },
+    {
+      "name": "framework-a78e6de487364605.js",
+      "bytes": 189782
+    },
+    {
+      "name": "87c73c54-dd8d81ac9604067c.js",
+      "bytes": 173023
+    },
+    {
+      "name": "18-a6248b1b2bab1596.js",
+      "bytes": 172988
+    },
+    {
+      "name": "main-d388b6133a9cb8f8.js",
+      "bytes": 120960
+    },
+    {
+      "name": "polyfills-42372ed130431b0a.js",
+      "bytes": 112594
+    },
+    {
+      "name": "page-135d41d5a2b647d5.js",
+      "bytes": 59100
+    },
+    {
+      "name": "page-a86bcc65a1e06aa2.js",
+      "bytes": 55512
+    },
+    {
+      "name": "page-7f536471674c95e9.js",
+      "bytes": 39591
+    },
+    {
+      "name": "layout-3e157ec16f323c01.js",
+      "bytes": 33417
+    }
+  ],
+  "budgets": [
+    {
+      "label": "Framework bundle (React+Next)",
+      "bytes": 189782,
+      "budgetKb": 200,
+      "pct": 93,
+      "passed": true
+    },
+    {
+      "label": "App shared bundle",
+      "bytes": 1493,
+      "budgetKb": 150,
+      "pct": 1,
+      "passed": true
+    },
+    {
+      "label": "Largest page chunk (5534-8f241fe17d78f17b.js)",
+      "bytes": 422845,
+      "budgetKb": 500,
+      "pct": 83,
+      "passed": true
+    },
+    {
+      "label": "Total static JS",
+      "bytes": 2109093,
+      "budgetKb": 3000,
+      "pct": 69,
+      "passed": true
+    },
+    {
+      "label": "Total server JS",
+      "bytes": 3203168,
+      "budgetKb": 5120,
+      "pct": 61,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

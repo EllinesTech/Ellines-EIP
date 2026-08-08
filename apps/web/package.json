@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260730.1",
+    "@next/bundle-analyzer": "^15.5.23",
     "@testing-library/react": "^16.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^29.5.13",

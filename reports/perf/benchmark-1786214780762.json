@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-08-08T18:46:20.247Z",
+  "commit": "local",
+  "branch": "local",
+  "thresholds": {
+    "api": {
+      "p50LatencyMs": 50,
+      "p99LatencyMs": 200,
+      "minRps": 100,
+      "errorRate": 0.01
+    },
+    "bundle": {
+      "firstLoadKb": 200,
+      "totalClientKb": 500
+    }
+  },
+  "results": {
+    "synthetic": [
+      {
+        "name": "AES-256-GCM encrypt",
+        "perOpMs": 0.07482799999999998,
+        "passed": true
+      },
+      {
+        "name": "scrypt cold derivation",
+        "elapsedMs": 80.61430000000007,
+        "passed": true
+      },
+      {
+        "name": "HMAC-SHA256 sign",
+        "perOpMs": 0.013865599999999973,
+        "passed": true
+      },
+      {
+        "name": "JSON serialization",
+        "perOpUs": 29.83957999999999,
+        "passed": true
+      }
+    ],
+    "bundle": {
+      "totalClientKb": 2059.6611328125,
+      "routes": []
+    }
+  }
+}

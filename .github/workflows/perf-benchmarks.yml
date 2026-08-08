@@ -1,0 +1,241 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_api_benchmark:
+        description: 'Run API load test (requires identity service)'
+        type: boolean
+        default: false
+
+jobs:
+  # ────────────────────────────────────────────────
+  # 1. Bundle size analysis (no server needed)
+  # ────────────────────────────────────────────────
+  bundle-size:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:shared
+
+      - name: Build web app
+        run: npm run build -w @ellines-eip/web
+
+      - name: Run bundle size check
+        run: node scripts/bundle-size-check.mjs --ci
+        continue-on-error: true   # Warn but don't fail PR for bundle growth
+
+      - name: Save bundle baseline (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: node scripts/bundle-size-check.mjs --save-baseline
+
+      - name: Upload bundle report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-size-report
+          path: reports/perf/bundle-latest.json
+          retention-days: 30
+
+      - name: Bundle size summary
+        if: always()
+        run: |
+          echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          node -e "
+            const fs = require('fs');
+            try {
+              const r = JSON.parse(fs.readFileSync('reports/perf/bundle-latest.json', 'utf8'));
+              console.log('| Metric | Size | Budget |');
+              console.log('|--------|------|--------|');
+              console.log('| Total static JS | ' + (r.totalStaticBytes/1024).toFixed(1) + ' KB | 3000 KB |');
+              console.log('| Framework bundle | ' + (r.frameworkBytes/1024).toFixed(1) + ' KB | 200 KB |');
+              console.log('| App bundle | ' + (r.appBytes/1024).toFixed(1) + ' KB | 150 KB |');
+              if (r.largestPageBytes > 0) {
+                console.log('| Largest page | ' + (r.largestPageBytes/1024).toFixed(1) + ' KB | 500 KB |');
+              }
+              if (r.errors && r.errors.length > 0) {
+                console.log('');
+                console.log('### ⚠ Budget Exceeded');
+                r.errors.forEach(e => console.log('- ' + e));
+              }
+            } catch(e) { console.log('No bundle data available'); }
+          " >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────
+  # 2. Synthetic performance tests (crypto, JSON)
+  # ────────────────────────────────────────────────
+  synthetic-perf:
+    name: Synthetic Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eip
+          POSTGRES_PASSWORD: eip_dev_password
+          POSTGRES_DB: ellines_eip_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      DIRECT_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      JWT_SECRET: ci-jwt-secret-for-benchmarks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:shared
+
+      - name: Run synthetic benchmarks (bundle-only mode, no live server)
+        run: node scripts/perf-benchmark.mjs --bundle-only --ci
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-report
+          path: reports/perf/
+          retention-days: 30
+
+      - name: Benchmark summary
+        if: always()
+        run: |
+          echo "## Synthetic Performance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          node -e "
+            const fs = require('fs');
+            try {
+              const r = JSON.parse(fs.readFileSync('reports/perf/latest.json', 'utf8'));
+              const s = r.results?.synthetic || [];
+              console.log('| Test | Result | Threshold | Status |');
+              console.log('|------|--------|-----------|--------|');
+              for (const t of s) {
+                const val = t.perOpMs != null ? t.perOpMs.toFixed(3) + ' ms' :
+                            t.perOpUs != null ? t.perOpUs.toFixed(1) + ' µs' :
+                            t.elapsedMs != null ? t.elapsedMs.toFixed(1) + ' ms' : 'N/A';
+                const status = t.passed ? '✅' : '❌';
+                console.log('| ' + t.name + ' | ' + val + ' | — | ' + status + ' |');
+              }
+            } catch(e) { console.log('No benchmark data'); }
+          " >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────
+  # 3. API load test (manual trigger only)
+  # ────────────────────────────────────────────────
+  api-benchmark:
+    name: API Load Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' && inputs.run_api_benchmark == true
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eip
+          POSTGRES_PASSWORD: eip_dev_password
+          POSTGRES_DB: ellines_eip_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      DIRECT_URL: postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test
+      JWT_SECRET: ci-jwt-secret-for-benchmarks
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:shared
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Push schema to test DB
+        run: npx dotenv-cli -e /dev/null -- env DATABASE_URL="postgresql://eip:eip_dev_password@localhost:5432/ellines_eip_test" npx prisma db push --schema services/identity/prisma/schema.prisma --skip-generate
+
+      - name: Build identity service
+        run: npx nest build
+        working-directory: services/identity
+
+      - name: Start identity service
+        run: node dist/main.js &
+        working-directory: services/identity
+
+      - name: Wait for identity service
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api/v1/health; then
+              echo "Identity service ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run API load benchmark
+        run: node scripts/perf-benchmark.mjs --url=http://localhost:3001 --ci
+
+      - name: Upload load test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-load-test-report
+          path: reports/perf/
+          retention-days: 30
