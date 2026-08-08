@@ -1584,3 +1584,60 @@ CSV format produces Excel-compatible rows with proper field escaping. JSON forma
 ---
 
 *Last update: 2026-08-08*
+
+
+---
+
+## Sprint 16 — API Gateway & Rate Limiting ✅ COMPLETE
+
+**Date:** 2026-08-08  
+**Status:** `done`  
+**Builds:** `npm run verify:pages-functions` ✅ (130 functions) · `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅ · `npm run db:push` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| B.3.2 | **API Gateway & rate limiting** | `done` | Tiered rate limiting system with 4 plans: Free (100 req/day, 1 connector, $0), Starter (1k req/day, 5 connectors, $29/mo), Professional (10k req/day, 20 connectors, $99/mo), Enterprise (100k req/day, unlimited, $299/mo). Prisma models: ApiUsage (tracks requests per org/user/endpoint), RateLimitTier (tier definitions), OrganizationTier (org tier assignments), RateLimitViolation (logs when limits exceeded). NestJS implementation: RateLimitService (sliding window algorithm checking minute/hour/day limits), RateLimitGuard (enforces limits on endpoints), RateLimitController (tier management APIs). Pages Functions integration: `withRateLimit()` middleware wrapper, automatic X-RateLimit-* headers (Limit/Remaining/Reset/Tier), 429 Too Many Requests responses with Retry-After. Feature gates per tier: webhooks (Starter+), SSO (Professional+), custom roles (Professional+), agents (Professional+), advanced BI (Professional+). Usage tracking and violation logging for monitoring and tier upgrade recommendations. Seed script populates 4 default tiers. 130 Pages Functions verified ✅ |
+
+### What ships in Sprint 16
+
+**Tiered rate limiting system** — Organizations are now subject to API rate limits based on their tier. Four tiers available:
+
+- **Free**: 100 requests/day, 20/hour, 5/minute. 1 connector, 3 users, 1 export/day. No webhooks, SSO, custom roles, agents, or advanced BI.
+- **Starter**: 1,000 requests/day, 200/hour, 20/minute. 5 connectors, 10 users, 5 exports/day. Webhooks enabled. $29/month.
+- **Professional**: 10,000 requests/day, 2,000/hour, 100/minute. 20 connectors, 50 users, 20 exports/day. All features enabled. $99/month.
+- **Enterprise**: 100,000 requests/day, 20,000/hour, 1,000/minute. Unlimited connectors and users. All features enabled. $299/month (custom pricing).
+
+**Enforcement mechanism:**
+- Sliding window algorithm checks minute, hour, and day limits
+- Returns 429 Too Many Requests when exceeded
+- Includes Retry-After header with seconds to wait
+- Logs all violations with IP address and user agent
+
+**Rate limit headers on every response:**
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 2026-08-09T00:00:00Z
+X-RateLimit-Tier: Starter
+```
+
+**Files created:**
+- `services/identity/prisma/schema.prisma` — Added 4 rate limiting models
+- `services/identity/prisma/seed-rate-limits.ts` — Seed script for tiers
+- `services/identity/src/rate-limit/rate-limit.service.ts` — Core service
+- `services/identity/src/rate-limit/rate-limit.guard.ts` — NestJS guard
+- `services/identity/src/rate-limit/rate-limit.controller.ts` — API endpoints
+- `services/identity/src/rate-limit/rate-limit.module.ts` — Module registration
+- `apps/web/functions/shared/rate-limit.ts` — Pages Functions middleware
+
+**API endpoints:**
+- `GET /api/v1/rate-limits/tiers` — List all available tiers (public)
+- `GET /api/v1/rate-limits/orgs/:orgId/tier` — Get org's current tier
+- `POST /api/v1/rate-limits/orgs/:orgId/tier` — Assign tier (platform admin)
+- `GET /api/v1/rate-limits/orgs/:orgId/usage` — Get usage stats (owner/admin)
+
+**Commercial readiness:** The platform now has a foundation for tiered pricing and feature gates. Organizations default to the free tier and can be upgraded by platform admins.
+
+---
+
+*Last update: 2026-08-08*

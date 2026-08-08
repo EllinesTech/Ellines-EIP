@@ -12,6 +12,7 @@ import { LoggingModule } from './logging/logging.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { AgentsModule } from './agents/agents.module';
 import { DatabaseModule } from './database/database.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -35,6 +36,7 @@ import { HealthController } from './health.controller';
     ObservabilityModule,
     AgentsModule,
     DatabaseModule,
+    RateLimitModule,
   ],
   controllers: [HealthController],
 })

@@ -51,6 +51,9 @@ model Organization {
   agentSubscriptions     AgentWebhookSubscription[] @relation("AgentSubscriptions")
   databaseConfigs        DatabaseConfiguration[]   // Multi-database support
   databaseSwitchLogs     DatabaseSwitchLog[]     // Database switch audit trail
+  apiUsage               ApiUsage[]              // B.3.2: API usage tracking
+  organizationTier       OrganizationTier?       // B.3.2: Rate limit tier
+  rateLimitViolations    RateLimitViolation[]    // B.3.2: Rate limit violations
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -106,6 +109,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
   memberships         OrganizationMembership[]
   ssoProviderUsers    SsoProviderUser[]
+  apiUsage            ApiUsage[]              // B.3.2: API usage tracking
+  rateLimitViolations RateLimitViolation[]    // B.3.2: Rate limit violations
 
   @@index([organizationId])
   @@map("users")
@@ -986,4 +991,113 @@ model DatabaseSwitchLog {
   @@index([organizationId])
   @@index([createdAt])
   @@map("database_switch_logs")
+}
+
+
+// ─── v2.0 Phase B.3.2 — API Gateway & Rate Limiting ────────────────────────────
+
+/**
+ * ApiUsage — Tracks API usage per organization and user for rate limiting.
+ * Aggregates requests per window (minute/hour/day) for enforcement.
+ */
+model ApiUsage {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  endpoint       String
+  method         String
+  requestCount   Int      @default(1) @map("request_count")
+  windowStart    DateTime @map("window_start")
+  windowEnd      DateTime @map("window_end")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, windowStart])
+  @@index([userId, windowStart])
+  @@index([windowStart, windowEnd])
+  @@map("api_usage")
+}
+
+/**
+ * RateLimitTier — Defines tiered access plans with different rate limits and features.
+ * Tiers: free, starter, professional, enterprise
+ */
+model RateLimitTier {
+  id                   String   @id @default(cuid())
+  name                 String   @unique // 'free', 'starter', 'professional', 'enterprise'
+  displayName          String   @map("display_name")
+  requestsPerDay       Int      @map("requests_per_day")
+  requestsPerHour      Int      @map("requests_per_hour")
+  requestsPerMinute    Int      @map("requests_per_minute")
+  burstLimit           Int      @default(10) @map("burst_limit") // Allow short bursts
+  allowedEndpoints     String[] @map("allowed_endpoints") // Empty = all endpoints
+  blockedEndpoints     String[] @map("blocked_endpoints")
+  maxConnectors        Int?     @map("max_connectors")
+  maxUsers             Int?     @map("max_users")
+  maxDataExportPerDay  Int?     @map("max_data_export_per_day")
+  enableWebhooks       Boolean  @default(false) @map("enable_webhooks")
+  enableSso            Boolean  @default(false) @map("enable_sso")
+  enableCustomRoles    Boolean  @default(false) @map("enable_custom_roles")
+  enableAgents         Boolean  @default(false) @map("enable_agents")
+  enableAdvancedBI     Boolean  @default(false) @map("enable_advanced_bi")
+  priority             Int      @default(0) // Higher priority = better support
+  monthlyPrice         Int      @default(0) @map("monthly_price") // In cents
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organizations OrganizationTier[]
+
+  @@map("rate_limit_tiers")
+}
+
+/**
+ * OrganizationTier — Associates an organization with a rate limit tier.
+ * Supports custom overrides and expiration for trial periods.
+ */
+model OrganizationTier {
+  id             String   @id @default(cuid())
+  organizationId String   @unique @map("organization_id")
+  tierId         String   @map("tier_id")
+  startedAt      DateTime @default(now()) @map("started_at")
+  expiresAt      DateTime? @map("expires_at")
+  autoRenew      Boolean  @default(true) @map("auto_renew")
+  customLimits   Json?    @map("custom_limits") // Override tier defaults
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tier         RateLimitTier @relation(fields: [tierId], references: [id])
+
+  @@index([organizationId])
+  @@index([tierId])
+  @@map("organization_tiers")
+}
+
+/**
+ * RateLimitViolation — Logs when an organization exceeds its rate limits.
+ * Used for monitoring, alerting, and potential tier upgrade recommendations.
+ */
+model RateLimitViolation {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  endpoint       String
+  method         String
+  tierName       String   @map("tier_name")
+  limit          Int
+  actualCount    Int      @map("actual_count")
+  windowType     String   @map("window_type") // 'minute', 'hour', 'day'
+  blockedAt      DateTime @default(now()) @map("blocked_at")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, blockedAt])
+  @@index([userId, blockedAt])
+  @@map("rate_limit_violations")
 }

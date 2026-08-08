@@ -1,84 +1,331 @@
-import type { PagesFunction } from '@cloudflare/workers-types';
+/**
+ * Rate Limiting for Cloudflare Pages Functions (B.3.2)
+ * 
+ * Wraps API endpoints with rate limiting checks.
+ * Reads tier from organization settings and enforces limits.
+ */
+
+import type { Env } from './auth';
+import { getAdminClient } from './auth';
+
+export interface RateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  reset: Date;
+  tierName: string;
+  violated?: boolean;
+}
+
+interface RateLimitTier {
+  name: string;
+  displayName: string;
+  requestsPerDay: number;
+  requestsPerHour: number;
+  requestsPerMinute: number;
+}
+
+const DEFAULT_TIERS: Record<string, RateLimitTier> = {
+  free: {
+    name: 'free',
+    displayName: 'Free',
+    requestsPerDay: 100,
+    requestsPerHour: 20,
+    requestsPerMinute: 5,
+  },
+  starter: {
+    name: 'starter',
+    displayName: 'Starter',
+    requestsPerDay: 1000,
+    requestsPerHour: 200,
+    requestsPerMinute: 20,
+  },
+  professional: {
+    name: 'professional',
+    displayName: 'Professional',
+    requestsPerDay: 10000,
+    requestsPerHour: 2000,
+    requestsPerMinute: 100,
+  },
+  enterprise: {
+    name: 'enterprise',
+    displayName: 'Enterprise',
+    requestsPerDay: 100000,
+    requestsPerHour: 20000,
+    requestsPerMinute: 1000,
+  },
+};
 
 /**
- * Simple rate limiter using Cloudflare Workers KV.
- * Tracks requests per IP or org, enforces max-requests-per-minute.
+ * Check rate limit for organization
  */
-export interface RateLimitConfig {
-  maxRequests: number;
-  windowMs: number; // in ms (typically 60000 for 1 minute)
-  keyPrefix: string; // e.g., 'ratelimit:auth:login'
-}
-
 export async function checkRateLimit(
-  context: PagesFunction,
-  config: RateLimitConfig,
-  key: string,
-): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
-  // Extract KV from context (passed via environment)
-  const kv = (context.env as unknown as Record<string, unknown>).KV_CACHE as KVNamespace | undefined;
-
-  if (!kv) {
-    // If KV not available, allow request (graceful degradation on Pages)
-    return { allowed: true, remaining: config.maxRequests, resetAt: new Date(Date.now() + config.windowMs) };
-  }
-
-  const fullKey = `${config.keyPrefix}:${key}`;
-  const now = Date.now();
-  const windowStart = now - config.windowMs;
-
+  env: Env,
+  organizationId: string,
+  userId: string | null,
+  endpoint: string,
+  method: string,
+): Promise<RateLimitResult> {
   try {
-    // Get current bucket
-    const data = await kv.get(fullKey, 'json');
-    const bucket = (data as Record<string, unknown> | null) || { count: 0, resetAt: now + config.windowMs };
+    const supabase = getAdminClient(env);
 
-    // Check if window has expired
-    if ((bucket.resetAt as number) < now) {
-      // New window, reset counter
-      await kv.put(fullKey, JSON.stringify({ count: 1, resetAt: now + config.windowMs }), {
-        expirationTtl: Math.ceil(config.windowMs / 1000) + 10,
-      });
-      return {
-        allowed: true,
-        remaining: config.maxRequests - 1,
-        resetAt: new Date((bucket.resetAt as number) || now + config.windowMs),
-      };
+    // Get organization tier
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', organizationId)
+      .maybeSingle();
+
+    const tierName = orgData?.settings?.rateLimitTier || 'free';
+    const tier = DEFAULT_TIERS[tierName] || DEFAULT_TIERS.free;
+
+    // Check minute limit (most restrictive)
+    const minuteResult = await checkWindow(
+      env,
+      organizationId,
+      endpoint,
+      method,
+      'minute',
+      tier.requestsPerMinute,
+    );
+
+    if (!minuteResult.allowed) {
+      return { ...minuteResult, tierName: tier.displayName };
     }
 
-    const count = (bucket.count as number) || 0;
-    if (count >= config.maxRequests) {
-      // Rate limit exceeded
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: new Date(bucket.resetAt as number),
-      };
+    // Check hour limit
+    const hourResult = await checkWindow(
+      env,
+      organizationId,
+      endpoint,
+      method,
+      'hour',
+      tier.requestsPerHour,
+    );
+
+    if (!hourResult.allowed) {
+      return { ...hourResult, tierName: tier.displayName };
     }
 
-    // Increment and allow
-    await kv.put(fullKey, JSON.stringify({ count: count + 1, resetAt: bucket.resetAt }), {
-      expirationTtl: Math.ceil(config.windowMs / 1000) + 10,
-    });
+    // Check day limit
+    const dayResult = await checkWindow(
+      env,
+      organizationId,
+      endpoint,
+      method,
+      'day',
+      tier.requestsPerDay,
+    );
+
+    if (!dayResult.allowed) {
+      return { ...dayResult, tierName: tier.displayName };
+    }
+
+    // All checks passed - record usage
+    await recordUsage(env, organizationId, userId, endpoint, method);
+
     return {
       allowed: true,
-      remaining: config.maxRequests - (count + 1),
-      resetAt: new Date(bucket.resetAt as number),
+      limit: tier.requestsPerDay,
+      remaining: dayResult.remaining - 1,
+      reset: dayResult.reset,
+      tierName: tier.displayName,
     };
   } catch (err) {
-    console.error('Rate limit check failed:', err);
-    // On error, allow request (don't break auth due to KV failure)
-    return { allowed: true, remaining: config.maxRequests, resetAt: new Date(Date.now() + config.windowMs) };
+    console.error('[checkRateLimit] Error:', err);
+    // On error, allow request but log
+    return {
+      allowed: true,
+      limit: 100,
+      remaining: 99,
+      reset: new Date(Date.now() + 86400000),
+      tierName: 'Unknown',
+    };
   }
 }
 
-export function rateLimitResponse(remaining: number, resetAt: Date): Response {
-  return new Response(JSON.stringify({ statusCode: 429, message: 'Too many requests' }), {
-    status: 429,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'retry-after': String(Math.ceil((resetAt.getTime() - Date.now()) / 1000)),
-      'x-ratelimit-remaining': String(Math.max(0, remaining)),
-      'x-ratelimit-reset': resetAt.toISOString(),
-    },
+/**
+ * Check usage within a time window
+ */
+async function checkWindow(
+  env: Env,
+  organizationId: string,
+  endpoint: string,
+  method: string,
+  window: 'minute' | 'hour' | 'day',
+  limit: number,
+): Promise<RateLimitResult> {
+  const now = new Date();
+  const windowStart = getWindowStart(now, window);
+  const windowEnd = getWindowEnd(now, window);
+
+  const supabase = getAdminClient(env);
+
+  // Count requests in current window
+  const { data: usage } = await supabase
+    .from('api_usage')
+    .select('request_count')
+    .eq('organization_id', organizationId)
+    .eq('endpoint', endpoint)
+    .eq('method', method)
+    .gte('window_start', windowStart.toISOString())
+    .maybeSingle();
+
+  const currentCount = usage?.request_count || 0;
+  const remaining = Math.max(0, limit - currentCount);
+  const allowed = currentCount < limit;
+
+  return {
+    allowed,
+    limit,
+    remaining,
+    reset: windowEnd,
+    tierName: '',
+  };
+}
+
+/**
+ * Record API usage
+ */
+async function recordUsage(
+  env: Env,
+  organizationId: string,
+  userId: string | null,
+  endpoint: string,
+  method: string,
+): Promise<void> {
+  try {
+    const now = new Date();
+    const windowStart = getWindowStart(now, 'day');
+    const windowEnd = getWindowEnd(now, 'day');
+
+    const supabase = getAdminClient(env);
+
+    // Check if record exists
+    const { data: existing } = await supabase
+      .from('api_usage')
+      .select('id, request_count')
+      .eq('organization_id', organizationId)
+      .eq('endpoint', endpoint)
+      .eq('method', method)
+      .eq('window_start', windowStart.toISOString())
+      .maybeSingle();
+
+    if (existing) {
+      // Increment existing record
+      await supabase
+        .from('api_usage')
+        .update({ request_count: existing.request_count + 1 })
+        .eq('id', existing.id);
+    } else {
+      // Create new record
+      await supabase.from('api_usage').insert({
+        organization_id: organizationId,
+        user_id: userId,
+        endpoint,
+        method,
+        request_count: 1,
+        window_start: windowStart.toISOString(),
+        window_end: windowEnd.toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('[recordUsage] Error:', err);
+    // Non-fatal - don't block request
+  }
+}
+
+/**
+ * Get window start time
+ */
+function getWindowStart(now: Date, window: 'minute' | 'hour' | 'day'): Date {
+  const date = new Date(now);
+  switch (window) {
+    case 'minute':
+      date.setSeconds(0, 0);
+      break;
+    case 'hour':
+      date.setMinutes(0, 0, 0);
+      break;
+    case 'day':
+      date.setHours(0, 0, 0, 0);
+      break;
+  }
+  return date;
+}
+
+/**
+ * Get window end time
+ */
+function getWindowEnd(now: Date, window: 'minute' | 'hour' | 'day'): Date {
+  const date = getWindowStart(now, window);
+  switch (window) {
+    case 'minute':
+      date.setMinutes(date.getMinutes() + 1);
+      break;
+    case 'hour':
+      date.setHours(date.getHours() + 1);
+      break;
+    case 'day':
+      date.setDate(date.getDate() + 1);
+      break;
+  }
+  return date;
+}
+
+/**
+ * Middleware wrapper that applies rate limiting
+ */
+export async function withRateLimit(
+  env: Env,
+  request: Request,
+  organizationId: string,
+  userId: string | null,
+  handler: () => Promise<Response>,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const endpoint = url.pathname;
+  const method = request.method;
+
+  const result = await checkRateLimit(env, organizationId, userId, endpoint, method);
+
+  // Add rate limit headers
+  const headers = new Headers();
+  headers.set('X-RateLimit-Limit', String(result.limit));
+  headers.set('X-RateLimit-Remaining', String(result.remaining));
+  headers.set('X-RateLimit-Reset', result.reset.toISOString());
+  headers.set('X-RateLimit-Tier', result.tierName);
+
+  if (!result.allowed) {
+    const retryAfter = Math.ceil((result.reset.getTime() - Date.now()) / 1000);
+    headers.set('Retry-After', String(retryAfter));
+    headers.set('Content-Type', 'application/json');
+
+    return new Response(
+      JSON.stringify({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded. Tier: ${result.tierName}. Limit: ${result.limit} requests. Try again in ${retryAfter} seconds.`,
+        limit: result.limit,
+        remaining: 0,
+        reset: result.reset.toISOString(),
+        tier: result.tierName,
+      }),
+      {
+        status: 429,
+        headers,
+      },
+    );
+  }
+
+  // Execute handler and add rate limit headers to response
+  const response = await handler();
+  const newResponse = new Response(response.body, response);
+  
+  // Copy rate limit headers
+  headers.forEach((value, key) => {
+    newResponse.headers.set(key, value);
   });
+
+  return newResponse;
 }
