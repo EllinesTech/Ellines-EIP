@@ -11,7 +11,7 @@ import { Suspense } from 'react';
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialToken = useMemo(() => searchParams.get('token') || '', [searchParams]);
+  const initialToken = useMemo(() => searchParams?.get('token') || '', [searchParams]);
 
   const [token, setToken] = useState(initialToken);
   const [password, setPassword] = useState('');

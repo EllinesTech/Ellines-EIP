@@ -405,7 +405,7 @@ function CapabilityBody({
 export default function OrgSystemCapabilityClient() {
   const router = useRouter();
   const params = useParams();
-  const slug = typeof params.capability === 'string' ? params.capability : '';
+  const slug = typeof params?.capability === 'string' ? params.capability : '';
   const cap = getCapabilityBySlug(slug);
 
   const [allowed, setAllowed] = useState(false);

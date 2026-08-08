@@ -10,7 +10,7 @@ import { useAutofitScale } from '../login/use-autofit-scale';
 function AcceptInviteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
+  const token = useMemo(() => searchParams?.get('token') || '', [searchParams]);
 
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');

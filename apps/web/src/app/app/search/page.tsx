@@ -146,7 +146,7 @@ function addRecent(q: string) {
 function SearchInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const initial = params.get('q') || '';
+  const initial = params?.get('q') || '';
   const [query, setQuery] = useState(initial);
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
   const [installs, setInstalls] = useState<ConnectorInstallationDto[]>([]);

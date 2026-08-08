@@ -292,7 +292,8 @@ function initials(name: string) {
 
 export default function AppShellLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathnameRaw = usePathname();
+  const pathname = pathnameRaw ?? '';
   const [session, setSessionState] = useState<AuthSession | null>(null);
   const [ready, setReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);

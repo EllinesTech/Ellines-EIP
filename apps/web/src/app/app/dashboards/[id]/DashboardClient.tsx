@@ -33,7 +33,7 @@ const CONDITIONS = ['gt', 'lt', 'eq', 'gte', 'lte'] as const;
 export default function DashboardClient() {
   const params = useParams();
   const router = useRouter();
-  const id = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : '';
+  const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
   const [allowed, setAllowed] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<DashboardDto | null>(null);
