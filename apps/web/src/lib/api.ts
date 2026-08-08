@@ -1128,6 +1128,39 @@ export function deleteReportApi(id: string) {
   });
 }
 
+// ─── Data Export (B.3.1) ──────────────────────────────────────────────────────
+
+export type ExportType = 'uem' | 'timeline' | 'approvals' | 'all';
+export type ExportFormat = 'csv' | 'json';
+
+/**
+ * Export organization data for backup and analysis
+ * Downloads as a file (CSV or JSON)
+ */
+export async function exportOrgData(type: ExportType, format: ExportFormat): Promise<Blob> {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Authentication required');
+  }
+
+  const res = await fetch(
+    `${API_URL}/api/v1/orgs/me/export?type=${type}&format=${format}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: `Export failed (${res.status})` }));
+    throw new Error(err.message || `Export failed (${res.status})`);
+  }
+
+  return res.blob();
+}
+
 export type ReportRunHistoryDto = {
   id: string;
   reportId: string;

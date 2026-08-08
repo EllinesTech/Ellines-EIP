@@ -31,6 +31,18 @@ Ellines EIP is an AI-native enterprise intelligence platform that sits **above**
 | [Cloudflare Pages ↔ GitHub](./docs/10_Cloudflare_Pages_GitHub.md) | Actions secrets + deploy to eip.ellines.co.ke |
 | [AGENTS.md](./AGENTS.md) | Instructions for Cursor Cloud Agents |
 
+## API Documentation
+
+| Document | Description |
+|----------|-------------|
+| [**API Quick Reference**](./docs/API_QUICK_REFERENCE.md) | **Quick reference card for all endpoints** |
+| [**Complete API Reference**](./docs/33_Complete_API_Reference.md) | **Full API documentation (100+ endpoints)** |
+| [API Summary](./docs/API_SUMMARY.md) | Overview of API documentation |
+| [Super Admin Dashboard Spec](./docs/34_Super_Admin_Dashboard_Spec.md) | Platform admin dashboard specification |
+| [Ellinea AI API Contract](./docs/11_Ellinea_API_Contract.md) | Ellinea AI endpoints (ask, brief, recommend) |
+| [RBAC API Reference](./docs/31_RBAC_API_Reference.md) | Custom roles and permissions API |
+| [RBAC Permission Matrix](./docs/32_RBAC_Permission_Matrix.md) | Complete permission reference |
+
 ## Repository Structure
 
 ```

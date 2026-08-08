@@ -1550,3 +1550,37 @@ After S14 completes:
 
 ---
 
+
+
+---
+
+## Sprint 15 — Data Export (Bulk) ✅ COMPLETE
+
+**Date:** 2026-08-08  
+**Status:** `done`  
+**Builds:** `npm run verify:pages-functions` ✅ (130 functions) · `npm run build:shared` ✅ · `npm run build -w @ellines-eip/web` ✅
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| B.3.1 | **Bulk data export (UEM, timeline, approvals)** | `done` | Pages Function `/api/v1/orgs/me/export?type=uem\|timeline\|approvals\|all&format=csv\|json` exports organization data for backup and analysis. Owner/IT only. CSV format: Excel-compatible rows with proper escaping. JSON format: nested structure preserving relationships. Exports: UEM objects (people, branches, departments, assets), timeline events (all activity history), approval workflows (requests & decisions). UI at `/app/exports` with type selector + format picker + download button. Full audit trail logged. Snapshot-based export reads from org settings enterpriseSnapshot. 130 Pages Functions verified ✅ |
+
+### What ships in Sprint 15
+
+**Bulk data export** — Owner and IT admins can now export organization data in CSV or JSON format from `/app/exports`. Four export types available:
+- **UEM Objects**: People, branches, departments, assets with full metadata
+- **Timeline Events**: Complete activity history with timestamps and actors
+- **Approval Workflows**: All approval requests, decisions, steps, and status
+- **All Data**: Combined export of all three types
+
+CSV format produces Excel-compatible rows with proper field escaping. JSON format preserves nested relationships and full object structure. All exports include an `exportedAt` timestamp and are audit-logged for compliance tracking.
+
+**Files created:**
+- `apps/web/functions/api/v1/orgs/me/export.ts` — Pages Function endpoint
+- `apps/web/src/app/app/exports/page.tsx` — Export UI page
+- Added `exportOrgData()` function to `apps/web/src/lib/api.ts`
+
+**Security:** Access restricted to Owner/IT roles only via `isOrgAdminRole` check. All exports logged to audit trail with record counts and parameters.
+
+---
+
+*Last update: 2026-08-08*
