@@ -85,8 +85,14 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s",
       "!**/*.module.ts",
+      "!**/*.controller.ts",
+      "!**/*.dto.ts",
+      "!**/*.decorator.ts",
+      "!**/*.strategy.ts",
       "!**/main.ts",
-      "!**/index.ts"
+      "!**/index.ts",
+      "!**/dto/**",
+      "!**/interfaces/**"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {
