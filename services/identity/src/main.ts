@@ -16,6 +16,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ObservabilityInterceptor } from './middleware/observability.interceptor';
 import { MetricsCollector } from './metrics/metrics-collector';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,6 +26,9 @@ async function bootstrap() {
   // Register global observability interceptor
   const metricsCollector = app.get(MetricsCollector);
   app.useGlobalInterceptors(new ObservabilityInterceptor(metricsCollector));
+
+  // Global exception filter — structured error logging + optional Sentry (Q.3)
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const configService = app.get(ConfigService);
   const corsRaw =

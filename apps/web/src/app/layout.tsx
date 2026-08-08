@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '@/fonts/exo2.css';
 import './globals.css';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export const metadata: Metadata = {
   title: 'Ellines EIP — Enterprise Intelligence Platform',
@@ -45,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Ellines EIP" />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning><ErrorBoundary>{children}</ErrorBoundary></body>
     </html>
   );
 }
