@@ -304,6 +304,15 @@ export default function ReportsPage() {
                         type="button" className={adminStyles.primary}
                         onClick={() => runNow(r.id)} disabled={!r.enabled || busy}
                       >Run now</button>
+                      <button
+                        type="button" className={adminStyles.ghost}
+                        onClick={() => {
+                          const token = getSession()?.accessToken;
+                          if (!token) return;
+                          window.open(`/api/v1/orgs/me/reports/${r.id}/pdf`, '_blank');
+                        }}
+                        disabled={busy}
+                      >📥 PDF</button>
                       <button type="button" className={adminStyles.ghost} disabled={busy} onClick={() => toggle(r.id)}>
                         {r.enabled ? 'Pause' : 'Resume'}
                       </button>
