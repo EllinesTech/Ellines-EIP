@@ -1362,6 +1362,7 @@ export default function SystemSettingsPage() {
           {orgAdmin ? <Link href="/app/admin" className={styles.primaryLink}>Org Admin →</Link> : null}
           {orgAdmin ? <Link href="/app/connectors" className={styles.primaryLink}>Connectors →</Link> : null}
           {orgAdmin ? <Link href="/app/audit" className={styles.primaryLink}>Audit Center →</Link> : null}
+          {orgAdmin ? <Link href="/app/compliance" className={styles.primaryLink}>Compliance Export →</Link> : null}
         </div>
       </section>
 

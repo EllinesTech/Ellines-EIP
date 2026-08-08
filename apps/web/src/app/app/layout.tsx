@@ -278,6 +278,7 @@ const NAV: NavItem[] = [
   },
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
+  { href: '/app/compliance', label: 'Compliance', icon: <IconAudit />, adminOnly: true },
   { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea-console', label: 'Ellinea Console', icon: <IconEllinea />, adminOnly: true },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },

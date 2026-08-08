@@ -1246,6 +1246,43 @@ export async function exportOrgData(type: ExportType, format: ExportFormat): Pro
   return res.blob();
 }
 
+// ─── Compliance Export (D.2.1) ───────────────────────────────────────────────
+
+export type ComplianceTemplate = 'soc2' | 'hipaa' | 'gdpr' | 'pci' | 'all';
+
+/**
+ * Export compliance audit report (SOC 2, HIPAA, GDPR, PCI-DSS or all)
+ * Downloads as file (CSV or JSON)
+ */
+export async function exportComplianceReport(opts: {
+  template: ComplianceTemplate;
+  format: ExportFormat;
+  from?: string;
+  to?: string;
+}): Promise<Blob> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+
+  const params = new URLSearchParams({
+    template: opts.template,
+    format: opts.format,
+  });
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+
+  const res = await fetch(
+    `${API_URL}/api/v1/orgs/me/compliance-export?${params}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: `Compliance export failed (${res.status})` }));
+    throw new Error(err.message || `Compliance export failed (${res.status})`);
+  }
+
+  return res.blob();
+}
+
 export type ReportRunHistoryDto = {
   id: string;
   reportId: string;
