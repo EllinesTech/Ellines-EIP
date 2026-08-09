@@ -74,9 +74,7 @@ export class DashboardSharingService {
     await this.prisma.dashboard.update({
       where: { id: dashboardId },
       data: {
-        // In production, use a separate DashboardShare table
-        // For now, store in layout metadata
-        layout: dashboard.layout,
+        updatedAt: new Date(),
       },
     });
 

@@ -60,7 +60,7 @@ export class DashboardExportService {
         dashboardId,
         format,
         schedule: null, // Manual export
-        lastExportedAt: new Date(),
+        lastRun: new Date(),
       },
     });
 
@@ -159,7 +159,7 @@ startxref
         dashboardId,
         format,
         schedule,
-        lastExportedAt: null,
+        lastRun: null,
       },
     });
 
@@ -185,7 +185,7 @@ startxref
   async listExports(dashboardId: string): Promise<any[]> {
     return this.prisma.dashboardExport.findMany({
       where: { dashboardId },
-      orderBy: { lastExportedAt: 'desc' },
+      orderBy: { lastRun: 'desc' },
     });
   }
 }
