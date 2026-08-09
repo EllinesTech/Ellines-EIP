@@ -1381,3 +1381,82 @@ model FederatedLearningParticipant {
   @@index([organizationId])
   @@map("federated_learning_participants")
 }
+
+/**
+ * LearnerStrategyCandidate — Stores newly discovered remediation strategies awaiting approval.
+ * Req 6.2: Patterns from successful remediations.
+ * Req 6.3: Strategies learned from manual admin fixes.
+ * Req 6.8: Requires Platform_Super_Admin approval before production deployment.
+ */
+model LearnerStrategyCandidate {
+  id                String    @id @default(cuid())
+  errorPattern      String    @map("error_pattern")
+  learnedActions    Json      @default("[]")             // Array of RemediationAction objects
+  confidence        Float     @default(0.5)              // Initial confidence (0.0-1.0)
+  source            String                               // 'pattern_analysis' | 'manual_fix' | 'federated'
+  sourceIncidentId  String?   @map("source_incident_id") // Incident that triggered learning
+  sourceAdminId     String?   @map("source_admin_id")    // Admin who performed manual fix
+  status            String    @default("pending")        // 'pending' | 'approved' | 'rejected' | 'deployed'
+  reviewedBy        String?   @map("reviewed_by")        // Platform_Super_Admin user id
+  reviewedAt        DateTime? @map("reviewed_at")
+  reviewNotes       String?   @map("review_notes")
+  organizationId    String?   @map("organization_id")    // Originating org (null = platform-wide)
+  patternSupport    Int       @default(1) @map("pattern_support") // Number of incidents supporting this pattern
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([errorPattern])
+  @@index([status])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("learner_strategy_candidates")
+}
+
+/**
+ * LearnerRecurringIssue — Tracks issues that recur frequently, flagging them for permanent fix.
+ * Req 6.5: Identify recurring issues requiring permanent fixes vs temporary remediations.
+ */
+model LearnerRecurringIssue {
+  id                  String    @id @default(cuid())
+  errorPattern        String    @unique @map("error_pattern")
+  organizationId      String?   @map("organization_id")
+  occurrenceCount     Int       @default(1) @map("occurrence_count")
+  firstSeenAt         DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt          DateTime  @default(now()) @map("last_seen_at")
+  remediationCount    Int       @default(0) @map("remediation_count")   // Times auto-remediated
+  permanentFixNeeded  Boolean   @default(false) @map("permanent_fix_needed")
+  permanentFixNotes   String?   @map("permanent_fix_notes")
+  resolvedAt          DateTime? @map("resolved_at")
+  status              String    @default("active")  // 'active' | 'resolved' | 'ignored'
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([permanentFixNeeded])
+  @@map("learner_recurring_issues")
+}
+
+/**
+ * LearnerArchitectureRecommendation — Architecture/configuration improvement recommendations.
+ * Req 6.6: Generate recommendations for architecture improvements.
+ */
+model LearnerArchitectureRecommendation {
+  id                  String    @id @default(cuid())
+  type                String                             // 'architecture' | 'configuration' | 'monitoring'
+  description         String
+  rationale           String
+  preventedErrorTypes Json      @default("[]")          // Array of error type strings
+  estimatedImpact     Json?     @map("estimated_impact") // ImpactEstimate object
+  organizationId      String?   @map("organization_id")
+  status              String    @default("open")         // 'open' | 'acknowledged' | 'implemented' | 'dismissed'
+  acknowledgedBy      String?   @map("acknowledged_by")
+  acknowledgedAt      DateTime? @map("acknowledged_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([organizationId])
+  @@index([status])
+  @@map("learner_architecture_recommendations")
+}
