@@ -200,7 +200,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - Test manual fix capture and strategy generation
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [~] 3.6 Build Alert Correlation Engine
+- [-] 3.6 Build Alert Correlation Engine
   - Create AlertCorrelationEngine service in self-healing microservice
   - Implement alert clustering within 5-minute time windows
   - Create root cause identification algorithm separating causes from symptoms
@@ -238,7 +238,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
 
 ### 4. Predictive Analytics Engine
 
-- [~] 4.1 Create Predictive Analytics Engine service
+- [ ] 4.1 Create Predictive Analytics Engine service
   - Create `services/predictive-analytics` NestJS service
   - Implement time-series forecasting with 30+ day horizon and confidence intervals
   - Build leading indicator identifier
@@ -459,7 +459,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
 
 ### 8. Advanced Integration and Data Quality
 
-- [~] 8.1 Extend connector capabilities
+- [-] 8.1 Extend connector capabilities
   - Add GraphQL connector type to existing connector framework
   - Add SOAP connector type
   - Add MongoDB connector (NoSQL)
