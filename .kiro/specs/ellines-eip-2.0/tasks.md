@@ -24,21 +24,20 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
    - Manual testing of new features
    - Automated test execution
    - Integration verification
-4. **Commit** - Stage and commit changes to Git:
+4. **Commit & Push** - **ONLY ONCE after all verification passes**:
    ```bash
    git add .
    git commit -m "feat(v2.0): <task-description> - Task X.X"
-   ```
-5. **Push** - Push to remote repository:
-   ```bash
    git push origin main
    ```
-6. **Verify Deployment** - Confirm changes are live (if applicable):
+5. **Verify Deployment** - Confirm changes are live (if applicable):
    - Check Cloudflare Pages deployment status
    - Verify services are healthy
    - Test live functionality
 
-**Only after all 6 steps are complete should the task be marked as done.**
+**CRITICAL: Git commit and push should happen ONLY ONCE at step 4, after all implementation and verification is complete. Do NOT push multiple times during a single task.**
+
+**Only after all 5 steps are complete should the task be marked as done.**
 
 ## Tasks
 
@@ -54,7 +53,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - _Requirements: 2.1, 17.1, 17.2, 17.3_
 
 
-- [ ] 1.2 Write integration tests for data layer components
+- [x] 1.2 Write integration tests for data layer components
   - Test Neo4j connection and query performance
   - Test Redis cache operations and invalidation
   - Test InfluxDB time-series writes and range queries
@@ -72,7 +71,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - Add fallback handling with degradation notices
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [~] 2.2 Integrate specialized AI models
+- [x] 2.2 Integrate specialized AI models
   - Add language understanding model integration (OpenAI GPT or compatible)
   - Add time-series forecasting model (Prophet or TensorFlow)
   - Add anomaly detection model integration
@@ -82,13 +81,13 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - _Requirements: 1.1, 1.5, 1.6, 1.8_
 
 
-- [ ] 2.3 Write property tests for Model Orchestrator
+- [~] 2.3 Write property tests for Model Orchestrator
   - **Property 1: Model routing consistency** — Same query type always routes to same model given same performance metrics
   - **Validates: Requirements 1.2**
   - **Property 2: Ensemble result confidence** — Combined confidence is within bounds of constituent model confidences
   - **Validates: Requirements 1.3**
 
-- [~] 2.4 Build Knowledge Graph Engine
+- [x] 2.4 Build Knowledge Graph Engine
   - Create `services/knowledge-graph` NestJS service
   - Implement entity extraction from System of Record data sources
   - Implement relationship discovery algorithms using co-occurrence and temporal analysis
@@ -165,7 +164,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
 
-- [~] 3.2 Build Self-Healing Remediator service
+- [x] 3.2 Build Self-Healing Remediator service
   - Create RemediationService within self-healing microservice
   - Implement remediation playbook lookup from database
   - Create multi-stage remediation executor (3 escalating stages)
@@ -260,7 +259,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
 
 ### 5. Futuristic Dashboard System
 
-- [~] 5.1 Create Dashboard Service foundation
+- [x] 5.1 Create Dashboard Service foundation
   - Create `DashboardService` in existing identity service or new dashboard microservice
   - Implement dashboard CRUD operations with Prisma models
   - Create widget configuration schema supporting 20+ visualization types
