@@ -9,6 +9,14 @@ const API_URL = (() => {
   return 'http://localhost:3001';
 })();
 
+// Endpoints that are Cloudflare Pages Functions (not in the NestJS identity service).
+// In dev these are served by the Next.js dev server at port 3100.
+// In production they are same-origin (/api/v1/...) via Cloudflare Pages Functions.
+const PAGES_API_URL = (() => {
+  if (process.env.NODE_ENV === 'production') return '';
+  return 'http://localhost:3100';
+})();
+
 const AUTH_KEY = 'eip_auth';
 
 export interface AuthUser {
@@ -107,6 +115,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message =
+      (data as { message?: string | string[] }).message ||
+      `Request failed (${res.status})`;
+    throw new Error(Array.isArray(message) ? message.join(', ') : message);
+  }
+  return data as T;
+}
+
+/** Like request() but targets Pages Functions (localhost:3100 dev, same-origin prod). */
+async function pagesRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${PAGES_API_URL}${path}`, {
     ...options,
     headers,
   });
@@ -744,7 +778,7 @@ export function listWebhookDeliveries(opts?: { limit?: number; status?: string }
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.status) params.set('status', opts.status);
   const qs = params.toString();
-  return request<WebhookDeliveryListDto>(
+  return pagesRequest<WebhookDeliveryListDto>(
     `/api/v1/orgs/me/webhook-deliveries${qs ? `?${qs}` : ''}`,
   );
 }
@@ -755,7 +789,7 @@ export function testWebhookDelivery(payload: {
   secret?: string;
   event?: string;
 }) {
-  return request<WebhookTestResultDto>('/api/v1/orgs/me/webhook-test', {
+  return pagesRequest<WebhookTestResultDto>('/api/v1/orgs/me/webhook-test', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -763,7 +797,7 @@ export function testWebhookDelivery(payload: {
 
 /** Owner/IT: retry a failed webhook delivery by ID. */
 export function retryWebhookDelivery(deliveryId: string) {
-  return request<WebhookRetryResultDto>('/api/v1/orgs/me/webhook-retry', {
+  return pagesRequest<WebhookRetryResultDto>('/api/v1/orgs/me/webhook-retry', {
     method: 'POST',
     body: JSON.stringify({ deliveryId }),
   });
@@ -821,12 +855,12 @@ export type TestConnectionResponse = {
 
 /** Owner/IT: list all database configurations for organization */
 export function listDatabaseConfigurations() {
-  return request<DatabaseConfigurationDto[]>('/api/v1/orgs/me/database-config');
+  return pagesRequest<DatabaseConfigurationDto[]>('/api/v1/orgs/me/database-config');
 }
 
 /** Owner/IT: create new database configuration */
 export function createDatabaseConfiguration(config: Omit<DatabaseConfigurationDto, 'id' | 'organizationId' | 'createdBy' | 'createdAt' | 'updatedAt'>) {
-  return request<DatabaseConfigurationDto>('/api/v1/orgs/me/database-config', {
+  return pagesRequest<DatabaseConfigurationDto>('/api/v1/orgs/me/database-config', {
     method: 'POST',
     body: JSON.stringify(config),
   });
@@ -834,7 +868,7 @@ export function createDatabaseConfiguration(config: Omit<DatabaseConfigurationDt
 
 /** Owner/IT: test database connection */
 export function testDatabaseConnection(config: TestConnectionRequest) {
-  return request<TestConnectionResponse>('/api/v1/orgs/me/database-config/test-connection', {
+  return pagesRequest<TestConnectionResponse>('/api/v1/orgs/me/database-config/test-connection', {
     method: 'POST',
     body: JSON.stringify(config),
   });
@@ -842,7 +876,7 @@ export function testDatabaseConnection(config: TestConnectionRequest) {
 
 /** Owner/IT: switch primary database */
 export function switchPrimaryDatabase(configId: string, reason?: string) {
-  return request<{ success: boolean; message: string; configId: string; previousConfigId?: string }>(
+  return pagesRequest<{ success: boolean; message: string; configId: string; previousConfigId?: string }>(
     '/api/v1/orgs/me/database-config/switch-primary',
     {
       method: 'POST',
@@ -2373,7 +2407,7 @@ export type OrgDataWindowDto = {
 
 /** Aggregate emails + reports from all connected/synced systems for the Org Data Window. */
 export function fetchOrgDataWindow() {
-  return request<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
+  return pagesRequest<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
 }
 
 // ─── Sprint 7 — Health + Org Status ──────────────────────────────────────────
