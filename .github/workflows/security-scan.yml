@@ -17,6 +17,9 @@ jobs:
     name: Snyk Dependency Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
@@ -42,8 +45,8 @@ jobs:
             --exclude=.next,.next-dev,dist,coverage
 
       - name: Upload Snyk SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('snyk.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: snyk.sarif
@@ -65,7 +68,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-and-quality
@@ -73,7 +76,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
@@ -84,7 +87,7 @@ jobs:
         continue-on-error: true  # CodeQL can analyze even partial builds
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript-typescript"
 
@@ -95,6 +98,9 @@ jobs:
     name: OWASP Dependency Check
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,7 +108,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
@@ -111,6 +117,7 @@ jobs:
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
         id: depcheck
+        continue-on-error: true   # Don't fail the job if NVD data fetch has issues
         with:
           project: "ellines-eip"
           path: "."
@@ -125,15 +132,15 @@ jobs:
 
       - name: Upload OWASP report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('reports/owasp/**') != ''
         with:
           name: owasp-dependency-check
           path: reports/owasp/
           retention-days: 30
 
       - name: Upload OWASP SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('reports/owasp/dependency-check-report.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: reports/owasp/dependency-check-report.sarif
@@ -171,14 +178,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: npm audit (high+critical)
-        run: npm audit --audit-level=high --json > reports/npm-audit.json || true
+        run: mkdir -p reports && npm audit --audit-level=high --json > reports/npm-audit.json || true
 
       - name: Print audit summary
         run: |
