@@ -3,7 +3,7 @@ import { RemediationService } from './remediation.service';
 import { RemediationPolicyService } from './remediation-policy.service';
 
 @Module({
-  providers: [RemediationService, RemediationPolicyService],
+  providers: [RemediationPolicyService, RemediationService],
   exports: [RemediationService, RemediationPolicyService],
 })
 export class RemediationModule {}
