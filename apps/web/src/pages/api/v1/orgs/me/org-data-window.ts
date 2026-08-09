@@ -3,7 +3,7 @@
  * Pages Router API routes are IGNORED during static export builds.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { devJson, getDevSupabase, requireDevAuth } from '../../../../../lib/dev-authlib/dev-auth';
+import { devJson, getDevSupabase, requireDevAuth } from '../../../../../lib/dev-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'OPTIONS') { devJson(res, { ok: true }); return; }
