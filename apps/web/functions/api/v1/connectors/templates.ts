@@ -2,16 +2,17 @@ import { Router } from 'itty-router';
 
 const router = Router({ base: '/api/v1/connectors/templates' });
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // GET /api/v1/connectors/templates
-router.get('', async (req: any) => {
+router.get('', async (req: any, env?: Record<string, string>) => {
   try {
     const { category } = req.query;
-    
-    const query = category 
-      ? `?category=${encodeURIComponent(category)}`
-      : '';
+    const query = category ? `?category=${encodeURIComponent(category)}` : '';
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/templates${query}`, {
+    const response = await fetch(`${getApiUrl(env)}/api/v1/connectors/templates${query}`, {
       headers: {
         'Authorization': req.headers.get('Authorization') || '',
         'Content-Type': 'application/json',
@@ -36,11 +37,11 @@ router.get('', async (req: any) => {
 });
 
 // POST /api/v1/connectors/templates (Admin)
-router.post('', async (req: any) => {
+router.post('', async (req: any, env?: Record<string, string>) => {
   try {
     const input = await req.json();
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/templates`, {
+    const response = await fetch(`${getApiUrl(env)}/api/v1/connectors/templates`, {
       method: 'POST',
       headers: {
         'Authorization': req.headers.get('Authorization') || '',

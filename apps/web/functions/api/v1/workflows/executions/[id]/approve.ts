@@ -1,19 +1,40 @@
-import { Router } from 'itty-router';
+/**
+ * Workflow Execution Approval/Rejection
+ * POST /api/v1/workflows/executions/:id/approve
+ * POST /api/v1/workflows/executions/:id/reject
+ *
+ * Proxy to the Identity service.
+ * Owner/Admin only.
+ */
 
-const router = Router();
+import { requireAuth, requireOrgAdmin, json, options, type Env } from '../../../../../shared/auth';
 
-// POST /api/v1/workflows/executions/:id/approve
-router.post('/api/v1/workflows/executions/:id/approve', async (req: any) => {
+export const onRequest: PagesFunction<Env> = async (context) => {
+  if (context.request.method === 'OPTIONS') return options();
+  if (context.request.method !== 'POST') {
+    return json({ statusCode: 405, message: 'Method not allowed' }, 405);
+  }
+
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
+  const denied = requireOrgAdmin(auth.role);
+  if (denied) return denied;
+
   try {
-    const { id } = req.params;
-    const input = await req.json();
+    const id = context.params.id as string;
+    const url = new URL(context.request.url);
+    const isReject = url.pathname.endsWith('/reject');
+    const action = isReject ? 'reject' : 'approve';
+
+    const input = await context.request.json() as Record<string, unknown>;
+    const apiUrl = getApiUrl(context.env);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/workflows/executions/${id}/approve`,
+      `${apiUrl}/api/v1/workflows/executions/${id}/${action}`,
       {
         method: 'POST',
         headers: {
-          'Authorization': req.headers.get('Authorization') || '',
+          'Authorization': context.request.headers.get('Authorization') || '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(input),
@@ -25,51 +46,13 @@ router.post('/api/v1/workflows/executions/:id/approve', async (req: any) => {
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json(data);
   } catch (error: any) {
-    console.error('[executions/:id/approve] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('[executions/:id/approve-reject] Error:', error);
+    return json({ statusCode: 500, message: error.message }, 500);
   }
-});
+};
 
-// POST /api/v1/workflows/executions/:id/reject
-router.post('/api/v1/workflows/executions/:id/reject', async (req: any) => {
-  try {
-    const { id } = req.params;
-    const input = await req.json();
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/workflows/executions/${id}/reject`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': req.headers.get('Authorization') || '',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      },
-    );
-
-    if (!response.ok) {
-      return new Response(await response.text(), { status: response.status });
-    }
-
-    const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error: any) {
-    console.error('[executions/:id/reject] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-});
-
-export const onRequest = router.handle;
+function getApiUrl(env: Env): string {
+  return env.BASE_URL || 'http://localhost:3001';
+}

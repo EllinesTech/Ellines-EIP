@@ -35,8 +35,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const provider = providers[0];  // Simplified—in production, use RelayState to select
 
-    // Decode SAML Response
-    const xml = Buffer.from(samlResponse, 'base64').toString('utf-8');
+    // Decode SAML Response (base64url → utf-8 string)
+    const b64 = samlResponse.replace(/-/g, '+').replace(/_/g, '/');
+    const xml = new TextDecoder().decode(
+      Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)),
+    );
 
     // Parse NameID
     const nameIdMatch = xml.match(/<saml:NameID[^>]*>([^<]+)<\/saml:NameID>/);
@@ -164,7 +167,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Redirect to app with JWT
     const redirectUrl = new URL(
-      `${process.env.BASE_URL || 'http://localhost:3100'}/app`,
+      `${context.env.BASE_URL || 'http://localhost:3100'}/app`,
     );
     redirectUrl.searchParams.set('jwt', accessToken.accessToken);
 

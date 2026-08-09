@@ -2,14 +2,18 @@ import { Router } from 'itty-router';
 
 const router = Router();
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // POST /api/v1/dashboards/:id/alerts
-router.post('/api/v1/dashboards/:id/alerts', async (req: any) => {
+router.post('/api/v1/dashboards/:id/alerts', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
     const input = await req.json();
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/dashboards/${id}/alerts`,
+      `${getApiUrl(env)}/api/v1/dashboards/${id}/alerts`,
       {
         method: 'POST',
         headers: {

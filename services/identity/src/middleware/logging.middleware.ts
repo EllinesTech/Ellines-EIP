@@ -1,8 +1,10 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Logger, generateTraceId, LogContext } from '../logging/log-context';
+import { getCorrelationId } from '../logging/correlation.middleware';
 
 /**
- * Middleware to log all HTTP requests with structured context
+ * Middleware to log all HTTP requests with structured context.
+ * Uses the correlation ID from CorrelationMiddleware (must run first).
  */
 @Injectable()
 export class LoggingMiddleware implements NestMiddleware {
@@ -10,10 +12,8 @@ export class LoggingMiddleware implements NestMiddleware {
 
   use(req: any, res: any, next: Function) {
     const start = Date.now();
-    const traceId = req.headers['x-trace-id'] || generateTraceId();
-
-    // Attach trace ID to response header
-    res.setHeader('x-trace-id', traceId);
+    // Prefer correlation ID set by CorrelationMiddleware, fall back to trace ID header
+    const traceId = getCorrelationId() || req.headers['x-trace-id'] || generateTraceId();
 
     res.on('finish', () => {
       const duration = Date.now() - start;
@@ -28,7 +28,7 @@ export class LoggingMiddleware implements NestMiddleware {
       const context: LogContext = {
         trace_id: traceId,
         user_id: req.user?.id,
-        org_id: req.user?.org_id,
+        org_id: req.user?.organizationId,
         service: 'identity',
         operation: `${req.method} ${req.path}`,
         level,
@@ -45,13 +45,12 @@ export class LoggingMiddleware implements NestMiddleware {
       this.logger.log(context);
     });
 
-    // Log request errors
     res.on('error', (error: Error) => {
       this.logger.error(
         {
           trace_id: traceId,
           user_id: req.user?.id,
-          org_id: req.user?.org_id,
+          org_id: req.user?.organizationId,
           service: 'identity',
           operation: `${req.method} ${req.path}`,
           level: 'error',

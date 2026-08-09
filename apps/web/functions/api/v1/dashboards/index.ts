@@ -2,8 +2,12 @@ import { Router } from 'itty-router';
 
 const router = Router({ base: '/api/v1/dashboards' });
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // GET /api/v1/dashboards
-router.get('', async (req: any) => {
+router.get('', async (req: any, env?: Record<string, string>) => {
   try {
     const { organizationId } = req.query;
 
@@ -15,7 +19,7 @@ router.get('', async (req: any) => {
     }
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/dashboards?organizationId=${organizationId}`,
+      `${getApiUrl(env)}/api/v1/dashboards?organizationId=${organizationId}`,
       {
         headers: {
           'Authorization': req.headers.get('Authorization') || '',
@@ -42,11 +46,11 @@ router.get('', async (req: any) => {
 });
 
 // POST /api/v1/dashboards
-router.post('', async (req: any) => {
+router.post('', async (req: any, env?: Record<string, string>) => {
   try {
     const input = await req.json();
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/dashboards`, {
+    const response = await fetch(`${getApiUrl(env)}/api/v1/dashboards`, {
       method: 'POST',
       headers: {
         'Authorization': req.headers.get('Authorization') || '',

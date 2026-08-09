@@ -189,6 +189,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   });
 };
 
+type FrameworkSection = {
+  fw: Framework;
+  title: string;
+  controls: Control[];
+  pass: number;
+  partial: number;
+  missing: number;
+  score: number;
+};
+
 function sc(status: ControlStatus) {
   return { pass: '#6ee7b7', partial: '#fbbf24', missing: '#f87171' }[status];
 }
@@ -204,12 +214,12 @@ function esc(s: string) {
 
 function buildEvidencePack(opts: {
   orgName: string; orgId: string; generatedAt: string; periodDays: number;
-  since: string; auditorNote: string; frameworkSections: ReturnType<typeof buildEvidencePack extends (...args: any[]) => any ? never : any>[];
+  since: string; auditorNote: string; frameworkSections: FrameworkSection[];
   rows: any[]; actors: Record<string, string>; includeAccessLog: boolean;
 }): string {
-  const { orgName, orgId, generatedAt, periodDays, since, auditorNote, frameworkSections, rows, actors, includeAccessLog } = opts;
+  const { orgName, orgId, generatedAt, periodDays, since, auditorNote, frameworkSections, rows, actors } = opts;
 
-  const frameworkHTML = (frameworkSections as any[]).map((fs: any) => {
+  const frameworkHTML = frameworkSections.map((fs) => {
     const scoreColor = fs.score >= 80 ? '#6ee7b7' : fs.score >= 50 ? '#fbbf24' : '#f87171';
     const controlRows = (fs.controls as Control[]).map(c => `
       <tr>
@@ -296,7 +306,7 @@ function buildEvidencePack(opts: {
     <table style="border:none;background:transparent;width:auto;font-size:13px">
       <tr><td style="padding:3px 16px 3px 0;color:#64748b;font-weight:600">Generated</td><td style="color:#e2e8f0">${new Date(generatedAt).toLocaleString()}</td></tr>
       <tr><td style="padding:3px 16px 3px 0;color:#64748b;font-weight:600">Period</td><td style="color:#e2e8f0">Last ${periodDays} days (from ${new Date(since).toLocaleDateString()})</td></tr>
-      <tr><td style="padding:3px 16px 3px 0;color:#64748b;font-weight:600">Frameworks</td><td style="color:#e2e8f0">${(frameworkSections as any[]).map((f: any) => f.fw.toUpperCase()).join(', ')}</td></tr>
+      <tr><td style="padding:3px 16px 3px 0;color:#64748b;font-weight:600">Frameworks</td><td style="color:#e2e8f0">${frameworkSections.map((f) => f.fw.toUpperCase()).join(', ')}</td></tr>
       <tr><td style="padding:3px 16px 3px 0;color:#64748b;font-weight:600">Total events</td><td style="color:#e2e8f0">${rows.length}</td></tr>
     </table>
     ${auditorNote ? `<div style="margin-top:16px;padding:12px 16px;background:#1e293b;border-left:3px solid #6f2d8d;border-radius:4px;font-size:13px;color:#e2e8f0"><strong>Auditor note:</strong> ${esc(auditorNote)}</div>` : ''}

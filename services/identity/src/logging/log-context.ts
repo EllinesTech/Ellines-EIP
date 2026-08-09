@@ -1,4 +1,5 @@
 import * as winston from 'winston';
+import { getCorrelationId } from './correlation.middleware';
 
 /**
  * Structured log context interface
@@ -26,6 +27,7 @@ export function generateTraceId(): string {
 
 /**
  * Structured logger wrapper
+ * Automatically injects correlation_id from async request context when available.
  */
 export class Logger {
   constructor(private winstonLogger: winston.Logger) {}
@@ -41,6 +43,7 @@ export class Logger {
       level,
       message,
       timestamp: new Date().toISOString(),
+      correlation_id: getCorrelationId(),
       ...rest,
     });
   }
@@ -56,6 +59,7 @@ export class Logger {
       message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
+      correlation_id: getCorrelationId(),
       ...rest,
     });
   }

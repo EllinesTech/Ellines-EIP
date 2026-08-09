@@ -17,6 +17,7 @@
     "build:shared": "npm run build -w @ellines-eip/shared && npm run build -w @ellines-eip/connectors-sdk && npm run build -w @ellines-eip/ellinea-ai && npm run build -w @ellines-eip/ellinea-sdk",
     "build:web": "npm run build:shared && npm run build -w @ellines-eip/web",
     "verify:pages-functions": "node scripts/verify-pages-functions.mjs",
+    "verify:data-layer": "node scripts/verify-data-layer.mjs",
     "set-pages-secrets": "node scripts/set-pages-secrets.mjs",
     "deploy:pages": "npm run verify:pages-functions && npm run build:web && npm run deploy:pages -w @ellines-eip/web",
     "db:push": "npm run prisma:push -w @ellines-eip/identity",

@@ -22,6 +22,7 @@ export type InstallConfig = {
   selectedRoutes?: { method: string; path: string; capability?: string }[];
   connectionString?: string;
   sql?: string;
+  fieldMap?: Record<string, string>;
   systemName?: string;
   imapHost?: string;
   imapPort?: number;

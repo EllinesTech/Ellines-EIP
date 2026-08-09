@@ -122,6 +122,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ...tokens,
     });
   } catch (err) {
+    // Handle payload size errors with 413 status
+    if (err instanceof RangeError && err.message.includes('Payload exceeds')) {
+      return json({ statusCode: 413, message: err.message }, 413);
+    }
     const message = err instanceof Error ? err.message : 'Login failed';
     return json({ statusCode: 500, message }, 500);
   }

@@ -113,7 +113,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   } else if (successCount > 0) {
     emailStatus = `partial: ${successCount} sent, ${failCount} failed`;
   } else {
-    emailStatus = `failed: ${results[0]?.error || 'Unknown error'}`;
+    const firstResult = results[0];
+    const errMsg = firstResult && !firstResult.ok ? firstResult.error : 'Unknown error';
+    emailStatus = `failed: ${errMsg}`;
   }
 
   await supabase.from('audit_logs').insert({

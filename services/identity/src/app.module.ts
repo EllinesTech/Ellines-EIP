@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
@@ -14,6 +14,8 @@ import { AgentsModule } from './agents/agents.module';
 import { DatabaseModule } from './database/database.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { HealthController } from './health.controller';
+import { CorrelationMiddleware } from './logging/correlation.middleware';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
 @Module({
   imports: [
@@ -40,4 +42,12 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply correlation ID first (generates/propagates X-Correlation-ID),
+    // then structured request logging — both on all routes.
+    consumer
+      .apply(CorrelationMiddleware, LoggingMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

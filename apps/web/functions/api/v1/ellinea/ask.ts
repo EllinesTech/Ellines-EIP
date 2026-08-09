@@ -225,6 +225,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const organizationName =
     typeof body.organizationName === 'string' ? body.organizationName : undefined;
 
+  const actorEmail = auth.email;
+
   const grounding = buildGrounding({
     question,
     summary: body.summary || null,
@@ -236,7 +238,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   /** Send a real email to the user's registered address with the Q&A result. */
   async function notifyUser(answer: string, mode: string): Promise<void> {
-    const userEmail = auth.email;
+    const userEmail = actorEmail;
     if (!userEmail) return;
     const orgLabel = organizationName ? ` — ${organizationName}` : '';
     const subject = `Ellinea AI response${orgLabel}`;

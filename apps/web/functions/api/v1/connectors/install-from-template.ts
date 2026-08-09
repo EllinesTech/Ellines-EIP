@@ -2,13 +2,17 @@ import { Router } from 'itty-router';
 
 const router = Router({ base: '/api/v1/connectors/install-from-template' });
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // POST /api/v1/connectors/install-from-template
-router.post('', async (req: any) => {
+router.post('', async (req: any, env?: Record<string, string>) => {
   try {
     const input = await req.json();
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/install-from-template`,
+      `${getApiUrl(env)}/api/v1/connectors/install-from-template`,
       {
         method: 'POST',
         headers: {

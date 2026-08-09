@@ -77,7 +77,7 @@ export function json(
     : { statusCode: status, data };
 
   return new Response(JSON.stringify(body), {
-    status: body.statusCode || status,
+    status: (typeof body.statusCode === 'number' ? body.statusCode : undefined) || status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': '*',

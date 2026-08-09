@@ -168,7 +168,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const ctx = { ...asObj(body.payload), eventSource, eventSourceId: body.eventSourceId, eventType };
+  const ctx: Record<string, unknown> = { ...asObj(body.payload), eventSource, eventSourceId: body.eventSourceId, eventType };
   const agents: AgentRecord[] = ((settings.ellineaAgents as AgentRecord[] | undefined) ?? []);
   const newExecutions: ExecutionRecord[] = [];
   const updatedAgents = [...agents];

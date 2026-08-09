@@ -55,7 +55,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         code,
         client_id: provider.client_id || '',
         client_secret: provider.client_secret || '',
-        redirect_uri: `${process.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/oauth2/callback`,
+        redirect_uri: `${context.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/oauth2/callback`,
       }).toString(),
     });
 
@@ -182,7 +182,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Redirect to app with JWT in URL (or set cookie)
     const redirectUrl = new URL(
-      `${process.env.BASE_URL || 'http://localhost:3100'}/app`,
+      `${context.env.BASE_URL || 'http://localhost:3100'}/app`,
     );
     redirectUrl.searchParams.set('jwt', accessToken.accessToken);
 
@@ -205,8 +205,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 function decodeJwt(token: string): Record<string, unknown> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid JWT');
-
-  const payload = parts[1];
-  const decoded = Buffer.from(payload, 'base64').toString('utf-8');
+  // Base64url → base64 → string
+  const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const padded = payload + '=='.slice((2 - payload.length * 3) & 3);
+  const decoded = atob(padded);
   return JSON.parse(decoded) as Record<string, unknown>;
 }

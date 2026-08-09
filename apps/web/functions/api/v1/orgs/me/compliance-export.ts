@@ -176,6 +176,12 @@ function categorize(action: string, template: Template): string[] {
   return cats.length ? cats : ['general'];
 }
 
+type EnrichedRow = {
+  id: string; timestamp: string; actorUserId: string;
+  actorEmail: string; actorName: string; action: string;
+  resource: string; metadata: unknown; complianceCategory: string[];
+};
+
 function esc(v: string): string {
   const s = String(v ?? '');
   if (s.includes(',') || s.includes('"') || s.includes('\n')) {
@@ -186,7 +192,7 @@ function esc(v: string): string {
 
 function buildCSV(
   meta: Record<string, unknown>,
-  records: ReturnType<typeof categorize extends (...args: any[]) => any ? never : any>[],
+  records: EnrichedRow[],
   template: Template,
 ): string {
   const header = templateHeader(template);
@@ -203,11 +209,11 @@ function buildCSV(
   const cols = ['timestamp', 'actorEmail', 'actorName', 'actorUserId', 'action', 'resource', 'complianceCategory', 'id'];
   out += cols.map(esc).join(',') + '\n';
 
-  for (const r of records as any[]) {
+  for (const r of records) {
     out +=
       cols
         .map((c) => {
-          const val = r[c];
+          const val = r[c as keyof EnrichedRow];
           if (Array.isArray(val)) return esc(val.join('; '));
           return esc(String(val ?? ''));
         })

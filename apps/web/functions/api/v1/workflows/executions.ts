@@ -1,26 +1,37 @@
-import { Router } from 'itty-router';
+/**
+ * Workflow Executions API
+ * GET /api/v1/workflows/executions — List workflow executions for an org
+ *
+ * Proxy to the Identity service.
+ * Owner/Admin only.
+ */
 
-const router = Router({ base: '/api/v1/workflows/executions' });
+import { requireAuth, requireOrgAdmin, json, options, type Env } from '../../../shared/auth';
 
-// GET /api/v1/workflows/executions
-router.get('', async (req: any) => {
+export const onRequest: PagesFunction<Env> = async (context) => {
+  if (context.request.method === 'OPTIONS') return options();
+  if (context.request.method !== 'GET') {
+    return json({ statusCode: 405, message: 'Method not allowed' }, 405);
+  }
+
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
+  const denied = requireOrgAdmin(auth.role);
+  if (denied) return denied;
+
   try {
-    const { organizationId, ruleId, limit } = req.query;
+    const url = new URL(context.request.url);
+    const ruleId = url.searchParams.get('ruleId');
+    const limit = url.searchParams.get('limit');
 
-    if (!organizationId) {
-      return new Response(JSON.stringify({ error: 'organizationId required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    const apiUrl = getApiUrl(context.env);
+    let targetUrl = `${apiUrl}/api/v1/workflows/executions?organizationId=${auth.organizationId}`;
+    if (ruleId) targetUrl += `&ruleId=${ruleId}`;
+    if (limit) targetUrl += `&limit=${limit}`;
 
-    let url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/workflows/executions?organizationId=${organizationId}`;
-    if (ruleId) url += `&ruleId=${ruleId}`;
-    if (limit) url += `&limit=${limit}`;
-
-    const response = await fetch(url, {
+    const response = await fetch(targetUrl, {
       headers: {
-        'Authorization': req.headers.get('Authorization') || '',
+        'Authorization': context.request.headers.get('Authorization') || '',
         'Content-Type': 'application/json',
       },
     });
@@ -30,16 +41,13 @@ router.get('', async (req: any) => {
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json(data);
   } catch (error: any) {
     console.error('[executions] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ statusCode: 500, message: error.message }, 500);
   }
-});
+};
 
-export const onRequest = router.handle;
+function getApiUrl(env: Env): string {
+  return env.BASE_URL || 'http://localhost:3001';
+}

@@ -2,13 +2,17 @@ import { Router } from 'itty-router';
 
 const router = Router();
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // GET /api/v1/connectors/templates/:id
-router.get('/api/v1/connectors/templates/:id', async (req: any) => {
+router.get('/api/v1/connectors/templates/:id', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/templates/${id}`,
+      `${getApiUrl(env)}/api/v1/connectors/templates/${id}`,
       {
         headers: {
           'Authorization': req.headers.get('Authorization') || '',
@@ -35,13 +39,13 @@ router.get('/api/v1/connectors/templates/:id', async (req: any) => {
 });
 
 // PATCH /api/v1/connectors/templates/:id (Admin)
-router.patch('/api/v1/connectors/templates/:id', async (req: any) => {
+router.patch('/api/v1/connectors/templates/:id', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
     const input = await req.json();
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/templates/${id}`,
+      `${getApiUrl(env)}/api/v1/connectors/templates/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -70,12 +74,12 @@ router.patch('/api/v1/connectors/templates/:id', async (req: any) => {
 });
 
 // DELETE /api/v1/connectors/templates/:id (Admin)
-router.delete('/api/v1/connectors/templates/:id', async (req: any) => {
+router.delete('/api/v1/connectors/templates/:id', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/connectors/templates/${id}`,
+      `${getApiUrl(env)}/api/v1/connectors/templates/${id}`,
       {
         method: 'DELETE',
         headers: {

@@ -48,6 +48,8 @@ export interface Env {
   /** Web Push VAPID (optional; without keys push stays simulated). */
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
+  /** Base URL for SSO redirects and callbacks. */
+  BASE_URL?: string;
   VAPID_SUBJECT?: string;
   ELLINEA_VAPID_PUBLIC_KEY?: string;
   ELLINEA_VAPID_PRIVATE_KEY?: string;

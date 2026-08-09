@@ -109,7 +109,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const settings = asObj(orgData?.settings || {});
   const ellineaSettings = asObj(settings.ellineaSettings || {});
   const llmEnabled = Boolean(ellineaSettings.llmEnabled);
-  const openAiKey = (context.env as Record<string, string>)['OPENAI_API_KEY'];
+  const openAiKey = (context.env as unknown as Record<string, string>)['OPENAI_API_KEY'];
 
   let recommendation = templateAnswer;
   let mode: 'template' | 'llm' = 'template';

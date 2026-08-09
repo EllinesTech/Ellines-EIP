@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { createLogger } from './logger';
 import { Logger } from './log-context';
+import { WinstonLoggerService } from './winston-logger.service';
 
 @Global()
 @Module({
@@ -11,10 +12,11 @@ import { Logger } from './log-context';
     },
     {
       provide: Logger,
-      useFactory: (winstonLogger) => new Logger(winstonLogger),
+      useFactory: (winstonLogger: any) => new Logger(winstonLogger),
       inject: ['WINSTON_LOGGER'],
     },
+    WinstonLoggerService,
   ],
-  exports: [Logger, 'WINSTON_LOGGER'],
+  exports: [Logger, 'WINSTON_LOGGER', WinstonLoggerService],
 })
 export class LoggingModule {}

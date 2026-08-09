@@ -49,7 +49,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: provider.client_id || '',
-      redirect_uri: `${process.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/oauth2/callback`,
+      redirect_uri: `${context.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/oauth2/callback`,
       scope: 'openid profile email',
       state,
       nonce,

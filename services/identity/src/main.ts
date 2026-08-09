@@ -17,9 +17,14 @@ import { AppModule } from './app.module';
 import { ObservabilityInterceptor } from './middleware/observability.interceptor';
 import { MetricsCollector } from './metrics/metrics-collector';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { WinstonLoggerService } from './logging/winston-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bufferLogs: true — hold NestJS boot logs until WinstonLoggerService is available
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Route all NestJS framework logs through Winston (Q.2)
+  app.useLogger(app.get(WinstonLoggerService));
 
   app.setGlobalPrefix('api/v1');
 

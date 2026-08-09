@@ -13,6 +13,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const { id } = context.params;
+  const providerId = Array.isArray(id) ? id[0] : id;
   const supabase = getAdminClient(context.env);
 
   try {
@@ -27,7 +28,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const { data: provider, error: fetchError } = await supabase
       .from('sso_providers')
       .select('*')
-      .eq('id', id)
+      .eq('id', providerId)
       .eq('organization_id', user.organization_id)
       .single();
 
@@ -80,7 +81,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         organizationId: user.organization_id,
         userId: auth.sub,
         action: 'sso.provider.tested',
-        resource: id,
+        resource: providerId,
         ip,
         metadata: { result: testResult.ok },
       }),

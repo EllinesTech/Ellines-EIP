@@ -95,7 +95,7 @@ async function probeOne(urlStr: string, timeoutMs: number): Promise<ProbeItem> {
     try {
       const buf = await res.arrayBuffer();
       const slice = buf.byteLength > MAX_BODY ? buf.slice(0, MAX_BODY) : buf;
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(slice);
+      const text = new TextDecoder('utf-8', { fatal: false, ignoreBOM: false }).decode(slice);
       if (
         (contentType && /html/i.test(contentType)) ||
         text.trimStart().startsWith('<')

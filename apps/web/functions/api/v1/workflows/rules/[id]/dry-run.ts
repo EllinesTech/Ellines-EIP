@@ -1,19 +1,35 @@
-import { Router } from 'itty-router';
+/**
+ * Workflow Rule Dry Run
+ * POST /api/v1/workflows/rules/:id/dry-run
+ *
+ * Proxy to the Identity service.
+ * Owner/Admin only.
+ */
 
-const router = Router();
+import { requireAuth, requireOrgAdmin, json, options, type Env } from '../../../../../shared/auth';
 
-// POST /api/v1/workflows/rules/:id/dry-run
-router.post('/api/v1/workflows/rules/:id/dry-run', async (req: any) => {
+export const onRequest: PagesFunction<Env> = async (context) => {
+  if (context.request.method === 'OPTIONS') return options();
+  if (context.request.method !== 'POST') {
+    return json({ statusCode: 405, message: 'Method not allowed' }, 405);
+  }
+
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
+  const denied = requireOrgAdmin(auth.role);
+  if (denied) return denied;
+
   try {
-    const { id } = req.params;
-    const input = await req.json();
+    const id = context.params.id as string;
+    const input = await context.request.json() as Record<string, unknown>;
+    const apiUrl = getApiUrl(context.env);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/workflows/rules/${id}/dry-run`,
+      `${apiUrl}/api/v1/workflows/rules/${id}/dry-run`,
       {
         method: 'POST',
         headers: {
-          'Authorization': req.headers.get('Authorization') || '',
+          'Authorization': context.request.headers.get('Authorization') || '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(input),
@@ -25,16 +41,13 @@ router.post('/api/v1/workflows/rules/:id/dry-run', async (req: any) => {
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json(data);
   } catch (error: any) {
     console.error('[workflows/rules/:id/dry-run] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ statusCode: 500, message: error.message }, 500);
   }
-});
+};
 
-export const onRequest = router.handle;
+function getApiUrl(env: Env): string {
+  return env.BASE_URL || 'http://localhost:3001';
+}

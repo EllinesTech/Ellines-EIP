@@ -43,7 +43,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const instant = new Date().toISOString();
     const acsUrl =
       provider.acs_url ||
-      `${process.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/saml2/acs`;
+      `${context.env.BASE_URL || 'http://localhost:3100'}/api/v1/auth/sso/saml2/acs`;
 
     const authnRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" 
@@ -54,7 +54,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   Destination="${provider.idp_sso_url}"
   AssertionConsumerServiceURL="${acsUrl}"
   ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
-  <saml:Issuer>${provider.entity_id || `${process.env.BASE_URL || 'http://localhost:3100'}/saml`}</saml:Issuer>
+  <saml:Issuer>${provider.entity_id || `${context.env.BASE_URL || 'http://localhost:3100'}/saml`}</saml:Issuer>
 </samlp:AuthnRequest>`;
 
     // Encode to base64 using Web Crypto (no Buffer in Workers)

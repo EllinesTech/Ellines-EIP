@@ -2,14 +2,18 @@ import { Router } from 'itty-router';
 
 const router = Router();
 
+function getApiUrl(env?: Record<string, string>): string {
+  return (env && env['IDENTITY_API_URL']) || 'http://localhost:3001';
+}
+
 // POST /api/v1/dashboards/:id/export
-router.post('/api/v1/dashboards/:id/export', async (req: any) => {
+router.post('/api/v1/dashboards/:id/export', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
     const input = await req.json();
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/dashboards/${id}/export`,
+      `${getApiUrl(env)}/api/v1/dashboards/${id}/export`,
       {
         method: 'POST',
         headers: {
@@ -39,13 +43,13 @@ router.post('/api/v1/dashboards/:id/export', async (req: any) => {
 });
 
 // GET /api/v1/dashboards/:id/exports
-router.get('/api/v1/dashboards/:id/exports', async (req: any) => {
+router.get('/api/v1/dashboards/:id/exports', async (req: any, env?: Record<string, string>) => {
   try {
     const { id } = req.params;
     const { organizationId } = req.query;
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/dashboards/${id}/exports?organizationId=${organizationId}`,
+      `${getApiUrl(env)}/api/v1/dashboards/${id}/exports?organizationId=${organizationId}`,
       {
         headers: {
           'Authorization': req.headers.get('Authorization') || '',

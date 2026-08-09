@@ -1101,3 +1101,283 @@ model RateLimitViolation {
   @@index([userId, blockedAt])
   @@map("rate_limit_violations")
 }
+
+// ─── v2.0 Data Layer — Knowledge Graph, Model Registry, Remediation ─────────────
+
+/**
+ * KnowledgeGraphEntity — Metadata for entities in the Neo4j knowledge graph.
+ * Actual graph data lives in Neo4j; this table tracks entity metadata and sync status.
+ */
+model KnowledgeGraphEntity {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  entityType        String   @map("entity_type")  // 'person' | 'product' | 'location' | 'event' | 'document'
+  neo4jNodeId       String   @map("neo4j_node_id")  // Neo4j internal node ID
+  sourceSystem      String   @map("source_system")  // System that provided this entity
+  sourceEntityId    String   @map("source_entity_id")  // ID in source system
+  displayName       String   @map("display_name")
+  confidence        Float    @default(1.0)         // Confidence score 0.0-1.0
+  lastSyncedAt      DateTime @map("last_synced_at")
+  syncStatus        String   @default("active") @map("sync_status")  // 'active' | 'deleted' | 'merged'
+  mergedIntoId      String?  @map("merged_into_id")  // If merged, points to surviving entity
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, sourceSystem, sourceEntityId])
+  @@index([organizationId, entityType])
+  @@index([neo4jNodeId])
+  @@map("knowledge_graph_entities")
+}
+
+/**
+ * KnowledgeGraphRelationship — Metadata for relationships in the Neo4j knowledge graph.
+ * Tracks relationship metadata, confidence, and evidence.
+ */
+model KnowledgeGraphRelationship {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  neo4jRelId        String   @map("neo4j_rel_id")  // Neo4j internal relationship ID
+  fromEntityId      String   @map("from_entity_id")  // KnowledgeGraphEntity.id
+  toEntityId        String   @map("to_entity_id")    // KnowledgeGraphEntity.id
+  relationshipType  String   @map("relationship_type")  // 'works_at' | 'purchased' | 'located_in' | etc.
+  confidence        Float    @default(0.8)           // Confidence score 0.0-1.0
+  evidence          Json     @default("[]")          // Array of evidence sources
+  properties        Json     @default("{}")          // Additional relationship properties
+  isInferred        Boolean  @default(false) @map("is_inferred")  // True if relationship was inferred, not explicit
+  lastVerifiedAt    DateTime? @map("last_verified_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([neo4jRelId])
+  @@index([organizationId])
+  @@index([fromEntityId])
+  @@index([toEntityId])
+  @@index([relationshipType])
+  @@map("knowledge_graph_relationships")
+}
+
+/**
+ * AiModelRegistry — Registry of AI models used by the Model Orchestrator.
+ * Tracks model metadata, performance metrics, availability, and capabilities.
+ */
+model AiModelRegistry {
+  id                String   @id @default(cuid())
+  modelId           String   @unique @map("model_id")  // Internal model identifier (e.g., 'gpt-4', 'claude-3-opus')
+  displayName       String   @map("display_name")
+  provider          String                              // 'openai' | 'anthropic' | 'azure' | 'local' | 'custom'
+  modelType         String   @map("model_type")        // 'language' | 'time_series' | 'anomaly' | 'vision' | 'reasoning'
+  capabilities      String[] @default([])              // Array of capabilities: 'text', 'code', 'reasoning', 'vision', etc.
+  contextWindow     Int?     @map("context_window")    // Max context tokens
+  costPerMToken     Float?   @map("cost_per_m_token")  // Cost per million tokens (in USD)
+  avgLatencyMs      Int?     @map("avg_latency_ms")    // Average response latency in milliseconds
+  accuracyScore     Float?   @map("accuracy_score")    // Accuracy metric (0.0-1.0)
+  throughputQps     Float?   @map("throughput_qps")    // Queries per second capacity
+  isAvailable       Boolean  @default(true) @map("is_available")
+  priority          Int      @default(50)              // Priority for model selection (0-100)
+  configuration     Json     @default("{}")            // Model-specific configuration
+  fallbackModelId   String?  @map("fallback_model_id") // Fallback model if this one fails
+  lastHealthCheck   DateTime? @map("last_health_check")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  modelDecisions    ModelDecisionLog[]
+  performanceLogs   ModelPerformanceLog[]
+
+  @@index([modelType])
+  @@index([isAvailable])
+  @@index([provider])
+  @@map("ai_model_registry")
+}
+
+/**
+ * ModelDecisionLog — Logs each model routing decision made by the Model Orchestrator.
+ * Used for explainability, debugging, and continuous improvement.
+ */
+model ModelDecisionLog {
+  id                String   @id @default(cuid())
+  organizationId    String?  @map("organization_id")
+  queryId           String   @map("query_id")
+  queryType         String   @map("query_type")        // 'text' | 'forecast' | 'anomaly' | 'vision' | 'reasoning'
+  selectedModelId   String   @map("selected_model_id")
+  secondaryModels   String[] @default([]) @map("secondary_models")  // Array of model IDs used in ensemble
+  routingReason     String   @map("routing_reason")    // Why this model was selected
+  ensembleStrategy  String?  @map("ensemble_strategy") // 'weighted_vote' | 'meta_learning' | 'cascade' | null
+  confidence        Float?                             // Overall confidence in result
+  latencyMs         Int?     @map("latency_ms")
+  success           Boolean  @default(true)
+  errorMessage      String?  @map("error_message")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  model AiModelRegistry @relation(fields: [selectedModelId], references: [modelId], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([selectedModelId])
+  @@index([queryType])
+  @@index([createdAt])
+  @@map("model_decision_logs")
+}
+
+/**
+ * ModelPerformanceLog — Time-series performance metrics for AI models.
+ * Aggregated hourly for tracking model performance trends.
+ */
+model ModelPerformanceLog {
+  id                String   @id @default(cuid())
+  modelId           String   @map("model_id")
+  windowStart       DateTime @map("window_start")
+  windowEnd         DateTime @map("window_end")
+  requestCount      Int      @default(0) @map("request_count")
+  successCount      Int      @default(0) @map("success_count")
+  failureCount      Int      @default(0) @map("failure_count")
+  avgLatencyMs      Float    @map("avg_latency_ms")
+  p95LatencyMs      Float?   @map("p95_latency_ms")
+  p99LatencyMs      Float?   @map("p99_latency_ms")
+  avgConfidence     Float?   @map("avg_confidence")
+  totalCost         Float    @default(0.0) @map("total_cost")  // Total cost in USD
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  model AiModelRegistry @relation(fields: [modelId], references: [modelId], onDelete: Cascade)
+
+  @@unique([modelId, windowStart])
+  @@index([modelId, windowStart])
+  @@map("model_performance_logs")
+}
+
+/**
+ * RemediationPlaybook — Defines remediation strategies for known error patterns.
+ * Used by the Self-Healing Remediator to automatically fix issues.
+ */
+model RemediationPlaybook {
+  id                    String   @id @default(cuid())
+  errorPattern          String   @unique @map("error_pattern")  // Regex or exact error pattern
+  errorCategory         String   @map("error_category")         // 'database' | 'network' | 'memory' | 'authentication' | 'integration'
+  severity              String                                  // 'critical' | 'high' | 'medium' | 'low'
+  stages                Json     @default("[]")                 // Array of remediation stages with actions
+  confidenceThreshold   Float    @default(0.85) @map("confidence_threshold")  // Minimum confidence to auto-execute
+  maxAttempts           Int      @default(3) @map("max_attempts")
+  verificationPeriod    Int      @default(300) @map("verification_period")  // Seconds to monitor after remediation
+  isActive              Boolean  @default(true) @map("is_active")
+  createdBy             String?  @map("created_by")             // 'system' | 'manual' | 'learned'
+  learnedFrom           String?  @map("learned_from")           // If learned, reference to incident ID
+  successRate           Float    @default(0.0) @map("success_rate")  // Historical success rate (0.0-1.0)
+  executionCount        Int      @default(0) @map("execution_count")
+  lastExecutedAt        DateTime? @map("last_executed_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  executions RemediationExecution[]
+
+  @@index([errorCategory])
+  @@index([severity])
+  @@index([isActive])
+  @@map("remediation_playbook")
+}
+
+/**
+ * RemediationExecution — Logs each execution of a remediation strategy.
+ * Used for learning, auditing, and improving self-healing capabilities.
+ */
+model RemediationExecution {
+  id                String    @id @default(cuid())
+  playbookId        String    @map("playbook_id")
+  organizationId    String?   @map("organization_id")
+  incidentId        String    @map("incident_id")           // Reference to the incident being remediated
+  errorPattern      String    @map("error_pattern")
+  stagesExecuted    Int       @default(0) @map("stages_executed")
+  actionsPerformed  Json      @default("[]")               // Array of actions executed
+  confidence        Float                                  // Confidence score at execution time
+  outcome           String                                 // 'success' | 'partial_success' | 'failure' | 'escalated'
+  beforeSnapshot    Json?     @map("before_snapshot")      // System state before remediation
+  afterSnapshot     Json?     @map("after_snapshot")       // System state after remediation
+  timeTaken         Int       @map("time_taken")           // Milliseconds to execute
+  escalatedTo       String?   @map("escalated_to")         // User ID if escalated
+  escalationReason  String?   @map("escalation_reason")
+  verifiedAt        DateTime? @map("verified_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  playbook RemediationPlaybook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+
+  @@index([playbookId])
+  @@index([organizationId])
+  @@index([outcome])
+  @@index([createdAt])
+  @@map("remediation_executions")
+}
+
+/**
+ * SystemHealthMetric — Metadata for time-series health metrics stored in InfluxDB.
+ * This table tracks what metrics are being collected and their configuration.
+ */
+model SystemHealthMetric {
+  id                String   @id @default(cuid())
+  metricName        String   @unique @map("metric_name")
+  displayName       String   @map("display_name")
+  description       String   @default("")
+  metricType        String   @map("metric_type")        // 'gauge' | 'counter' | 'histogram'
+  category          String                              // 'performance' | 'health' | 'business' | 'security'
+  unit              String?                             // 'ms' | 'bytes' | 'count' | '%' | etc.
+  influxBucket      String   @default("platform_metrics") @map("influx_bucket")
+  influxMeasurement String   @map("influx_measurement")
+  retentionDays     Int      @default(90) @map("retention_days")
+  aggregationLevel  String   @default("1m") @map("aggregation_level")  // '1s' | '1m' | '1h' | '1d'
+  alertThresholds   Json?    @map("alert_thresholds")   // Alert configuration
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isActive])
+  @@map("system_health_metrics")
+}
+
+/**
+ * FederatedLearningRound — Tracks federated learning training rounds.
+ * Records participation, model updates, and privacy guarantees.
+ */
+model FederatedLearningRound {
+  id                  String   @id @default(cuid())
+  roundNumber         Int      @unique @map("round_number")
+  modelType           String   @map("model_type")         // Which model is being trained
+  participantCount    Int      @default(0) @map("participant_count")
+  startedAt           DateTime @default(now()) @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  status              String   @default("in_progress")    // 'in_progress' | 'completed' | 'failed'
+  aggregationStrategy String   @map("aggregation_strategy") // 'fedavg' | 'fedprox' | 'scaffold'
+  privacyBudget       Float    @map("privacy_budget")     // Differential privacy budget used
+  globalModelVersion  String?  @map("global_model_version")  // Version identifier of resulting model
+  performanceMetrics  Json?    @map("performance_metrics")
+  patternsLearned     Json?    @map("patterns_learned")    // Summary of what was learned
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  participants FederatedLearningParticipant[]
+
+  @@index([roundNumber])
+  @@index([status])
+  @@index([startedAt])
+  @@map("federated_learning_rounds")
+}
+
+/**
+ * FederatedLearningParticipant — Tracks organization participation in federated learning.
+ * Records which organizations contributed to each round and their update quality.
+ */
+model FederatedLearningParticipant {
+  id                String   @id @default(cuid())
+  roundId           String   @map("round_id")
+  organizationId    String   @map("organization_id")
+  updateSubmitted   Boolean  @default(false) @map("update_submitted")
+  updateAccepted    Boolean  @default(false) @map("update_accepted")
+  rejectionReason   String?  @map("rejection_reason")    // If update rejected (e.g., 'poisoning_detected')
+  datasetSize       Int?     @map("dataset_size")        // Number of examples used for local training
+  contributionScore Float?   @map("contribution_score")  // Quality score of contribution (0.0-1.0)
+  submittedAt       DateTime? @map("submitted_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  round FederatedLearningRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, organizationId])
+  @@index([roundId])
+  @@index([organizationId])
+  @@map("federated_learning_participants")
+}
