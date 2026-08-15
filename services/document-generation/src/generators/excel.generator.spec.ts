@@ -21,7 +21,10 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Sheet1',
             headers: ['Name', 'Age', 'City'],
-            data: [['Alice', 30, 'London'], ['Bob', 25, 'Paris']],
+            data: [
+              ['Alice', 30, 'London'],
+              ['Bob', 25, 'Paris'],
+            ] as any,
           },
         ],
       };
@@ -38,12 +41,12 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Users',
             headers: ['ID', 'Name'],
-            data: [[1, 'Alice'], [2, 'Bob']],
+            data: [[1, 'Alice'], [2, 'Bob']] as any,
           },
           {
             name: 'Products',
             headers: ['ProductID', 'Title'],
-            data: [[101, 'Widget'], [102, 'Gadget']],
+            data: [[101, 'Widget'], [102, 'Gadget']] as any,
           },
         ],
       };
@@ -59,7 +62,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Calculations',
             headers: ['Value1', 'Value2', 'Sum'],
-            data: [[10, 20, null], [15, 25, null]],
+            data: [[10, 20, null], [15, 25, null]] as any,
           },
         ],
         formulas: [
@@ -79,7 +82,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Data',
             headers: ['Month', 'Sales'],
-            data: [['Jan', 100], ['Feb', 150], ['Mar', 120]],
+            data: [['Jan', 100], ['Feb', 150], ['Mar', 120]] as any,
           },
         ],
         charts: [
@@ -105,7 +108,7 @@ describe('ExcelGeneratorService', () => {
             name: 'Formatted',
             headers: ['Name', 'Score'],
             columnWidths: [20, 15],
-            data: [['Alice', 95], ['Bob', 87]],
+            data: [['Alice', 95], ['Bob', 87]] as any,
           },
         ],
         formatting: {
@@ -133,7 +136,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Report',
             headers: ['Metric', 'Value'],
-            data: [['Revenue', 50000], ['Profit', 10000]],
+            data: [['Revenue', 50000], ['Profit', 10000]] as any,
           },
         ],
         branding: {
@@ -154,7 +157,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Empty',
             headers: [],
-            data: [],
+            data: [] as any,
           },
         ],
       };
@@ -170,7 +173,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'NullValues',
             headers: ['A', 'B', 'C'],
-            data: [[1, null, 'text'], [undefined, 2, 'more']],
+            data: [[1, null, 'text'], [undefined, 2, 'more']] as any,
           },
         ],
       };
@@ -187,14 +190,14 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'LargeData',
             headers: ['ID', 'Name', 'Value'],
-            data: rows,
+            data: rows as any,
           },
         ],
       };
 
       const buffer = await service.generate(config);
       expect(buffer).toBeInstanceOf(Buffer);
-      expect(buffer.length).toBeGreaterThan(10000); // Large buffer expected
+      expect(buffer.length).toBeGreaterThan(10000);
     });
 
     it('should set workbook metadata', async () => {
@@ -204,14 +207,13 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Data',
             headers: ['Col1'],
-            data: [['Value1']],
+            data: [['Value1']] as any,
           },
         ],
       };
 
       const buffer = await service.generate(config);
       expect(buffer).toBeInstanceOf(Buffer);
-      // Metadata is embedded in the workbook
     });
   });
 
@@ -223,7 +225,7 @@ describe('ExcelGeneratorService', () => {
             name: 'ColumnWidth',
             headers: ['Narrow', 'Wide', 'Medium'],
             columnWidths: [10, 30, 20],
-            data: [['A', 'B', 'C']],
+            data: [['A', 'B', 'C']] as any,
           },
         ],
       };
@@ -238,7 +240,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'AutoFit',
             headers: ['Short', 'VeryLongHeaderName', 'X'],
-            data: [['a', 'b', 'c']],
+            data: [['a', 'b', 'c']] as any,
           },
         ],
       };
@@ -258,7 +260,7 @@ describe('ExcelGeneratorService', () => {
             {
               name: 'Data',
               headers: ['X', 'Y'],
-              data: [['A', 10], ['B', 20]],
+              data: [['A', 10], ['B', 20]] as any,
             },
           ],
           charts: [
@@ -285,7 +287,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Styled',
             headers: ['Header1', 'Header2'],
-            data: [['Data1', 'Data2']],
+            data: [['Data1', 'Data2']] as any,
           },
         ],
         formatting: {
@@ -308,7 +310,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Striped',
             headers: ['Col1', 'Col2'],
-            data: Array.from({ length: 10 }, (_, i) => [`Row${i + 1}`, i]),
+            data: Array.from({ length: 10 }, (_, i) => [`Row${i + 1}`, i]) as any,
           },
         ],
         formatting: {
@@ -326,7 +328,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Frozen',
             headers: ['Frozen', 'Header'],
-            data: Array.from({ length: 100 }, (_, i) => [`Row${i}`, i]),
+            data: Array.from({ length: 100 }, (_, i) => [`Row${i}`, i]) as any,
           },
         ],
         formatting: {
@@ -344,7 +346,7 @@ describe('ExcelGeneratorService', () => {
           {
             name: 'Filtered',
             headers: ['Name', 'Age', 'City'],
-            data: [['Alice', 30, 'London'], ['Bob', 25, 'Paris']],
+            data: [['Alice', 30, 'London'], ['Bob', 25, 'Paris']] as any,
           },
         ],
         formatting: {
