@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ConnectorPackDto,
@@ -24,9 +24,408 @@ import {
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
+import dashboardStyles from './platform.module.css';
 import { formatOrgDateTime } from '@ellines-eip/shared';
 
-export default function PlatformAdminPage() {
+// ─── Real-time Metrics Types ───────────────────────────────────────────────
+interface DashboardMetrics {
+  timestamp: Date;
+  orgDistribution: OrgDistributionMetric[];
+  selfHealingStats: SelfHealingStats;
+  federatedLearningStatus: FederatedLearningStatus;
+  predictiveForecasts: PredictiveForecasts;
+}
+
+interface OrgDistributionMetric {
+  orgId: string;
+  orgName: string;
+  healthScore: number;
+  userCount: number;
+  connectorCount: number;
+  syncHealth: number;
+}
+
+interface SelfHealingStats {
+  remediationCount: number;
+  successRate: number;
+  escalationCount: number;
+  avgRemediationTime: number;
+  lastIncidentTime: Date | null;
+}
+
+interface FederatedLearningStatus {
+  participatingOrgs: number;
+  modelVersion: number;
+  privacyBudgetUsed: number;
+  trainingAccuracy: number;
+  lastTrainingTime: Date | null;
+}
+
+interface PredictiveForecasts {
+  operationalRisks: RiskForecast[];
+  resourceConstraints: RiskForecast[];
+  financialIssues: RiskForecast[];
+  nextUpdateTime: Date;
+}
+
+interface RiskForecast {
+  name: string;
+  probability: number;
+  timeframe: string;
+  affectedOrgs: number;
+}
+
+type Theme = 'dark' | 'light' | 'high-contrast';
+
+// ─── Theme Management ──────────────────────────────────────────────────────
+const themes: Record<Theme, Record<string, string>> = {
+  dark: {
+    '--bg-primary': '#0f172a',
+    '--bg-secondary': '#1e293b',
+    '--bg-tertiary': '#334155',
+    '--text-primary': '#f1f5f9',
+    '--text-secondary': '#cbd5e1',
+    '--text-muted': '#94a3b8',
+    '--border-color': 'rgba(255, 255, 255, 0.12)',
+    '--accent-primary': '#7c3aed',
+    '--accent-secondary': '#3b82f6',
+    '--success': '#22c55e',
+    '--warning': '#f59e0b',
+    '--error': '#ef4444',
+  },
+  light: {
+    '--bg-primary': '#ffffff',
+    '--bg-secondary': '#f8fafc',
+    '--bg-tertiary': '#e2e8f0',
+    '--text-primary': '#0f172a',
+    '--text-secondary': '#334155',
+    '--text-muted': '#64748b',
+    '--border-color': 'rgba(0, 0, 0, 0.12)',
+    '--accent-primary': '#6d28d9',
+    '--accent-secondary': '#2563eb',
+    '--success': '#16a34a',
+    '--warning': '#d97706',
+    '--error': '#dc2626',
+  },
+  'high-contrast': {
+    '--bg-primary': '#000000',
+    '--bg-secondary': '#1a1a1a',
+    '--bg-tertiary': '#333333',
+    '--text-primary': '#ffffff',
+    '--text-secondary': '#e6e6e6',
+    '--text-muted': '#cccccc',
+    '--border-color': '#ffffff',
+    '--accent-primary': '#ffff00',
+    '--accent-secondary': '#00ffff',
+    '--success': '#00ff00',
+    '--warning': '#ff8800',
+    '--error': '#ff0000',
+  },
+};
+
+// ─── AI Copilot Component ──────────────────────────────────────────────────
+interface CopilotMessage {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () => void; metrics: DashboardMetrics | null }) {
+  const [messages, setMessages] = useState<CopilotMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = useCallback(async (message: string) => {
+    if (!message.trim()) return;
+
+    const userMessage: CopilotMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: message,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      // Generate contextual response based on metrics
+      const assistantResponse = generateCopilotResponse(message, metrics);
+      
+      const assistantMessage: CopilotMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: assistantResponse,
+        timestamp: new Date(),
+      };
+
+      // Simulate response delay for realistic interaction
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setMessages((prev) => [...prev, assistantMessage]);
+    } finally {
+      setLoading(false);
+    }
+  }, [metrics]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={dashboardStyles.copilotPanel}>
+      <div className={dashboardStyles.copilotHeader}>
+        <h3>Ellinea Platform Assistant</h3>
+        <button className={dashboardStyles.closeBtn} onClick={onClose} aria-label="Close copilot">
+          ×
+        </button>
+      </div>
+
+      <div className={dashboardStyles.copilotMessages}>
+        {messages.length === 0 ? (
+          <div className={dashboardStyles.copilotWelcome}>
+            <p>Welcome to the Platform Super Admin Assistant.</p>
+            <p>Ask me about organization metrics, self-healing activities, federated learning status, or platform recommendations.</p>
+          </div>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} className={`${dashboardStyles.message} ${dashboardStyles[msg.type]}`}>
+              <p>{msg.content}</p>
+              <small>{msg.timestamp.toLocaleTimeString()}</small>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className={dashboardStyles.copilotInput}>
+        <input
+          type="text"
+          placeholder="Ask about platform health, organizations, or recommendations..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(input)}
+          disabled={loading}
+        />
+        <button
+          onClick={() => handleSendMessage(input)}
+          disabled={loading || !input.trim()}
+          className={dashboardStyles.sendBtn}
+        >
+          {loading ? '…' : 'Send'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function generateCopilotResponse(query: string, metrics: DashboardMetrics | null): string {
+  const lowerQuery = query.toLowerCase();
+
+  if (!metrics) {
+    return 'Please wait while I load platform metrics...';
+  }
+
+  if (lowerQuery.includes('health') || lowerQuery.includes('status')) {
+    const avgHealth = metrics.orgDistribution.reduce((sum, org) => sum + org.healthScore, 0) / Math.max(metrics.orgDistribution.length, 1);
+    return `Platform health score: ${avgHealth.toFixed(1)}%. ${metrics.orgDistribution.length} organizations are active. Remediation success rate is ${(metrics.selfHealingStats.successRate * 100).toFixed(1)}%.`;
+  }
+
+  if (lowerQuery.includes('organizations') || lowerQuery.includes('orgs')) {
+    return `You have ${metrics.orgDistribution.length} organizations. Top performer: ${metrics.orgDistribution[0]?.orgName || 'N/A'} with ${metrics.orgDistribution[0]?.healthScore || 0}% health.`;
+  }
+
+  if (lowerQuery.includes('healing') || lowerQuery.includes('remediation')) {
+    return `Self-healing metrics: ${metrics.selfHealingStats.remediationCount} remediations performed with ${(metrics.selfHealingStats.successRate * 100).toFixed(1)}% success rate. ${metrics.selfHealingStats.escalationCount} escalations to admins. Average fix time: ${(metrics.selfHealingStats.avgRemediationTime / 60).toFixed(1)} minutes.`;
+  }
+
+  if (lowerQuery.includes('learning') || lowerQuery.includes('federated')) {
+    return `Federated learning status: Model v${metrics.federatedLearningStatus.modelVersion} trained across ${metrics.federatedLearningStatus.participatingOrgs} organizations. Training accuracy: ${(metrics.federatedLearningStatus.trainingAccuracy * 100).toFixed(1)}%. Privacy budget usage: ${(metrics.federatedLearningStatus.privacyBudgetUsed * 100).toFixed(1)}%.`;
+  }
+
+  if (lowerQuery.includes('risk') || lowerQuery.includes('forecast')) {
+    const totalRisks = metrics.predictiveForecasts.operationalRisks.length + 
+                       metrics.predictiveForecasts.resourceConstraints.length + 
+                       metrics.predictiveForecasts.financialIssues.length;
+    const highRisks = (metrics.predictiveForecasts.operationalRisks.filter(r => r.probability > 0.7) || []).length;
+    return `Detected ${highRisks} high-probability risks across ${totalRisks} forecasts. Recommend reviewing critical operational forecasts in next 24 hours.`;
+  }
+
+  return `I can help you monitor platform health, organization metrics, self-healing activities, federated learning status, and predictive forecasts. What specific metrics would you like to explore?`;
+}
+
+// ─── Heatmap Widget ───────────────────────────────────────────────────────
+function OrgHeatmap({ orgs, theme }: { orgs: OrgDistributionMetric[]; theme: Theme }) {
+  const getColor = useCallback((score: number) => {
+    if (score >= 80) return 'var(--success)';
+    if (score >= 60) return 'var(--warning)';
+    return 'var(--error)';
+  }, []);
+
+  return (
+    <div className={dashboardStyles.widget}>
+      <h3>Organization Health Distribution</h3>
+      <div className={dashboardStyles.heatmap}>
+        {orgs.map((org) => (
+          <div
+            key={org.orgId}
+            className={dashboardStyles.heatmapCell}
+            style={{
+              backgroundColor: getColor(org.healthScore),
+              opacity: 0.7,
+            }}
+            title={`${org.orgName}: ${org.healthScore}% health`}
+          >
+            <span className={dashboardStyles.heatmapLabel}>{org.orgName.substring(0, 3).toUpperCase()}</span>
+            <span className={dashboardStyles.heatmapValue}>{org.healthScore}%</span>
+          </div>
+        ))}
+      </div>
+      <div className={dashboardStyles.legend}>
+        <div><span style={{ color: 'var(--success)' }}>●</span> Healthy (80%+)</div>
+        <div><span style={{ color: 'var(--warning)' }}>●</span> Caution (60-79%)</div>
+        <div><span style={{ color: 'var(--error)' }}>●</span> Attention (&lt;60%)</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Self-Healing Metrics Widget ──────────────────────────────────────────
+function SelfHealingMetrics({ stats }: { stats: SelfHealingStats }) {
+  return (
+    <div className={dashboardStyles.widget}>
+      <h3>Self-Healing Activity</h3>
+      <div className={dashboardStyles.metricsGrid}>
+        <div className={dashboardStyles.metric}>
+          <span>Remediations</span>
+          <strong>{stats.remediationCount}</strong>
+          <small>automated actions</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Success Rate</span>
+          <strong>{(stats.successRate * 100).toFixed(1)}%</strong>
+          <small>first-time fixes</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Escalations</span>
+          <strong>{stats.escalationCount}</strong>
+          <small>to administrators</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Avg Fix Time</span>
+          <strong>{(stats.avgRemediationTime / 60).toFixed(1)}m</strong>
+          <small>minutes to resolve</small>
+        </div>
+      </div>
+      {stats.lastIncidentTime && (
+        <div className={dashboardStyles.footer}>
+          Last incident: {stats.lastIncidentTime.toLocaleString()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Federated Learning Status Widget ──────────────────────────────────────
+function FederatedLearningWidget({ status }: { status: FederatedLearningStatus }) {
+  return (
+    <div className={dashboardStyles.widget}>
+      <h3>Federated Learning Status</h3>
+      <div className={dashboardStyles.metricsGrid}>
+        <div className={dashboardStyles.metric}>
+          <span>Participating Orgs</span>
+          <strong>{status.participatingOrgs}</strong>
+          <small>in training round</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Model Version</span>
+          <strong>v{status.modelVersion}</strong>
+          <small>deployed</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Training Accuracy</span>
+          <strong>{(status.trainingAccuracy * 100).toFixed(1)}%</strong>
+          <small>cross-org performance</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Privacy Budget</span>
+          <strong>{(status.privacyBudgetUsed * 100).toFixed(1)}%</strong>
+          <small>differential privacy</small>
+        </div>
+      </div>
+      {status.lastTrainingTime && (
+        <div className={dashboardStyles.footer}>
+          Last training: {status.lastTrainingTime.toLocaleString()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Predictive Analytics Widget ──────────────────────────────────────────
+function PredictiveAnalyticsWidget({ forecasts }: { forecasts: PredictiveForecasts }) {
+  const allRisks = [
+    ...forecasts.operationalRisks.map(r => ({ ...r, type: 'Operational' })),
+    ...forecasts.resourceConstraints.map(r => ({ ...r, type: 'Resource' })),
+    ...forecasts.financialIssues.map(r => ({ ...r, type: 'Financial' })),
+  ];
+
+  const highRisks = allRisks.filter(r => r.probability > 0.7);
+  const mediumRisks = allRisks.filter(r => r.probability > 0.4 && r.probability <= 0.7);
+
+  return (
+    <div className={dashboardStyles.widget}>
+      <h3>Predictive Forecasts</h3>
+      <div className={dashboardStyles.metricsGrid}>
+        <div className={dashboardStyles.metric}>
+          <span>High-Risk Alerts</span>
+          <strong style={{ color: 'var(--error)' }}>{highRisks.length}</strong>
+          <small>probability &gt; 70%</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Medium-Risk Alerts</span>
+          <strong style={{ color: 'var(--warning)' }}>{mediumRisks.length}</strong>
+          <small>probability 40-70%</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Affected Organizations</span>
+          <strong>{new Set(allRisks.flatMap(r => r.affectedOrgs)).size}</strong>
+          <small>requires attention</small>
+        </div>
+        <div className={dashboardStyles.metric}>
+          <span>Next Update</span>
+          <strong>{Math.floor((forecasts.nextUpdateTime.getTime() - Date.now()) / 60000)}m</strong>
+          <small>time to rerun</small>
+        </div>
+      </div>
+
+      {highRisks.length > 0 && (
+        <div className={dashboardStyles.riskList}>
+          <h4>⚠️ High-Risk Forecasts</h4>
+          {highRisks.slice(0, 3).map((risk, idx) => (
+            <div key={idx} className={dashboardStyles.riskItem}>
+              <div>{risk.name}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                {risk.type} • {(risk.probability * 100).toFixed(0)}% • {risk.affectedOrgs} orgs
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────
+export default function PlatformPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
   const [orgs, setOrgs] = useState<PlatformOrg[]>([]);
