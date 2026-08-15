@@ -64,7 +64,7 @@ export class AnomalyModelProvider extends BaseModelProvider {
         },
       };
     } catch (error) {
-      this.logger.error(`Anomaly detection failed: ${error.message}`);
+      this.logger.error(`Anomaly detection failed: ${(error as Error).message}`);
       throw error;
     }
   }

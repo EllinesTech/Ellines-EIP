@@ -56,7 +56,7 @@ export class TimeSeriesModelProvider extends BaseModelProvider {
         },
       };
     } catch (error) {
-      this.logger.error(`Time-series forecasting failed: ${error.message}`);
+      this.logger.error(`Time-series forecasting failed: ${(error as Error).message}`);
       throw error;
     }
   }

@@ -59,7 +59,7 @@ export class ReasoningModelProvider extends BaseModelProvider {
         },
       };
     } catch (error) {
-      this.logger.error(`Reasoning failed: ${error.message}`);
+      this.logger.error(`Reasoning failed: ${(error as Error).message}`);
       throw error;
     }
   }

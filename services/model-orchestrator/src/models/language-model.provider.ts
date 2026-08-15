@@ -80,7 +80,7 @@ export class LanguageModelProvider extends BaseModelProvider {
         },
       };
     } catch (error) {
-      this.logger.error(`Language model invocation failed: ${error.message}`);
+      this.logger.error(`Language model invocation failed: ${(error as Error).message}`);
       return this.getMockResponse(request, startTime);
     }
   }
@@ -109,7 +109,7 @@ export class LanguageModelProvider extends BaseModelProvider {
       });
       return response.ok;
     } catch (error) {
-      this.logger.error(`Health check failed: ${error.message}`);
+      this.logger.error(`Health check failed: ${(error as Error).message}`);
       return false;
     }
   }

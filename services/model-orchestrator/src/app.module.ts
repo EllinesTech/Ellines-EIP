@@ -1,15 +1,19 @@
 /**
  * Model Orchestrator App Module
- * 
- * Integrates all specialized AI models with pluggable architecture
+ *
+ * Top-level module for the model-orchestrator microservice.
+ * Integrates all specialized AI models with pluggable architecture.
+ *
+ * Requirements: 1.1 – 1.8
  */
 
 import { Module } from '@nestjs/common';
-import { ModelsModule } from './models/models.module';
+import { OrchestratorModule } from './orchestrator.module';
+import { HealthController } from './health.controller';
 
 @Module({
-  imports: [ModelsModule],
-  controllers: [],
+  imports: [OrchestratorModule],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}

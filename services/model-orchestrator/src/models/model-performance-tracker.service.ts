@@ -61,7 +61,7 @@ export class ModelPerformanceTracker {
       // Update in-memory metrics
       this.updateMetricsCache(response.modelId, response.latencyMs, response.confidence, true);
     } catch (error) {
-      this.logger.error(`Failed to log model invocation: ${error.message}`);
+      this.logger.error(`Failed to log model invocation: ${(error as Error).message}`);
     }
   }
 
@@ -95,7 +95,7 @@ export class ModelPerformanceTracker {
       // Update failure count
       this.updateMetricsCache(modelId, 0, 0, false);
     } catch (error) {
-      this.logger.error(`Failed to log model failure: ${error.message}`);
+      this.logger.error(`Failed to log model failure: ${(error as Error).message}`);
     }
   }
 
@@ -191,7 +191,7 @@ export class ModelPerformanceTracker {
           },
         });
       } catch (error) {
-        this.logger.error(`Failed to flush metrics for ${modelId}: ${error.message}`);
+        this.logger.error(`Failed to flush metrics for ${modelId}: ${(error as Error).message}`);
       }
     }
 
