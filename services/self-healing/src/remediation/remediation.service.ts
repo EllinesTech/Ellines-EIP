@@ -8,7 +8,7 @@
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8
  */
 
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Inject, Optional } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { RemediationPolicyService } from './remediation-policy.service';
 
@@ -125,7 +125,10 @@ export class RemediationService implements OnModuleDestroy {
   /** Tracks active concurrent remediations per org */
   private readonly activeRemediations = new Map<string, number>();
 
-  constructor(private readonly policyService: RemediationPolicyService) {
+  constructor(
+    private readonly policyService: RemediationPolicyService,
+    @Optional() @Inject('LearnerService') private readonly learnerService?: any,
+  ) {
     this.prisma = new PrismaClient();
   }
 
@@ -207,6 +210,16 @@ export class RemediationService implements OnModuleDestroy {
 
       // Req 5.7: Audit log
       await this.auditExecution(incident, result, strategy);
+      
+      // Req 6.1: Record outcome for learner (if available)
+      if (this.learnerService && typeof this.learnerService.recordOutcome === 'function') {
+        try {
+          await this.learnerService.recordOutcome(result, incident);
+        } catch (err: any) {
+          this.logger.error(`Failed to record outcome with learner: ${err?.message}`);
+        }
+      }
+      
       return result;
     } finally {
       this.decrementActive(incident.organizationId);

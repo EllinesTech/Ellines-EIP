@@ -24,8 +24,8 @@ export class Neo4jProvider implements OnModuleDestroy {
     try {
       this.driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
       this.logger.log(`Neo4j driver initialized: ${uri}`);
-    } catch (error) {
-      this.logger.error(`Failed to initialize Neo4j driver: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to initialize Neo4j driver: ${error?.message ?? String(error)}`);
     }
   }
 
