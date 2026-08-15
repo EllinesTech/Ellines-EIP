@@ -2,6 +2,18 @@
  * Security Anomaly Controller
  *
  * REST endpoints for security anomaly detection management.
+ *
+ * Routes:
+ *   POST   /security/sessions                  — Register a session for monitoring
+ *   POST   /security/analyze                   — Full session security analysis
+ *   POST   /security/privilege-escalation-check — Check single endpoint access
+ *   GET    /security/events                    — List security events for org
+ *   PATCH  /security/events/:id/resolve        — Resolve / close an event
+ *   POST   /security/protective-action         — Execute a protective action manually
+ *   GET    /security/baseline/:userId          — Get user behavior baseline
+ *   GET    /security/reports                   — List incident reports for org
+ *   GET    /security/reports/:incidentId       — Get a specific incident report
+ *
  * Requirements: 15.1–15.8
  */
 
@@ -14,24 +26,24 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { SecurityAnomalyDetectorService } from './security-anomaly-detector.service';
+import { AnomalyDetectionEngineService } from './anomaly-detection-engine.service';
+import { SecurityIncidentReportGeneratorService } from './security-incident-report-generator.service';
 import {
-  UserSession,
-  SecurityPolicy,
-  SecurityEventType,
   ProtectiveActionType,
+  UserSession,
+  SecurityEventType,
 } from './security-anomaly.interfaces';
 
-// ── Request DTOs ─────────────────────────────────────────────────────────────
+// ── DTOs ─────────────────────────────────────────────────────────────────────
 
-export class RegisterSessionDto implements UserSession {
+export class RegisterSessionDto {
   sessionId!: string;
   userId!: string;
   organizationId!: string;
   ipAddress!: string;
   countryCode!: string;
-  startedAt!: Date;
-  lastActivityAt!: Date;
+  startedAt!: string | Date;
+  lastActivityAt!: string | Date;
   requestCount!: number;
   dataAccessedBytes!: number;
   exportVolumeBytes!: number;
@@ -40,25 +52,18 @@ export class RegisterSessionDto implements UserSession {
 }
 
 export class AnalyzeSessionDto {
-  session!: UserSession;
+  session!: RegisterSessionDto;
+  role?: string;
+  department?: string;
   autoRemediate?: boolean;
 }
 
 export class PrivEscCheckDto {
   userId!: string;
   organizationId!: string;
-  sessionId!: string;
+  sessionId?: string;
   attemptedEndpoint!: string;
   userRole!: string;
-}
-
-export class UpdatePolicyDto {
-  anomalySensitivity?: number;
-  exfiltrationThresholdMultiplier?: number;
-  impossibleTravelWindowHours?: number;
-  autoRemediationEnabled?: Record<SecurityEventType, boolean>;
-  notifyChannels?: Array<'email' | 'in_app' | 'webhook'>;
-  webhookUrl?: string;
 }
 
 export class ProtectiveActionDto {
@@ -67,54 +72,60 @@ export class ProtectiveActionDto {
   action!: ProtectiveActionType;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function toSession(dto: RegisterSessionDto): UserSession {
+  return {
+    ...dto,
+    startedAt: new Date(dto.startedAt),
+    lastActivityAt: new Date(dto.lastActivityAt),
+  };
+}
+
 // ── Controller ────────────────────────────────────────────────────────────────
 
 @Controller('security')
 export class SecurityAnomalyController {
-  constructor(private readonly detector: SecurityAnomalyDetectorService) {}
+  constructor(
+    private readonly engine: AnomalyDetectionEngineService,
+    private readonly reportGen: SecurityIncidentReportGeneratorService,
+  ) {}
+
+  // ── Session ─────────────────────────────────────────────────────────────────
 
   /**
-   * Register an active session for monitoring.
+   * Register an active session for monitoring (impossible-travel detection).
    * POST /security/sessions
    */
   @Post('sessions')
   registerSession(@Body() dto: RegisterSessionDto) {
-    const session: UserSession = {
-      ...dto,
-      startedAt: new Date(dto.startedAt),
-      lastActivityAt: new Date(dto.lastActivityAt),
-    };
-    this.detector.registerSession(session);
+    const session = toSession(dto);
+    this.engine.travelDetector.registerSession(session);
     return { registered: true, sessionId: session.sessionId };
   }
 
+  // ── Analysis ─────────────────────────────────────────────────────────────────
+
   /**
-   * Analyze a session for security anomalies and optionally auto-remediate.
+   * Run full security analysis for a session.
    * POST /security/analyze
    */
   @Post('analyze')
   async analyzeSession(@Body() dto: AnalyzeSessionDto) {
-    const session: UserSession = {
-      ...dto.session,
-      startedAt: new Date(dto.session.startedAt),
-      lastActivityAt: new Date(dto.session.lastActivityAt),
+    const session = toSession(dto.session);
+    const role = dto.role ?? 'staff';
+    const department = dto.department ?? 'general';
+    const autoRemediate = dto.autoRemediate !== false;
+
+    const result = await this.engine.analyzeSession(session, role, department, autoRemediate);
+    return {
+      eventsDetected: result.events.length,
+      protectiveActionsCount: result.protectiveActionsCount,
+      reports: result.reports,
     };
-    this.detector.registerSession(session);
-
-    const events = await this.detector.analyzeSession(session);
-
-    const reports = [];
-    for (const event of events) {
-      let actionsTaken = [];
-      if (dto.autoRemediate !== false) {
-        actionsTaken = await this.detector.autoRemediate(event);
-      }
-      const report = this.detector.generateIncidentReport(event, actionsTaken);
-      reports.push(report);
-    }
-
-    return { eventsDetected: events.length, reports };
   }
+
+  // ── Privilege Escalation ──────────────────────────────────────────────────────
 
   /**
    * Check for privilege escalation on a specific endpoint access attempt.
@@ -122,7 +133,7 @@ export class SecurityAnomalyController {
    */
   @Post('privilege-escalation-check')
   checkPrivilegeEscalation(@Body() dto: PrivEscCheckDto) {
-    const event = this.detector.detectPrivilegeEscalation(
+    const result = this.engine.checkPrivilegeEscalation(
       dto.userId,
       dto.organizationId,
       dto.sessionId,
@@ -130,13 +141,14 @@ export class SecurityAnomalyController {
       dto.userRole,
     );
 
-    if (!event) {
-      return { detected: false };
-    }
-
-    const report = this.detector.generateIncidentReport(event, []);
-    return { detected: true, event, report };
+    return {
+      detected: result.detected,
+      event: result.event ?? null,
+      report: result.report ?? null,
+    };
   }
+
+  // ── Events ──────────────────────────────────────────────────────────────────
 
   /**
    * Get security events for an organization.
@@ -148,7 +160,7 @@ export class SecurityAnomalyController {
     @Query('unresolved') unresolved?: string,
     @Query('limit') limit?: string,
   ) {
-    const events = this.detector.getSecurityEvents(orgId, {
+    const events = this.engine.getSecurityEvents(orgId, {
       unresolved: unresolved === 'true',
       limit: limit ? parseInt(limit, 10) : 50,
     });
@@ -161,24 +173,28 @@ export class SecurityAnomalyController {
    */
   @Patch('events/:eventId/resolve')
   resolveEvent(@Param('eventId') eventId: string) {
-    const resolved = this.detector.resolveEvent(eventId);
+    const resolved = this.engine.resolveEvent(eventId);
     return { resolved, eventId };
   }
 
+  // ── Protective Actions ──────────────────────────────────────────────────────
+
   /**
-   * Execute a protective action for an event.
+   * Execute a protective action manually for a detected event.
    * POST /security/protective-action
    */
   @Post('protective-action')
   async executeProtectiveAction(@Body() dto: ProtectiveActionDto) {
-    const events = this.detector.getSecurityEvents(dto.organizationId);
+    const events = this.engine.getSecurityEvents(dto.organizationId);
     const event = events.find((e) => e.id === dto.eventId);
     if (!event) {
       return { success: false, error: 'Event not found' };
     }
-    const result = await this.detector.executeProtectiveAction(event, dto.action);
+    const result = await this.engine.protection.executeProtectiveAction(event, dto.action);
     return { success: result.success, result };
   }
+
+  // ── Baselines ───────────────────────────────────────────────────────────────
 
   /**
    * Get behavior baseline for a user.
@@ -186,25 +202,49 @@ export class SecurityAnomalyController {
    */
   @Get('baseline/:userId')
   getBaseline(@Param('userId') userId: string) {
-    const baseline = this.detector.getBaseline(userId);
+    const baseline = this.engine.profiler.getUserBaseline(userId);
     return baseline ?? { userId, message: 'No baseline established yet' };
   }
 
   /**
-   * Get security policy for an organization.
-   * GET /security/policy/:orgId
+   * List all baselines for an organization.
+   * GET /security/baseline/org/:orgId
    */
-  @Get('policy/:orgId')
-  getPolicy(@Param('orgId') orgId: string) {
-    return this.detector.getEffectivePolicy(orgId);
+  @Get('baseline/org/:orgId')
+  getOrgBaselines(@Param('orgId') orgId: string) {
+    const baselines = this.engine.profiler.listOrganizationBaselines(orgId);
+    return { baselines, count: baselines.length };
+  }
+
+  // ── Reports ─────────────────────────────────────────────────────────────────
+
+  /**
+   * List security incident reports for an organization.
+   * GET /security/reports?orgId=xxx&eventType=data_exfiltration&limit=20
+   */
+  @Get('reports')
+  listReports(
+    @Query('orgId') orgId: string,
+    @Query('eventType') eventType?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const reports = this.reportGen.listReports(orgId, {
+      eventType: eventType as SecurityEventType | undefined,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
+    return { reports, total: reports.length };
   }
 
   /**
-   * Update security policy for an organization.
-   * PATCH /security/policy/:orgId
+   * Get a specific security incident report.
+   * GET /security/reports/:incidentId
    */
-  @Patch('policy/:orgId')
-  updatePolicy(@Param('orgId') orgId: string, @Body() dto: UpdatePolicyDto) {
-    return this.detector.setPolicy(orgId, dto);
+  @Get('reports/:incidentId')
+  getReport(@Param('incidentId') incidentId: string) {
+    const report = this.reportGen.getReport(incidentId);
+    if (!report) {
+      return { error: 'Report not found', incidentId };
+    }
+    return report;
   }
 }

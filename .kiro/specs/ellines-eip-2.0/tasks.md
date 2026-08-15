@@ -181,7 +181,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - **Property 6: Confidence threshold enforcement** — Remediation only executes when confidence >= 85%
   - **Validates: Requirements 5.2**
 
-- [-] 3.4 Build Self-Healing Learner service
+- [x] 3.4 Build Self-Healing Learner service
   - Create LearnerService within self-healing microservice
   - Implement outcome recording for all remediation attempts
   - Build pattern analyzer identifying successful remediation strategies
@@ -218,7 +218,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - **Validates: Requirements 12.2**
 
 
-- [-] 3.8 Build Advanced Security and Anomaly Detection
+- [~] 3.8 Build Advanced Security and Anomaly Detection
   - Extend AnomalyDetectionEngine in self-healing service
   - Implement user behavior profiling per role and department
   - Add data exfiltration detection (large downloads, unusual exports)
@@ -269,7 +269,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - Add dashboard sharing with permissions
   - _Requirements: 7.1, 8.1, 9.1, 10.1, 20.1, 20.2, 20.3, 20.4_
 
-- [-] 5.2 Build Widget Library with visualization types
+- [~] 5.2 Build Widget Library with visualization types
   - Implement 20+ widget types: KPI cards, line charts, bar charts, pie charts, heat maps, network graphs, Sankey, gauges, sparklines, tables, maps, timelines, radar, waterfall, funnel, scatter, box plots, treemap
   - Create widget renderer supporting all visualization types
   - Add AI insight widget type for Ellinea recommendations
@@ -341,7 +341,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
 
 ### 6. Universal Operations Engine
 
-- [ ] 6.1 Build Document Generation Service
+- [~] 6.1 Build Document Generation Service
   - Create `services/document-generation` NestJS service
   - Implement Excel workbook generator with sheets, formulas, charts, pivot tables
   - Build PDF generator with custom layouts, branding, headers/footers, visualizations
@@ -496,7 +496,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
 
 ### 9. Context-Aware Personalization
 
-- [~] 9.1 Build Personalization Service
+- [ ] 9.1 Build Personalization Service
   - Create PersonalizationService in identity or new service
   - Implement user context profiler (role, department, access patterns, preferences)
   - Build adaptive dashboard content generator

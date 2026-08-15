@@ -132,6 +132,8 @@ export interface SecurityPolicy {
   exfiltrationThresholdMultiplier: number;
   /** Impossible travel: max hours between two geo-separated sessions */
   impossibleTravelWindowHours: number;
+  /** Absolute max export bytes before triggering exfiltration flag (default 500 MB) */
+  maxExportBytesAbsolute?: number;
   /** Whether protective auto-remediation is enabled per event type */
   autoRemediationEnabled: Record<SecurityEventType, boolean>;
   /** Notification channels */
