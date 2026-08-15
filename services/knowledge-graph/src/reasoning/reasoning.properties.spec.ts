@@ -164,7 +164,7 @@ const arbitraryGraphEdge = fc
     fc.hexaString({ minLength: 4, maxLength: 8 }),
     fc.hexaString({ minLength: 4, maxLength: 8 }),
     fc.constantFrom('causedBy', 'relatedTo', 'correlatedWith', 'precedesIn', 'partOf'),
-    fc.float({ min: 0, max: 1, noNaN: true }),
+    fc.integer({ min: 0, max: 100 }).map(v => v / 100), // 0.0 to 1.0
   )
   .map(([fromId, toId, edgeType, conf]) => buildGraphEdge(fromId, toId, edgeType, conf));
 
@@ -187,7 +187,7 @@ const arbitraryEvidenceLink = fc
     fc.hexaString({ minLength: 4, maxLength: 8 }),
     fc.constantFrom('Entity', 'Event', 'Metric'),
     fc.constantFrom('ERP', 'CRM', 'HRMS', 'Accounting'),
-    fc.float({ min: 0.1, max: 1.0, noNaN: true }),
+    fc.integer({ min: 10, max: 100 }).map(v => v / 100), // 0.1 to 1.0
   )
   .map(([entityId, entityType, system, strength]) =>
     buildEvidenceLink(entityId, entityType, system, strength),
@@ -201,7 +201,7 @@ const arbitraryConclusion = fc
     fc.string({ minLength: 10, maxLength: 100 }),
     fc.array(fc.hexaString({ minLength: 4, maxLength: 8 }), { minLength: 1, maxLength: 5 }),
     fc.array(fc.constantFrom('ERP', 'CRM', 'HRMS', 'Accounting'), { minLength: 1, maxLength: 3 }),
-    fc.float({ min: 0.3, max: 1.0, noNaN: true }),
+    fc.integer({ min: 30, max: 100 }).map(v => v / 100), // 0.3 to 1.0
   )
   .map(([statement, entityIds, systems, conf]) =>
     buildConclusion(statement, entityIds, systems, conf),
