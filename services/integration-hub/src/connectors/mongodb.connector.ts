@@ -30,7 +30,7 @@ export class MongoDBConnector {
 
     // Dynamic import to avoid hard dependency when mongo isn't installed
     try {
-      const { MongoClient } = await import('mongodb');
+      const { MongoClient } = (await import('mongodb' as any)) as any;
       const client = new MongoClient(config.connectionString, {
         serverSelectionTimeoutMS: config.timeout ?? 5000,
       });
@@ -38,8 +38,9 @@ export class MongoDBConnector {
       this.clients.set(config.connectionString, client);
       this.logger.log(`MongoDB connected: ${config.database}`);
       return client;
-    } catch (error) {
-      this.logger.error(`MongoDB connection failed: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`MongoDB connection failed: ${msg}`);
       throw error;
     }
   }
