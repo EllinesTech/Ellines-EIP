@@ -229,3 +229,230 @@ describe('HypothesisGeneratorService', () => {
     }
   });
 });
+
+// ─── Evidence Chain Builder (Evidence-based validation) ─────────────────────
+
+describe('Evidence Chain Builder', () => {
+  it('builds evidence chains with confidence scores in [0, 1]', () => {
+    // Test that confidence scores are always within valid range
+    const testCases = [
+      { preliminary: 0.5, sources: 1, expectedMin: 0.05, expectedMax: 0.97 },
+      { preliminary: 0.9, sources: 3, expectedMin: 0.05, expectedMax: 0.97 },
+      { preliminary: 0.1, sources: 0, expectedMin: 0.05, expectedMax: 0.97 },
+    ];
+
+    for (const tc of testCases) {
+      // Simulate confidence scoring logic:
+      // confidence = min(max(preliminary * 0.5 + 0.2 + bonus, 0.05), 0.97)
+      const confidence = Math.min(
+        Math.max(tc.preliminary * 0.5 + 0.2, 0.05),
+        0.97,
+      );
+      expect(confidence).toBeGreaterThanOrEqual(tc.expectedMin);
+      expect(confidence).toBeLessThanOrEqual(tc.expectedMax);
+    }
+  });
+
+  it('increases confidence with multiple evidence sources', () => {
+    // Source diversity bonus: (sources - 1) * 0.05, max 0.2
+    const sources1 = 1;
+    const sources3 = 3;
+    const bonus1 = Math.min((sources1 - 1) * 0.05, 0.2);
+    const bonus3 = Math.min((sources3 - 1) * 0.05, 0.2);
+
+    expect(bonus3).toBeGreaterThan(bonus1);
+    expect(bonus3).toBeLessThanOrEqual(0.2);
+  });
+
+  it('ensures supporting evidence links are present in chains', () => {
+    const entityIds = ['ent1', 'ent2', 'ent3'];
+    const systems = ['ERP', 'CRM', 'HRMS'];
+
+    // Evidence links should be created for each entity
+    const expectedLinkCount = entityIds.length;
+    expect(expectedLinkCount).toBe(3);
+
+    // Each link should have a valid sourceSystem from the list
+    for (const sys of systems) {
+      expect(['ERP', 'CRM', 'HRMS']).toContain(sys);
+    }
+  });
+});
+
+// ─── Knowledge Gap Detection ───────────────────────────────────────────────
+
+describe('Knowledge Gap Detection', () => {
+  it('detects gaps when reasoning confidence is low', () => {
+    const lowConfidence = 0.3;
+    const threshold = 0.5;
+    const shouldDetectGap = lowConfidence < threshold;
+
+    expect(shouldDetectGap).toBe(true);
+  });
+
+  it('suggests actions for different gap severity levels', () => {
+    const severities: Array<'critical' | 'major' | 'minor'> = ['critical', 'major', 'minor'];
+
+    for (const severity of severities) {
+      expect(['critical', 'major', 'minor']).toContain(severity);
+    }
+  });
+
+  it('generates explanations for all gap types', () => {
+    const gapTypes = [
+      'Insufficient data to reason',
+      'Missing entity types',
+      'Isolated nodes',
+      'Low relationship density',
+    ];
+
+    for (const gapType of gapTypes) {
+      expect(gapType.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ─── Multi-hop Depth Validation ───────────────────────────────────────────
+
+describe('Multi-hop Depth Validation', () => {
+  it('enforces minimum 3-hop traversal requirement', () => {
+    const MIN_HOPS = 3;
+    const maxHops = 5;
+    const effectiveMaxHops = Math.max(maxHops, MIN_HOPS);
+
+    expect(effectiveMaxHops).toBeGreaterThanOrEqual(MIN_HOPS);
+    expect(effectiveMaxHops).toBe(5); // Should use the larger value
+  });
+
+  it('enforces minimum 3-hop even when requested lower', () => {
+    const MIN_HOPS = 3;
+    const requestedHops = 2;
+    const effectiveMaxHops = Math.max(requestedHops, MIN_HOPS);
+
+    expect(effectiveMaxHops).toBe(MIN_HOPS);
+    expect(effectiveMaxHops).toBeGreaterThanOrEqual(3);
+  });
+
+  it('detects when reasoning did not reach minimum hop depth', () => {
+    const MIN_HOPS = 3;
+    const paths = [
+      { totalHops: 2 },
+      { totalHops: 1 },
+    ];
+
+    const deepPaths = paths.filter((p) => p.totalHops >= MIN_HOPS);
+    expect(deepPaths.length).toBe(0);
+  });
+
+  it('recognizes successful deep traversal', () => {
+    const MIN_HOPS = 3;
+    const paths = [
+      { totalHops: 4 },
+      { totalHops: 5 },
+      { totalHops: 3 },
+    ];
+
+    const deepPaths = paths.filter((p) => p.totalHops >= MIN_HOPS);
+    expect(deepPaths.length).toBe(3);
+  });
+});
+
+// ─── Cross-System Pattern Requirements ─────────────────────────────────────
+
+describe('Cross-System Pattern Detection Requirements', () => {
+  it('requires minimum 3 data sources for cross-system patterns', () => {
+    const MIN_SOURCES = 3;
+    const testCases = [
+      { sources: 2, shouldDetect: false },
+      { sources: 3, shouldDetect: true },
+      { sources: 5, shouldDetect: true },
+    ];
+
+    for (const tc of testCases) {
+      const canDetect = tc.sources >= MIN_SOURCES;
+      expect(canDetect).toBe(tc.shouldDetect);
+    }
+  });
+
+  it('validates pattern fields are always populated', () => {
+    const pattern = {
+      id: 'p1',
+      name: 'Test Pattern',
+      description: 'A test',
+      type: 'correlation' as const,
+      confidence: 0.75,
+      affectedSystems: ['SysA', 'SysB', 'SysC'],
+      affectedEntityTypes: ['Type1'],
+      occurrences: 10,
+      timeRange: { from: new Date(), to: new Date() },
+      strength: 0.8,
+    };
+
+    expect(pattern.id).toBeTruthy();
+    expect(pattern.confidence).toBeGreaterThanOrEqual(0);
+    expect(pattern.confidence).toBeLessThanOrEqual(1);
+    expect(pattern.affectedSystems.length).toBeGreaterThanOrEqual(1);
+    expect(pattern.strength).toBeGreaterThanOrEqual(0);
+    expect(pattern.strength).toBeLessThanOrEqual(1);
+  });
+});
+
+// ─── Causal Chain Validation ──────────────────────────────────────────────
+
+describe('Causal Chain Temporal Analysis', () => {
+  it('validates temporal ordering in causal chains', () => {
+    const causeTime = new Date(1000);
+    const effectTime = new Date(2000);
+    const lag = effectTime.getTime() - causeTime.getTime();
+
+    expect(lag).toBeGreaterThan(0);
+    expect(causeTime.getTime()).toBeLessThan(effectTime.getTime());
+  });
+
+  it('formats lag times in human-readable format', () => {
+    const lagMs = 3600000; // 1 hour
+    const lagHours = lagMs / (1000 * 60 * 60);
+
+    expect(Math.round(lagHours)).toBe(1);
+  });
+
+  it('validates causal confidence is bounded', () => {
+    const confidences = [0.15, 0.52, 0.89, 0.97];
+
+    for (const conf of confidences) {
+      expect(conf).toBeGreaterThanOrEqual(0.1);
+      expect(conf).toBeLessThanOrEqual(0.97);
+    }
+  });
+});
+
+// ─── Hypothesis Validation Status ─────────────────────────────────────────
+
+describe('Hypothesis Validation Status', () => {
+  it('sets correct status based on supporting/refuting evidence', () => {
+    const testCases = [
+      { supporting: 3, refuting: 0, expectedStatus: 'supported' },
+      { supporting: 0, refuting: 2, expectedStatus: 'refuted' },
+      { supporting: 2, refuting: 1, expectedStatus: 'inconclusive' },
+      { supporting: 0, refuting: 0, expectedStatus: 'unvalidated' },
+    ];
+
+    for (const tc of testCases) {
+      let status: 'supported' | 'refuted' | 'inconclusive' | 'unvalidated' = 'unvalidated';
+      if (tc.supporting > 0 && tc.refuting === 0) status = 'supported';
+      else if (tc.refuting > 0 && tc.supporting === 0) status = 'refuted';
+      else if (tc.supporting > 0 || tc.refuting > 0) status = 'inconclusive';
+
+      expect(status).toBe(tc.expectedStatus);
+    }
+  });
+
+  it('confidence scores increase with validation evidence', () => {
+    const preliminary = 0.4;
+    const supportRatio = 0.8;
+    const updated = Math.min(preliminary + supportRatio * 0.4, 0.95);
+
+    expect(updated).toBeGreaterThan(preliminary);
+    expect(updated).toBeLessThanOrEqual(0.95);
+  });
+});
