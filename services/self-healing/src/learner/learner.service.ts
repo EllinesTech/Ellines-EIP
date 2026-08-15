@@ -12,81 +12,38 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { RemediationResult, RemediationAction, Incident } from '../remediation/remediation.service';
+import {
+  TimeRange,
+  ManualFix,
+  ManualAction,
+  NewStrategy,
+  UpdatedStrategy,
+  ImpactEstimate,
+  Recommendation,
+  FederatedContribution,
+  AnonymizedStrategy,
+  RecurringIssue,
+  RemediationOutcome,
+  StrategyPattern,
+} from './learner.interfaces';
 
-// ── Domain interfaces ───────────────────────────────────────────────────────
+// Re-export for backward compatibility
+export {
+  TimeRange,
+  ManualFix,
+  ManualAction,
+  NewStrategy,
+  UpdatedStrategy,
+  ImpactEstimate,
+  Recommendation,
+  FederatedContribution,
+  AnonymizedStrategy,
+  RecurringIssue,
+  RemediationOutcome,
+};
 
-export interface TimeRange {
-  from: Date;
-  to: Date;
-}
-
-export interface Pattern {
-  errorPattern: string;
-  occurrenceCount: number;
-  successRate: number;
-  commonActions: RemediationAction[];
-  avgTimeTaken: number;
-}
-
-export interface ManualFix {
-  incidentId: string;
-  adminId: string;
-  actions: ManualAction[];
-  resolution: string;
-  timeTaken: number;
-}
-
-export interface ManualAction {
-  description: string;
-  target: string;
-  type: string;
-  parameters?: Record<string, any>;
-}
-
-export interface NewStrategy {
-  errorPattern: string;
-  learnedActions: RemediationAction[];
-  confidence: number;
-  requiresApproval: boolean;
-  candidateId?: string;
-}
-
-export interface UpdatedStrategy {
-  errorPattern: string;
-  oldThreshold: number;
-  newThreshold: number;
-  successRate: number;
-  executionCount: number;
-}
-
-export interface ImpactEstimate {
-  affectedIncidentsPerMonth: number;
-  estimatedMttrReductionMinutes: number;
-  confidenceLevel: 'low' | 'medium' | 'high';
-}
-
-export interface Recommendation {
-  type: 'architecture' | 'configuration' | 'monitoring';
-  description: string;
-  rationale: string;
-  preventedErrorTypes: string[];
-  estimatedImpact: ImpactEstimate;
-  id?: string;
-}
-
-export interface FederatedContribution {
-  contributedPatterns: number;
-  anonymizedStrategies: AnonymizedStrategy[];
-  organizationId: string;
-  timestamp: Date;
-}
-
-export interface AnonymizedStrategy {
-  errorPatternHash: string;
-  actionTypes: string[];
-  successRate: number;
-  executionCount: number;
-}
+/** @deprecated Use StrategyPattern from learner.interfaces instead */
+export type Pattern = StrategyPattern;
 
 // ── Service ─────────────────────────────────────────────────────────────────
 
@@ -163,7 +120,7 @@ export class LearnerService implements OnModuleDestroy {
    * and promote promising new strategies.
    * Req 6.2: Analyze successful remediations to identify patterns and add new strategies.
    */
-  async analyzeSuccesses(timeWindow: TimeRange): Promise<Pattern[]> {
+  async analyzeSuccesses(timeWindow: TimeRange): Promise<StrategyPattern[]> {
     this.logger.log(
       `Analyzing successes from ${timeWindow.from.toISOString()} to ${timeWindow.to.toISOString()}`,
     );
@@ -189,7 +146,7 @@ export class LearnerService implements OnModuleDestroy {
       grouped.get(key)!.push(exec);
     }
 
-    const patterns: Pattern[] = [];
+    const patterns: StrategyPattern[] = [];
 
     for (const [errorPattern, group] of grouped.entries()) {
       const successCount = group.length;
@@ -292,16 +249,24 @@ export class LearnerService implements OnModuleDestroy {
   }
 
   /**
-   * Adjust the confidence threshold for a remediation strategy based on historical success rates.
+   * EMA smoothing factor for confidence threshold adjustment.
+   * Alpha = 0.2 means 20% weight on the latest observation, 80% retained.
+   * Req 6.4: Use EMA to adjust confidence thresholds.
+   */
+  private readonly EMA_ALPHA = 0.2;
+
+  /**
+   * Adjust the confidence threshold for a remediation strategy using EMA.
    * Req 6.4: Adjust confidence thresholds for Auto_Remediation actions based on historical success rates.
    *
-   * Rules:
-   * - High success rate (>= 90%): lower threshold by STEP (easier to trigger auto-remediation)
-   * - Low success rate (<= 60%): raise threshold by STEP (require more confidence before acting)
-   * - Otherwise: no change
+   * EMA formula: new_threshold = alpha * target + (1 - alpha) * current
+   * Target is derived from success rate:
+   *   - High success (>= 90%): target = 0.75 (allow easier triggering)
+   *   - Low success  (<= 60%): target = 0.95 (require higher confidence)
+   *   - Otherwise: no adjustment
    */
   async adjustThresholds(errorPattern: string): Promise<UpdatedStrategy> {
-    this.logger.log(`Adjusting confidence threshold for pattern: ${errorPattern}`);
+    this.logger.log(`Adjusting confidence threshold via EMA for pattern: ${errorPattern}`);
 
     const playbook = await this.prisma.remediationPlaybook.findFirst({
       where: { errorPattern, isActive: true },
@@ -318,26 +283,35 @@ export class LearnerService implements OnModuleDestroy {
 
     // Only adjust after sufficient executions to have statistical validity
     if (executionCount >= 10) {
+      let target: number | null = null;
+
       if (successRate >= 0.9) {
-        // Lower threshold: strategy is very reliable — trigger it more readily
-        newThreshold = Math.max(0.5, oldThreshold - this.THRESHOLD_ADJUSTMENT_STEP);
+        // Lower threshold target: strategy is very reliable — trigger more readily
+        target = Math.max(0.5, oldThreshold - this.THRESHOLD_ADJUSTMENT_STEP);
         this.logger.log(
-          `Pattern "${errorPattern}" has high success (${(successRate * 100).toFixed(1)}%) — lowering threshold ${oldThreshold} → ${newThreshold}`,
+          `Pattern "${errorPattern}" has high success (${(successRate * 100).toFixed(1)}%) — EMA target toward lower threshold`,
         );
       } else if (successRate <= 0.6) {
-        // Raise threshold: strategy is unreliable — require higher confidence before acting
-        newThreshold = Math.min(0.99, oldThreshold + this.THRESHOLD_ADJUSTMENT_STEP);
+        // Raise threshold target: strategy is unreliable — require higher confidence
+        target = Math.min(0.99, oldThreshold + this.THRESHOLD_ADJUSTMENT_STEP);
         this.logger.log(
-          `Pattern "${errorPattern}" has low success (${(successRate * 100).toFixed(1)}%) — raising threshold ${oldThreshold} → ${newThreshold}`,
+          `Pattern "${errorPattern}" has low success (${(successRate * 100).toFixed(1)}%) — EMA target toward higher threshold`,
         );
       } else {
         this.logger.log(
           `Pattern "${errorPattern}" success rate ${(successRate * 100).toFixed(1)}% within normal range — no threshold adjustment`,
         );
       }
+
+      if (target !== null) {
+        // Apply EMA: smooth transition toward target
+        newThreshold = this.EMA_ALPHA * target + (1 - this.EMA_ALPHA) * oldThreshold;
+        // Round to 3 decimal places
+        newThreshold = Math.round(newThreshold * 1000) / 1000;
+      }
     } else {
       this.logger.log(
-        `Pattern "${errorPattern}" has only ${executionCount} executions — insufficient data for threshold adjustment (need >= 10)`,
+        `Pattern "${errorPattern}" has only ${executionCount} executions — insufficient data for EMA adjustment (need >= 10)`,
       );
     }
 
