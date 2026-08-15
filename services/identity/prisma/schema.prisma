@@ -54,6 +54,10 @@ model Organization {
   apiUsage               ApiUsage[]              // B.3.2: API usage tracking
   organizationTier       OrganizationTier?       // B.3.2: Rate limit tier
   rateLimitViolations    RateLimitViolation[]    // B.3.2: Rate limit violations
+  userContextProfiles    UserContextProfile[]    @relation("UserContextProfiles")  // v2.0: Personalization user contexts
+  interactionLogs        InteractionLog[]        @relation("InteractionLogs")  // v2.0: Personalization interaction logs
+  notificationPrefs      NotificationPreference[] @relation("NotificationPreferences") // v2.0: Personalization notification preferences
+  shortcutSuggestions    ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -111,9 +115,203 @@ model User {
   ssoProviderUsers    SsoProviderUser[]
   apiUsage            ApiUsage[]              // B.3.2: API usage tracking
   rateLimitViolations RateLimitViolation[]    // B.3.2: Rate limit violations
+  contextProfile      UserContextProfile?    // v2.0: Personalization context
+  shortcutSuggestions ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
 
   @@index([organizationId])
   @@map("users")
+}
+
+// ─── v2.0 — Context-Aware Personalization ───────────────────────────────────
+
+/**
+ * UserContextProfile — Stores learned user context for personalization.
+ * Includes role, department, access patterns, and interaction behaviors.
+ * Used by PersonalizationService for dashboard adaptation and AI response tailoring.
+ */
+model UserContextProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  organizationId    String   @map("organization_id")
+  
+  // Demographic context
+  role              String                           // Matches User.role at profile creation
+  department        String?                          // Department name (from org structure)
+  jobTitle          String?  @map("job_title")
+  
+  // Behavioral patterns (learned from interactions)
+  frequentlyAccessedDataTypes String[]  @default([]) @map("frequently_accessed_data_types")  // e.g., ["orders", "customers", "products"]
+  frequentlyUsedFeatures      String[]  @default([]) @map("frequently_used_features")        // e.g., ["dashboard", "reports", "search"]
+  preferredDashboardWidgets   String[]  @default([]) @map("preferred_dashboard_widgets")     // e.g., ["kpi_card", "line_chart"]
+  
+  // Interaction metrics
+  totalLogins         Int      @default(0) @map("total_logins")
+  lastLoginAt         DateTime? @map("last_login_at")
+  averageSessionTime  Int      @default(0) @map("average_session_time")  // In seconds
+  
+  // Preferences metadata
+  preferredLanguage   String   @default("en") @map("preferred_language")
+  preferredTimezone   String   @default("UTC") @map("preferred_timezone")
+  
+  // AI response preferences
+  verbosityLevel      String   @default("medium") @map("verbosity_level")      // "concise" | "medium" | "detailed"
+  preferredTerminology String  @default("business") @map("preferred_terminology") // "technical" | "business" | "simple"
+  
+  // Metadata
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  lastProfiledAt      DateTime? @map("last_profiled_at")
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization        Organization @relation("UserContextProfiles", fields: [organizationId], references: [id], onDelete: Cascade)
+  preferences         UserPreference[]
+  interactionLogs     InteractionLog[]
+  notificationPrefs   NotificationPreference?
+  shortcutSuggestions ShortcutSuggestion[]
+
+  @@index([organizationId])
+  @@index([role])
+  @@index([department])
+  @@map("user_context_profiles")
+}
+
+/**
+ * UserPreference — Explicitly set user preferences that override learned behaviors.
+ * Examples: favorite features, dismissed recommendations, feature toggles.
+ */
+model UserPreference {
+  id                String   @id @default(cuid())
+  contextProfileId  String   @map("context_profile_id")
+  
+  // Preference key-value
+  preferenceKey     String                          // e.g., "dismiss_recommendation_onboarding", "favorite_report_id"
+  preferenceValue   Json     @default("{}")
+  
+  // Metadata
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([contextProfileId, preferenceKey])
+  @@index([contextProfileId])
+  @@map("user_preferences")
+}
+
+/**
+ * InteractionLog — Records user interactions for preference learning.
+ * Examples: clicked widget, dismissed recommendation, accessed data, used shortcut.
+ */
+model InteractionLog {
+  id                String   @id @default(cuid())
+  contextProfileId  String   @map("context_profile_id")
+  organizationId    String   @map("organization_id")
+  
+  // Interaction details
+  interactionType   String                          // "widget_click" | "recommendation_dismiss" | "recommendation_accept" | "feature_use" | "data_access" | "shortcut_use"
+  resourceType      String?  @map("resource_type")  // e.g., "dashboard", "widget", "report", "feature"
+  resourceId        String?  @map("resource_id")
+  
+  // Context at time of interaction
+  contextData       Json     @default("{}")         // { "dashboard_id": "...", "widget_type": "kpi_card", ... }
+  
+  // Outcome
+  outcome           String?                         // "accepted" | "dismissed" | "completed" | "abandoned" for analyzing patterns
+  timeSpent         Int?     @map("time_spent")     // In seconds
+  
+  // Metadata
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization      Organization @relation("InteractionLogs", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([contextProfileId])
+  @@index([organizationId])
+  @@index([interactionType])
+  @@index([createdAt])
+  @@map("interaction_logs")
+}
+
+/**
+ * NotificationPreference — Learned notification preferences per user.
+ * Adapts based on read, ignored, and acted-upon patterns.
+ */
+model NotificationPreference {
+  id                String   @id @default(cuid())
+  contextProfileId  String   @unique @map("context_profile_id")
+  organizationId    String   @map("organization_id")
+  
+  // Channel preferences
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  inAppNotifications Boolean @default(true) @map("in_app_notifications")
+  pushNotifications  Boolean @default(true) @map("push_notifications")
+  
+  // Notification types preferences (learned from user behavior)
+  notificationTypes Json    @default("{}") // { "approval_pending": { "enabled": true, "frequency": "immediate" }, ... }
+  
+  // Quiet hours
+  quietHoursStart   String?  @map("quiet_hours_start")     // e.g., "18:00"
+  quietHoursEnd     String?  @map("quiet_hours_end")       // e.g., "08:00"
+  quietHoursEnabled Boolean  @default(false) @map("quiet_hours_enabled")
+  
+  // Learning metrics
+  readRate          Float    @default(0.5) @map("read_rate")           // % of notifications read (0-1)
+  ignoredRate       Float    @default(0.2) @map("ignored_rate")        // % ignored (0-1)
+  actedUponRate     Float    @default(0.3) @map("acted_upon_rate")     // % with action taken (0-1)
+  lastLearningAt    DateTime? @map("last_learning_at")
+  
+  // Metadata
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization      Organization @relation("NotificationPreferences", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("notification_preferences")
+}
+
+/**
+ * ShortcutSuggestion — Context-aware suggested next actions for the user.
+ * Generated based on historical interaction patterns and current context.
+ */
+model ShortcutSuggestion {
+  id                String   @id @default(cuid())
+  contextProfileId  String   @map("context_profile_id")
+  organizationId    String   @map("organization_id")
+  userId            String   @map("user_id")
+  
+  // Suggestion details
+  actionTitle       String                          // e.g., "View pending approvals"
+  actionDescription String   @default("")
+  actionUrl         String                          // e.g., "/app/approvals?status=pending"
+  actionType        String                          // "navigate" | "shortcut" | "workflow"
+  
+  // Scoring & ranking
+  confidence        Float    @default(0.5)          // 0.0-1.0: how likely user will find this useful
+  usageCount        Int      @default(0) @map("usage_count")
+  successCount      Int      @default(0) @map("success_count")  // How many times led to action completion
+  
+  // Context
+  context           Json     @default("{}")         // { "time_of_day": "morning", "day_type": "weekday", ... }
+  basedOnPattern    String?  @map("based_on_pattern")         // Which interaction pattern generated this
+  
+  // Lifecycle
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  expiresAt         DateTime? @map("expires_at")   // Expire old suggestions
+
+  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization      Organization @relation("ShortcutSuggestions", fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User @relation("ShortcutSuggestions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contextProfileId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([confidence])
+  @@index([createdAt])
+  @@map("shortcut_suggestions")
 }
 
 /**
