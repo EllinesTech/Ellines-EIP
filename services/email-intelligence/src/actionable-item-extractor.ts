@@ -26,24 +26,24 @@ export class ActionableItemExtractor {
 
   private readonly actionPatterns = {
     task: [
-      /(?:please|can you|could you|would you|need|require)\s+(\w+(?:\s+\w+){0,5})\s*(?:\?|$|by|before|until)/i,
-      /(?:action item|todo|task):\s*(.+?)(?:\.|$)/i,
-      /(?:need to|should|must)\s+(\w+(?:\s+\w+){0,5})\s*(?:\?|$|by|before)/i,
+      /(?:please|can you|could you|would you|need|require)\s+(\w+(?:\s+\w+){0,5})\s*(?:\?|$|by|before|until)/gi,
+      /(?:action item|todo|task):\s*(.+?)(?:\.|$)/gi,
+      /(?:need to|should|must)\s+(\w+(?:\s+\w+){0,5})\s*(?:\?|$|by|before)/gi,
     ],
     approval: [
-      /(?:please\s+)?(?:approve|reject|review|sign)\s+(?:the\s+)?(.+?)(?:\?|$|by|before)/i,
-      /(?:for\s+)?(?:approval|sign-off|authorization)\s*(?:of\s+)?(.+?)(?:\.|$)/i,
-      /need(?:s)?\s+(?:your\s+)?(?:approval|signature|sign-off)\s+(?:on|for)\s+(.+?)(?:\?|$)/i,
+      /(?:please\s+)?(?:approve|reject|review|sign)\s+(?:the\s+)?(.+?)(?:\?|$|by|before)/gi,
+      /(?:for\s+)?(?:approval|sign-off|authorization)\s*(?:of\s+)?(.+?)(?:\.|$)/gi,
+      /need(?:s)?\s+(?:your\s+)?(?:approval|signature|sign-off)\s+(?:on|for)\s+(.+?)(?:\?|$)/gi,
     ],
     meeting_request: [
-      /(?:let'?s\s+)?(?:schedule|arrange|book|set\s+up|have)\s+(?:a\s+)?(?:meeting|call|sync)\s+(?:on|for)?\s*(.+?)(?:\?|$)/i,
-      /meeting request:\s*(.+?)(?:\n|$)/i,
-      /(?:want to|would like to)\s+(?:meet|discuss)\s+(?:about|regarding)\s+(.+?)(?:\?|$)/i,
+      /(?:let'?s\s+)?(?:schedule|arrange|book|set\s+up|have)\s+(?:a\s+)?(?:meeting|call|sync)\s+(?:on|for)?\s*(.+?)(?:\?|$)/gi,
+      /meeting request:\s*(.+?)(?:\n|$)/gi,
+      /(?:want to|would like to)\s+(?:meet|discuss)\s+(?:about|regarding)\s+(.+?)(?:\?|$)/gi,
     ],
     information_request: [
-      /(?:can\s+you\s+)?(?:provide|send|share)\s+(?:the|me|us)?\s*(?:information|details|data|report)\s+(?:on|about|for)\s+(.+?)(?:\?|$)/i,
-      /(?:need|require)\s+(?:information|details|data)\s+(?:on|about|for|regarding)\s+(.+?)(?:\?|$)/i,
-      /(?:what\s+)?(?:is|are)\s+(.+?)(?:\?|$)/i,
+      /(?:can\s+you\s+)?(?:provide|send|share)\s+(?:the|me|us)?\s*(?:information|details|data|report)\s+(?:on|about|for)\s+(.+?)(?:\?|$)/gi,
+      /(?:need|require)\s+(?:information|details|data)\s+(?:on|about|for|regarding)\s+(.+?)(?:\?|$)/gi,
+      /(?:what\s+)?(?:is|are)\s+(.+?)(?:\?|$)/gi,
     ],
   };
 

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
-import * as Imap from 'imap';
+import Imap from 'imap';
 import { simpleParser } from 'mailparser';
 
 export interface EmailAccount {
@@ -103,7 +103,7 @@ export class EmailAccountConnector {
 
       return {
         accessToken: tokens.access_token || '',
-        refreshToken: tokens.refresh_token,
+        refreshToken: tokens.refresh_token || undefined,
         expiresIn: tokens.expiry_date ? Math.floor((tokens.expiry_date - Date.now()) / 1000) : 3600,
       };
     } catch (error) {
@@ -152,7 +152,7 @@ export class EmailAccountConnector {
         resolve(false);
       }, 5000);
 
-      imap.on('error', (err) => {
+      imap.on('error', (err: any) => {
         this.logger.error(`Outlook connection error: ${err}`);
         clearTimeout(timeout);
         resolve(false);
@@ -213,7 +213,7 @@ export class EmailAccountConnector {
         resolve(imap);
       });
 
-      imap.on('error', (err) => {
+      imap.on('error', (err: any) => {
         clearTimeout(timeout);
         reject(err);
       });
@@ -266,8 +266,8 @@ export class EmailAccountConnector {
 
         const f = imap.seq.fetch('1:' + Math.min(limit, box.messages.total), { bodies: '' });
 
-        f.on('message', (msg, seqno) => {
-          simpleParser(msg, async (err, parsed) => {
+        f.on('message', (msg: any, seqno: number) => {
+          simpleParser(msg, async (err: any, parsed: any) => {
             if (err) {
               this.logger.error(`Error parsing email: ${err}`);
               return;
