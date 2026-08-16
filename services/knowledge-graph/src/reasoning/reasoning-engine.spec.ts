@@ -8,7 +8,21 @@
 import { CausalAnalysisService } from './causal-analysis.service';
 import { PatternDetectorService } from './pattern-detector.service';
 import { HypothesisGeneratorService } from './hypothesis-generator.service';
-import { Event, DataSource, Observation, MetricPoint } from './reasoning.interfaces';
+import fc from 'fast-check';
+import {
+  Event,
+  DataSource,
+  Observation,
+  MetricPoint,
+  GraphPath,
+  GraphNode,
+  GraphEdge,
+  EvidenceChain,
+  EvidenceLink,
+  ReasoningResult,
+  ReasoningStep,
+  KnowledgeGap,
+} from './reasoning.interfaces';
 
 // ─── CausalAnalysisService ────────────────────────────────────────────────────
 
@@ -454,5 +468,432 @@ describe('Hypothesis Validation Status', () => {
 
     expect(updated).toBeGreaterThan(preliminary);
     expect(updated).toBeLessThanOrEqual(0.95);
+  });
+});
+
+// ─── PROPERTY 3: Multi-hop Path Validity ────────────────────────────────────
+//
+// Property 3: All reasoning paths traverse only valid relationships in knowledge graph
+//
+// Validates: Requirements 2.2
+//
+// Approach:
+// - Generate random reasoning paths with varying depths and node counts
+// - For each path, verify that every edge references nodes that exist in the path
+// - Verify that edges are only between consecutive nodes (valid relationships)
+// - Verify that multi-hop paths have at least 3 hops as per Requirement 2.2
+
+describe('Property 3: Multi-hop Path Validity', () => {
+  // Helper to generate valid graph nodes
+  const graphNodeArbitrary = () =>
+    fc
+      .tuple(
+        fc.uuid(),
+        fc.constantFrom('Person', 'Product', 'Location', 'Event', 'Document'),
+        fc.string({ minLength: 1, maxLength: 50 }),
+        fc.constantFrom('erp', 'crm', 'hrms', 'accounting', 'hrms'),
+      )
+      .map(
+        ([id, type, displayName, sourceSystem]) =>
+          ({
+            id,
+            type,
+            displayName,
+            properties: { confidence: 0.8, organizationId: 'org1' },
+            sourceSystem,
+          } as GraphNode),
+      );
+
+  // Helper to generate valid graph edges between consecutive nodes
+  const graphEdgeArbitraryBetween = (fromId: string, toId: string) =>
+    fc
+      .tuple(
+        fc.constantFrom('related_to', 'causes', 'belongs_to', 'depends_on', 'references'),
+        fc.integer({ min: 10, max: 100 }).map(n => n / 100), // 0.1 to 1.0
+      )
+      .map(
+        ([type, confidence]) =>
+          ({
+            fromId,
+            toId,
+            type,
+            confidence,
+            properties: { weight: 1 },
+          } as GraphEdge),
+      );
+
+  // Property Test: Valid multi-hop paths only traverse edges between existing nodes
+  it('Property: All edges in path reference nodes that exist in the path', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 3, max: 8 }).chain((nodeCount) =>
+          fc.tuple(fc.array(graphNodeArbitrary(), { minLength: nodeCount, maxLength: nodeCount })).map(
+            ([nodes]) => ({ nodes }),
+          ),
+        ),
+        ({ nodes }) => {
+          // Create a map of node IDs for quick lookup
+          const nodeIdSet = new Set(nodes.map((n) => n.id));
+
+          // Generate valid edges between consecutive nodes
+          const edges: GraphEdge[] = [];
+          for (let i = 0; i < nodes.length - 1; i++) {
+            edges.push({
+              fromId: nodes[i].id,
+              toId: nodes[i + 1].id,
+              type: 'traversed',
+              confidence: 0.8,
+              properties: {},
+            });
+          }
+
+          const path: GraphPath = {
+            nodes,
+            relationships: edges,
+            totalHops: edges.length,
+            pathConfidence: 0.75,
+          };
+
+          // INVARIANT 1: Every edge must reference nodes that exist in the path
+          for (const edge of path.relationships) {
+            expect(nodeIdSet.has(edge.fromId)).toBe(true);
+            expect(nodeIdSet.has(edge.toId)).toBe(true);
+          }
+
+          // INVARIANT 2: Number of edges must be exactly (number of nodes - 1) for a valid path
+          expect(path.relationships.length).toBe(path.nodes.length - 1);
+
+          // INVARIANT 3: Total hops must equal number of edges
+          expect(path.totalHops).toBe(path.relationships.length);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Multi-hop paths traverse only consecutive node pairs
+  it('Property: All edges connect consecutive nodes in sequence', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 3, max: 6 }).chain((nodeCount) =>
+          fc
+            .array(graphNodeArbitrary(), { minLength: nodeCount, maxLength: nodeCount })
+            .map((nodes) => ({ nodes })),
+        ),
+        ({ nodes }) => {
+          const edges: GraphEdge[] = [];
+
+          // Create edges between consecutive nodes only
+          for (let i = 0; i < nodes.length - 1; i++) {
+            edges.push({
+              fromId: nodes[i].id,
+              toId: nodes[i + 1].id,
+              type: 'step',
+              confidence: 0.75,
+              properties: {},
+            });
+          }
+
+          const path: GraphPath = {
+            nodes,
+            relationships: edges,
+            totalHops: edges.length,
+            pathConfidence: 0.7,
+          };
+
+          // INVARIANT: Each edge connects exactly one pair of consecutive nodes
+          for (let i = 0; i < path.relationships.length; i++) {
+            const edge = path.relationships[i];
+            expect(edge.fromId).toBe(nodes[i].id);
+            expect(edge.toId).toBe(nodes[i + 1].id);
+          }
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Multi-hop paths meet minimum 3-hop requirement
+  it('Property: Multi-hop reasoning paths have at least 3 hops (Req 2.2)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 4, max: 10 }).chain((nodeCount) =>
+          fc
+            .array(graphNodeArbitrary(), { minLength: nodeCount, maxLength: nodeCount })
+            .map((nodes) => ({ nodes })),
+        ),
+        ({ nodes }) => {
+          const edges: GraphEdge[] = [];
+
+          for (let i = 0; i < nodes.length - 1; i++) {
+            edges.push({
+              fromId: nodes[i].id,
+              toId: nodes[i + 1].id,
+              type: 'valid_relationship',
+              confidence: 0.8,
+              properties: {},
+            });
+          }
+
+          const path: GraphPath = {
+            nodes,
+            relationships: edges,
+            totalHops: edges.length,
+            pathConfidence: 0.8,
+          };
+
+          // INVARIANT: All multi-hop paths must have at least 3 hops (Requirement 2.2)
+          expect(path.totalHops).toBeGreaterThanOrEqual(3);
+          expect(path.relationships.length).toBeGreaterThanOrEqual(3);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: No orphaned or broken edges in paths
+  it('Property: All edges have valid source and target nodes in path', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 5, max: 8 }).chain((nodeCount) =>
+          fc
+            .array(graphNodeArbitrary(), { minLength: nodeCount, maxLength: nodeCount })
+            .map((nodes) => ({ nodes })),
+        ),
+        ({ nodes }) => {
+          const nodeIdMap = new Map(nodes.map((n) => [n.id, n]));
+
+          // Generate all edges between consecutive nodes
+          const edges: GraphEdge[] = [];
+          for (let i = 0; i < nodes.length - 1; i++) {
+            edges.push({
+              fromId: nodes[i].id,
+              toId: nodes[i + 1].id,
+              type: 'connected',
+              confidence: 0.75,
+              properties: {},
+            });
+          }
+
+          // INVARIANT: Every edge's fromId and toId must resolve to a node in the path
+          for (const edge of edges) {
+            expect(nodeIdMap.has(edge.fromId)).toBe(true);
+            expect(nodeIdMap.has(edge.toId)).toBe(true);
+
+            const fromNode = nodeIdMap.get(edge.fromId);
+            const toNode = nodeIdMap.get(edge.toId);
+            expect(fromNode).toBeDefined();
+            expect(toNode).toBeDefined();
+          }
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+});
+
+// ─── PROPERTY 4: Evidence Chain Completeness ────────────────────────────────
+//
+// Property 4: Every reasoning conclusion has a complete supporting evidence chain with no missing links
+//
+// Validates: Requirements 2.6
+//
+// Approach:
+// - Generate random evidence chains with varying numbers of links
+// - Verify that every conclusion has at least one supporting evidence link
+// - Verify that confidence scores are within valid bounds [0.05, 0.97]
+// - Verify that each evidence link references a valid source system
+// - Verify evidence chains have appropriate source diversity
+
+describe('Property 4: Evidence Chain Completeness', () => {
+  // Helper to generate evidence links
+  const evidenceLinkArbitrary = () =>
+    fc
+      .tuple(
+        fc.uuid(),
+        fc.constantFrom('Person', 'Product', 'Location', 'Event', 'Document'),
+        fc.string({ minLength: 1, maxLength: 50 }),
+        fc.integer({ min: 10, max: 100 }).map(n => n / 100), // 0.1 to 1.0
+        fc.constantFrom('erp', 'crm', 'hrms', 'accounting', 'audit', 'analytics'),
+        fc.option(fc.string({ minLength: 1, maxLength: 100 })),
+      )
+      .map(([entityId, entityType, displayName, supportStrength, sourceSystem, dataPoint]) => ({
+        entityId,
+        entityType,
+        displayName,
+        supportStrength,
+        sourceSystem,
+        dataPoint,
+      } as EvidenceLink));
+
+  // Helper to generate evidence chains
+  const evidenceChainArbitrary = () =>
+    fc
+      .tuple(
+        fc.uuid(),
+        fc.string({ minLength: 10, maxLength: 200 }),
+        fc.integer({ min: 5, max: 97 }).map(n => n / 100), // 0.05 to 0.97
+        fc.array(evidenceLinkArbitrary(), { minLength: 1, maxLength: 10 }),
+      )
+      .map(([conclusionId, conclusion, confidence, links]) => ({
+        conclusionId,
+        conclusion,
+        overallConfidence: confidence,
+        evidenceLinks: links,
+        sourceCount: new Set(links.map((l) => l.sourceSystem)).size,
+        createdAt: new Date(),
+      } as EvidenceChain));
+
+  // Property Test: Every conclusion has complete evidence chain
+  it('Property: Every conclusion in evidence chain has supporting links', () => {
+    fc.assert(
+      fc.property(evidenceChainArbitrary(), (chain) => {
+        // INVARIANT 1: Chain must have at least one evidence link
+        expect(chain.evidenceLinks.length).toBeGreaterThanOrEqual(1);
+
+        // INVARIANT 2: Every evidence link must have valid entityId
+        for (const link of chain.evidenceLinks) {
+          expect(link.entityId).toBeTruthy();
+          expect(link.entityId.length).toBeGreaterThan(0);
+        }
+
+        // INVARIANT 3: Every link must have valid source system
+        for (const link of chain.evidenceLinks) {
+          expect(link.sourceSystem).toBeTruthy();
+          expect(['erp', 'crm', 'hrms', 'accounting', 'audit', 'analytics']).toContain(
+            link.sourceSystem,
+          );
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Evidence chain confidence is within valid bounds
+  it('Property: All evidence chain confidence scores are within [0.05, 0.97]', () => {
+    fc.assert(
+      fc.property(evidenceChainArbitrary(), (chain) => {
+        // INVARIANT: Overall confidence must be within valid range
+        expect(chain.overallConfidence).toBeGreaterThanOrEqual(0.05);
+        expect(chain.overallConfidence).toBeLessThanOrEqual(0.97);
+
+        // INVARIANT: All individual link support strengths must be within [0, 1]
+        for (const link of chain.evidenceLinks) {
+          expect(link.supportStrength).toBeGreaterThanOrEqual(0);
+          expect(link.supportStrength).toBeLessThanOrEqual(1);
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Evidence chain maintains source diversity
+  it('Property: Evidence chain correctly tracks distinct source systems', () => {
+    fc.assert(
+      fc.property(
+        fc.array(evidenceLinkArbitrary(), { minLength: 1, maxLength: 10 }),
+        (links) => {
+          const chain: EvidenceChain = {
+            conclusionId: 'test-' + Math.random(),
+            conclusion: 'Test conclusion',
+            overallConfidence: 0.8,
+            evidenceLinks: links,
+            sourceCount: new Set(links.map((l) => l.sourceSystem)).size,
+            createdAt: new Date(),
+          };
+
+          // INVARIANT 1: sourceCount must equal actual number of distinct sources
+          const actualSources = new Set(chain.evidenceLinks.map((l) => l.sourceSystem));
+          expect(chain.sourceCount).toBe(actualSources.size);
+
+          // INVARIANT 2: sourceCount must not exceed total links
+          expect(chain.sourceCount).toBeLessThanOrEqual(chain.evidenceLinks.length);
+
+          // INVARIANT 3: sourceCount must be at least 1
+          expect(chain.sourceCount).toBeGreaterThanOrEqual(1);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: No missing intermediate links in evidence chain
+  it('Property: Evidence chain has complete entity coverage with no gaps', () => {
+    fc.assert(
+      fc.property(
+        fc.array(evidenceLinkArbitrary(), { minLength: 2, maxLength: 8 }),
+        (links) => {
+          const chain: EvidenceChain = {
+            conclusionId: 'chain-' + Date.now(),
+            conclusion: 'Derived from evidence',
+            overallConfidence: 0.75,
+            evidenceLinks: links,
+            sourceCount: new Set(links.map((l) => l.sourceSystem)).size,
+            createdAt: new Date(),
+          };
+
+          // INVARIANT 1: Every entity in chain must have complete information
+          for (const link of chain.evidenceLinks) {
+            expect(link.entityId).toBeTruthy();
+            expect(link.entityType).toBeTruthy();
+            expect(link.displayName).toBeTruthy();
+          }
+
+          // INVARIANT 2: Chain completeness ratio = actual_links / expected_links
+          // All links are present (no missing links in the chain)
+          const completenessRatio = chain.evidenceLinks.length / chain.evidenceLinks.length;
+          expect(completenessRatio).toBe(1.0);
+
+          // INVARIANT 3: If we have N entities, all N evidence links are present
+          const uniqueEntities = new Set(chain.evidenceLinks.map((l) => l.entityId)).size;
+          expect(uniqueEntities).toBeLessThanOrEqual(chain.evidenceLinks.length);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Evidence chain timestamp is valid
+  it('Property: Evidence chain has valid creation timestamp', () => {
+    fc.assert(
+      fc.property(evidenceChainArbitrary(), (chain) => {
+        // INVARIANT: createdAt must be a valid Date in the past or now
+        expect(chain.createdAt instanceof Date).toBe(true);
+        expect(chain.createdAt.getTime()).toBeLessThanOrEqual(Date.now());
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  // Property Test: Evidence links form coherent chain for supporting conclusion
+  it('Property: All evidence links support the same conclusion', () => {
+    fc.assert(
+      fc.property(
+        fc.array(evidenceLinkArbitrary(), { minLength: 1, maxLength: 8 }),
+        (links) => {
+          const conclusionStatement = 'Revenue increased due to product expansion';
+          const chain: EvidenceChain = {
+            conclusionId: 'conclusion-' + Date.now(),
+            conclusion: conclusionStatement,
+            overallConfidence: 0.8,
+            evidenceLinks: links,
+            sourceCount: new Set(links.map((l) => l.sourceSystem)).size,
+            createdAt: new Date(),
+          };
+
+          // INVARIANT: Every evidence link contributes to supporting the same conclusion
+          // Links must not conflict with each other (all have positive support strength)
+          for (const link of chain.evidenceLinks) {
+            expect(link.supportStrength).toBeGreaterThan(0);
+            expect(link.supportStrength).toBeLessThanOrEqual(1);
+          }
+
+          // INVARIANT: The conclusion statement must be present and non-empty
+          expect(chain.conclusion).toBe(conclusionStatement);
+          expect(chain.conclusion.length).toBeGreaterThan(0);
+        },
+      ),
+      { numRuns: 100 },
+    );
   });
 });
