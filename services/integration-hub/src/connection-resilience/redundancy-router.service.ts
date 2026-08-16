@@ -289,6 +289,27 @@ export class RedundancyRouterService {
   clearStats(connectionId: string): void {
     this.connectionStats.delete(connectionId);
   }
+
+  /**
+   * Get failover statistics for a connection
+   */
+  getFailoverStats(connectionId: string): any {
+    const stats = this.connectionStats.get(connectionId);
+    if (!stats) {
+      return {
+        connectionId,
+        failovers: 0,
+        lastFailover: undefined,
+      };
+    }
+
+    return {
+      connectionId,
+      failovers: stats.methodStats.reduce((sum, m) => sum + m.failures, 0),
+      lastFailover: stats.lastRoute?.timestamp,
+      methodStats: stats.methodStats,
+    };
+  }
 }
 
 interface ConnectionStats {

@@ -1,0 +1,37 @@
+{
+  "name": "@ellines-eip/email-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Email Intelligence Service for account connection, summarization, categorization, and integration",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@ellines-eip/connectors-sdk": "*",
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/jwt": "^12.0.1",
+    "@nestjs/passport": "^11.0.3",
+    "@nestjs/platform-express": "^11.0.12",
+    "axios": "^1.7.7",
+    "google-auth-library": "^9.14.0",
+    "googleapis": "^139.0.0",
+    "imap": "^0.8.20",
+    "mailparser": "^3.6.8",
+    "passport-oauth2": "^1.8.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.13.10",
+    "@types/uuid": "^10.0.8",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.8.2"
+  }
+}

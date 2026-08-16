@@ -58,6 +58,14 @@ model Organization {
   interactionLogs        InteractionLog[]        @relation("InteractionLogs")  // v2.0: Personalization interaction logs
   notificationPrefs      NotificationPreference[] @relation("NotificationPreferences") // v2.0: Personalization notification preferences
   shortcutSuggestions    ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
+  dataQualityScores      DataQualityScore[]      // v2.0: Data Quality Service
+  dataQualityIssues      DataQualityIssue[]      @relation("DataQualityIssues") // v2.0: Data Quality Issues
+  quarantinedData        QuarantinedData[]       @relation("QuarantinedData") // v2.0: Quarantined data
+  cleansingRules         CleansingRule[]         @relation("CleansingRules") // v2.0: Data cleansing rules
+  dataQualityHistory     DataQualityHistory[]    @relation("DataQualityHistory") // v2.0: Quality history
+  resilientConnections   ResilientConnection[]   // v2.0: Resilient Connection Manager
+  generatedConnectors    GeneratedConnector[]    // v2.0: Auto-generated connectors
+  approvalWorkflows      ApprovalWorkflowRequest[] // v2.0: Generated connector approvals
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -1657,4 +1665,526 @@ model LearnerArchitectureRecommendation {
   @@index([organizationId])
   @@index([status])
   @@map("learner_architecture_recommendations")
+}
+
+// ─── v2.0 Data Quality Service ──────────────────────────────────────────────────
+
+/**
+ * DataQualityScore — Overall data quality score per source and entity type.
+ * Aggregates scores across all five quality dimensions.
+ * Used by AI recommendation service to add quality caveats.
+ */
+model DataQualityScore {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
+  entityType        String   @map("entity_type")         // e.g., "customer", "order", "product"
+  
+  // Five dimensions of data quality (0-100)
+  completenessScore Float    @map("completeness_score")   // % of required fields populated
+  accuracyScore     Float    @map("accuracy_score")       // % of values matching validation rules
+  consistencyScore  Float    @map("consistency_score")    // % data consistent across sources
+  timelinessScore   Float    @map("timeliness_score")     // % recent data (not stale)
+  validityScore     Float    @map("validity_score")       // % passing format/type checks
+  
+  // Overall score (average of five dimensions)
+  overallScore      Float    @map("overall_score")        // 0-100
+  qualityRating     String   @map("quality_rating")       // "excellent" | "good" | "fair" | "poor"
+  
+  // Metrics
+  recordsAssessed   Int      @default(0) @map("records_assessed")
+  recordsWithIssues Int      @default(0) @map("records_with_issues")
+  
+  // Trend data
+  scoreHistory      Json     @default("[]")              // Array of { date, overallScore }
+  trendDirection    String   @default("stable") @map("trend_direction")  // "improving" | "stable" | "degrading"
+  trendDays         Int      @default(7) @map("trend_days")              // Days included in trend analysis
+  
+  // Metadata
+  scoredAt          DateTime @map("scored_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  issues        DataQualityIssue[]
+  quarantined   QuarantinedData[]
+
+  @@unique([organizationId, sourceSystemId, entityType])
+  @@index([organizationId, sourceSystemId])
+  @@index([overallScore])
+  @@index([createdAt])
+  @@map("data_quality_scores")
+}
+
+/**
+ * DataQualityIssue — Individual data quality issues detected.
+ * Examples: missing values, duplicates, format errors, referential integrity violations.
+ */
+model DataQualityIssue {
+  id                String   @id @default(cuid())
+  scoreId           String   @map("score_id")
+  organizationId    String   @map("organization_id")
+  
+  // Issue classification
+  issueType         String   @map("issue_type")          // "missing_value" | "duplicate" | "format_error" | "referential_integrity" | "stale_data" | "outlier"
+  dimension         String                               // "completeness" | "accuracy" | "consistency" | "timeliness" | "validity"
+  severity          String                               // "critical" | "high" | "medium" | "low"
+  
+  // Data identification
+  recordId          String   @map("record_id")           // Record identifier in source system
+  fieldName         String?  @map("field_name")
+  currentValue      String?  @map("current_value")
+  expectedValue     String?  @map("expected_value")
+  
+  // Context
+  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
+  entityType        String   @map("entity_type")
+  
+  // Issue details
+  detectionRule     String   @map("detection_rule")      // Rule that triggered this issue
+  autoRemediable    Boolean  @default(false) @map("auto_remediable")
+  remediationAction String?  @map("remediation_action")
+  
+  // Resolution
+  status            String   @default("detected") @map("status")  // "detected" | "quarantined" | "remediated" | "ignored"
+  remediatedAt      DateTime? @map("remediated_at")
+  remediationResult String?  @map("remediation_result")   // "success" | "partial" | "failed"
+  
+  // Metadata
+  detectedAt        DateTime @default(now()) @map("detected_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  score DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  organization Organization @relation("DataQualityIssues", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([scoreId])
+  @@index([organizationId])
+  @@index([issueType])
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
+  @@map("data_quality_issues")
+}
+
+/**
+ * QuarantinedData — Records flagged as suspicious and isolated.
+ * Prevents bad data from propagating to downstream systems.
+ * IT admins can review and decide: fix, delete, or release.
+ */
+model QuarantinedData {
+  id                String   @id @default(cuid())
+  scoreId           String   @map("score_id")
+  organizationId    String   @map("organization_id")
+  
+  // Data identification
+  recordId          String   @map("record_id")           // Record identifier in source system
+  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
+  entityType        String   @map("entity_type")
+  recordSnapshot    Json                                 // Full record data for review
+  
+  // Quarantine reason
+  quarantineReason  String   @map("quarantine_reason")   // "multiple_issues" | "critical_issue" | "anomaly_detected" | "manual_flag"
+  suspiciousFields  String[] @default([])  @map("suspicious_fields")
+  
+  // Resolution
+  status            String   @default("isolated")        // "isolated" | "approved" | "rejected" | "fixed"
+  reviewedBy        String?  @map("reviewed_by")         // IT admin user ID
+  reviewedAt        DateTime? @map("reviewed_at")
+  reviewNotes       String?  @map("review_notes")
+  
+  // Action taken
+  actionTaken       String?  @map("action_taken")        // "released" | "fixed" | "deleted" | null
+  fixedData         Json?    @map("fixed_data")
+  
+  // Metadata
+  quarantinedAt     DateTime @default(now()) @map("quarantined_at")
+  resolvedAt        DateTime? @map("resolved_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  score DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  organization Organization @relation("QuarantinedData", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([scoreId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([quarantinedAt])
+  @@map("quarantined_data")
+}
+
+/**
+ * CleansingRule — Rules used for automatic data remediation.
+ * Examples: trim whitespace, standardize phone format, fix date format.
+ */
+model CleansingRule {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  
+  // Rule identification
+  name              String
+  description       String   @default("")
+  ruleType          String   @map("rule_type")          // "trim" | "standardize" | "replace" | "normalize" | "validate"
+  
+  // Application
+  entityType        String   @map("entity_type")         // e.g., "customer", "order"
+  fieldName         String?  @map("field_name")
+  
+  // Rule definition
+  pattern           String?                              // Regex pattern for matching
+  transformation    Json                                 // { "type": "...", "config": {...} }
+  condition         Json?                                // Condition to apply rule
+  
+  // Metrics
+  isActive          Boolean  @default(true) @map("is_active")
+  appliedCount      Int      @default(0) @map("applied_count")
+  successCount      Int      @default(0) @map("success_count")
+  successRate       Float    @default(0.0) @map("success_rate")    // 0-100%
+  
+  // Metadata
+  createdBy         String?  @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation("CleansingRules", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([isActive])
+  @@map("cleansing_rules")
+}
+
+/**
+ * DataQualityHistory — Time-series snapshots of data quality scores.
+ * Used for trend analysis and reporting.
+ */
+model DataQualityHistory {
+  id                String   @id @default(cuid())
+  scoreId           String   @map("score_id")
+  organizationId    String   @map("organization_id")
+  sourceSystemId    String   @map("source_system_id")
+  entityType        String   @map("entity_type")
+  
+  // Dimensional scores at time of snapshot
+  completenessScore Float    @map("completeness_score")
+  accuracyScore     Float    @map("accuracy_score")
+  consistencyScore  Float    @map("consistency_score")
+  timelinessScore   Float    @map("timeliness_score")
+  validityScore     Float    @map("validity_score")
+  overallScore      Float    @map("overall_score")
+  
+  // Context
+  recordCount       Int      @default(0) @map("record_count")
+  issueCount        Int      @default(0) @map("issue_count")
+  
+  // Snapshot time
+  snapshotAt        DateTime @map("snapshot_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation("DataQualityHistory", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, sourceSystemId, entityType, snapshotAt])
+  @@index([scoreId])
+  @@index([snapshotAt])
+  @@map("data_quality_history")
+}
+
+
+// ─── v2.0 — Resilient Connection Manager (Task 6.3) ─────────────────────────
+
+/**
+ * ResilientConnection — Manages connections to external systems with redundancy.
+ * Supports multiple connection methods (API, Database, File, Screen-scrape, Message Queue, Webhook).
+ * Task 6.3 Requirement 28.1: Connection method discovery
+ * Task 6.3 Requirement 28.3: Connection redundancy with priority-based routing
+ */
+model ResilientConnection {
+  id                      String   @id @default(cuid())
+  organizationId          String   @map("organization_id")
+  systemId                String   @map("system_id")
+  systemName              String   @map("system_name")
+  
+  // Connection methods
+  primaryMethodId         String?  @map("primary_method_id")
+  currentMethodId         String?  @map("current_method_id")
+  
+  // Connection configuration
+  methods                 ConnectionMethod[] @relation("ConnectionMethods")
+  
+  // Health tracking
+  healthStatus            String   @default("healthy")  // "healthy" | "degraded" | "failing" | "disconnected"
+  lastHealthCheck         DateTime? @map("last_health_check")
+  lastSuccessfulConnection DateTime? @map("last_successful_connection")
+  
+  // Statistics
+  totalConnections        Int      @default(0) @map("total_connections")
+  successfulConnections   Int      @default(0) @map("successful_connections")
+  failedConnections       Int      @default(0) @map("failed_connections")
+  successRate             Float    @default(0.0) @map("success_rate")        // 0-100%
+  
+  // Metadata
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  healthHistory ConnectionHealth[]
+
+  @@index([organizationId])
+  @@index([systemId])
+  @@index([healthStatus])
+  @@map("resilient_connections")
+}
+
+/**
+ * ConnectionMethod — Individual connection method for a system.
+ * Task 6.3 Requirement 28.1: Support API, Database, File, Screen-scrape, Message Queue, Webhook
+ */
+model ConnectionMethod {
+  id                String   @id @default(cuid())
+  connectionId      String   @map("connection_id")
+  
+  // Method type and priority
+  type              String                           // "api" | "database" | "file_sync" | "screen_scrape" | "message_queue" | "webhook"
+  priority          Int      @default(0)             // Higher = better
+  
+  // Connection config (encrypted in production)
+  config            Json     @default("{}")
+  
+  // Performance metrics
+  successRate       Float    @default(0.0) @map("success_rate")    // 0-1.0
+  avgLatency        Int      @default(0) @map("avg_latency")       // milliseconds
+  lastAttempt       DateTime? @map("last_attempt")
+  lastSuccess       DateTime? @map("last_success")
+  
+  // Failover tracking
+  failoverAttempts  Int      @default(0) @map("failover_attempts")
+  lastFailover      DateTime? @map("last_failover")
+  
+  // Metadata
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  connection ResilientConnection @relation("ConnectionMethods", fields: [connectionId], references: [id], onDelete: Cascade)
+  healthHistory ConnectionHealthDetail[]
+
+  @@index([connectionId])
+  @@index([type])
+  @@index([priority])
+  @@map("connection_methods")
+}
+
+/**
+ * ConnectionHealth — Health monitoring history for connections.
+ * Task 6.3 Requirement 28.4: Connection health monitor with automatic failover
+ */
+model ConnectionHealth {
+  id                String   @id @default(cuid())
+  connectionId      String   @map("connection_id")
+  
+  // Health status
+  status            String                           // "healthy" | "degraded" | "failing" | "disconnected"
+  latency           Int      @default(0)             // milliseconds
+  errorRate         Float    @default(0.0) @map("error_rate")    // 0-1.0
+  
+  // Failover triggered
+  failoverTriggered Boolean  @default(false) @map("failover_triggered")
+  failoverReason    String?  @map("failover_reason")
+  
+  // Per-method details
+  methodDetails     ConnectionHealthDetail[]
+  
+  // Metadata
+  checkedAt         DateTime @default(now()) @map("checked_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  connection ResilientConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@index([status])
+  @@index([checkedAt])
+  @@map("connection_health")
+}
+
+/**
+ * ConnectionHealthDetail — Per-method health details.
+ * Task 6.3 Requirement 28.4: Track health per method for intelligent routing
+ */
+model ConnectionHealthDetail {
+  id            String   @id @default(cuid())
+  healthId      String   @map("health_id")
+  methodId      String   @map("method_id")
+  
+  // Method-specific health
+  status        String                          // "healthy" | "degraded" | "failing" | "disconnected"
+  latency       Int      @default(0)            // milliseconds
+  errorCount    Int      @default(0) @map("error_count")
+  successCount  Int      @default(0) @map("success_count")
+  
+  // Last test result
+  lastTestAt    DateTime? @map("last_test_at")
+  testError     String?   @map("test_error")
+  
+  // Metadata
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  health ConnectionHealth @relation(fields: [healthId], references: [id], onDelete: Cascade)
+  method ConnectionMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+
+  @@index([healthId])
+  @@index([methodId])
+  @@map("connection_health_details")
+}
+
+/**
+ * AlternativeConnectionPath — Alternative routing paths for redundancy.
+ * Task 6.3 Requirement 28.5: Alternative connection path establishment
+ * Task 6.3 Requirement 28.6: Connection redundancy with priority-based routing
+ */
+model AlternativeConnectionPath {
+  id               String   @id @default(cuid())
+  connectionId     String   @map("connection_id")
+  
+  // Path definition
+  methodSequence   String[] @default([])  @map("method_sequence")  // Ordered list of method IDs to try
+  priority         Int      @default(0)
+  isActive         Boolean  @default(true) @map("is_active")
+  
+  // Path metrics
+  successRate      Float    @default(0.0) @map("success_rate")
+  avgLatency       Int      @default(0) @map("avg_latency")
+  failureCount     Int      @default(0) @map("failure_count")
+  
+  // Metadata
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([connectionId])
+  @@index([isActive])
+  @@map("alternative_connection_paths")
+}
+
+/**
+ * GeneratedConnector — Auto-generated connector code for unsupported systems.
+ * Task 6.3 Requirement 28.2: Automatic code generator for unsupported systems
+ * Task 6.3 Requirement 28.7: Generated connector approval workflow for IT admins
+ */
+model GeneratedConnector {
+  id                String   @id @default(cuid())
+  organizationId    String   @map("organization_id")
+  systemId          String   @map("system_id")
+  systemName        String   @map("system_name")
+  
+  // Code details
+  sourceCode        String   @db.Text @map("source_code")
+  language          String   // "typescript" | "python" | "java"
+  dependencies      String[] @default([])
+  
+  // Test cases
+  testCases         String[] @default([]) @map("test_cases")
+  
+  // Approval workflow
+  approvalStatus    String   @default("pending")  // "pending" | "approved" | "rejected" | "deployed"
+  approvalRequest   ApprovalWorkflowRequest? @relation("ApprovalRequests")
+  
+  // Metadata
+  generatedAt       DateTime @default(now()) @map("generated_at")
+  generatedBy       String?  @map("generated_by")
+  deployedAt        DateTime? @map("deployed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([approvalStatus])
+  @@map("generated_connectors")
+}
+
+/**
+ * ApprovalWorkflowRequest — Approval request for generated connectors.
+ * Task 6.3 Requirement 28.7: Generated connector approval workflow for IT admins
+ * Task 6.3 Requirement 28.8: IT admin approval interface
+ */
+model ApprovalWorkflowRequest {
+  id                   String   @id @default(cuid())
+  organizationId       String   @map("organization_id")
+  generatedConnectorId String   @unique @map("generated_connector_id")
+  
+  // Request details
+  requestedBy          String   @map("requested_by")
+  requestedAt          DateTime @default(now()) @map("requested_at")
+  
+  // Approval status
+  status               String   @default("pending")  // "pending" | "approved" | "rejected"
+  approvedBy           String?  @map("approved_by")
+  approvedAt           DateTime? @map("approved_at")
+  rejectionReason      String?  @map("rejection_reason")
+  approvalNotes        String?  @db.Text @map("approval_notes")
+  
+  // Metadata
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connector GeneratedConnector @relation("ApprovalRequests", fields: [generatedConnectorId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([requestedAt])
+  @@map("approval_workflow_requests")
+}
+
+/**
+ * ConnectionRoutingRule — Rules for intelligent connection routing.
+ * Task 6.3 Requirement 28.6: Priority-based routing with load balancing
+ */
+model ConnectionRoutingRule {
+  id             String   @id @default(cuid())
+  connectionId   String   @map("connection_id")
+  
+  // Rule conditions
+  condition      Json                                // Matching condition
+  priority       Int      @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+  
+  // Routing action
+  actionType     String                              // "prefer_method" | "load_balance" | "failover"
+  actionConfig   Json     @default("{}")
+  
+  // Metrics
+  matchCount     Int      @default(0) @map("match_count")
+  successCount   Int      @default(0) @map("success_count")
+  
+  // Metadata
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([connectionId])
+  @@index([isActive])
+  @@map("connection_routing_rules")
+}
+
+/**
+ * ConnectionFailoverEvent — Log of failover events.
+ * Task 6.3 Requirement 28.4: Track failover for audit and optimization
+ */
+model ConnectionFailoverEvent {
+  id                   String   @id @default(cuid())
+  connectionId         String   @map("connection_id")
+  
+  // Failover details
+  previousMethodId     String   @map("previous_method_id")
+  newMethodId          String   @map("new_method_id")
+  reason               String
+  
+  // Outcome
+  success              Boolean  @default(false)
+  latency              Int      @default(0)  // milliseconds
+  errorMessage         String?  @map("error_message")
+  
+  // Metadata
+  occurredAt           DateTime @default(now()) @map("occurred_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([connectionId])
+  @@index([occurredAt])
+  @@map("connection_failover_events")
 }
