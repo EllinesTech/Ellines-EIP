@@ -84,7 +84,7 @@ export class FederatedLearningCoordinatorService {
       `Federated learning round ${roundId} started. Submit updates by ${expectedEndTime.toISOString()}`,
     );
 
-    this.logger.info(
+    this.logger.log(
       `Training round ${roundId} started with ${optedInOrgs.length} opted-in organizations`,
     );
 
@@ -178,13 +178,13 @@ export class FederatedLearningCoordinatorService {
       // Step 3: Detect poisoning (Req 3.4)
       const validationResult = await this.poisoningDetector.detectPoisoningByZScore(privateUpdates);
 
-      this.logger.info(
+      this.logger.log(
         `Poisoning detection: ${validationResult.cleanUpdates.length} clean, ${validationResult.poisonedUpdates.length} poisoned`,
       );
 
       // Step 4: Aggregate clean updates (Req 3.5)
       const cleanDatasetSizes = validationResult.cleanUpdates.map((_, i) => {
-        const idx = privateUpdates.indexOf(_);
+        const idx = updates.findIndex((u) => u === validationResult.cleanUpdates[i]);
         return datasetSizes[idx] || 1;
       });
 
@@ -219,7 +219,7 @@ export class FederatedLearningCoordinatorService {
       privacyBudget.remainingBudget = privacyBudget.totalBudget - privacyBudget.consumedBudget;
       privacyBudget.roundsCompleted += 1;
 
-      this.logger.info(`Round ${roundId} aggregated successfully. Model ID: ${globalModel.id}`);
+      this.logger.log(`Round ${roundId} aggregated successfully. Model ID: ${globalModel.id}`);
       return globalModel;
     } catch (error) {
       round.status = 'failed';
@@ -250,7 +250,7 @@ export class FederatedLearningCoordinatorService {
       round.status = 'completed';
       round.endTime = new Date();
 
-      this.logger.info(
+      this.logger.log(
         `Model distributed to ${result.distributedTo.length} organizations, ${result.failedOrgs.length} failed`,
       );
 
@@ -294,7 +294,7 @@ export class FederatedLearningCoordinatorService {
    */
   async optIn(orgId: string): Promise<{ orgId: string; optedIn: boolean; joinedAt: Date }> {
     const result = await this.orgParticipation.optIn(orgId);
-    this.logger.info(`Organization ${orgId} opted in to federated learning`);
+    this.logger.log(`Organization ${orgId} opted in to federated learning`);
     return {
       orgId: result.orgId,
       optedIn: result.optedIn,
@@ -311,7 +311,7 @@ export class FederatedLearningCoordinatorService {
    */
   async optOut(orgId: string, reason: string): Promise<{ orgId: string; optedIn: boolean; reason: string }> {
     const result = await this.orgParticipation.optOut(orgId, reason);
-    this.logger.info(`Organization ${orgId} opted out: ${reason}`);
+    this.logger.log(`Organization ${orgId} opted out: ${reason}`);
     return {
       orgId: result.orgId,
       optedIn: result.optedIn,
@@ -371,7 +371,7 @@ export class FederatedLearningCoordinatorService {
       lastUpdated: new Date(),
     };
     this.privacyBudgets.set('default', budget);
-    this.logger.info(`Privacy budget reset to ${newBudget}`);
+    this.logger.log(`Privacy budget reset to ${newBudget}`);
   }
 
   /**

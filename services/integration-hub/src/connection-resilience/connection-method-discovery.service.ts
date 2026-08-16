@@ -105,7 +105,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`API method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`API method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }
@@ -135,7 +136,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`Database method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Database method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }
@@ -165,7 +167,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`File sync method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`File sync method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }
@@ -195,7 +198,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`Screen scrape method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Screen scrape method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }
@@ -225,7 +229,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`Message queue method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Message queue method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }
@@ -255,7 +260,8 @@ export class ConnectionMethodDiscoveryService {
         lastSuccess: new Date(),
       };
     } catch (error) {
-      this.logger.debug(`Webhook method failed for ${system.id}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Webhook method failed for ${system.id}: ${errorMessage}`);
       return null;
     }
   }

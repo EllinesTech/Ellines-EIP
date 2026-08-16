@@ -68,15 +68,16 @@ export class ConnectionHealthMonitorService {
 
       return health;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to check health for connection ${connection.id}: ${error.message}`,
+        `Failed to check health for connection ${connection.id}: ${errorMessage}`,
       );
       return {
         status: ConnectionHealthStatus.DISCONNECTED,
         lastCheck: new Date(),
         latency: Infinity,
         errorRate: 1.0,
-        message: `Health check failed: ${error.message}`,
+        message: `Health check failed: ${errorMessage}`,
       };
     }
   }
@@ -184,8 +185,9 @@ export class ConnectionHealthMonitorService {
             );
           }
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger.error(
-            `Error during health check for ${connectionId}: ${error.message}`,
+            `Error during health check for ${connectionId}: ${errorMessage}`,
           );
         }
       }

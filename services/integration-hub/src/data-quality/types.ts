@@ -3,6 +3,20 @@
  * Defines interfaces for data quality assessment, scoring, issues, and remediation.
  */
 
+export enum QuarantineStatus {
+  ISOLATED = 'isolated',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  FIXED = 'fixed',
+}
+
+export enum QuarantineReason {
+  MULTIPLE_ISSUES = 'multiple_issues',
+  CRITICAL_ISSUE = 'critical_issue',
+  ANOMALY_DETECTED = 'anomaly_detected',
+  MANUAL_FLAG = 'manual_flag',
+}
+
 export interface DataRecord {
   [key: string]: unknown;
 }
@@ -70,6 +84,10 @@ export interface QuarantineRecord {
   quarantineReason: 'multiple_issues' | 'critical_issue' | 'anomaly_detected' | 'manual_flag';
   suspiciousFields: string[];
   status: 'isolated' | 'approved' | 'rejected' | 'fixed';
+  fixedData?: DataRecord;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  reviewNotes?: string;
 }
 
 export interface TrendDataPoint {

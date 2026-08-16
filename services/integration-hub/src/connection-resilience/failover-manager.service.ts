@@ -68,8 +68,9 @@ export class FailoverManagerService {
         timestamp: new Date(),
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Failover attempt failed for ${connection.id}: ${error.message}`,
+        `Failover attempt failed for ${connection.id}: ${errorMessage}`,
       );
 
       // Increment failover attempts
@@ -120,7 +121,8 @@ export class FailoverManagerService {
 
       this.logger.debug(`Connection test passed for method: ${method.type}`);
     } catch (error) {
-      this.logger.warn(`Connection test failed for method ${method.type}: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Connection test failed for method ${method.type}: ${errorMessage}`);
       throw error;
     }
   }
@@ -277,7 +279,8 @@ export class FailoverManagerService {
       try {
         return await this.attemptFailover(connection);
       } catch (error) {
-        this.logger.error(`Auto failover failed: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Auto failover failed: ${errorMessage}`);
         return null;
       }
     }

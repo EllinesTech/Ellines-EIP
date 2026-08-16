@@ -1,89 +1,97 @@
 /**
- * QualityScoreGenerator — Generates and tracks data quality scores per source and entity type.
- * Maintains historical trends for analysis and visualization.
+ * QualityScoreGenerator — Generates composite quality scores and tracks trends.
+ * 
+ * Responsibility:
+ * - Compute composite quality scores (0-100) from dimension scores
+ * - Support configurable weighting of dimensions
+ * - Track scores over time for trend analysis
+ * - Calculate trend direction and change percentage
  */
 
 import {
   DataQualityScoreResult,
-  QualityTrend,
+  QualityDimensions,
   TrendDataPoint,
-  DataRecord,
-  ValidationSchema,
-  QualityAssessmentConfig,
+  QualityTrend,
 } from './types';
-import { DataQualityAssessor } from './data-quality-assessor';
 
-export interface ScoreSnapshot {
-  sourceSystemId: string;
-  entityType: string;
-  score: DataQualityScoreResult;
-  timestamp: Date;
+export interface ScoreWeighting {
+  completeness: number;
+  accuracy: number;
+  consistency: number;
+  timeliness: number;
+  validity: number;
 }
 
 export class QualityScoreGenerator {
-  private assessor: DataQualityAssessor;
-  private scoreHistory: Map<string, TrendDataPoint[]> = new Map();
+  private static readonly DEFAULT_WEIGHTING: ScoreWeighting = {
+    completeness: 0.25,
+    accuracy: 0.30,
+    consistency: 0.15,
+    timeliness: 0.20,
+    validity: 0.10,
+  };
 
-  constructor() {
-    this.assessor = new DataQualityAssessor();
+  /**
+   * Generate a composite quality score from dimension scores.
+   * By default uses weighted average, but can apply custom weighting.
+   */
+  generateCompositeScore(
+    dimensions: QualityDimensions,
+    weighting?: ScoreWeighting,
+  ): number {
+    const weights = weighting || QualityScoreGenerator.DEFAULT_WEIGHTING;
+
+    const score =
+      dimensions.completeness * weights.completeness +
+      dimensions.accuracy * weights.accuracy +
+      dimensions.consistency * weights.consistency +
+      dimensions.timeliness * weights.timeliness +
+      dimensions.validity * weights.validity;
+
+    return Math.min(100, Math.max(0, Math.round(score * 100) / 100));
   }
 
-  generateScore(
-    records: DataRecord[],
-    schema: ValidationSchema,
-    config: QualityAssessmentConfig,
-  ): ScoreSnapshot {
-    const score = this.assessor.assessData(records, schema, config);
-
-    const key = `${config.sourceSystemId}:${config.entityType}`;
-    this.recordTrendPoint(key, score);
-
-    return {
-      sourceSystemId: config.sourceSystemId,
-      entityType: config.entityType,
-      score,
-      timestamp: new Date(),
-    };
+  /**
+   * Generate a quality rating based on overall score.
+   */
+  getQualityRating(overallScore: number): 'excellent' | 'good' | 'fair' | 'poor' {
+    if (overallScore >= 90) return 'excellent';
+    if (overallScore >= 75) return 'good';
+    if (overallScore >= 60) return 'fair';
+    return 'poor';
   }
 
-  private recordTrendPoint(key: string, score: DataQualityScoreResult): void {
-    if (!this.scoreHistory.has(key)) {
-      this.scoreHistory.set(key, []);
-    }
-
-    const history = this.scoreHistory.get(key)!;
-    history.push({
-      date: new Date(),
-      overallScore: score.overallScore,
-      dimensions: score.dimensions,
-    });
-
-    // Keep last 90 days of history
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const filtered = history.filter((point) => point.date >= ninetyDaysAgo);
-    this.scoreHistory.set(key, filtered);
-  }
-
-  getTrend(sourceSystemId: string, entityType: string, trendDays: number = 7): QualityTrend {
-    const key = `${sourceSystemId}:${entityType}`;
-    const history = this.scoreHistory.get(key) || [];
-
-    const trendThreshold = new Date(Date.now() - trendDays * 24 * 60 * 60 * 1000);
-    const recentHistory = history.filter((point) => point.date >= trendThreshold);
-
-    if (recentHistory.length < 2) {
+  /**
+   * Calculate trend from a sequence of score data points.
+   * Trend is determined by comparing current score against historical average.
+   */
+  calculateTrend(scoreHistory: DataQualityScoreResult[], trendDays: number = 7): QualityTrend {
+    if (scoreHistory.length === 0) {
       return {
         direction: 'stable',
         trendDays,
-        scoreHistory: recentHistory,
+        scoreHistory: [],
         changePercentage: 0,
       };
     }
 
-    const oldestScore = recentHistory[0].overallScore;
-    const newestScore = recentHistory[recentHistory.length - 1].overallScore;
+    const trendPoints = this.buildTrendPoints(scoreHistory);
+
+    if (trendPoints.length < 2) {
+      return {
+        direction: 'stable',
+        trendDays,
+        scoreHistory: trendPoints,
+        changePercentage: 0,
+      };
+    }
+
+    const oldestScore = trendPoints[0].overallScore;
+    const newestScore = trendPoints[trendPoints.length - 1].overallScore;
     const changePercentage = ((newestScore - oldestScore) / oldestScore) * 100;
 
+    // Determine trend direction with 2% threshold to avoid noise
     let direction: 'improving' | 'stable' | 'degrading';
     if (changePercentage > 2) {
       direction = 'improving';
@@ -96,110 +104,82 @@ export class QualityScoreGenerator {
     return {
       direction,
       trendDays,
-      scoreHistory: recentHistory,
+      scoreHistory: trendPoints,
       changePercentage: Math.round(changePercentage * 100) / 100,
     };
   }
 
-  getScoreHistory(
-    sourceSystemId: string,
-    entityType: string,
-    days: number = 30,
-  ): TrendDataPoint[] {
-    const key = `${sourceSystemId}:${entityType}`;
-    const history = this.scoreHistory.get(key) || [];
-
-    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    return history.filter((point) => point.date >= threshold);
+  /**
+   * Convert quality assessment results to trend data points.
+   */
+  private buildTrendPoints(scoreHistory: DataQualityScoreResult[]): TrendDataPoint[] {
+    return scoreHistory.map((result) => ({
+      date: new Date(),
+      overallScore: result.overallScore,
+      dimensions: result.dimensions,
+    }));
   }
 
-  getCurrentScore(sourceSystemId: string, entityType: string): DataQualityScoreResult | null {
-    const key = `${sourceSystemId}:${entityType}`;
-    const history = this.scoreHistory.get(key);
+  /**
+   * Generate a quality report for a source system.
+   * Useful for IT admin notifications and dashboard display.
+   */
+  generateQualityReport(
+    sourceSystemId: string,
+    entityType: string,
+    latestScore: DataQualityScoreResult,
+    trend?: QualityTrend,
+  ): Record<string, unknown> {
+    const trend_text =
+      trend?.direction === 'improving'
+        ? `Data quality is improving (+${trend.changePercentage}%)`
+        : trend?.direction === 'degrading'
+          ? `Data quality is degrading (${trend.changePercentage}%)`
+          : 'Data quality is stable';
 
-    if (!history || history.length === 0) {
-      return null;
-    }
+    const critical_issues = this.identifyCriticalIssues(latestScore);
 
-    const latest = history[history.length - 1];
     return {
-      overallScore: latest.overallScore,
-      qualityRating:
-        latest.overallScore >= 90
-          ? 'excellent'
-          : latest.overallScore >= 75
-            ? 'good'
-            : latest.overallScore >= 60
-              ? 'fair'
-              : 'poor',
-      dimensions: latest.dimensions,
-      recordsAssessed: 0, // Would need to track this separately
-      recordsWithIssues: 0, // Would need to track this separately
+      sourceSystemId,
+      entityType,
+      overallScore: latestScore.overallScore,
+      qualityRating: latestScore.qualityRating,
+      dimensions: latestScore.dimensions,
+      recordsAssessed: latestScore.recordsAssessed,
+      recordsWithIssues: latestScore.recordsWithIssues,
+      issuePercentage: Math.round(
+        (latestScore.recordsWithIssues / latestScore.recordsAssessed) * 100 * 100,
+      ) / 100,
+      trend: trend_text,
+      trendDirection: trend?.direction || 'stable',
+      trendChangePercentage: trend?.changePercentage || 0,
+      criticalIssues: critical_issues,
+      generatedAt: new Date().toISOString(),
     };
   }
 
-  getAverageScore(sourceSystemId: string, days: number = 30): number {
-    const entities = Array.from(this.scoreHistory.keys()).filter((key) =>
-      key.startsWith(`${sourceSystemId}:`),
-    );
+  /**
+   * Identify critical issues based on dimension scores.
+   */
+  private identifyCriticalIssues(score: DataQualityScoreResult): string[] {
+    const issues: string[] = [];
 
-    if (entities.length === 0) return 0;
+    if (score.dimensions.completeness < 70) {
+      issues.push('Critical: Missing required fields in ' + score.dimensions.completeness + '% of records');
+    }
+    if (score.dimensions.accuracy < 70) {
+      issues.push('Critical: Inaccurate data in ' + score.dimensions.accuracy + '% of records');
+    }
+    if (score.dimensions.validity < 70) {
+      issues.push('Critical: Invalid data formats in ' + score.dimensions.validity + '% of records');
+    }
+    if (score.dimensions.timeliness < 50) {
+      issues.push('Critical: Stale data detected - ' + score.dimensions.timeliness + '% timeliness');
+    }
+    if (score.dimensions.consistency < 70) {
+      issues.push('Critical: Data inconsistencies across sources - ' + score.dimensions.consistency + '% consistency');
+    }
 
-    let totalScore = 0;
-    let count = 0;
-
-    entities.forEach((key) => {
-      const history = this.scoreHistory.get(key) || [];
-      const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      const recentScores = history.filter((point) => point.date >= threshold);
-
-      if (recentScores.length > 0) {
-        const avgForEntity =
-          recentScores.reduce((sum, point) => sum + point.overallScore, 0) / recentScores.length;
-        totalScore += avgForEntity;
-        count++;
-      }
-    });
-
-    return count === 0 ? 0 : Math.round((totalScore / count) * 100) / 100;
-  }
-
-  getSourcesWithLowestScores(limit: number = 5, days: number = 7): Array<{
-    sourceSystemId: string;
-    entityType: string;
-    overallScore: number;
-    qualityRating: string;
-  }> {
-    const scores: Array<{
-      sourceSystemId: string;
-      entityType: string;
-      overallScore: number;
-      qualityRating: string;
-    }> = [];
-
-    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
-    this.scoreHistory.forEach((history, key) => {
-      const recentPoints = history.filter((point) => point.date >= threshold);
-      if (recentPoints.length > 0) {
-        const latestPoint = recentPoints[recentPoints.length - 1];
-        const [sourceSystemId, entityType] = key.split(':');
-        scores.push({
-          sourceSystemId,
-          entityType,
-          overallScore: latestPoint.overallScore,
-          qualityRating:
-            latestPoint.overallScore >= 90
-              ? 'excellent'
-              : latestPoint.overallScore >= 75
-                ? 'good'
-                : latestPoint.overallScore >= 60
-                  ? 'fair'
-                  : 'poor',
-        });
-      }
-    });
-
-    return scores.sort((a, b) => a.overallScore - b.overallScore).slice(0, limit);
+    return issues;
   }
 }

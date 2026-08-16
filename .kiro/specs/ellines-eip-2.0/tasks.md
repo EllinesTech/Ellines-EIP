@@ -251,7 +251,7 @@ The implementation leverages the existing TypeScript/Next.js/NestJS stack and ex
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8_
 
 
-- [ ]* 4.2 Write property tests for predictive analytics
+- [x]* 4.2 Write property tests for predictive analytics
   - **Property 9: Forecast confidence bounds** — All forecast points have confidence intervals within 0-100%
   - **Validates: Requirements 11.1**
   - **Property 10: Scenario probability sum** — Best/worst/likely scenario probabilities sum to 100%

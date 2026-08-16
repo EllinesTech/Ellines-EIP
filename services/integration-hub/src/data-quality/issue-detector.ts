@@ -1,13 +1,13 @@
 /**
- * IssueDetector — Detects individual data quality issues.
+ * IssueDetector — Detects data quality issues in records.
  * 
- * Detects:
- * - Missing values
- * - Duplicates
- * - Format errors
- * - Referential integrity violations
- * - Stale data (timeliness issues)
- * - Outliers and anomalies
+ * Issue Types:
+ * - missing_value: Required fields are null/undefined/empty
+ * - duplicate: Records with same key fields appear multiple times
+ * - format_error: Values don't match expected format (email, phone, date, etc.)
+ * - referential_integrity: Foreign key reference doesn't exist in related data
+ * - stale_data: Data hasn't been updated within expected timeframe
+ * - outlier: Values are statistical outliers (e.g., unusual prices, ages)
  */
 
 import {
@@ -17,9 +17,17 @@ import {
   DuplicateDetectionConfig,
 } from './types';
 
+export interface IssueDetectionResult {
+  issues: QualityIssue[];
+  hasIssues: boolean;
+  issueCount: number;
+  issuesByType: Record<string, number>;
+  issuesBySeverity: Record<string, number>;
+}
+
 export class IssueDetector {
   /**
-   * Detect all data quality issues in records
+   * Detect all issues in a batch of records.
    */
   detectIssues(
     records: DataRecord[],
@@ -27,321 +35,222 @@ export class IssueDetector {
     sourceSystemId: string,
     entityType: string,
     duplicateConfig?: DuplicateDetectionConfig,
-    freshnessDays?: number,
-  ): QualityIssue[] {
+    freshnessThresholdDays?: number,
+  ): IssueDetectionResult {
     const issues: QualityIssue[] = [];
-    const issueIdSet = new Set<string>();
 
-    // Detect missing values
-    records.forEach((record, index) => {
-      const missingIssues = this.detectMissingValues(
-        record,
-        schema,
-        index,
-        sourceSystemId,
-        entityType,
-      );
-      missingIssues.forEach((issue) => {
-        issues.push(issue);
-      });
+    // Check for missing values
+    records.forEach((record, idx) => {
+      issues.push(...this.detectMissingValues(record, schema, sourceSystemId, entityType, `record-${idx}`));
     });
 
-    // Detect format errors and validity issues
-    records.forEach((record, index) => {
-      const formatIssues = this.detectFormatErrors(
-        record,
-        schema,
-        index,
-        sourceSystemId,
-        entityType,
-      );
-      formatIssues.forEach((issue) => {
-        issues.push(issue);
-      });
+    // Check for format errors
+    records.forEach((record, idx) => {
+      issues.push(...this.detectFormatErrors(record, schema, sourceSystemId, entityType, `record-${idx}`));
     });
 
-    // Detect duplicates
-    if (duplicateConfig) {
-      const duplicateIssues = this.detectDuplicates(
-        records,
-        duplicateConfig,
-        sourceSystemId,
-        entityType,
-      );
-      duplicateIssues.forEach((issue) => {
-        issues.push(issue);
-      });
-    }
-
-    // Detect stale data
-    if (freshnessDays) {
-      records.forEach((record, index) => {
-        const staleIssues = this.detectStaleData(
-          record,
-          index,
-          freshnessDays,
-          sourceSystemId,
-          entityType,
+    // Check for stale data
+    if (freshnessThresholdDays) {
+      records.forEach((record, idx) => {
+        issues.push(
+          ...this.detectStaleData(record, freshnessThresholdDays, sourceSystemId, entityType, `record-${idx}`),
         );
-        staleIssues.forEach((issue) => {
-          issues.push(issue);
-        });
       });
     }
 
-    // Detect outliers
-    const outlierIssues = this.detectOutliers(
-      records,
-      schema,
-      sourceSystemId,
-      entityType,
-    );
-    outlierIssues.forEach((issue) => {
-      issues.push(issue);
+    // Check for duplicates
+    if (duplicateConfig) {
+      issues.push(...this.detectDuplicates(records, duplicateConfig, sourceSystemId, entityType));
+    }
+
+    // Check for outliers (basic statistical)
+    issues.push(...this.detectOutliers(records, schema, sourceSystemId, entityType));
+
+    // Count by type and severity
+    const issuesByType: Record<string, number> = {};
+    const issuesBySeverity: Record<string, number> = {};
+
+    issues.forEach((issue) => {
+      issuesByType[issue.issueType] = (issuesByType[issue.issueType] || 0) + 1;
+      issuesBySeverity[issue.severity] = (issuesBySeverity[issue.severity] || 0) + 1;
     });
 
-    return issues;
+    return {
+      issues,
+      hasIssues: issues.length > 0,
+      issueCount: issues.length,
+      issuesByType,
+      issuesBySeverity,
+    };
   }
 
+  /**
+   * Detect missing values in required fields.
+   */
   private detectMissingValues(
     record: DataRecord,
     schema: ValidationSchema,
-    recordIndex: number,
     sourceSystemId: string,
     entityType: string,
+    recordId: string,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
     Object.entries(schema).forEach(([fieldName, fieldDef]) => {
-      if (fieldDef.required) {
-        const value = record[fieldName];
-        if (value === undefined || value === null || value === '') {
-          issues.push({
-            issueType: 'missing_value',
-            dimension: 'completeness',
-            severity: 'high',
-            recordId: String(record.id || recordIndex),
-            fieldName,
-            currentValue: value,
-            expectedValue: `<${fieldName}>`,
-            detectionRule: `Required field "${fieldName}" is missing`,
-            autoRemediable: false,
-            status: 'detected',
-          });
-        }
+      if (fieldDef.required && (record[fieldName] === undefined || record[fieldName] === null || record[fieldName] === '')) {
+        issues.push({
+          issueType: 'missing_value',
+          dimension: 'completeness',
+          severity: 'high',
+          recordId,
+          fieldName,
+          currentValue: record[fieldName],
+          expectedValue: `<${fieldDef.type}>`,
+          detectionRule: `Required field '${fieldName}' is missing or empty`,
+          autoRemediable: false,
+          status: 'detected',
+        });
       }
     });
 
     return issues;
   }
 
+  /**
+   * Detect format errors (invalid emails, dates, phone numbers, etc.).
+   */
   private detectFormatErrors(
     record: DataRecord,
     schema: ValidationSchema,
-    recordIndex: number,
     sourceSystemId: string,
     entityType: string,
+    recordId: string,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
     Object.entries(schema).forEach(([fieldName, fieldDef]) => {
       const value = record[fieldName];
-      if (value !== undefined && value !== null && value !== '') {
-        // Type checking
-        if (fieldDef.type === 'string' && typeof value !== 'string') {
-          issues.push({
-            issueType: 'format_error',
-            dimension: 'validity',
-            severity: 'high',
-            recordId: String(record.id || recordIndex),
-            fieldName,
-            currentValue: value,
-            expectedValue: `string (got ${typeof value})`,
-            detectionRule: `Field "${fieldName}" should be string but is ${typeof value}`,
-            autoRemediable: true,
-            status: 'detected',
-          });
-        }
 
-        if (fieldDef.type === 'number' && typeof value !== 'number') {
-          issues.push({
-            issueType: 'format_error',
-            dimension: 'validity',
-            severity: 'high',
-            recordId: String(record.id || recordIndex),
-            fieldName,
-            currentValue: value,
-            expectedValue: 'number',
-            detectionRule: `Field "${fieldName}" should be number`,
-            autoRemediable: true,
-            status: 'detected',
-          });
-        }
+      // Skip null/undefined values - those are covered by missing value detection
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
 
-        // Format validation
-        if (fieldDef.format === 'email') {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(String(value))) {
-            issues.push({
-              issueType: 'format_error',
-              dimension: 'validity',
-              severity: 'medium',
-              recordId: String(record.id || recordIndex),
+      // Type checking
+      if (fieldDef.type === 'string' && typeof value !== 'string') {
+        issues.push(this.createFormatIssue(recordId, fieldName, value, fieldDef, 'Type mismatch: expected string'));
+      } else if (fieldDef.type === 'number' && typeof value !== 'number') {
+        issues.push(this.createFormatIssue(recordId, fieldName, value, fieldDef, 'Type mismatch: expected number'));
+      } else if (fieldDef.type === 'boolean' && typeof value !== 'boolean') {
+        issues.push(this.createFormatIssue(recordId, fieldName, value, fieldDef, 'Type mismatch: expected boolean'));
+      }
+
+      // Format-specific validation
+      if (fieldDef.format === 'email' && !this.isValidEmail(String(value))) {
+        issues.push(
+          this.createFormatIssue(recordId, fieldName, value, fieldDef, `Invalid email format: ${value}`),
+        );
+      }
+
+      if (fieldDef.format === 'phone' && !this.isValidPhone(String(value))) {
+        issues.push(
+          this.createFormatIssue(recordId, fieldName, value, fieldDef, `Invalid phone format: ${value}`),
+        );
+      }
+
+      if (fieldDef.format === 'date' && !this.isValidDate(String(value))) {
+        issues.push(
+          this.createFormatIssue(recordId, fieldName, value, fieldDef, `Invalid date format: ${value}`),
+        );
+      }
+
+      // Regex pattern validation
+      if (fieldDef.pattern && typeof value === 'string') {
+        const regex = new RegExp(fieldDef.pattern);
+        if (!regex.test(value)) {
+          issues.push(
+            this.createFormatIssue(
+              recordId,
               fieldName,
-              currentValue: value,
-              expectedValue: 'valid email format',
-              detectionRule: `Field "${fieldName}" does not match email format`,
-              autoRemediable: false,
-              status: 'detected',
-            });
-          }
+              value,
+              fieldDef,
+              `Does not match pattern: ${fieldDef.pattern}`,
+            ),
+          );
         }
+      }
 
-        if (fieldDef.format === 'date') {
-          const date = new Date(String(value));
-          if (isNaN(date.getTime())) {
-            issues.push({
-              issueType: 'format_error',
-              dimension: 'validity',
-              severity: 'medium',
-              recordId: String(record.id || recordIndex),
-              fieldName,
-              currentValue: value,
-              expectedValue: 'valid date',
-              detectionRule: `Field "${fieldName}" is not a valid date`,
-              autoRemediable: false,
-              status: 'detected',
-            });
-          }
-        }
-
-        // Pattern matching
-        if (fieldDef.pattern) {
-          const regex = new RegExp(fieldDef.pattern);
-          if (!regex.test(String(value))) {
-            issues.push({
-              issueType: 'format_error',
-              dimension: 'validity',
-              severity: 'medium',
-              recordId: String(record.id || recordIndex),
-              fieldName,
-              currentValue: value,
-              expectedValue: `matches pattern ${fieldDef.pattern}`,
-              detectionRule: `Field "${fieldName}" does not match pattern ${fieldDef.pattern}`,
-              autoRemediable: false,
-              status: 'detected',
-            });
-          }
-        }
-
-        // Length validation
-        if (fieldDef.minLength && String(value).length < fieldDef.minLength) {
-          issues.push({
-            issueType: 'format_error',
-            dimension: 'validity',
-            severity: 'low',
-            recordId: String(record.id || recordIndex),
+      // Length validation
+      if (fieldDef.minLength && String(value).length < fieldDef.minLength) {
+        issues.push(
+          this.createFormatIssue(
+            recordId,
             fieldName,
-            currentValue: value,
-            expectedValue: `minimum ${fieldDef.minLength} characters`,
-            detectionRule: `Field "${fieldName}" is shorter than minimum ${fieldDef.minLength}`,
-            autoRemediable: false,
-            status: 'detected',
-          });
-        }
+            value,
+            fieldDef,
+            `Too short (min: ${fieldDef.minLength}, got: ${String(value).length})`,
+          ),
+        );
+      }
 
-        if (fieldDef.maxLength && String(value).length > fieldDef.maxLength) {
-          issues.push({
-            issueType: 'format_error',
-            dimension: 'validity',
-            severity: 'low',
-            recordId: String(record.id || recordIndex),
+      if (fieldDef.maxLength && String(value).length > fieldDef.maxLength) {
+        issues.push(
+          this.createFormatIssue(
+            recordId,
             fieldName,
-            currentValue: value,
-            expectedValue: `maximum ${fieldDef.maxLength} characters`,
-            detectionRule: `Field "${fieldName}" is longer than maximum ${fieldDef.maxLength}`,
-            autoRemediable: true,
-            status: 'detected',
-          });
-        }
+            value,
+            fieldDef,
+            `Too long (max: ${fieldDef.maxLength}, got: ${String(value).length})`,
+          ),
+        );
+      }
 
-        // Enum validation
-        if (fieldDef.enum && !fieldDef.enum.includes(value)) {
-          issues.push({
-            issueType: 'format_error',
-            dimension: 'accuracy',
-            severity: 'medium',
-            recordId: String(record.id || recordIndex),
+      // Enum validation
+      if (fieldDef.enum && !fieldDef.enum.includes(value)) {
+        issues.push(
+          this.createFormatIssue(
+            recordId,
             fieldName,
-            currentValue: value,
-            expectedValue: `one of [${fieldDef.enum.join(', ')}]`,
-            detectionRule: `Field "${fieldName}" has invalid enum value`,
-            autoRemediable: false,
-            status: 'detected',
-          });
-        }
+            value,
+            fieldDef,
+            `Value not in allowed enum: ${fieldDef.enum.join(', ')}`,
+          ),
+        );
       }
     });
 
     return issues;
   }
 
-  private detectDuplicates(
-    records: DataRecord[],
-    config: DuplicateDetectionConfig,
-    sourceSystemId: string,
-    entityType: string,
-  ): QualityIssue[] {
-    const issues: QualityIssue[] = [];
-    const seen = new Map<string, number>();
-
-    records.forEach((record, index) => {
-      const key = config.keyFields.map((field) => record[field]).join('|');
-      if (seen.has(key)) {
-        issues.push({
-          issueType: 'duplicate',
-          dimension: 'consistency',
-          severity: 'high',
-          recordId: String(record.id || index),
-          detectionRule: `Duplicate detected by key fields: ${config.keyFields.join(', ')}`,
-          autoRemediable: false,
-          status: 'detected',
-          currentValue: key,
-          expectedValue: 'unique',
-        });
-      } else {
-        seen.set(key, index);
-      }
-    });
-
-    return issues;
-  }
-
+  /**
+   * Detect stale data (not updated within threshold).
+   */
   private detectStaleData(
     record: DataRecord,
-    recordIndex: number,
-    freshnessDays: number,
+    freshnessThresholdDays: number,
     sourceSystemId: string,
     entityType: string,
+    recordId: string,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
-    const timestampFields = ['updatedAt', 'updated_at', 'lastModified', 'createdAt', 'created_at'];
     const now = new Date();
-    const staleDateThreshold = new Date(now.getTime() - freshnessDays * 24 * 60 * 60 * 1000);
+    const staleDateThreshold = new Date(now.getTime() - freshnessThresholdDays * 24 * 60 * 60 * 1000);
+
+    const timestampFields = ['updatedAt', 'updated_at', 'lastModified', 'modifiedDate', 'createdAt', 'created_at'];
 
     for (const field of timestampFields) {
       if (record[field]) {
         const timestamp = new Date(record[field] as string);
-        if (timestamp < staleDateThreshold) {
+        if (!isNaN(timestamp.getTime()) && timestamp < staleDateThreshold) {
           issues.push({
             issueType: 'stale_data',
             dimension: 'timeliness',
             severity: 'medium',
-            recordId: String(record.id || recordIndex),
+            recordId,
             fieldName: field,
             currentValue: record[field],
-            expectedValue: `updated within ${freshnessDays} days`,
-            detectionRule: `Record not updated in ${freshnessDays} days`,
+            expectedValue: `Within last ${freshnessThresholdDays} days`,
+            detectionRule: `Data not updated within ${freshnessThresholdDays} days`,
             autoRemediable: false,
             status: 'detected',
           });
@@ -353,6 +262,53 @@ export class IssueDetector {
     return issues;
   }
 
+  /**
+   * Detect duplicate records using key field matching.
+   */
+  private detectDuplicates(
+    records: DataRecord[],
+    config: DuplicateDetectionConfig,
+    sourceSystemId: string,
+    entityType: string,
+  ): QualityIssue[] {
+    const issues: QualityIssue[] = [];
+    const keyMap = new Map<string, number[]>();
+
+    // Build a map of key combinations to record indices
+    records.forEach((record, idx) => {
+      const keyValues = config.keyFields.map((field) => String(record[field] || '')).join('|');
+      if (!keyMap.has(keyValues)) {
+        keyMap.set(keyValues, []);
+      }
+      keyMap.get(keyValues)!.push(idx);
+    });
+
+    // Find duplicates
+    keyMap.forEach((indices) => {
+      if (indices.length > 1) {
+        // All but the first are duplicates
+        for (let i = 1; i < indices.length; i++) {
+          issues.push({
+            issueType: 'duplicate',
+            dimension: 'consistency',
+            severity: 'high',
+            recordId: `record-${indices[i]}`,
+            currentValue: JSON.stringify(config.keyFields.map((f) => records[indices[i]][f])),
+            expectedValue: `Unique (matches record-${indices[0]})`,
+            detectionRule: `Duplicate key fields: ${config.keyFields.join(', ')}`,
+            autoRemediable: true,
+            status: 'detected',
+          });
+        }
+      }
+    });
+
+    return issues;
+  }
+
+  /**
+   * Detect statistical outliers in numeric fields.
+   */
   private detectOutliers(
     records: DataRecord[],
     schema: ValidationSchema,
@@ -361,47 +317,84 @@ export class IssueDetector {
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
-    // Simple outlier detection for numeric fields
+    // Find numeric fields
     Object.entries(schema).forEach(([fieldName, fieldDef]) => {
-      if (fieldDef.type === 'number') {
-        const numbers: { value: number; index: number }[] = [];
+      if (fieldDef.type !== 'number') return;
 
-        records.forEach((record, index) => {
-          const value = record[fieldName];
-          if (typeof value === 'number') {
-            numbers.push({ value, index });
+      const values = records
+        .map((r) => {
+          const v = r[fieldName];
+          return typeof v === 'number' ? v : null;
+        })
+        .filter((v) => v !== null) as number[];
+
+      if (values.length < 3) return; // Need at least 3 values for outlier detection
+
+      // Calculate mean and standard deviation
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, v) => a + Math.pow(v - mean, 2), 0) / values.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Find outliers (> 3 standard deviations)
+      records.forEach((record, idx) => {
+        const value = record[fieldName];
+        if (typeof value === 'number') {
+          const zScore = Math.abs((value - mean) / stdDev);
+          if (zScore > 3) {
+            issues.push({
+              issueType: 'outlier',
+              dimension: 'accuracy',
+              severity: 'low',
+              recordId: `record-${idx}`,
+              fieldName,
+              currentValue: value,
+              expectedValue: `Between ${mean - 3 * stdDev} and ${mean + 3 * stdDev}`,
+              detectionRule: `Statistical outlier (${zScore.toFixed(2)} standard deviations from mean)`,
+              autoRemediable: false,
+              status: 'detected',
+            });
           }
-        });
-
-        if (numbers.length > 3) {
-          // Calculate mean and standard deviation
-          const mean = numbers.reduce((sum, item) => sum + item.value, 0) / numbers.length;
-          const variance =
-            numbers.reduce((sum, item) => sum + Math.pow(item.value - mean, 2), 0) /
-            numbers.length;
-          const stdDev = Math.sqrt(variance);
-
-          // Flag values > 3 standard deviations from mean as outliers
-          numbers.forEach(({ value, index }) => {
-            if (Math.abs(value - mean) > 3 * stdDev) {
-              issues.push({
-                issueType: 'outlier',
-                dimension: 'accuracy',
-                severity: 'low',
-                recordId: String(records[index].id || index),
-                fieldName,
-                currentValue: value,
-                expectedValue: `within ${3 * stdDev} of mean ${mean}`,
-                detectionRule: `Field "${fieldName}" is a statistical outlier`,
-                autoRemediable: false,
-                status: 'detected',
-              });
-            }
-          });
         }
-      }
+      });
     });
 
     return issues;
+  }
+
+  private createFormatIssue(
+    recordId: string,
+    fieldName: string,
+    value: unknown,
+    fieldDef: any,
+    rule: string,
+  ): QualityIssue {
+    return {
+      issueType: 'format_error',
+      dimension: 'validity',
+      severity: 'medium',
+      recordId,
+      fieldName,
+      currentValue: value,
+      expectedValue: `Valid ${fieldDef.type}${fieldDef.format ? ` (${fieldDef.format})` : ''}`,
+      detectionRule: rule,
+      autoRemediable: false,
+      status: 'detected',
+    };
+  }
+
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  private isValidPhone(phone: string): boolean {
+    // Allow various phone formats
+    const phoneRegex = /^[\d\-\+\s\(\)]+$/;
+    return phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 10;
+  }
+
+  private isValidDate(dateStr: string): boolean {
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime());
   }
 }
