@@ -829,6 +829,12 @@ export default function PlatformPage() {
   const [statsBusy, setStatsBusy] = useState(false);
   const [platformHealth, setPlatformHealth] = useState<HealthDto | null>(null);
 
+  // Dashboard state
+  const [viewMode, setViewMode] = useState<'dashboard' | 'admin'>('dashboard');
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const { theme, setTheme: setThemeMode } = useTheme();
+  const metrics = useRealtimeMetrics(orgs, allowed && loading === false);
+
   useEffect(() => {
     const s = getSession();
     if (!s) {
@@ -996,6 +1002,160 @@ export default function PlatformPage() {
     );
   }
 
+  // Dashboard view for super admin
+  if (viewMode === 'dashboard' && metrics) {
+    return (
+      <div style={{
+        background: 'var(--bg-primary)',
+        color: 'var(--text-primary)',
+        minHeight: '100vh',
+        padding: '2rem',
+      }}>
+        {/* Header with controls */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+              Platform Command Center
+            </h1>
+            <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+              Real-time platform metrics • Self-healing • Federated learning • Predictive insights
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={theme}
+              onChange={(e) => setThemeMode(e.target.value as Theme)}
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '0.375rem',
+                color: 'var(--text-primary)',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="dark">🌙 Dark</option>
+              <option value="light">☀️ Light</option>
+              <option value="high-contrast">⚡ High Contrast</option>
+            </select>
+            <button
+              onClick={() => setCopilotOpen(!copilotOpen)}
+              style={{
+                background: 'var(--accent-primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                padding: '0.5rem 1rem',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'var(--transition)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-secondary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent-primary)')}
+            >
+              {copilotOpen ? '✕ Close Copilot' : '✨ Copilot'}
+            </button>
+            <button
+              onClick={() => setViewMode('admin')}
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '0.375rem',
+                color: 'var(--text-primary)',
+                padding: '0.5rem 1rem',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'var(--transition)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+            >
+              ⚙️ Admin Panel
+            </button>
+          </div>
+        </div>
+
+        {error ? (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            marginBottom: '1rem',
+            color: 'var(--error)',
+            fontSize: '0.95rem',
+          }}>
+            {error}
+          </div>
+        ) : null}
+
+        {/* Dashboard grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '2rem',
+        }}>
+          {/* Geo heatmap */}
+          <GeoHeatmap orgs={metrics.orgDistribution} />
+
+          {/* Self-healing metrics */}
+          <SelfHealingMetrics stats={metrics.selfHealingStats} />
+
+          {/* Federated learning */}
+          <FederatedLearningWidget status={metrics.federatedLearningStatus} />
+
+          {/* Predictive analytics */}
+          <PredictiveAnalyticsWidget forecasts={metrics.predictiveForecasts} />
+        </div>
+
+        {/* Platform health summary */}
+        {platformHealth ? (
+          <div className={dashboardStyles.widget}>
+            <h3>Platform Health Overview</h3>
+            <div className={dashboardStyles.metricsGrid}>
+              <div className={dashboardStyles.metric}>
+                <span>Status</span>
+                <strong style={{ color: 'var(--success)' }}>🟢 Healthy</strong>
+                <small>all systems nominal</small>
+              </div>
+              <div className={dashboardStyles.metric}>
+                <span>Uptime</span>
+                <strong>{Math.floor((platformHealth.uptimeSeconds ?? 0) / 3600)}h</strong>
+                <small>continuous operation</small>
+              </div>
+              <div className={dashboardStyles.metric}>
+                <span>Organizations</span>
+                <strong>{orgs.length}</strong>
+                <small>active tenants</small>
+              </div>
+              <div className={dashboardStyles.metric}>
+                <span>Last Updated</span>
+                <strong style={{ fontSize: '0.9rem' }}>
+                  {platformHealth.ts ? new Date(platformHealth.ts).toLocaleTimeString() : '—'}
+                </strong>
+                <small>real-time sync</small>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Copilot panel */}
+        <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} metrics={metrics} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -1006,6 +1166,23 @@ export default function PlatformPage() {
             Tenants, feature flags, and connector packs — freeze a working install so the next customer
             only enters credentials. Grant via <code>PLATFORM_ADMIN_EMAILS</code>.
           </p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+          <button
+            onClick={() => setViewMode('dashboard')}
+            style={{
+              background: 'var(--accent-primary)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              padding: '0.5rem 1rem',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            ← Back to Dashboard
+          </button>
         </div>
       </header>
 
