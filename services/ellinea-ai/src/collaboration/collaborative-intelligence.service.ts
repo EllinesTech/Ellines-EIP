@@ -19,6 +19,8 @@ import { ContributionSynthesizer } from './contribution-synthesizer';
 import { DecisionFacilitator } from './decision-facilitator';
 import { SessionHistoryRecorder } from './session-history-recorder';
 import { AbsentStakeholderNotifier } from './absent-stakeholder-notifier';
+import { AgreementHighlighter } from './agreement-highlighter';
+import { InformationFilter } from './information-filter';
 
 export class CollaborativeIntelligenceService {
   private contextTracker: SessionContextTracker;
@@ -26,6 +28,8 @@ export class CollaborativeIntelligenceService {
   private facilitator: DecisionFacilitator;
   private historyRecorder: SessionHistoryRecorder;
   private notifier: AbsentStakeholderNotifier;
+  private agreementHighlighter: AgreementHighlighter;
+  private informationFilter: InformationFilter;
   private contributions: Map<string, UserContribution[]> = new Map();
   private decisions: Map<string, DecisionOption[]> = new Map();
 
@@ -35,6 +39,8 @@ export class CollaborativeIntelligenceService {
     this.facilitator = new DecisionFacilitator();
     this.historyRecorder = new SessionHistoryRecorder();
     this.notifier = new AbsentStakeholderNotifier();
+    this.agreementHighlighter = new AgreementHighlighter();
+    this.informationFilter = new InformationFilter();
   }
 
   /**
@@ -518,6 +524,103 @@ export class CollaborativeIntelligenceService {
       decisions: decisions.length,
       primaryDecision: decisions[0],
       status: session.status,
+    };
+  }
+
+  /**
+   * Get agreement summary for session
+   */
+  getAgreementSummary(sessionId: string) {
+    const contributions = this.contributions.get(sessionId) || [];
+    const synthesized = this.synthesizer.synthesizeContributions(contributions);
+    return this.agreementHighlighter.generateAgreementSummary(contributions, synthesized);
+  }
+
+  /**
+   * Get participant alignment report
+   */
+  getParticipantAlignmentReport(sessionId: string) {
+    const contributions = this.contributions.get(sessionId) || [];
+    return this.agreementHighlighter.generateParticipantAlignmentReport(contributions);
+  }
+
+  /**
+   * Get bridge-building suggestions for consensus
+   */
+  getBridgeBuildingSuggestions(sessionId: string) {
+    const contributions = this.contributions.get(sessionId) || [];
+    const report = this.agreementHighlighter.generateParticipantAlignmentReport(contributions);
+    return this.agreementHighlighter.findBridgeBuildingSuggestions(report);
+  }
+
+  /**
+   * Apply role-based information filtering to view
+   */
+  getFilteredViewWithPermissions(
+    sessionId: string,
+    participantId: string,
+    allContributions?: UserContribution[],
+    allDecisions?: DecisionOption[],
+  ) {
+    const session = this.contextTracker.getSession(sessionId);
+    if (!session) return null;
+
+    const participant = this.contextTracker.getParticipant(sessionId, participantId);
+    if (!participant) return null;
+
+    const permissions = this.contextTracker.getRolePermissions(participant.role);
+    if (!permissions) return null;
+
+    const contributions = allContributions || this.contributions.get(sessionId) || [];
+    const decisions = allDecisions || this.decisions.get(sessionId) || [];
+
+    return this.informationFilter.generateFilteredView(
+      participant,
+      contributions,
+      decisions,
+      permissions,
+    );
+  }
+
+  /**
+   * Get accessibility report for all participants
+   */
+  getAccessibilityReport(sessionId: string) {
+    const session = this.contextTracker.getSession(sessionId);
+    if (!session) return null;
+
+    const contributions = this.contributions.get(sessionId) || [];
+    const decisions = this.decisions.get(sessionId) || [];
+
+    const views = new Map();
+    for (const participant of session.participants) {
+      const permissions = this.contextTracker.getRolePermissions(participant.role);
+      if (permissions) {
+        const filtered = this.informationFilter.generateFilteredView(
+          participant,
+          contributions,
+          decisions,
+          permissions,
+        );
+        views.set(participant.id, filtered);
+      }
+    }
+
+    // Build permission map
+    const rolePermissions = new Map();
+    for (const role of ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'] as ParticipantRole[]) {
+      const permissions = this.contextTracker.getRolePermissions(role);
+      if (permissions) {
+        rolePermissions.set(role, permissions);
+      }
+    }
+
+    return {
+      sessionId,
+      totalParticipants: session.participants.length,
+      viewsGenerated: views.size,
+      statistics: this.informationFilter.getAccessibilityStatistics(views),
+      details: Array.from(views.entries()),
     };
   }
 }

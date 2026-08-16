@@ -333,12 +333,12 @@ export class ContributionSynthesizer {
   generateActionItems(
     synthesized: SynthesizedContribution[],
   ): Array<{ description: string; priority: 'high' | 'medium' | 'low'; suggestedOwner: string }> {
-    const actionItems = [];
+    const actionItems: Array<{ description: string; priority: 'high' | 'medium' | 'low'; suggestedOwner: string }> = [];
 
     for (const item of synthesized) {
       // Contributions of type 'recommendation' become action items
       if (item.primaryContribution.type === 'recommendation') {
-        const priority =
+        const priority: 'high' | 'medium' | 'low' =
           item.primaryContribution.confidence && item.primaryContribution.confidence >= 80
             ? 'high'
             : item.consensusScore >= 70
@@ -354,7 +354,7 @@ export class ContributionSynthesizer {
     }
 
     return actionItems.sort((a, b) => {
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const priorityOrder: Record<'high' | 'medium' | 'low', number> = { high: 0, medium: 1, low: 2 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
   }

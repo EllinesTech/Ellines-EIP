@@ -8,6 +8,7 @@ import {
   SessionNotification,
   Participant,
   CollaborativeSession,
+  ParticipantRole,
 } from './types';
 
 export class AbsentStakeholderNotifier {
@@ -38,14 +39,14 @@ export class AbsentStakeholderNotifier {
     const criticalRoles = criticalRolesByTopic[topicArea] || criticalRolesByTopic.default;
 
     for (const role of criticalRoles) {
-      if (!presentRoles.has(role)) {
+      if (!presentRoles.has(role as ParticipantRole)) {
         const roleCount = organizationRoles.find((r) => r.role === role)?.count || 0;
         if (roleCount > 0) {
           absentStakeholders.push({
             id: `absent_${role}_${Date.now()}`,
             name: `${this.formatRoleName(role)} (Absent)`,
             email: `${role}@organization.local`,
-            role: role as any,
+            role: role as ParticipantRole,
             relevanceToDecision: this.calculateRelevance(role, topicArea),
             potentialConcerns: this.identifyConcerns(role, topicArea),
           });

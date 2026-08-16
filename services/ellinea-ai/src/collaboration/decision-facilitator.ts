@@ -295,7 +295,7 @@ export class DecisionFacilitator {
    * Identify decision blockers
    */
   identifyBlockers(options: DecisionOption[]): Array<{ type: string; description: string; severity: 'critical' | 'high' | 'medium' }> {
-    const blockers = [];
+    const blockers: Array<{ type: string; description: string; severity: 'critical' | 'high' | 'medium' }> = [];
 
     for (const option of options) {
       // Strong opposition is a blocker
@@ -337,7 +337,7 @@ export class DecisionFacilitator {
     }
 
     return blockers.sort((a, b) => {
-      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const severityOrder: Record<'critical' | 'high' | 'medium', number> = { critical: 0, high: 1, medium: 2 };
       return severityOrder[a.severity] - severityOrder[b.severity];
     });
   }

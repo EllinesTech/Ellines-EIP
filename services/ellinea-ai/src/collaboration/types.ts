@@ -108,7 +108,6 @@ export interface DecisionFacilitationView {
 
 export interface SessionHistoryEntry {
   id: string;
-  sessionId: string;
   timestamp: Date;
   actionType: 'participant_joined' | 'contribution_added' | 'decision_proposed' | 'vote_cast' | 'session_concluded';
   actor: Participant;

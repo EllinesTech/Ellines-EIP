@@ -222,8 +222,8 @@ export class SessionHistoryRecorder {
       .map((h) => ({
         timestamp: h.timestamp,
         participant: h.actor.name,
-        type: h.data.type,
-        content: h.data.content,
+        type: h.data?.type || '',
+        content: h.data?.content || '',
       }));
   }
 
@@ -240,22 +240,22 @@ export class SessionHistoryRecorder {
     const decisions = [];
 
     const proposals = history
-      .filter((h) => h.actionType === 'decision_proposed')
+      .filter((h) => h.actionType === 'decision_proposed' && h.data)
       .map((h) => ({
         timestamp: h.timestamp,
         participant: h.actor.name,
-        title: h.data.title,
-        optionId: h.data.optionId,
+        title: h.data?.title || '',
+        optionId: h.data?.optionId || '',
       }));
 
     const votes = history
-      .filter((h) => h.actionType === 'vote_cast')
+      .filter((h) => h.actionType === 'vote_cast' && h.data)
       .reduce((acc, h) => {
-        const optionId = h.data.optionId;
+        const optionId = h.data?.optionId;
         if (!acc[optionId]) acc[optionId] = [];
         acc[optionId].push({
           voter: h.actor.name,
-          vote: h.data.vote,
+          vote: h.data?.vote || '',
         });
         return acc;
       }, {} as Record<string, Array<{ voter: string; vote: string }>>);
