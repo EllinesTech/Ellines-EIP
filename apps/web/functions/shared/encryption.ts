@@ -82,7 +82,21 @@ export async function encrypt(
 async function decryptLegacyV1(encryptedData: Record<string, unknown>, organizationId: string): Promise<string> {
   const key = await deriveLegacyV1Key(organizationId);
   const iv = fromB64(String(encryptedData.iv || ''));
-  const ciphertext = fromB64(String(encryptedData.ciphertext || ''));
+  let ciphertext = fromB64(String(encryptedData.ciphertext || ''));
+
+  // Pages v1 stored the GCM tag inside ciphertext. The older NestJS v1
+  // envelope stored authTag separately and used a 16-byte IV.
+  const legacyAuthTag = encryptedData.authTag ? fromB64(String(encryptedData.authTag)) : null;
+  if (legacyAuthTag) {
+    if (legacyAuthTag.length !== 16 || iv.length !== 16) throw new Error('Invalid legacy Node encryption envelope');
+    const combined = new Uint8Array(ciphertext.length + legacyAuthTag.length);
+    combined.set(ciphertext);
+    combined.set(legacyAuthTag, ciphertext.length);
+    ciphertext = combined;
+  } else if (iv.length !== 12) {
+    throw new Error('Invalid legacy Pages encryption envelope');
+  }
+
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
   return new TextDecoder().decode(plaintext);
 }
