@@ -1720,15 +1720,38 @@ Secrets must be:
 - never logged;
 - never returned to clients;
 - scoped to connectors;
-- revocable.
+- revocable;
+- fail-closed when unavailable or integrity checks fail.
 
-Prefer external secret management where supported.
+### Credential encryption
+
+Tenant database and integration credentials must use authenticated encryption backed by a platform-managed master secret.
+
+Current EIP encryption requirements:
+
+- AES-256-GCM;
+- per-value random IV;
+- master-key-backed per-organization derivation;
+- organization context authenticated as additional data;
+- explicit encryption version;
+- no plaintext fallback;
+- no Base64-as-encryption fallback;
+- no organization-ID-only key material;
+- unsupported or tampered ciphertext must fail closed.
+
+The production master secret is `EIP_ENCRYPTION_MASTER_KEY`.
+
+The secret must exist only in deployment secret storage/environment and must never be persisted in tenant data.
+
+Legacy credentials may be migrated through an explicit, audited migration workflow. New writes must never generate legacy encryption formats.
 
 Application configuration must distinguish:
 
 - public configuration;
 - sensitive configuration;
 - secret material.
+
+Database-selection failures caused by credential decryption/integrity failures must not silently redirect a tenant to another database.
 
 ---
 
