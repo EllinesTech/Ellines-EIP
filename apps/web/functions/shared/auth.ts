@@ -22,6 +22,8 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN?: string;
+  /** Required 256-bit+ master secret for encrypting tenant credentials. */
+  EIP_ENCRYPTION_MASTER_KEY?: string;
   /** Comma-separated Ellines operator emails (platform Super Admin). */
   PLATFORM_ADMIN_EMAILS?: string;
   /** Optional OpenAI-compatible key for Ellinea Ask (4.10). */
