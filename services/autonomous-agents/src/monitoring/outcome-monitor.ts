@@ -24,7 +24,7 @@ export class OutcomeMonitor {
    */
   recordWorkflowOutcome(outcome: WorkflowOutcome): void {
     this.outcomes.set(outcome.executionId, outcome);
-    this.logger.info(
+    this.logger.log(
       `Recorded workflow outcome: ${outcome.executionId} - Success: ${outcome.success}`,
     );
 

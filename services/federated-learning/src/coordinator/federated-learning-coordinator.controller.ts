@@ -9,7 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FederatedLearningCoordinatorService } from './federated-learning-coordinator.service';
-import { FederatedConfig, TrainingRound, GlobalModel, TransparencyReport } from '../interfaces/federated-learning.interfaces';
+import type {
+  FederatedConfig,
+  TrainingRound,
+  GlobalModel,
+  TransparencyReport,
+} from '../interfaces/federated-learning.interfaces';
 
 /**
  * Federated Learning Coordinator Controller

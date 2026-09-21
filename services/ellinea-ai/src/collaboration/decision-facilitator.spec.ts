@@ -498,7 +498,7 @@ describe('DecisionFacilitator', () => {
 
       const timeline = facilitator.suggestTimeline(options);
 
-      expect(timeline).toContain('immediately') || expect(timeline).toContain('1-2');
+      expect(timeline.includes('immediately') || timeline.includes('1-2')).toBe(true);
     });
 
     it('should suggest 24-hour for moderate consensus', () => {
