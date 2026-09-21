@@ -571,6 +571,102 @@ export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspe
   });
 }
 
+export interface PlatformPackage {
+  id: string;
+  name: string;
+  display_name: string;
+  requests_per_day: number;
+  requests_per_hour: number;
+  requests_per_minute: number;
+  burst_limit: number;
+  max_connectors: number | null;
+  max_users: number | null;
+  max_data_export_per_day: number | null;
+  enable_webhooks: boolean;
+  enable_sso: boolean;
+  enable_custom_roles: boolean;
+  enable_agents: boolean;
+  enable_advanced_bi: boolean;
+  priority: number;
+  monthly_price: number;
+}
+
+export function listPlatformPackages() {
+  return request<PlatformPackage[]>('/api/v1/platform/packages');
+}
+
+export function createPlatformPackage(payload: Partial<PlatformPackage> & { name: string; display_name: string }) {
+  return request<PlatformPackage>('/api/v1/platform/packages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePlatformPackage(id: string, payload: Partial<PlatformPackage>) {
+  return request<PlatformPackage>(`/api/v1/platform/packages/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePlatformPackage(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, { method: 'DELETE' });
+}
+
+export function fetchPlatformOrgPackage(orgId: string) {
+  return request<Record<string, unknown> | null>(`/api/v1/platform/orgs/${orgId}/package`);
+}
+
+export function assignPlatformOrgPackage(orgId: string, payload: { tierId: string; expiresAt?: string | null; autoRenew?: boolean; customLimits?: Record<string, unknown> | null }) {
+  return request<Record<string, unknown>>(`/api/v1/platform/orgs/${orgId}/package`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface PlatformAuditRow {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  organizationSlug: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  userFullName: string | null;
+  action: string;
+  resource: string;
+  metadata: unknown;
+  createdAt: string;
+}
+
+export function fetchPlatformAudit(params: { orgId?: string; action?: string; limit?: number; offset?: number } = {}) {
+  const q = new URLSearchParams();
+  if (params.orgId) q.set('orgId', params.orgId);
+  if (params.action) q.set('action', params.action);
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.offset) q.set('offset', String(params.offset));
+  return request<{ total: number; offset: number; limit: number; rows: PlatformAuditRow[] }>(`/api/v1/platform/audit-logs?${q.toString()}`);
+}
+
+export function listPlatformOrgUsers(orgId: string) {
+  return request<OrgMember[]>(`/api/v1/platform/orgs/${orgId}/users`);
+}
+
+export function createPlatformOrgUser(orgId: string, payload: { email: string; fullName: string; password: string; role: string }) {
+  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users`, {
+    method: 'POST', body: JSON.stringify(payload),
+  });
+}
+
+export function updatePlatformOrgUser(orgId: string, userId: string, payload: { fullName?: string; role?: string; isActive?: boolean; password?: string }) {
+  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, {
+    method: 'PATCH', body: JSON.stringify(payload),
+  });
+}
+
+export function deactivatePlatformOrgUser(orgId: string, userId: string) {
+  return request<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
 export function listPlatformFlags() {
   return request<FeatureFlag[]>('/api/v1/platform/flags');
 }
