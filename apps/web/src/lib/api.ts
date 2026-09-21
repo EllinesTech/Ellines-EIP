@@ -1257,6 +1257,22 @@ export function createPlatformOrg(payload: {
 }
 
 /** Fetch cross-org audit logs (platform admin). */
+export interface EncryptionMigrationResult {
+  dryRun: boolean;
+  scanned: number;
+  migrated: number;
+  alreadyCurrent: number;
+  failed: number;
+  failures: { configId: string; field: string; message: string }[];
+}
+
+export function migratePlatformEncryption(dryRun = false, organizationId?: string) {
+  return request<EncryptionMigrationResult>('/api/v1/platform/security/migrate-encryption', {
+    method: 'POST',
+    body: JSON.stringify({ dryRun, organizationId }),
+  });
+}
+
 export function listPlatformAuditLogs(params?: {
   orgId?: string;
   action?: string;
