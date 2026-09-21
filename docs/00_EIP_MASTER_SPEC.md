@@ -1,468 +1,404 @@
-# ELLINESEIP
+# ELLINES EIP — MASTER SPECIFICATION
 
 ## Enterprise Intelligence Platform
 
-*Where Enterprise Systems Think Together.*
-
-**Version:** 1.0  
-**Status:** Canonical build specification  
-**Target branch for implementation:** `eip-live-command-center-build`  
-**Specification branch:** `main`  
+**Tagline:** Where Enterprise Systems Think Together.  
+**Product:** Ellines EIP  
+**AI Engine:** Ellinea AI  
+**Owner:** Ellines Tech  
+**Version:** 2.0 Master Specification  
+**Status:** Canonical product, architecture, security, and implementation specification  
+**Specification branch:** `eip/master-spec-completion`  
+**Target implementation branch:** `eip-live-command-center-build`  
+**Canonical integration branch:** `main`  
 **Last updated:** 2026-09-21
 
 ---
 
-## 1. Purpose
+# 1. Purpose
 
-ELLINESEIP (Enterprise Intelligence Platform) is an intelligent, live business command center that sits **above** a company's existing business systems.
+Ellines EIP is an intelligent enterprise command platform that sits above existing business systems and gives authorized users one secure place to understand, monitor, compare, report on, and eventually act across their businesses.
 
-EIP does **not** replace ERP, POS, HR, CRM, accounting, inventory, or other source systems. Those systems remain the systems of record.
+EIP is **not** intended to unnecessarily replace ERP, POS, CRM, HR, accounting, hospital, inventory, banking, logistics, or other operational systems. Connected source systems remain authoritative for their operational records.
 
-EIP connects to authorized systems, discovers what they can provide, retrieves only the information required for the user's request, understands and normalizes that information, and presents useful business intelligence, reports, alerts, recommendations, and eventually authorized actions.
+EIP provides the intelligence layer between the user and those systems.
 
-The owner should be able to manage and understand multiple businesses without physically visiting each business or repeatedly logging into each underlying system.
+Core principle:
 
-### Core principle
+> **LIVE BY DEFAULT. STORE BY PURPOSE. ACT ONLY WHEN AUTHORIZED.**
 
-> **LIVE BY DEFAULT. STORE BY PURPOSE.**
-
-Operational data should remain in the source system unless EIP has a defined, authorized reason to retain a derived artifact, metric, audit record, configuration, or requested historical snapshot.
+EIP must retrieve the minimum information needed to answer a request, retain only information that has a defined purpose, clearly identify freshness, and preserve source-system traceability.
 
 ---
 
-## 2. Product Vision
+# 2. Product Vision
 
-EIP should feel like a secure live connection to the owner's businesses.
+The user should experience EIP as a secure live connection to an entire enterprise.
 
 The user should not need to know:
-- which ERP contains the data;
-- which screen contains a transaction;
-- which database table contains an entity;
-- which API endpoint supplies the information;
-- which connector is responsible for the request.
 
-The user asks a business question in normal language and EIP determines how to obtain the answer.
+- which system contains the information;
+- which database table contains it;
+- which API supplies it;
+- which connector retrieves it;
+- how different systems name the same entity;
+- how data is technically normalized.
 
-Examples:
+The user should be able to ask:
 
-- "How are all my businesses doing?"
-- "Show me Kamau Business."
-- "What happened today?"
-- "Give me today's sales."
-- "Check all pending supplier payments."
-- "Show me customer cheques that have not been processed."
-- "Which business needs my attention?"
-- "Compare Business A and Business B."
-- "Why are expenses higher this month?"
-- "Generate the monthly finance report."
-- "Send the report to my finance team."
-- "Create an approval request for this payment." (only when authorized)
+- “How are all my businesses doing?”
+- “Show me Business A.”
+- “What happened today?”
+- “Give me today's sales.”
+- “Which supplier payments are pending?”
+- “Show me all unprocessed cheques.”
+- “Why are expenses higher this month?”
+- “Compare these businesses.”
+- “Generate the monthly report.”
+- “Create an approval request.”
+- “Send this report to the finance team.”
+
+EIP turns these requests into controlled, auditable technical operations.
 
 ---
 
-## 3. Source-of-Truth Model
+# 3. Non-Goals
 
-Each connected business system remains authoritative for its operational data.
+EIP must not:
 
-### EIP should not normally duplicate
+1. Become an uncontrolled copy of every connected database.
+2. Assume every enterprise uses the same ERP schema.
+3. Treat AI output as authorization.
+4. Claim an action succeeded without source confirmation.
+5. Hide uncertainty or stale data.
+6. silently merge records that cannot be confidently matched.
+7. expose data outside the user's effective scope.
+8. require one specific ERP vendor.
+9. make unsupported capabilities appear available.
+10. use automation to bypass authentication or access controls.
 
-- full ERP databases;
-- every POS transaction;
-- every customer record;
-- every employee record;
-- every invoice;
-- every inventory row;
-- every purchase document;
-- every operational document.
+---
 
-### EIP may persist
+# 4. Source-of-Truth Architecture
 
-- users and organizations;
+Each source system remains authoritative for operational data.
+
+Examples of source-of-truth systems:
+
+- ERP;
+- POS;
+- accounting;
+- HR;
+- CRM;
+- hospital systems;
+- inventory systems;
+- banking platforms;
+- e-commerce systems;
+- custom enterprise applications.
+
+EIP may persist:
+
+- organizations;
 - businesses;
-- permissions and security policies;
-- connector configuration;
-- encrypted credentials/tokens;
-- system and capability metadata;
-- data mappings;
-- audit logs;
-- EIP workflows;
-- approvals created in EIP;
-- notification definitions;
-- report schedules;
+- users;
+- roles;
+- permissions;
+- connector definitions;
+- encrypted credentials or references to external secret stores;
+- capability metadata;
+- mappings;
+- audit records;
+- workflows;
+- approvals;
+- schedules;
 - generated reports;
-- requested exports;
-- user-created dashboards;
-- selected historical metrics;
-- explicit historical snapshots;
-- model/configuration metadata;
-- operational health telemetry;
-- minimal request/trace metadata needed for security and reliability.
+- requested snapshots;
+- derived metrics;
+- health telemetry;
+- notification state;
+- AI configuration metadata.
 
-### Temporary data
-
-EIP may use short-lived encrypted caches for performance.
-
-Cache entries must:
-- have explicit TTLs;
-- be scoped to organization/business/user permissions;
-- never become an accidental permanent copy;
-- be invalidated when appropriate;
-- contain only the minimum required data.
+EIP should not normally persist complete operational datasets unless a documented feature requires it.
 
 ---
 
-## 4. Operating Modes
+# 5. Data Retention Model
 
-### 4.1 Live Mode
+Every retained dataset must have:
 
-The default mode.
+- owner;
+- purpose;
+- scope;
+- retention classification;
+- creation time;
+- expiration policy;
+- deletion mechanism;
+- access policy.
+
+Retention classes:
+
+1. Ephemeral — seconds/minutes.
+2. Short-lived cache — explicit TTL.
+3. Operational metadata — retained for platform operation.
+4. Audit — retained according to security/compliance policy.
+5. Derived analytics — compact historical metrics.
+6. Generated artifact — report/document requested by a user or workflow.
+7. Explicit snapshot — deliberately saved historical state.
+
+Default behavior is data minimization.
+
+---
+
+# 6. Operating Modes
+
+## 6.1 Live Mode
+
+Default mode.
 
 Flow:
 
-`User Request → Intent → Authorization → Capability Discovery → Connector → Source System → Normalize → Analyze → Answer`
+`Request → Intent → Scope → Authorization → Capability → Query Plan → Source → Normalize → Validate → Answer`
 
-Live mode is used for:
-- current balances;
-- current sales;
-- current inventory;
-- pending payments;
-- pending approvals;
-- current employee/HR information;
-- current alerts;
-- current operational status.
+Used for current:
 
-### 4.2 Report Mode
+- balances;
+- sales;
+- inventory;
+- payments;
+- approvals;
+- employee information;
+- alerts;
+- operational status.
 
-Used when the user explicitly requests a generated artifact or recurring report.
+## 6.2 Cached Mode
 
-Examples:
-- daily;
-- weekly;
-- monthly;
-- quarterly;
-- annual;
-- custom schedule;
-- on-demand.
+Used only where a cache is explicitly allowed.
 
-Generated reports may be retained according to the organization's retention policy.
+The interface must display:
 
-### 4.3 Historical Analytics Mode
+- cached;
+- cache timestamp;
+- expected freshness;
+- source.
 
-EIP may retain compact derived metrics required for trend analysis.
+## 6.3 Historical Mode
 
-Example:
+Uses retained derived metrics or authorized historical records.
 
-`Business A / 2026-09-20 / Revenue / Expenses / Profit / Receivables / Payables`
+## 6.4 Snapshot Mode
 
-This is preferred over copying the complete source-system transaction history.
+Explicitly saved state.
 
-### 4.4 Snapshot Mode
+Snapshots must never be represented as live.
 
-The user may explicitly request:
-- "save this report";
-- "keep this snapshot";
-- "compare today's position with this date";
-- "store this monthly report."
+## 6.5 Degraded Mode
 
-Snapshots are clearly identified as snapshots and are not silently treated as live data.
+If a source is unavailable, EIP may continue serving unaffected sources and clearly identify unavailable data.
 
 ---
 
-## 5. Multi-Business Model
-
-EIP must support one owner managing one or many businesses.
+# 7. Multi-Business Model
 
 Hierarchy:
 
-`Platform → Organization → Owner → Businesses → Systems → Capabilities → Data`
+`Platform → Organization → User → Business → System → Capability → Resource`
 
-Example:
-
-```
-Owner
-├── Kamau Business
-│   ├── ERP
-│   ├── POS
-│   ├── HR
-│   └── CRM
-├── Business B
-│   ├── ERP
-│   └── POS
-└── Business C
-    ├── Accounting
-    ├── Inventory
-    └── CRM
-```
+A single organization may contain multiple businesses.
 
 Views:
 
-1. **Business View** — one business.
-2. **Portfolio View** — all authorized businesses.
-3. **Comparison View** — selected businesses.
-4. **Executive Attention View** — businesses/issues requiring attention.
+1. Business View.
+2. Portfolio View.
+3. Comparison View.
+4. Executive Attention View.
+5. System Health View.
 
-A user must never see a business or system outside their effective permissions.
-
----
-
-## 6. Owner Dashboard
-
-The owner dashboard is the primary command center.
-
-### Header
-
-- Ellines EIP identity;
-- organization/group selector;
-- business selector;
-- global search;
-- AI/business assistant;
-- notifications;
-- approvals;
-- user/profile;
-- connection status.
-
-### Executive overview
-
-Display live or clearly timestamped:
-- revenue;
-- expenses;
-- profit;
-- growth;
-- receivables;
-- payables;
-- inventory position;
-- pending payments;
-- pending approvals;
-- major alerts;
-- business/system health;
-- recent material changes.
-
-### Attention Required
-
-Prioritize actionable observations such as:
-- pending supplier payments;
-- overdue customer payments;
-- payment failures;
-- unusual sales changes;
-- inventory shortages;
-- unusual expenses;
-- overdue receivables;
-- critical approvals;
-- system connection failures;
-- compliance/security events.
-
-EIP must distinguish:
-- factual observation;
-- supporting evidence;
-- interpretation;
-- recommendation.
+Every request must resolve to an effective scope before data retrieval.
 
 ---
 
-## 7. Owner Navigation
+# 8. Tenant Isolation
 
-A business-specific sidebar should expose the capabilities available to that business.
+Tenant isolation is mandatory at every layer.
 
-### Business
+Required dimensions:
 
-- Dashboard
-- Overview
-- Activity
-- Alerts
-- Approvals
+- organization ID;
+- business ID;
+- user ID;
+- role;
+- resource scope;
+- connector scope;
+- cache scope;
+- database scope;
+- audit scope;
+- report scope;
+- workflow scope.
 
-### ERP
+A request must never be able to obtain another tenant's data by manipulating:
 
-ERP is a capability family, not a requirement that EIP replace an ERP.
-
-Possible sections:
-
-- Overview
-- Sales
-- Purchases
-- Inventory
-- Products
-- Customers
-- Suppliers
-- Invoices
-- Receivables
-- Payables
-- Payments
-  - Supplier Payments
-  - Customer Payments
-  - Cheques
-  - Bank Transfers
-  - Cash Payments
-  - Pending
-  - Approved
-  - Failed
-  - Returned
-  - Payment History
-- Expenses
-- Assets
-- General Ledger / Finance
-- Tax
-- Branches
-- Warehouses
-- Approvals
-- Documents
-
-The actual navigation is capability-driven. Unsupported modules should not be displayed as if they exist.
-
-### POS
-
-- Overview
-- Sales
-- Transactions
-- Products
-- Customers
-- Refunds
-- Discounts
-- Cashier activity
-- Branch/register activity
-- Payment methods
-- End-of-day summaries
-
-### HR
-
-- Overview
-- Employees
-- Departments
-- Attendance
-- Leave
-- Payroll
-- Recruitment
-- Performance
-- Documents
-- Employee activity permitted by role
-
-### CRM
-
-- Customers
-- Leads
-- Opportunities
-- Activities
-- Communications
-- Pipelines
-- Customer value
-- Follow-ups
-
-### Reports
-
-- Executive
-- Financial
-- Sales
-- Purchases
-- Inventory
-- Payments
-- POS
-- HR
-- CRM
-- Operations
-- Tax
-- Branch
-- Custom
-- Scheduled
-- Saved Reports
-- Report History
-
-### Other dynamic capabilities
-
-EIP must be able to expose additional connected capabilities such as:
-- manufacturing;
-- projects;
-- fleet;
-- logistics;
-- procurement;
-- banking;
-- education;
-- healthcare;
-- hospitality;
-- property;
-- document management;
-- e-commerce;
-- messaging;
-- custom enterprise applications.
+- IDs;
+- filters;
+- URLs;
+- prompts;
+- connector parameters;
+- API requests;
+- database queries;
+- cached keys;
+- report identifiers.
 
 ---
 
-## 8. Payments and Cheques
+# 9. Identity
 
-Payments are a first-class enterprise domain.
+Identity services must support:
 
-A cheque is a payment instrument and must not be treated as an unrelated top-level business domain.
+- registration/invitation;
+- authentication;
+- password policy;
+- MFA;
+- session management;
+- device/session listing;
+- session revocation;
+- password reset;
+- account recovery;
+- service identities;
+- API identities;
+- machine-to-machine authentication.
 
-### Payment model
-
-```
-Payments
-├── Supplier Payments
-│   ├── Cheque
-│   ├── Bank Transfer
-│   ├── Cash
-│   └── Other
-├── Customer Payments
-│   ├── Cheque
-│   ├── Bank Transfer
-│   ├── Cash
-│   └── Other
-├── Pending
-├── Awaiting Approval
-├── Processing
-├── Completed
-├── Failed
-├── Returned
-└── History
-```
-
-EIP must normalize cheque information where available:
-- cheque number;
-- payer/payee;
-- customer/supplier;
-- amount;
-- currency;
-- issue date;
-- due date;
-- bank;
-- status;
-- approval state;
-- processing state;
-- return/failure reason;
-- source system;
-- source record reference.
-
-Example request:
-
-> "Show all cheques still in the queue."
-
-EIP should determine:
-1. selected business scope;
-2. payment capability;
-3. relevant supplier/customer payment entities;
-4. cheque/payment status;
-5. source system;
-6. user permissions;
-7. live query;
-8. normalized result.
+Authentication and authorization are separate concerns.
 
 ---
 
-## 9. Universal Connector Fabric
+# 10. Authorization
 
-EIP must use a common connector architecture.
+Permission model:
 
-Supported and planned connector families include:
+`Module → Resource → Action → Scope`
 
-### API
+Actions may include:
+
+- view;
+- create;
+- edit;
+- delete;
+- approve;
+- reject;
+- execute;
+- export;
+- share;
+- schedule;
+- configure.
+
+Scope may include:
+
+- organization;
+- business;
+- branch;
+- department;
+- warehouse;
+- resource;
+- record.
+
+Authorization must be evaluated server-side.
+
+The client must never be trusted to enforce permissions.
+
+---
+
+# 11. Role-Based and Attribute-Based Access
+
+EIP should support:
+
+- RBAC;
+- scoped roles;
+- permission groups;
+- resource-level permissions;
+- attribute-based conditions where required;
+- temporary permissions;
+- delegated permissions;
+- service permissions.
+
+Examples:
+
+`Finance → Cheques → View → Business A`
+
+`Finance → Payments → Approve → Business B`
+
+A user may have different permissions in different businesses.
+
+---
+
+# 12. SuperAdmin / GodMode
+
+SuperAdmin is a platform authority and is separate from business ownership.
+
+SuperAdmin capabilities may include:
+
+- organizations;
+- users;
+- businesses;
+- connectors;
+- platform settings;
+- licensing;
+- feature flags;
+- health;
+- global audit;
+- security events;
+- diagnostics;
+- platform limits.
+
+GodMode must **not** become an invisible bypass.
+
+Every privileged operation must produce an immutable audit event.
+
+Sensitive privileged actions should support:
+
+- reason;
+- ticket/reference;
+- confirmation;
+- optional dual approval;
+- session re-authentication.
+
+---
+
+# 13. Business Owner Administration
+
+Business owners may be able to:
+
+- create businesses;
+- configure businesses;
+- connect systems;
+- invite users;
+- define roles;
+- assign permissions;
+- configure dashboards;
+- configure reports;
+- configure alerts;
+- configure workflows;
+- manage notification preferences;
+- review business audit events.
+
+All actions remain within organization authority.
+
+---
+
+# 14. Universal Connector Fabric
+
+The connector fabric is the central integration architecture.
+
+Connector families:
+
+### APIs
 
 - REST;
 - GraphQL;
-- OpenAPI/Swagger;
+- OpenAPI;
 - webhooks;
-- OAuth 2.0/OIDC;
+- OAuth 2.0;
+- OIDC;
 - API keys;
 - bearer tokens;
-- basic authentication where appropriate;
 - signed requests.
 
 ### Databases
@@ -471,15 +407,7 @@ Supported and planned connector families include:
 - MySQL/MariaDB;
 - SQL Server;
 - Oracle;
-- other supported SQL engines through adapters.
-
-Database access must use:
-- read-only credentials by default;
-- explicit write capability;
-- query allowlists/policies where appropriate;
-- connection isolation;
-- timeouts;
-- result limits.
+- other adapter-supported SQL engines.
 
 ### Enterprise protocols
 
@@ -487,11 +415,10 @@ Database access must use:
 - SFTP;
 - IMAP;
 - SMTP;
-- message queues;
 - Kafka;
 - RabbitMQ;
 - MQTT;
-- enterprise integration standards where justified.
+- message queues.
 
 ### Files
 
@@ -499,83 +426,81 @@ Database access must use:
 - XLSX;
 - JSON;
 - XML;
-- PDF;
-- secure document endpoints.
+- PDF.
 
-### Browser/legacy
+### Legacy
 
-For systems without usable APIs:
-- browser automation;
-- controlled desktop automation;
-- legacy application adapters.
+- controlled browser automation;
+- desktop automation;
+- legacy adapters.
 
-These require stronger security controls and must not bypass authentication or authorization.
-
-### Private/on-premise systems
-
-EIP Cloud must not assume it can directly reach a private LAN.
-
-Provide an **EIP Connector Agent** capable of:
-- secure outbound connection;
-- private ERP access;
-- local database access;
-- LAN-only application access;
-- encrypted communication;
-- command allowlisting;
-- health reporting;
-- credential isolation;
-- offline queueing where explicitly supported.
+Legacy automation must not bypass access controls.
 
 ---
 
-## 10. Connector Lifecycle
+# 15. Connector Lifecycle
 
-Every connector should support:
+Every connector must support:
 
 1. Install.
-2. Authenticate.
-3. Validate.
-4. Discover.
+2. Configure.
+3. Authenticate.
+4. Validate.
 5. Test.
-6. Describe capabilities.
-7. Map entities.
-8. Map fields.
-9. Set permissions.
-10. Set sync/live policies.
-11. Monitor health.
-12. Rotate credentials.
-13. Reauthorize.
+6. Discover.
+7. Describe.
+8. Map.
+9. Authorize.
+10. Enable.
+11. Monitor.
+12. Reauthorize.
+13. Rotate credentials.
 14. Pause.
 15. Disable.
 16. Revoke.
 17. Remove.
 
-EIP should show connection health and last successful access without exposing secrets.
+Connector health should expose:
+
+- connected;
+- degraded;
+- authentication required;
+- unavailable;
+- disabled;
+- revoked;
+- error.
+
+Secrets must never be displayed in plain text.
 
 ---
 
-## 11. Capability Discovery
+# 16. Connector Security
 
-After connection, EIP should discover what the system can actually provide.
+Connectors must have:
 
-Example:
+- isolated execution;
+- minimum permissions;
+- explicit capabilities;
+- timeouts;
+- rate limits;
+- input validation;
+- output validation;
+- SSRF protection;
+- command allowlists where relevant;
+- secret isolation;
+- audit;
+- health monitoring.
 
-```
-ERP
-├── Sales
-├── Purchases
-├── Inventory
-├── Customers
-├── Suppliers
-├── Payments
-│   ├── Supplier Payments
-│   ├── Customer Payments
-│   └── Cheques
-├── Employees
-└── Reports
-```
+Database connectors default to read-only.
 
-Capabilities must include:
+Writes require explicit connector capability and policy authorization.
+
+---
+
+# 17. Capability Discovery
+
+A connector may report capabilities such as:
+
 - read;
 - create;
 - update;
@@ -583,25 +508,35 @@ Capabilities must include:
 - approve;
 - export;
 - execute;
-- subscribe/webhook;
+- subscribe;
+- webhook;
 - report;
 - search.
 
-Capability discovery must not grant permissions. It only describes technical availability.
+Capability discovery describes technical availability.
+
+It does **not** grant user permissions.
+
+Final access is:
+
+`Technical Capability ∩ User Permission ∩ Policy`
 
 ---
 
-## 12. Universal Enterprise Model (UEM)
+# 18. Universal Enterprise Model (UEM)
 
-Different systems use different names and structures.
+UEM provides common semantic entities across different systems.
 
-EIP requires a common semantic model.
+Core entities:
 
-Examples:
-
+- Organization;
+- Business;
+- Branch;
+- Department;
+- User;
+- Employee;
 - Customer;
 - Supplier;
-- Employee;
 - Product;
 - Inventory Item;
 - Sale;
@@ -611,250 +546,443 @@ Examples:
 - Cheque;
 - Expense;
 - Account;
-- Branch;
-- Warehouse;
+- Asset;
 - Approval;
 - Document;
 - Report;
-- Alert.
+- Alert;
+- Workflow.
 
-Each normalized object should retain:
+Every normalized object should preserve:
+
 - source system;
 - source entity;
 - source record ID;
 - business ID;
-- timestamps;
-- normalization metadata;
-- confidence/quality metadata where relevant.
+- source timestamps;
+- normalization version;
+- mapping confidence;
+- source URL/reference where appropriate.
 
-EIP must never silently invent missing fields.
-
----
-
-## 13. Universal Query Engine
-
-Natural language is the primary interaction model, but deterministic structured queries remain available.
-
-Pipeline:
-
-```
-User
- ↓
-Intent Detection
- ↓
-Business/Scope Resolution
- ↓
-Permission Check
- ↓
-Capability Resolution
- ↓
-Query Planning
- ↓
-Source Selection
- ↓
-Live Retrieval
- ↓
-Normalization
- ↓
-Validation
- ↓
-Analysis
- ↓
-Answer
-```
-
-The query planner should minimize unnecessary source access.
-
-For example:
-
-> "How much did Kamau Business sell today?"
-
-should not query HR or inventory unless required.
+EIP must never silently invent missing information.
 
 ---
 
-## 14. Cross-System Intelligence
+# 19. Entity Resolution
 
-EIP must be able to combine authorized data from multiple systems.
+EIP must distinguish:
+
+- exact source identity;
+- confidently matched identity;
+- probable match;
+- ambiguous match;
+- unmatched record.
+
+When ambiguity can materially affect the answer, EIP must ask for clarification or present the ambiguity.
 
 Example:
 
-```
-POS sales
-+
-ERP inventory
-+
-ERP purchases
-+
-Finance payments
-=
-business insight
-```
+Two systems may contain:
 
-Example question:
+`John Mwangi`
 
-> "Why are sales good but profit down?"
+and
 
-EIP may inspect:
-- sales;
-- discounts;
-- purchases;
-- expenses;
-- inventory cost;
-- payment/finance information.
+`J. Mwangi`
 
-It should explain which evidence supports its conclusion.
+EIP must not automatically assume they are the same person when the evidence is insufficient.
 
 ---
 
-## 15. Executive Intelligence
+# 20. Universal Query Engine
 
-EIP should convert raw enterprise data into useful summaries.
+Natural-language requests are translated into controlled execution plans.
 
-For example, instead of displaying 4,000 transactions, show:
+Pipeline:
 
-- total sales;
-- transaction count;
-- major changes;
-- top products;
-- unusual activity;
-- refunds;
-- payment mix;
-- branch differences;
-- supporting evidence.
+`User → Intent → Scope → Authorization → Capability → Query Plan → Source Selection → Retrieval → Normalization → Validation → Analysis → Answer`
 
-### Recommendation format
+The query planner must:
 
-```
-Observation
-Evidence
-Possible interpretation
-Recommended action
-Confidence/limitations
-```
-
-Recommendations must not be presented as facts.
+- minimize source access;
+- avoid irrelevant systems;
+- enforce result limits;
+- apply time boundaries;
+- apply tenant scope;
+- track source provenance;
+- handle partial failures;
+- support cancellation/timeouts.
 
 ---
 
-## 16. Multi-Business Intelligence
+# 21. Query Planning
 
-The owner should be able to ask:
+Each query plan should contain:
 
-- "How are all my businesses doing?"
-- "Which businesses changed the most?"
-- "Show Business A."
-- "Compare A, B and C."
-- "Which business needs attention?"
-- "Give me a group report."
-- "What happened across my businesses today?"
+- request ID;
+- user;
+- organization;
+- business scope;
+- intent;
+- required entities;
+- required fields;
+- source candidates;
+- selected sources;
+- filters;
+- time range;
+- permission decisions;
+- expected output;
+- timeout;
+- risk classification.
 
-EIP must aggregate only businesses the user is authorized to access.
+Plans should be inspectable in diagnostics without exposing sensitive values unnecessarily.
 
-Comparison should support:
+---
+
+# 22. Cross-System Intelligence
+
+EIP may combine authorized information.
+
+Example:
+
+`POS Sales + ERP Inventory + Purchasing + Finance = Enterprise Insight`
+
+The engine must preserve provenance for each important conclusion.
+
+Answers should distinguish:
+
+- observation;
+- evidence;
+- interpretation;
+- recommendation;
+- limitation.
+
+---
+
+# 23. Executive Dashboard
+
+The executive command center should provide:
+
 - revenue;
 - expenses;
 - profit;
 - growth;
 - receivables;
 - payables;
-- inventory;
-- sales volume;
-- payment activity;
-- operational alerts;
-- custom KPIs.
-
----
-
-## 17. Reporting Engine
-
-Reports must support:
-
-- on-demand generation;
-- scheduled generation;
-- daily;
-- weekly;
-- monthly;
-- quarterly;
-- annual;
-- custom schedules;
-- business-specific reports;
-- portfolio reports;
-- comparison reports;
-- custom reports;
-- PDF;
-- XLSX;
-- CSV;
-- JSON where useful.
-
-A report must record:
-- requested by;
-- scope;
-- source systems;
-- generation time;
-- data timestamp;
-- filters;
-- report definition;
-- retention policy.
-
-Reports must clearly distinguish:
-- live report;
-- generated snapshot;
-- historical report.
-
----
-
-## 18. Alerts and Monitoring
-
-EIP should monitor authorized business signals.
-
-Alert categories:
-- finance;
-- sales;
-- inventory;
-- payments;
-- HR;
-- system health;
+- inventory position;
+- pending payments;
+- pending approvals;
+- alerts;
 - connector health;
-- security;
-- workflow;
-- compliance;
-- custom thresholds.
+- system health;
+- recent material changes.
 
-Alerts should support:
-- severity;
-- acknowledgement;
-- assignment;
-- escalation;
-- resolution;
-- comments;
-- evidence;
-- timestamps.
+Every metric must display freshness.
 
----
+Possible states:
 
-## 19. Approvals
-
-EIP should provide a unified approval layer where connected systems expose approval workflows.
-
-Examples:
-- supplier payment approval;
-- purchase approval;
-- refund approval;
-- expense approval;
-- HR approval.
-
-Approvals must preserve the source-system authority.
-
-If approval is executed through EIP, the action must be authorized and auditable.
+- Live;
+- Live as of;
+- Cached;
+- Historical;
+- Snapshot;
+- Source unavailable.
 
 ---
 
-## 20. Universal Action Engine
+# 24. Attention Engine
 
-Eventually EIP must support authorized actions, not only reading.
+EIP should surface actionable issues such as:
 
-Possible actions:
+- overdue receivables;
+- pending supplier payments;
+- failed payments;
+- inventory shortages;
+- unusual expense movement;
+- unusual sales movement;
+- failed connectors;
+- critical approvals;
+- security events;
+- workflow failures.
+
+Attention items must include evidence and timestamps.
+
+---
+
+# 25. Business Navigation
+
+Navigation is capability-driven.
+
+Core business areas:
+
+### Business
+
+- Dashboard;
+- Overview;
+- Activity;
+- Alerts;
+- Approvals.
+
+### ERP
+
+- Sales;
+- Purchases;
+- Inventory;
+- Products;
+- Customers;
+- Suppliers;
+- Invoices;
+- Receivables;
+- Payables;
+- Payments;
+- Expenses;
+- Assets;
+- Finance;
+- Tax;
+- Branches;
+- Warehouses;
+- Documents.
+
+### POS
+
+- Sales;
+- Transactions;
+- Products;
+- Customers;
+- Refunds;
+- Discounts;
+- Cashier activity;
+- Registers;
+- Payment methods;
+- End-of-day.
+
+### HR
+
+- Employees;
+- Departments;
+- Attendance;
+- Leave;
+- Payroll;
+- Recruitment;
+- Performance;
+- Documents.
+
+### CRM
+
+- Customers;
+- Leads;
+- Opportunities;
+- Activities;
+- Communications;
+- Pipelines;
+- Follow-ups.
+
+Unsupported modules must not appear as functional modules.
+
+---
+
+# 26. Payments and Cheques
+
+Payments are a first-class domain.
+
+Model:
+
+`Payments → Supplier / Customer → Instrument → Status`
+
+Payment types may include:
+
+- cheque;
+- bank transfer;
+- cash;
+- card;
+- mobile money;
+- other source-defined methods.
+
+Cheque fields may include:
+
+- cheque number;
+- payer;
+- payee;
+- customer;
+- supplier;
+- amount;
+- currency;
+- issue date;
+- due date;
+- bank;
+- status;
+- approval state;
+- processing state;
+- failure/return reason;
+- source system;
+- source record ID.
+
+Statuses:
+
+- pending;
+- awaiting approval;
+- processing;
+- completed;
+- failed;
+- returned;
+- cancelled;
+- archived.
+
+---
+
+# 27. Data Governance
+
+Every data access must have:
+
+- identity;
+- organization;
+- business;
+- source;
+- purpose;
+- permission;
+- timestamp;
+- request ID.
+
+Sensitive data must support:
+
+- masking;
+- field-level permissions;
+- minimization;
+- controlled exports;
+- access logging.
+
+Data governance policies must be configurable by organization where legally and technically appropriate.
+
+---
+
+# 28. Privacy and Data Minimization
+
+Principle:
+
+> Retrieve what is needed, process what is needed, retain what is needed, delete what is no longer needed.
+
+EIP should support:
+
+- retention schedules;
+- deletion workflows;
+- export controls;
+- subject/data access workflows where applicable;
+- field masking;
+- consent/purpose metadata where applicable;
+- privacy event auditing.
+
+Privacy controls must not silently disable necessary security/audit records.
+
+---
+
+# 29. Audit System
+
+Audit events are immutable security records.
+
+An audit event should contain:
+
+- event ID;
+- timestamp;
+- actor;
+- actor type;
+- organization;
+- business;
+- action;
+- resource;
+- resource ID;
+- source system;
+- request ID;
+- outcome;
+- reason where required;
+- before/after metadata where safe;
+- IP/device/session metadata according to policy.
+
+Audit logs must be protected from ordinary users.
+
+---
+
+# 30. Observability
+
+EIP must provide:
+
+### Logs
+
+Structured application and security logs.
+
+### Metrics
+
+- request latency;
+- error rates;
+- connector latency;
+- connector failures;
+- query volume;
+- query success;
+- report generation;
+- workflow execution;
+- action execution;
+- cache hit rate;
+- resource utilization.
+
+### Traces
+
+Distributed tracing using correlation IDs.
+
+### Health
+
+- API health;
+- database health;
+- queue health;
+- connector health;
+- AI health;
+- storage health.
+
+---
+
+# 31. Reliability
+
+EIP must assume failures will happen.
+
+Required controls:
+
+- timeouts;
+- retries;
+- exponential backoff;
+- circuit breakers;
+- idempotency;
+- duplicate-action protection;
+- partial-result handling;
+- dead-letter queues;
+- graceful degradation;
+- health checks;
+- recovery procedures.
+
+Retries must never accidentally duplicate financial actions.
+
+---
+
+# 32. Transaction and Idempotency Safety
+
+Every externally visible action must have a risk classification.
+
+For actions that can create financial or operational side effects:
+
+- require idempotency keys;
+- persist execution state;
+- verify source response;
+- prevent duplicate execution;
+- record source transaction ID;
+- support safe retry.
+
+Example:
+
+A payment submission timeout must not automatically result in a second payment without determining whether the first submission succeeded.
+
+---
+
+# 33. Universal Action Engine
+
+EIP eventually supports authorized actions:
+
 - create;
 - update;
 - cancel;
@@ -864,411 +992,414 @@ Possible actions:
 - export;
 - notify;
 - schedule;
-- trigger workflow;
-- generate document.
+- trigger;
+- generate.
 
-Every action requires:
+Action flow:
 
-1. identity;
-2. permission;
-3. target business;
-4. target system;
-5. capability;
-6. validation;
-7. confirmation where required;
-8. execution;
-9. source-system result;
-10. audit record.
+`Identity → Permission → Policy → Validation → Confirmation → Execute → Source Result → Audit`
 
-High-risk actions may require explicit confirmation and/or multi-person approval.
+AI cannot skip this sequence.
 
 ---
 
-## 21. Workflow and Automation Engine
+# 34. Risk Classification
 
-Support multi-step processes.
+Actions should be classified:
 
-Example:
+### Low risk
 
-```
-Payment becomes overdue
- ↓
-EIP detects condition
- ↓
-Create alert
- ↓
-Notify finance manager
- ↓
-Create approval task
- ↓
-Wait for decision
- ↓
-Execute authorized action
- ↓
-Record result
-```
+- generate report;
+- refresh dashboard;
+- create internal note.
 
-Automation must have:
+### Medium risk
+
+- send notification;
+- create workflow;
+- update non-financial metadata.
+
+### High risk
+
+- approve payment;
+- create financial transaction;
+- delete operational data;
+- release sensitive information.
+
+High-risk actions may require:
+
+- explicit confirmation;
+- re-authentication;
+- MFA;
+- dual approval;
+- source confirmation;
+- enhanced audit.
+
+---
+
+# 35. Approval Engine
+
+Unified approvals may include:
+
+- supplier payments;
+- purchases;
+- refunds;
+- expenses;
+- HR requests;
+- custom workflows.
+
+Approval records must preserve source authority.
+
+EIP may coordinate an approval but must not falsely represent itself as the source system of record.
+
+---
+
+# 36. Workflow Engine
+
+Workflow model:
+
+`Trigger → Conditions → Actions → Wait → Decision → Actions → Complete`
+
+Every workflow must define:
+
 - owner;
+- organization;
 - scope;
 - trigger;
 - conditions;
 - actions;
-- failure handling;
-- retry policy;
 - timeout;
+- retries;
+- failure path;
+- escalation;
 - audit;
-- enable/disable control.
+- enabled state.
+
+Workflows must be deterministic where financial or security consequences are involved.
 
 ---
 
-## 22. Notifications
+# 37. Event Architecture
 
-Channels may include:
+EIP should support events such as:
+
+- sale.created;
+- payment.created;
+- payment.failed;
+- cheque.pending;
+- cheque.returned;
+- invoice.overdue;
+- inventory.low;
+- connector.failed;
+- approval.requested;
+- approval.completed;
+- workflow.failed.
+
+Events require:
+
+- unique ID;
+- timestamp;
+- source;
+- scope;
+- schema version;
+- correlation ID;
+- idempotency handling.
+
+---
+
+# 38. Notifications
+
+Channels:
+
 - in-app;
 - email;
 - SMS;
-- WhatsApp where legally and technically supported;
-- push notifications;
+- push;
+- WhatsApp where supported;
 - webhook.
 
-Users must control notification preferences.
+Notification engine must support:
+
+- preferences;
+- templates;
+- priority;
+- throttling;
+- deduplication;
+- escalation;
+- delivery status;
+- retries;
+- audit.
 
 ---
 
-## 23. Identity and Security
+# 39. Reporting Engine
 
-Required foundation:
+Reports must support:
 
-- authentication;
-- MFA;
-- session management;
-- device/session visibility;
-- RBAC;
-- granular permissions;
-- business scoping;
-- resource scoping;
-- API credentials;
-- secret management;
-- credential rotation;
-- encryption in transit;
-- encryption at rest;
-- audit logging;
-- rate limiting;
-- abuse protection;
-- CSRF/XSS protections;
-- SSRF protection;
-- connector isolation;
-- secure headers;
-- input validation.
+- on-demand;
+- scheduled;
+- daily;
+- weekly;
+- monthly;
+- quarterly;
+- annual;
+- custom schedules;
+- business reports;
+- portfolio reports;
+- comparison reports;
+- custom reports.
 
-### Permission model
+Formats:
 
-Use:
+- PDF;
+- XLSX;
+- CSV;
+- JSON where appropriate.
 
-`Module → Resource → Action → Scope`
+Report metadata:
 
-Example:
-
-`Finance → Cheques → View → Business A`
-
-Possible actions:
-- view;
-- create;
-- edit;
-- approve;
-- cancel;
-- export;
-- execute.
+- requester;
+- scope;
+- source systems;
+- generation time;
+- data timestamp;
+- filters;
+- definition version;
+- retention classification.
 
 ---
 
-## 24. Platform SuperAdmin / GodMode
+# 40. Reporting Intelligence
 
-SuperAdmin is a platform authority, separate from business-owner permissions.
+Where data supports it, reports may contain:
 
-SuperAdmin may manage:
-- organizations;
-- platform users;
+- trends;
+- variance;
+- period comparison;
+- business comparison;
+- anomalies;
+- contributors;
+- explanations;
+- recommendations;
+- source references.
+
+Generated reports must identify whether they represent:
+
+- live data;
+- generated snapshot;
+- historical data.
+
+---
+
+# 41. Search
+
+Search must support:
+
+- global search;
 - businesses;
-- connectors;
-- platform configuration;
-- subscriptions/licensing;
-- platform health;
-- security events;
-- global audit;
-- connector health;
-- feature flags;
-- system limits;
-- platform diagnostics.
-
-SuperAdmin must not be implemented as an unrestricted shortcut around audit/security controls.
-
-Privileged actions must remain auditable.
-
----
-
-## 25. Business Owner Administration
-
-Business owners should be able to:
-- add businesses;
-- configure business details;
-- connect systems;
-- invite users;
-- create roles;
-- grant granular permissions;
-- assign users to businesses;
-- configure report schedules;
-- manage alerts;
-- configure dashboards;
-- manage notification preferences;
-- view business audit information within their scope.
-
----
-
-## 26. Data Governance
-
-Every data access should have:
-- organization;
-- business;
-- user/service identity;
-- source system;
-- purpose/context;
-- timestamp;
-- permission decision.
-
-Policies should support:
-- retention;
-- deletion;
-- export;
-- data minimization;
-- regional requirements;
-- tenant isolation.
-
-EIP should avoid retaining sensitive operational data unnecessarily.
-
----
-
-## 27. Audit and Traceability
-
-Audit events should cover:
-
-- login;
-- logout;
-- failed authentication;
-- permission changes;
-- connector creation;
-- connector changes;
-- data access;
-- report generation;
-- exports;
-- actions;
-- approvals;
-- workflow execution;
-- configuration changes;
-- security events.
-
-For important operations, provide an end-to-end trace:
-
-`User → EIP Request → Permission → Connector → Source System → Result → Action/Report`
-
----
-
-## 28. Performance and Live Experience
-
-The UI should feel continuously ready.
-
-Requirements:
-- fast dashboard initialization;
-- parallel connector queries where safe;
-- request-specific retrieval;
-- bounded timeouts;
-- cancellation;
-- streaming/progressive results where useful;
-- short-lived caching;
-- stale-data indicators;
-- source timestamps;
-- graceful partial results.
-
-If one business system is offline, EIP should not make all other businesses appear offline.
-
-Example:
-
-```
-8 businesses
-7 live
-1 connector unavailable
-
-Dashboard:
-7 businesses live
-1 business: connection issue
-```
-
-Never silently present stale data as live.
-
----
-
-## 29. Resilience
-
-Required:
-- connector isolation;
-- retries with backoff;
-- circuit breakers;
-- timeouts;
-- partial-failure handling;
-- idempotency;
-- duplicate-action protection;
-- dead-letter/error queues where appropriate;
-- recovery procedures;
-- health checks.
-
----
-
-## 30. Observability
-
-Monitor:
-- API latency;
-- connector latency;
-- connector failures;
-- source-system availability;
-- query success;
-- query timeout;
-- report generation;
-- workflow failures;
-- action failures;
-- cache performance;
-- security events;
-- resource usage.
-
-Provide:
-- logs;
-- metrics;
-- traces;
-- health dashboards;
+- entities;
+- transactions;
+- documents;
+- reports;
 - alerts;
-- correlation IDs.
+- workflows;
+- natural-language search.
+
+Filters:
+
+- business;
+- source;
+- entity;
+- date;
+- status;
+- amount;
+- user;
+- branch.
+
+Search must obey the same authorization rules as direct retrieval.
 
 ---
 
-## 31. Files and Documents
+# 42. Documents
 
-EIP should support controlled document access and generation.
+Document support includes:
 
-Features:
 - invoices;
 - receipts;
 - payment documents;
-- cheques where represented digitally;
 - contracts;
 - reports;
-- CSV/XLSX/PDF;
-- document extraction;
-- document classification;
-- secure previews;
-- source references.
+- exports;
+- uploaded files;
+- digitally represented cheques.
 
-Documents should not be permanently retained unless required by the requested workflow or retention policy.
+Capabilities:
 
----
+- secure preview;
+- metadata extraction;
+- classification;
+- OCR where required;
+- controlled download;
+- source reference;
+- retention policy.
 
-## 32. Search
-
-Provide:
-- global business search;
-- entity search;
-- transaction search;
-- document search;
-- report search;
-- natural-language search;
-- filters;
-- date ranges;
-- source-system filters;
-- business filters.
-
-Search should query live sources when current information is required.
+Documents must not become an uncontrolled data lake.
 
 ---
 
-## 33. AI Assistant
+# 43. AI Assistant
 
-The assistant should be able to:
+Ellinea AI should be able to:
 
 - understand business language;
-- identify business scope;
+- resolve business scope;
 - resolve ambiguity;
-- inspect capabilities;
+- discover capabilities;
 - plan queries;
 - retrieve live information;
 - summarize;
 - compare;
 - explain;
 - generate reports;
-- suggest improvements;
-- ask clarifying questions when necessary;
-- execute authorized actions.
+- recommend;
+- ask clarification;
+- initiate authorized actions.
 
-AI must not:
+AI must never:
+
 - invent source data;
-- claim an action succeeded without source confirmation;
-- expose unauthorized data;
-- treat guesses as facts.
+- fabricate citations;
+- claim success without confirmation;
+- expose unauthorized information;
+- turn assumptions into facts;
+- bypass policy.
 
 ---
 
-## 34. AI Evidence Model
+# 44. AI Evidence Model
 
-Every important AI answer should be traceable to evidence.
+Important AI responses should include:
 
-Possible answer structure:
+1. Answer.
+2. Evidence.
+3. Source systems.
+4. Data timestamp.
+5. Interpretation.
+6. Recommendation, if requested.
+7. Limitations.
 
-```
-Answer
-Evidence
-Sources
-Data timestamp
-Interpretation
-Recommendation
-Limitations
-```
-
-For sensitive or high-impact decisions, require stronger evidence and explicit source references.
+For sensitive operations, evidence requirements must increase with risk.
 
 ---
 
-## 35. Connector Agent
+# 45. AI Guardrails
 
-The EIP Connector Agent is a secure bridge for systems that cannot be reached directly from the cloud.
+AI execution must use tools rather than unrestricted direct system access.
 
 Architecture:
 
-```
-Private Business Network
-        │
-   ERP / Database
-        │
- EIP Connector Agent
-        │
- encrypted outbound channel
-        │
-      EIP Cloud
-```
+`LLM → Tool Policy → Authorization → Connector → Source`
 
-The agent should:
-- initiate outbound connections;
-- avoid exposing inbound ports by default;
-- authenticate to EIP;
-- receive only permitted tasks;
-- enforce local policies;
-- isolate credentials;
-- report health;
-- support updates;
-- support signed/verified releases.
+The model receives only the tool results necessary for the task.
+
+Tool calls must be:
+
+- typed;
+- validated;
+- scoped;
+- logged;
+- rate-limited;
+- cancellable.
+
+Prompt injection from source data must not be allowed to redefine EIP policies.
 
 ---
 
-## 36. API Platform
+# 46. AI Memory
 
-EIP should expose APIs for:
+EIP should distinguish:
+
+- conversation context;
+- user preferences;
+- organization configuration;
+- business facts;
+- historical metrics;
+- explicit saved knowledge.
+
+AI memory must never become an unauthorized replica of enterprise databases.
+
+Users should be able to inspect and manage persistent AI memory where supported.
+
+---
+
+# 47. AI Model Abstraction
+
+EIP should not become permanently dependent on one model provider.
+
+Support an abstraction layer for:
+
+- hosted LLMs;
+- local models;
+- embedding models;
+- speech-to-text;
+- text-to-speech;
+- vision/document models.
+
+Model routing may consider:
+
+- cost;
+- latency;
+- privacy;
+- capability;
+- availability;
+- data sensitivity.
+
+---
+
+# 48. Connector Agent
+
+For private networks:
+
+`Private Network → EIP Connector Agent → Encrypted Outbound Channel → EIP`
+
+Agent responsibilities:
+
+- outbound secure connection;
+- local policy enforcement;
+- connector execution;
+- credential isolation;
+- health reporting;
+- signed updates;
+- offline queueing where safe.
+
+Inbound exposure should be avoided by default.
+
+---
+
+# 49. Connector Agent Security
+
+Agent requirements:
+
+- device identity;
+- mutual authentication;
+- certificate/key rotation;
+- signed packages;
+- verified updates;
+- least privilege;
+- local allowlists;
+- process isolation;
+- tamper detection where appropriate;
+- secure logs;
+- revocation.
+
+A compromised agent must not provide unrestricted enterprise access.
+
+---
+
+# 50. API Platform
+
+APIs should expose controlled resources for:
+
 - organizations;
 - businesses;
 - users;
@@ -1284,322 +1415,1192 @@ EIP should expose APIs for:
 - audit;
 - health.
 
-APIs must use:
+API standards:
+
+- versioning;
 - authentication;
 - authorization;
-- versioning;
 - rate limits;
-- idempotency where required;
-- consistent error format;
-- correlation IDs.
+- idempotency;
+- pagination;
+- filtering;
+- consistent errors;
+- correlation IDs;
+- schema validation.
 
 ---
 
-## 37. Connector SDK and Marketplace
+# 51. Connector SDK
 
-Future connector ecosystem:
+Connector SDK should provide reusable contracts for:
 
-```
-EIP Connector SDK
-       ↓
-Connector Definition
-       ↓
-Authentication
-       ↓
-Capability Discovery
-       ↓
-UEM Mapping
-       ↓
-Tests
-       ↓
-Certification
-       ↓
-Marketplace
-```
+- authentication;
+- discovery;
+- capabilities;
+- entity definitions;
+- field mappings;
+- query operations;
+- action operations;
+- health;
+- webhooks;
+- tests.
 
-Third-party connectors must be isolated and permissioned.
+Connector packages should be versioned and independently testable.
 
 ---
 
-## 38. Configuration and Feature Flags
+# 52. Connector Marketplace
 
-EIP should support:
-- organization settings;
-- business settings;
-- connector settings;
-- feature flags;
-- module visibility;
-- security policies;
-- retention policies;
-- report schedules;
-- AI policies.
+Future marketplace architecture:
+
+`SDK → Connector Package → Security Review → Certification → Publication → Installation → Updates`
+
+Third-party connectors must have:
+
+- declared permissions;
+- declared capabilities;
+- version;
+- author;
+- security metadata;
+- compatibility metadata;
+- audit behavior.
+
+No connector should receive hidden capabilities.
+
+---
+
+# 53. Configuration
+
+Configuration levels:
+
+1. Platform.
+2. Organization.
+3. Business.
+4. Connector.
+5. User.
+6. Role.
+7. Workflow.
+8. AI policy.
 
 Configuration changes must be audited.
 
----
+Feature flags must support:
 
-## 39. Multi-Tenant Architecture
-
-Tenant boundaries must be enforced at every layer.
-
-Required:
-- organization ID;
-- business ID;
-- user scope;
-- connector scope;
-- database/query scope;
-- cache scope;
-- audit scope;
-- report scope.
-
-No cross-tenant leakage.
+- gradual rollout;
+- per-tenant enablement;
+- rollback;
+- experimental features;
+- emergency disablement.
 
 ---
 
-## 40. Security Boundaries
+# 54. Multi-Region and Scalability
 
-Never allow a user prompt to become unrestricted technical access.
+Architecture should be capable of scaling from:
 
-The correct sequence is:
+- one business;
+- one organization;
+- one connector;
 
-`Prompt → Intent → Permission → Capability → Policy → Query/Action → Source → Result`
+to:
 
-AI is not an authorization mechanism.
+- many businesses;
+- many organizations;
+- thousands of connectors;
+- high query volume;
+- distributed agents.
 
----
+Scale-out components should be stateless where practical.
 
-## 41. Data Freshness
-
-Every displayed source-derived value should have a freshness state:
-
-- Live;
-- Live as of timestamp;
-- Cached;
-- Historical;
-- Snapshot;
-- Source unavailable.
-
-The UI must never make cached/historical information look live.
+Stateful services must have documented replication and recovery strategies.
 
 ---
 
-## 42. Offline and Degraded Operation
+# 55. Performance Targets
 
-EIP itself may remain usable when a source system is unavailable.
+Targets must be measurable and environment-specific.
 
-It should:
-- show last known permitted state if retained;
-- label it clearly;
-- show connection failure;
-- continue serving unaffected businesses;
-- queue supported operations only when safe;
-- never pretend queued actions have completed.
+Initial engineering objectives:
+
+- fast dashboard shell load;
+- parallel independent data retrieval;
+- bounded connector calls;
+- cancellation of abandoned queries;
+- pagination for large datasets;
+- streaming where appropriate;
+- caching only where permitted;
+- background report generation;
+- queue-based long-running workflows.
+
+Performance testing must use representative workloads rather than artificial single-user tests only.
 
 ---
 
-## 43. Localization
+# 56. Availability and Disaster Recovery
+
+Production architecture should define:
+
+- backups;
+- restore tests;
+- recovery point objective;
+- recovery time objective;
+- failover strategy;
+- database recovery;
+- queue recovery;
+- connector recovery;
+- secret recovery;
+- configuration recovery.
+
+A backup is not considered reliable until restoration has been tested.
+
+---
+
+# 57. Localization
 
 Support:
+
 - multiple currencies;
 - time zones;
-- date formats;
-- number formats;
-- localization;
-- multilingual user interaction.
+- localized dates;
+- localized numbers;
+- multilingual interfaces;
+- multilingual AI interaction.
 
-Business currency must not be assumed globally.
+Currency and timezone must come from business configuration or source context, not global assumptions.
 
 ---
 
-## 44. Accessibility
+# 58. Accessibility
 
 Support:
+
 - keyboard navigation;
 - screen readers;
-- readable contrast;
 - scalable text;
-- clear status indicators;
-- reduced-motion preference;
+- sufficient contrast;
 - accessible forms;
-- accessible tables/charts.
+- accessible tables;
+- accessible charts;
+- reduced motion;
+- clear focus states;
+- semantic status indicators.
+
+Accessibility is part of the definition of done.
 
 ---
 
-## 45. Dashboard Customization
+# 59. Cross-Device Experience
 
-Owners should eventually be able to:
-- reorder widgets;
-- show/hide modules;
-- pin KPIs;
-- save views;
-- create business-specific dashboards;
-- create portfolio dashboards;
-- create role-specific dashboards.
+EIP should support:
 
-Customization must never bypass permissions.
-
----
-
-## 46. Mobile and Cross-Device Experience
-
-EIP should work on:
 - desktop;
 - laptop;
 - tablet;
 - phone.
 
-The owner should be able to ask the same business questions from any supported device.
+Core functionality should remain consistent across devices while layouts adapt to screen size.
 
-Sessions and security policies must remain consistent across devices.
-
----
-
-## 47. Reporting Intelligence
-
-Reports should be more than tables.
-
-Where data supports it, include:
-- trends;
-- variance;
-- period comparison;
-- business comparison;
-- anomalies;
-- top/bottom contributors;
-- explanations;
-- recommendations;
-- source references.
+Security policies must remain consistent.
 
 ---
 
-## 48. Business Health
+# 60. Dashboard Customization
 
-EIP may calculate business health indicators from evidence.
+Users may eventually:
 
-A health indicator must be:
-- explainable;
-- based on documented metrics;
-- configurable;
-- scoped;
-- time-aware;
-- never presented as an unexplained AI judgment.
+- reorder widgets;
+- show/hide widgets;
+- pin KPIs;
+- save views;
+- create business dashboards;
+- create portfolio dashboards;
+- create role dashboards.
 
-Example components:
+Customization cannot bypass authorization.
+
+---
+
+# 61. Business Health
+
+Business health indicators must be explainable.
+
+Potential evidence:
+
 - sales trend;
 - margin trend;
 - receivables;
+- payables;
 - payment delays;
 - inventory risk;
 - expense variance;
 - operational alerts.
 
----
+Health indicators must show the underlying metrics and time period.
 
-## 49. Privacy by Design
-
-EIP must follow data minimization:
-
-> Retrieve what is needed, process what is needed, retain what is needed, delete what is no longer needed.
-
-Default retention should be conservative.
-
-Sensitive fields should be masked where the user's permission does not require full visibility.
+They must never be unexplained AI judgments.
 
 ---
 
-## 50. Testing Strategy
+# 62. Security Architecture
 
-Every major layer requires tests.
+Security layers:
 
-### Unit
+1. Identity.
+2. Authentication.
+3. Session security.
+4. Authorization.
+5. Tenant isolation.
+6. Connector isolation.
+7. Secret management.
+8. Network security.
+9. Input validation.
+10. Output validation.
+11. Audit.
+12. Monitoring.
+13. Incident response.
+
+Threats to explicitly test:
+
+- SQL injection;
+- command injection;
+- XSS;
+- CSRF;
+- SSRF;
+- path traversal;
+- broken access control;
+- IDOR;
+- credential leakage;
+- prompt injection;
+- replay attacks;
+- webhook forgery;
+- token theft;
+- privilege escalation;
+- tenant isolation failures.
+
+---
+
+# 63. Secrets Management
+
+Secrets must be:
+
+- encrypted;
+- access-controlled;
+- rotated;
+- never logged;
+- never returned to clients;
+- scoped to connectors;
+- revocable.
+
+Prefer external secret management where supported.
+
+Application configuration must distinguish:
+
+- public configuration;
+- sensitive configuration;
+- secret material.
+
+---
+
+# 64. Network Security
+
+Required controls include:
+
+- TLS;
+- secure cookies;
+- HSTS where appropriate;
+- secure headers;
+- CORS policy;
+- network segmentation;
+- egress controls;
+- connector isolation;
+- webhook verification;
+- API rate limiting.
+
+Internal services must authenticate to one another where required.
+
+---
+
+# 65. Secure Webhooks
+
+Incoming webhooks must support:
+
+- signature verification;
+- timestamp validation;
+- replay protection;
+- schema validation;
+- source identification;
+- rate limiting;
+- idempotency.
+
+Never trust webhook payloads merely because they reach the endpoint.
+
+---
+
+# 66. Error Handling
+
+Errors must be:
+
+- structured;
+- safe;
+- actionable;
+- traceable;
+- non-sensitive.
+
+Users should see useful explanations.
+
+Developers should have correlation IDs and diagnostic context.
+
+Secrets, tokens, stack traces, and internal credentials must not leak into user-facing errors.
+
+---
+
+# 67. Degraded Operation
+
+When a source fails:
+
+EIP should:
+
+1. detect failure;
+2. isolate the failure;
+3. continue unaffected sources;
+4. show the source as unavailable;
+5. display last permitted known state only if retained;
+6. label stale information;
+7. avoid false completeness;
+8. retry safely;
+9. record the incident.
+
+Queued actions must never be displayed as completed.
+
+---
+
+# 68. Data Freshness Contract
+
+Every source-derived value has:
+
+- source timestamp;
+- retrieval timestamp;
+- freshness class;
+- source identity;
+- cache state where applicable.
+
+The UI must never make stale data look current.
+
+---
+
+# 69. Enterprise UX
+
+The interface should feel:
+
+- premium;
+- clean;
+- fast;
+- trustworthy;
+- professional;
+- information-dense without being cluttered;
+- responsive;
+- consistent.
+
+The system should expose complexity progressively.
+
+Executives should see outcomes first.
+
+Technical administrators should be able to inspect deeper details.
+
+---
+
+# 70. Design System
+
+A shared design system must define:
+
+- typography;
+- spacing;
+- colors;
+- surfaces;
+- cards;
+- tables;
+- forms;
+- dialogs;
+- notifications;
+- charts;
+- loading states;
+- empty states;
+- error states;
+- accessibility states.
+
+Product branding must remain consistent across EIP applications.
+
+---
+
+# 71. Mobile UX
+
+Mobile must prioritize:
+
+- dashboard summary;
+- alerts;
+- approvals;
+- AI assistant;
+- search;
+- reports;
+- urgent actions.
+
+Large enterprise tables must provide responsive alternatives rather than simply shrinking unreadable columns.
+
+---
+
+# 72. International Enterprise Readiness
+
+Architecture should support:
+
+- KES and other currencies;
+- VAT/tax configuration;
+- regional business rules;
+- timezone-aware schedules;
+- localized document formats;
+- configurable fiscal periods.
+
+Country-specific rules must be implemented as configurable modules rather than hard-coded assumptions.
+
+---
+
+# 73. Compliance Architecture
+
+EIP should support configurable compliance controls.
+
+Depending on deployment and jurisdiction, the platform may need:
+
+- audit retention;
+- access reporting;
+- data export;
+- deletion workflows;
+- policy enforcement;
+- approval separation;
+- financial record traceability.
+
+Compliance claims must be verified against the actual deployment and applicable law.
+
+---
+
+# 74. Testing Strategy
+
+## Unit
+
+Test:
+
 - permissions;
 - normalization;
+- calculations;
 - parsers;
 - query planning;
-- calculations;
+- policies;
 - report generation.
 
-### Integration
-- connectors;
-- authentication;
-- live retrieval;
-- UEM mapping;
-- actions.
+## Integration
 
-### Security
+Test:
+
+- authentication;
+- connectors;
+- source retrieval;
+- mappings;
+- actions;
+- webhooks.
+
+## Security
+
+Test:
+
 - tenant isolation;
 - authorization;
 - SSRF;
-- secret handling;
 - injection;
+- secret handling;
 - session security;
-- replay protection.
+- replay protection;
+- prompt injection.
 
-### End-to-end
-- login → business → connector → live data → dashboard;
-- natural-language query → source result;
-- report generation;
-- scheduled report;
-- approval;
-- authorized action.
+## End-to-End
 
-### Failure tests
+Test:
+
+`Login → Business → Connector → Live Data → Dashboard`
+
+and:
+
+`Natural Language → Query Plan → Source → Answer`
+
+and:
+
+`Report → Schedule → Generate → Store → Notify`
+
+## Failure
+
+Test:
+
 - source offline;
 - timeout;
 - malformed response;
-- partial response;
 - revoked credential;
-- permission removal during request;
-- duplicate action.
+- partial response;
+- duplicate action;
+- permission removed during request;
+- connector crash.
 
 ---
 
-## 51. Development Phases
+# 75. Test Data and Sandboxes
 
-### Phase 1 — Foundation
+Each connector should support a safe test environment where possible.
+
+Financial actions must never be tested against production accidentally.
+
+Test environments must clearly identify:
+
+- sandbox;
+- staging;
+- production.
+
+Production credentials must never be silently used in development.
+
+---
+
+# 76. CI/CD
+
+The repository should enforce:
+
+- formatting;
+- linting;
+- type checking;
+- unit tests;
+- integration tests;
+- security checks;
+- build verification;
+- dependency checks;
+- migration checks where applicable.
+
+Deployments should be:
+
+- repeatable;
+- traceable;
+- reversible;
+- environment-aware.
+
+---
+
+# 77. Database Architecture
+
+The database must support:
+
+- tenant isolation;
+- migrations;
+- indexed scope queries;
+- audit records;
+- configuration;
+- workflows;
+- reports;
+- connector metadata.
+
+Indexes should reflect real query patterns.
+
+Database migrations must be versioned and tested.
+
+Destructive migrations require explicit review.
+
+---
+
+# 78. Caching
+
+Cache keys must include relevant scope.
+
+Example:
+
+`organization/business/resource/query-hash`
+
+Caching must account for:
+
+- permissions;
+- TTL;
+- source freshness;
+- invalidation;
+- privacy.
+
+Sensitive responses must not be shared across users through incorrectly scoped caches.
+
+---
+
+# 79. Background Jobs
+
+Long-running tasks should use workers/queues.
+
+Examples:
+
+- report generation;
+- scheduled queries;
+- document processing;
+- connector synchronization;
+- notifications;
+- workflow execution.
+
+Jobs must support:
+
+- retries;
+- idempotency;
+- timeout;
+- cancellation;
+- status;
+- failure reporting.
+
+---
+
+# 80. Scheduling
+
+Schedules should support:
+
+- timezone;
+- start date;
+- end date;
+- recurrence;
+- business scope;
+- report definition;
+- notification destination;
+- failure behavior.
+
+A schedule must not accidentally execute in UTC when the user expects local business time.
+
+---
+
+# 81. Import and Export
+
+Exports must be:
+
+- permission-checked;
+- scoped;
+- logged;
+- time-limited where appropriate;
+- protected against accidental data leakage.
+
+Imports must support:
+
+- schema validation;
+- preview;
+- mapping;
+- duplicate detection;
+- rollback or safe failure;
+- audit.
+
+---
+
+# 82. Versioning
+
+Version:
+
+- APIs;
+- connector contracts;
+- UEM schemas;
+- workflow definitions;
+- report definitions;
+- AI tool schemas;
+- configuration schemas.
+
+Backward compatibility should be maintained where practical.
+
+Breaking changes require migration plans.
+
+---
+
+# 83. Migration Strategy
+
+Migrations must define:
+
+- current state;
+- target state;
+- transformation;
+- rollback;
+- validation;
+- downtime requirement;
+- data backup requirement.
+
+No migration is complete until post-migration validation succeeds.
+
+---
+
+# 84. Feature Flags
+
+Incomplete functionality must be protected with feature flags.
+
+Flags may be scoped to:
+
+- development;
+- staging;
+- organization;
+- business;
+- user;
+- percentage rollout.
+
+Emergency disablement must be possible for risky capabilities.
+
+---
+
+# 85. Licensing and Commercial Architecture
+
+EIP should be architected so commercial controls can eventually support:
+
+- organizations;
+- plans;
+- modules;
+- connector limits;
+- user limits;
+- usage limits;
+- AI usage;
+- storage;
+- reports;
+- premium capabilities.
+
+Licensing must not corrupt core authorization logic.
+
+A disabled commercial feature should fail safely and transparently.
+
+---
+
+# 86. Usage Metering
+
+Metering may track:
+
+- users;
+- businesses;
+- connectors;
+- queries;
+- AI requests;
+- report generation;
+- workflow executions;
+- storage;
+- API calls.
+
+Usage records must be accurate enough for billing and diagnostics.
+
+---
+
+# 87. Cost Controls
+
+EIP should prevent uncontrolled infrastructure or AI costs through:
+
+- quotas;
+- rate limits;
+- token budgets;
+- query limits;
+- connector limits;
+- report limits;
+- concurrency limits.
+
+Cost controls must not silently corrupt business data retrieval.
+
+---
+
+# 88. Extensibility
+
+New enterprise capabilities should be addable without redesigning the entire platform.
+
+Architecture should use:
+
+- interfaces;
+- adapters;
+- registries;
+- schemas;
+- events;
+- plugins;
+- capability contracts.
+
+A new connector should not require hard-coding its UI throughout the platform.
+
+---
+
+# 89. Dynamic Capability UI
+
+Where a connected system exposes a supported capability, the UI should be able to generate or configure:
+
+- navigation;
+- entity lists;
+- filters;
+- detail views;
+- actions;
+- reports.
+
+Dynamic UI must still use approved schemas and design-system components.
+
+Arbitrary remote HTML/JS must never be trusted as UI.
+
+---
+
+# 90. Enterprise Knowledge Graph
+
+Future EIP versions may maintain a controlled semantic graph of:
+
+- businesses;
+- people;
+- products;
+- suppliers;
+- customers;
+- accounts;
+- transactions;
+- systems;
+- relationships.
+
+The graph should store references and derived relationships rather than becoming an uncontrolled operational-data copy.
+
+---
+
+# 91. Advanced Analytics
+
+EIP may eventually support:
+
+- trends;
+- forecasting;
+- anomaly detection;
+- variance analysis;
+- scenario analysis;
+- KPI modeling;
+- cohort analysis;
+- cross-business benchmarking.
+
+Analytical models must expose:
+
+- input period;
+- data sources;
+- assumptions;
+- model/version;
+- limitations.
+
+---
+
+# 92. Forecasting
+
+Forecasting is advisory unless explicitly incorporated into an authorized workflow.
+
+Forecast outputs should include:
+
+- forecast period;
+- source data period;
+- methodology/model;
+- confidence information where statistically justified;
+- assumptions;
+- limitations.
+
+Forecasts must never be presented as guaranteed outcomes.
+
+---
+
+# 93. Autonomous Operations
+
+Advanced automation may eventually allow EIP to execute predefined actions automatically.
+
+Autonomy requires:
+
+- explicit policy;
+- bounded scope;
+- approved tools;
+- action limits;
+- spending limits;
+- confirmation rules;
+- kill switch;
+- complete audit;
+- failure handling.
+
+Autonomous operation is never enabled merely because an AI model recommends it.
+
+---
+
+# 94. Human-in-the-Loop
+
+For sensitive decisions, EIP should require humans to review:
+
+- financial actions;
+- sensitive data releases;
+- destructive operations;
+- security changes;
+- high-risk workflows.
+
+The system should make the evidence available to the human reviewer.
+
+---
+
+# 95. Incident Response
+
+EIP should support:
+
+- security alerts;
+- incident creation;
+- severity;
+- assignment;
+- evidence;
+- containment;
+- connector revocation;
+- credential rotation;
+- investigation;
+- resolution;
+- post-incident reporting.
+
+Critical incidents should be traceable from detection to resolution.
+
+---
+
+# 96. Backup and Restore
+
+Backup scope includes:
+
+- configuration;
+- organization data;
+- audit data according to policy;
+- workflows;
+- report definitions;
+- required historical metrics.
+
+Restore tests must verify:
+
+- integrity;
+- tenant boundaries;
+- permissions;
+- connector configuration;
+- application functionality.
+
+---
+
+# 97. Documentation
+
+The repository must maintain documentation for:
+
+- architecture;
+- APIs;
+- connector contracts;
+- UEM;
+- permissions;
+- deployment;
+- operations;
+- security;
+- troubleshooting;
+- workflows;
+- AI tools;
+- configuration;
+- testing.
+
+Documentation must be updated with architectural changes.
+
+---
+
+# 98. Developer Rules
+
+Developers must:
+
+1. Read the master specification before major implementation.
+2. Prefer reusable abstractions.
+3. Avoid one-off hacks.
+4. Preserve source traceability.
+5. Never bypass authorization for convenience.
+6. Add tests with important features.
+7. Add observability to important services.
+8. Document new public contracts.
+9. Keep migrations reversible where possible.
+10. Never commit secrets.
+11. Avoid unnecessary data duplication.
+12. Keep incomplete features behind flags.
+13. Preserve backward compatibility where required.
+14. Treat security failures as release blockers.
+15. Keep implementation aligned with this specification.
+
+---
+
+# 99. Definition of Done
+
+A feature is **not complete** because the UI exists.
+
+A production feature requires:
+
+- architecture;
+- implementation;
+- authorization;
+- tenant isolation;
+- data policy;
+- integration;
+- validation;
+- error handling;
+- audit;
+- observability;
+- tests;
+- documentation;
+- security review;
+- migration strategy where required;
+- freshness state;
+- failure behavior;
+- rollback/recovery plan where appropriate.
+
+A feature is complete only when all applicable requirements pass verification.
+
+---
+
+# 100. Definition of EIP Complete
+
+EIP is considered complete for a release only when:
+
+- required specification items are implemented;
+- critical user journeys work;
+- supported connectors are reliable;
+- authorization is verified;
+- tenant isolation is tested;
+- AI cannot bypass security;
+- reports work;
+- alerts work;
+- workflows work;
+- required actions are safe;
+- audit is functional;
+- observability is operational;
+- backup/restore has been tested;
+- deployment is repeatable;
+- security testing has passed;
+- documentation is current;
+- known blockers are resolved or explicitly accepted.
+
+“Looks finished” is not the definition of complete.
+
+---
+
+# 101. Canonical User Journey — Opening
+
+`Owner Login → Resolve Authorized Businesses → Load Dashboard → Retrieve Live Signals → Normalize → Summarize → Show Attention Items → Remain Ready`
+
+The owner should immediately understand:
+
+- what is happening;
+- what needs attention;
+- which data is live;
+- which systems are unavailable.
+
+---
+
+# 102. Canonical User Journey — Question
+
+Example:
+
+> “Check all cheques that haven't been processed.”
+
+Process:
+
+1. Resolve user.
+2. Resolve organization.
+3. Resolve business scope.
+4. Resolve payment capability.
+5. Resolve cheque entity.
+6. Check permission.
+7. Select source.
+8. Build query.
+9. Retrieve live data.
+10. Normalize.
+11. Validate.
+12. Display result.
+13. Display source and timestamp.
+14. Log the request.
+
+---
+
+# 103. Canonical User Journey — Report
+
+Example:
+
+> “Send me this report every morning.”
+
+Process:
+
+1. Resolve report.
+2. Resolve scope.
+3. Resolve schedule timezone.
+4. Validate permissions.
+5. Save schedule.
+6. Execute at scheduled time.
+7. Retrieve authorized data.
+8. Generate report.
+9. Store artifact according to policy.
+10. Deliver.
+11. Record status.
+
+---
+
+# 104. Canonical User Journey — Action
+
+Example:
+
+> “Approve this supplier payment.”
+
+Process:
+
+1. Identify payment.
+2. Verify source.
+3. Verify user.
+4. Verify business scope.
+5. Verify permission.
+6. Verify action capability.
+7. Apply policy.
+8. Apply risk classification.
+9. Request confirmation if required.
+10. Execute through connector.
+11. Confirm source response.
+12. Record source transaction/result.
+13. Audit.
+
+No step may be skipped because the request came from AI.
+
+---
+
+# 105. Development Phases
+
+## Phase 1 — Foundation
+
 - organizations;
 - businesses;
 - users;
+- sessions;
 - roles;
 - permissions;
-- sessions;
 - audit;
-- security policies.
+- security foundations.
 
-### Phase 2 — SuperAdmin / GodMode
-- platform control center;
-- tenants;
-- platform health;
+## Phase 2 — SuperAdmin
+
+- platform administration;
+- users;
+- organizations;
+- businesses;
 - connectors;
-- users;
-- licensing/configuration;
-- global audit.
+- health;
+- configuration;
+- licensing.
 
-### Phase 3 — Business Owner Experience
+## Phase 3 — Business Owner Experience
+
 - business selector;
-- owner dashboard;
-- sidebar;
-- business settings;
+- executive dashboard;
+- navigation;
+- settings;
 - users;
-- roles;
-- permissions.
+- roles.
 
-### Phase 4 — Universal Connector Fabric
-- connector registry;
+## Phase 4 — Connector Fabric
+
+- registry;
 - authentication;
 - lifecycle;
 - health;
-- capability discovery;
-- secure secrets.
+- secrets;
+- capability discovery.
 
-### Phase 5 — Live Access Engine
-- live queries;
-- source routing;
+## Phase 5 — Live Access Engine
+
+- query planner;
+- live retrieval;
+- normalization;
 - caching;
-- timeouts;
-- partial results;
-- freshness.
+- freshness;
+- partial failure.
 
-### Phase 6 — ERP and Business Capability Integration
+## Phase 6 — Business Capabilities
+
 - ERP;
 - POS;
 - HR;
@@ -1607,226 +2608,346 @@ Every major layer requires tests.
 - finance;
 - inventory;
 - payments;
-- cheque normalization;
-- dynamic modules.
+- cheques.
 
-### Phase 7 — UEM
-- common entities;
-- field mapping;
-- semantic normalization;
-- source references.
+## Phase 7 — UEM
 
-### Phase 8 — Universal Query Engine
+- entities;
+- mappings;
+- entity resolution;
+- provenance.
+
+## Phase 8 — Universal Query
+
 - natural language;
 - intent;
 - query planning;
-- cross-system queries.
+- cross-system retrieval.
 
-### Phase 9 — Executive Intelligence
+## Phase 9 — Executive Intelligence
+
 - summaries;
 - anomalies;
 - evidence;
 - recommendations.
 
-### Phase 10 — Multi-Business Intelligence
-- portfolio;
+## Phase 10 — Portfolio Intelligence
+
 - comparison;
-- attention view;
+- portfolio;
+- attention;
 - group reporting.
 
-### Phase 11 — Reporting
-- on-demand;
-- scheduled;
-- PDF/XLSX/CSV;
-- snapshots;
-- report history.
+## Phase 11 — Reporting
 
-### Phase 12 — Alerts and Approvals
-- alerts;
+- reports;
+- schedules;
+- artifacts;
+- snapshots.
+
+## Phase 12 — Alerts and Approvals
+
+- alert engine;
 - approval queues;
 - escalation;
 - notifications.
 
-### Phase 13 — Action Engine
-- create/update/approve/send/trigger;
-- confirmations;
-- idempotency;
-- audit.
+## Phase 13 — Action Engine
 
-### Phase 14 — Connector Agent
+- create;
+- update;
+- approve;
+- reject;
+- send;
+- trigger.
+
+## Phase 14 — Connector Agent
+
 - private networks;
-- LAN systems;
 - local databases;
-- on-premise ERP.
+- on-premise systems.
 
-### Phase 15 — Advanced Integration
+## Phase 15 — Advanced Integrations
+
 - SOAP;
 - messaging;
-- browser/legacy;
-- specialized enterprise protocols.
+- legacy;
+- specialized protocols.
 
-### Phase 16 — Ecosystem
-- connector SDK;
+## Phase 16 — Ecosystem
+
+- SDK;
 - marketplace;
-- public API platform;
+- public API;
 - partner connectors.
 
-### Phase 17 — Advanced Intelligence
-- workflow planning;
+## Phase 17 — Advanced Intelligence
+
+- forecasting;
 - proactive monitoring;
-- advanced forecasting;
-- controlled autonomous operations.
+- workflow planning;
+- bounded autonomous operations.
 
 ---
 
-## 52. Build Rules
+# 106. Implementation Order Rule
 
-1. Do not replace source systems unnecessarily.
-2. Do not copy operational data unnecessarily.
-3. Prefer live retrieval.
-4. Store requested/generated artifacts.
-5. Store compact analytical history when justified.
-6. Never expose stale data as live.
-7. Never allow AI to bypass authorization.
-8. Every action must be auditable.
-9. Every connector must be isolated.
-10. Every business must be permission-scoped.
-11. Every important answer should have evidence.
-12. Every source failure must be visible.
-13. Unsupported capabilities must not be displayed as available.
-14. Do not build one-off integrations when a reusable connector abstraction is possible.
-15. Do not hard-code assumptions about ERP vendors.
-16. Do not make EIP dependent on one ERP schema.
-17. Preserve source-system IDs for traceability.
-18. Use feature flags for incomplete capabilities.
-19. Test security and failure states before production.
-20. Keep the specification ahead of implementation.
+Implementation must proceed in order unless a dependency requires otherwise.
+
+A phase is not considered complete merely because coding has started.
+
+Before advancing:
+
+- implementation complete;
+- tests complete;
+- security verified;
+- integration verified;
+- documentation updated;
+- acceptance criteria passed.
 
 ---
 
-## 53. Definition of Done
+# 107. Project Completion Discipline
 
-A feature is not complete merely because the UI exists.
+EIP development must follow:
 
-A production feature must have:
+`ONE PROJECT → COMPLETE → TEST → AUDIT → ACCEPT → CLOSE → NEXT PROJECT`
 
-- architecture;
-- authorization;
-- data policy;
-- source integration;
-- error handling;
-- audit;
+No unrelated Ellines project should be introduced into an active EIP implementation cycle.
+
+Within EIP, work should also remain focused on the current phase until its acceptance criteria are satisfied.
+
+---
+
+# 108. Release Gates
+
+### Gate A — Development
+
+Code exists and local tests run.
+
+### Gate B — Integration
+
+Dependencies and connectors work.
+
+### Gate C — Security
+
+Authorization and security tests pass.
+
+### Gate D — Reliability
+
+Failure/recovery tests pass.
+
+### Gate E — User Acceptance
+
+Required workflows work end-to-end.
+
+### Gate F — Production
+
+Deployment, monitoring, backups, and rollback are ready.
+
+A feature cannot be called production-ready before the applicable gates pass.
+
+---
+
+# 109. Master Acceptance Matrix
+
+Every major capability must eventually have:
+
+| Capability | UI | API | Auth | Data Policy | Tests | Audit | Observability | Failure Handling | Docs |
+|---|---|---|---|---|---|---|---|---|---|
+| Identity | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Businesses | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Connectors | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Live Queries | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| UEM | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| AI | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Reports | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Alerts | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Workflows | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+| Actions | Required | Required | Required | Required | Required | Required | Required | Required | Required |
+
+---
+
+# 110. Current Repository Alignment
+
+The current repository architecture is expected to remain modular:
+
+```
+apps/
+  web/
+  api-gateway/
+
+services/
+  identity/
+  integration-hub/
+  ellinea-ai/
+  workflow/
+  notification/
+
+packages/
+  shared/
+  ui/
+  connectors-sdk/
+  config/
+
+infra/
+  docker/
+  k8s/
+
+docs/
+assets/
+```
+
+The implementation may evolve this structure when justified, but changes must preserve the architectural principles in this document.
+
+---
+
+# 111. Existing Product Documentation
+
+The master specification must remain the highest-level architectural contract.
+
+Other documents should specialize rather than contradict it.
+
+Examples:
+
+- product overview;
+- MVP scope;
+- master blueprint;
+- enterprise lexicon;
+- build queue;
+- automation instructions;
+- API references;
+- RBAC references;
+- SuperAdmin specification;
+- deployment documentation.
+
+When documents conflict, the conflict must be resolved explicitly rather than allowing two competing truths.
+
+---
+
+# 112. Change Control
+
+A major architectural change must document:
+
+- reason;
+- affected components;
+- migration;
+- security implications;
+- compatibility;
 - tests;
-- observability;
-- documentation;
-- security review;
-- migration strategy where required;
-- clear live/stale state;
-- tenant/business isolation.
+- rollback;
+- documentation changes.
+
+The master specification should be updated before or together with implementation of major architectural changes.
 
 ---
 
-## 54. Canonical User Journey
+# 113. Future Capability Categories
 
-### Opening EIP
+EIP should remain extensible toward:
 
-```
-Owner logs in
- ↓
-EIP resolves authorized businesses
- ↓
-EIP loads executive dashboard
- ↓
-Live business data is requested in parallel where safe
- ↓
-Results are normalized
- ↓
-Dashboard summarizes the portfolio
- ↓
-Attention items are shown
- ↓
-EIP remains ready for requests
-```
+- manufacturing;
+- logistics;
+- fleet;
+- procurement;
+- banking;
+- education;
+- healthcare;
+- hospitality;
+- property;
+- e-commerce;
+- messaging;
+- project management;
+- custom enterprise applications.
 
-### Asking a question
-
-```
-Owner:
-"Check all cheques that haven't been processed."
-
- ↓
-
-EIP:
-Resolve business scope
- ↓
-Check permission
- ↓
-Resolve Payments capability
- ↓
-Resolve Cheque entity/status
- ↓
-Locate source system
- ↓
-Query live data
- ↓
-Normalize
- ↓
-Summarize
- ↓
-Show evidence/source/time
-```
-
-### Requesting a recurring report
-
-```
-Owner:
-"Send me this report every morning."
-
- ↓
-Create schedule
- ↓
-At scheduled time
- ↓
-Query authorized live sources
- ↓
-Generate report
- ↓
-Store report artifact
- ↓
-Notify owner
-```
+These are capability families, not mandatory modules for every deployment.
 
 ---
 
-## 55. Final Architectural Principle
+# 114. Enterprise Intelligence Loop
 
-Ellines EIP should behave like a **secure intelligent live bridge between the owner and the owner's businesses**.
-
-The owner should not need to manage the complexity of the underlying systems.
-
-EIP handles:
+The long-term EIP loop is:
 
 ```
 CONNECT
+   ↓
 DISCOVER
+   ↓
 UNDERSTAND
+   ↓
 QUERY
+   ↓
 NORMALIZE
-SUMMARIZE
-COMPARE
+   ↓
+VALIDATE
+   ↓
+ANALYZE
+   ↓
 EXPLAIN
+   ↓
 REPORT
+   ↓
 ALERT
+   ↓
 RECOMMEND
+   ↓
 APPROVE
+   ↓
 ACT
+   ↓
 AUDIT
+   ↓
+LEARN FROM AUTHORIZED HISTORY
+   ↓
+IMPROVE
 ```
 
-while the connected systems remain authoritative for their operational data.
+Every transition must remain bounded by policy and authorization.
 
-### Final rule
+---
 
-> **EIP should know enough to help, retrieve enough to answer, store enough to remember what the owner explicitly wants remembered, and nothing more than necessary.**
+# 115. Final Architectural Principles
 
-This document is the canonical product and architecture specification for the next implementation cycle.
+1. Source systems remain authoritative.
+2. Live data is preferred for current operational questions.
+3. Stored data must have a purpose.
+4. AI is not authorization.
+5. Every important answer should have evidence.
+6. Every action must be auditable.
+7. Every business must be isolated.
+8. Every connector must be isolated.
+9. Unsupported capabilities must not appear functional.
+10. Stale data must never look live.
+11. Failures must be visible.
+12. Financial actions require idempotency.
+13. Security is part of the feature, not a later addition.
+14. The platform must remain vendor-neutral.
+15. New capabilities should use reusable contracts.
+16. Human oversight remains available for high-risk operations.
+17. EIP must scale without becoming architecturally chaotic.
+18. Privacy and data minimization are default behaviors.
+19. Documentation must remain synchronized with implementation.
+20. Completion means verified functionality, not merely visible functionality.
+
+---
+
+# 116. Final Product Definition
+
+Ellines EIP is:
+
+> **A secure, intelligent, live enterprise command platform that connects authorized business systems, understands their capabilities and data, unifies their meaning, provides evidence-backed intelligence, coordinates workflows, produces reports, surfaces attention items, and executes only explicitly authorized actions while preserving the source systems as authoritative records.**
+
+The platform must be:
+
+**Secure. Live. Explainable. Extensible. Multi-business. Vendor-neutral. Auditable. Reliable. AI-native. Human-controlled.**
+
+---
+
+# 117. Final Rule
+
+> **EIP should know enough to help, retrieve enough to answer, store enough to remember what the organization explicitly needs remembered, and never obtain or retain more than necessary.**
+
+This document is the canonical master specification for Ellines EIP.
+
+Implementation must follow it.
+
