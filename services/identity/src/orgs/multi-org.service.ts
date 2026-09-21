@@ -189,6 +189,42 @@ export class MultiOrgService {
     };
   }
 
+  /**
+   * Owner deletes a child organization it directly owns (parentOrgId must
+   * match the caller's current org). Cascades to that org's users, branches,
+   * departments, etc. per the schema's onDelete: Cascade relations.
+   */
+  async deleteChildOrg(userId: string, actorRole: string, parentOrgId: string, childOrgId: string) {
+    if (actorRole !== 'owner') {
+      throw new ForbiddenException('Only the Organization Owner can delete linked organizations');
+    }
+
+    const childOrg = await this.prisma.organization.findUnique({ where: { id: childOrgId } });
+    if (!childOrg) throw new NotFoundException('Organization not found');
+    if (childOrg.parentOrgId !== parentOrgId) {
+      throw new ForbiddenException('You can only delete organizations linked directly under your own');
+    }
+    if (childOrgId === parentOrgId) {
+      throw new ForbiddenException('Cannot delete the current organization');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.auditLog.create({
+        data: {
+          organizationId: parentOrgId,
+          userId,
+          action: 'org.delete_child',
+          resource: 'organization',
+          metadata: { childOrgId: childOrg.id, childOrgName: childOrg.name },
+        },
+      });
+      // Cascades to the child org's users/branches/departments/etc.
+      await tx.organization.delete({ where: { id: childOrgId } });
+    });
+
+    return { id: childOrgId, deleted: true };
+  }
+
   private slugify(name: string): string {
     const slug = name
       .toLowerCase()

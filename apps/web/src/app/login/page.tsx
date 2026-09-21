@@ -366,7 +366,7 @@ export default function LoginPage() {
           </p>
 
           <p className={styles.footer}>
-            New organization? <Link href="/register">Create one</Link>
+            Need a new organization? Contact your Ellines account team.
           </p>
           <p className={styles.back}>
             <Link href="/">← Back to splash</Link>

@@ -171,6 +171,21 @@ export class OrgsController {
     );
   }
 
+  /** DELETE /api/v1/orgs/me/child/:id — Owner deletes a linked child org */
+  @Delete('me/child/:id')
+  @Roles('owner')
+  deleteChildOrg(
+    @Request() req: { user: { userId: string; organizationId: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.multiOrg.deleteChildOrg(
+      req.user.userId,
+      req.user.role,
+      req.user.organizationId,
+      id,
+    );
+  }
+
   /** GET /api/v1/orgs/me/alert-correlations — real-time alert correlation engine */
   @Get('me/alert-correlations')
   @Roles('owner', 'admin')

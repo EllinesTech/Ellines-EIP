@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createChildOrg,
+  deleteChildOrg,
   getSession,
   listMyOrgs,
   setSession,
@@ -29,6 +30,7 @@ export function OrgSwitcher({ session, onSwitch }: Props) {
   const [newName, setNewName] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const isOwner = isOrgOwnerRole(session.user.role);
@@ -110,6 +112,24 @@ export function OrgSwitcher({ session, onSwitch }: Props) {
     }
   }
 
+  async function handleDelete(org: OrgMembership) {
+    if (deletingId) return;
+    if (!window.confirm(`Delete "${org.name}" and all its data? This cannot be undone.`)) return;
+    setDeletingId(org.id);
+    try {
+      await deleteChildOrg(org.id);
+      setOrgs((prev) => prev.filter((o) => o.id !== org.id));
+      const current = getSession();
+      if (current?.orgs) {
+        setSession({ ...current, orgs: current.orgs.filter((o) => o.id !== org.id) });
+      }
+    } catch {
+      // ignore — row stays, user can retry
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   // Don't render switcher if user somehow has no session
   if (!session) return null;
 
@@ -141,22 +161,39 @@ export function OrgSwitcher({ session, onSwitch }: Props) {
 
           {orgs.map((org) => {
             const active = org.id === session.organization.id;
+            // Only the direct owner of the parent org can delete that child link.
+            const canDelete = isOwner && !active && org.parentOrgId === session.organization.id;
             return (
-              <button
-                key={org.id}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={`${styles.orgRow} ${active ? styles.orgRowActive : ''}`}
-                disabled={switching}
-                onClick={() => handleSwitch(org.id)}
-              >
-                {active && <span className={styles.activeDot} aria-hidden />}
-                <span className={styles.orgMeta}>
-                  <span className={styles.orgName}>{org.name}</span>
-                  <span className={styles.orgRole}>{org.role}{org.parentOrgId ? ' · child' : ''}</span>
-                </span>
-              </button>
+              <div key={org.id} style={{ display: 'flex', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  className={`${styles.orgRow} ${active ? styles.orgRowActive : ''}`}
+                  disabled={switching}
+                  onClick={() => handleSwitch(org.id)}
+                >
+                  {active && <span className={styles.activeDot} aria-hidden />}
+                  <span className={styles.orgMeta}>
+                    <span className={styles.orgName}>{org.name}</span>
+                    <span className={styles.orgRole}>{org.role}{org.parentOrgId ? ' · child' : ''}</span>
+                  </span>
+                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    title={`Delete ${org.name}`}
+                    aria-label={`Delete ${org.name}`}
+                    disabled={deletingId === org.id}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(org); }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             );
           })}
 

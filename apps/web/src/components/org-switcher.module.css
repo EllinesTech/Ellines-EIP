@@ -98,6 +98,27 @@
   flex-shrink: 0;
 }
 
+.deleteBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--color-muted, #94a3b8);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.deleteBtn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+
 .divider {
   height: 1px;
   background: color-mix(in srgb, var(--color-border, #334155) 60%, transparent);

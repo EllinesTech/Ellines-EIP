@@ -1673,6 +1673,17 @@ export function createChildOrg(name: string) {
   );
 }
 
+/**
+ * Owner: delete a child organization linked directly under the current one.
+ * Cascades to that org's users/branches/departments/etc.
+ */
+export function deleteChildOrg(childOrgId: string) {
+  return request<{ id: string; deleted: boolean }>(
+    `/api/v1/orgs/me/child/${childOrgId}`,
+    { method: 'DELETE' },
+  );
+}
+
 // ─── Document Hub API ─────────────────────────────────────────────────────────
 
 export type DocumentRecordDto = {
