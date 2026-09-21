@@ -72,3 +72,43 @@ Code that visually reports live, predictive, self-healing, federated, or operati
 ## Promotion rule
 
 This branch is **not** a release branch. No merge/push to `main` is performed by the assistant. Promotion happens only after the work block is locally tested and accepted.
+
+
+## Second implementation block — SuperAdmin + encryption
+
+The SuperAdmin control plane was redefined so the dashboard represents **EIP platform operations**, not a customer business dashboard.
+
+Implemented:
+
+- platform-focused Command Center;
+- business onboarding/registration;
+- business lifecycle controls;
+- tenant access control;
+- service packages backed by the existing rate-limit tier model;
+- package assignment to businesses;
+- global feature controls;
+- security/audit center;
+- Ellinea platform operator surface;
+- tenant date/time configuration;
+- Business Integration Catalog separated from EIP core health;
+- reversible disconnect/reconnect controls.
+
+Security work implemented:
+
+- `EIP_ENCRYPTION_MASTER_KEY` is now required for Pages credential encryption;
+- Web Crypto encryption moved to version 2 with AES-256-GCM + master-key-backed derivation;
+- Node/Nest encryption moved to version 2 with master-key-backed derivation;
+- encryption no longer falls back to Base64;
+- decryption no longer returns empty strings on authentication failure;
+- explicit migration support for legacy v1/Base64 credential values;
+- privileged platform encryption migration endpoint with dry-run support;
+- encryption migration is audited;
+- production secret requirements documented in `docs/49_Security_Encryption_Migration.md`.
+
+Remaining before this security block is accepted:
+
+1. local build/type-check;
+2. encryption test execution;
+3. dry-run migration against a real non-production dataset;
+4. verification that all credential write paths use the v2 service;
+5. removal of remaining unsafe/default credential fallbacks found by the security scan.
