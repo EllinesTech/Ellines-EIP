@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
   Request,
   ForbiddenException,
@@ -117,5 +119,106 @@ export class PlatformController {
       ...body,
       organizationId: req.user.organizationId,
     });
+  }
+
+  // ── God-mode org creation ─────────────────────────────────────────────────
+
+  @Post('orgs/create')
+  createOrg(
+    @Request() req: { user: { email: string; userId: string } },
+    @Body()
+    body: {
+      name?: string;
+      slug?: string;
+      ownerEmail?: string;
+      ownerFullName?: string;
+      ownerPassword?: string;
+    },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    if (!body.name?.trim()) throw new BadRequestException('Organization name is required');
+    return this.platform.createOrganization({
+      name: body.name.trim(),
+      slug: body.slug,
+      ownerEmail: body.ownerEmail,
+      ownerFullName: body.ownerFullName,
+      ownerPassword: body.ownerPassword,
+      actorUserId: req.user.userId,
+      actorEmail: req.user.email,
+    });
+  }
+
+  // ── God-mode user management ──────────────────────────────────────────────
+
+  @Get('orgs/:id/users')
+  listOrgUsers(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.platform.listOrgUsers(id);
+  }
+
+  @Post('orgs/:id/users')
+  createOrgUser(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { email?: string; fullName?: string; password?: string; role?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    if (!body.email || !body.fullName || !body.password) {
+      throw new BadRequestException('email, fullName, and password are required');
+    }
+    return this.platform.createOrgUser(id, {
+      email: body.email,
+      fullName: body.fullName,
+      password: body.password,
+      role: body.role,
+      actorUserId: req.user.userId,
+      actorEmail: req.user.email,
+    });
+  }
+
+  @Patch('orgs/:id/users/:userId')
+  updateOrgUser(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: { fullName?: string; role?: string; isActive?: boolean; password?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.platform.updateOrgUser(id, userId, {
+      ...body,
+      actorUserId: req.user.userId,
+      actorEmail: req.user.email,
+    });
+  }
+
+  @Delete('orgs/:id/users/:userId')
+  deactivateOrgUser(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.platform.deactivateOrgUser(id, userId, req.user.userId, req.user.email);
+  }
+
+  // ── Cross-org audit log viewer ────────────────────────────────────────────
+
+  @Get('audit-logs')
+  listAuditLogs(
+    @Request() req: { user: { email: string } },
+    @Query('orgId') orgId?: string,
+    @Query('action') action?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limitStr?: string,
+    @Query('offset') offsetStr?: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    const limit = Math.min(Math.max(1, parseInt(limitStr || '50', 10) || 50), 200);
+    const offset = Math.max(0, parseInt(offsetStr || '0', 10) || 0);
+    return this.platform.listAuditLogs({ orgId, action, from, to, limit, offset });
   }
 }

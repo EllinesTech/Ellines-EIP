@@ -1,5 +1,6 @@
 import {
   BCRYPT_ROUNDS,
+  auditRow,
   getAdminClient,
   json,
   options,
@@ -16,11 +17,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
+  let body: { currentPassword?: string; newPassword?: string } = {};
   try {
-    const body = (await context.request.json()) as {
-      currentPassword?: string;
-      newPassword?: string;
-    };
+    body = (await context.request.json()) as typeof body;
+  } catch {
+    return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
+  }
+
+  try {
     const currentPassword = body.currentPassword || '';
     const newPassword = body.newPassword || '';
 
@@ -45,6 +49,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 404, message: 'User not found' }, 404);
     }
 
+    // Invited users have an empty password_hash until they accept their invite.
+    // Give them a clear message instead of the generic "incorrect password" error.
+    if (!user.password_hash) {
+      return json(
+        {
+          statusCode: 403,
+          message:
+            'Your account was created via an invite link and has no password set yet. ' +
+            'Please use the "Forgot password" flow to set a password before changing it.',
+        },
+        403,
+      );
+    }
+
     const bcrypt = await import('bcryptjs');
     const valid = await bcrypt.compare(currentPassword, user.password_hash as string);
     if (!valid) {
@@ -62,17 +80,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: updateErr.message }, 500);
     }
 
-    await supabase.from('audit_logs').insert({
-      id: crypto.randomUUID(),
-      organization_id: user.organization_id,
-      user_id: auth.sub,
-      action: 'auth.change_password',
-      resource: 'user',
-      metadata: {},
-    });
+    await supabase.from('audit_logs').insert(
+      auditRow({
+        organizationId: user.organization_id as string,
+        userId: auth.sub,
+        action: 'auth.change_password',
+        resource: 'user',
+        ip: auth.ip,
+      }),
+    );
 
     return json({ message: 'Password updated.' });
-  } catch {
-    return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Request failed';
+    return json({ statusCode: 500, message }, 500);
   }
 };

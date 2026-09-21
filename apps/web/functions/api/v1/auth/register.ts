@@ -1,4 +1,6 @@
 import { getAdminClient, json, options, signAccessToken, BCRYPT_ROUNDS, getClientIp, auditRow, type Env } from '../../../shared/auth';
+import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
+import { checkContentLength, validateEmail, validatePassword } from '../../../shared/validation';
 import { sendOutboundEmail } from '../../../shared/mail';
 
 function slugify(name: string): string {
@@ -14,24 +16,50 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method !== 'POST') return json({ message: 'Method not allowed' }, 405);
 
   try {
-    const body = (await context.request.json()) as {
-      email?: string;
-      password?: string;
-      fullName?: string;
-      organizationName?: string;
-    };
-    const email = (body.email || '').toLowerCase().trim();
-    const password = body.password || '';
-    const fullName = (body.fullName || '').trim();
-    const organizationName = (body.organizationName || '').trim();
-    if (!email || !password || !fullName || !organizationName) {
+    // Check payload size before parsing
+    checkContentLength(context.request, 1_000_000);
+
+    // Rate limit by IP: 5 registrations per hour
+    const ip = getClientIp(context.request);
+    const limiter = await checkRateLimit(context, {
+      maxRequests: 5,
+      windowMs: 60 * 60 * 1000,
+      keyPrefix: 'ratelimit:auth:register',
+    }, ip);
+    if (!limiter.allowed) {
+      return rateLimitResponse(limiter.remaining, limiter.resetAt);
+    }
+
+    let body: { email?: unknown; password?: unknown; fullName?: unknown; organizationName?: unknown } = {};
+    try {
+      body = (await context.request.json()) as typeof body;
+    } catch {
+      return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
+    }
+
+    let email: string;
+    let password: string;
+    try {
+      email = validateEmail(body.email);
+      password = validatePassword(body.password, 8);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid email or password';
+      return json({ statusCode: 400, message: msg }, 400);
+    }
+
+    const fullName = (typeof body.fullName === 'string' ? body.fullName : '').trim();
+    const organizationName = (typeof body.organizationName === 'string' ? body.organizationName : '').trim();
+    if (!fullName || !organizationName) {
       return json(
-        { statusCode: 400, message: 'email, password, fullName, and organizationName are required' },
+        { statusCode: 400, message: 'fullName and organizationName are required' },
         400,
       );
     }
-    if (password.length < 8) {
-      return json({ statusCode: 400, message: 'Password must be at least 8 characters' }, 400);
+    if (fullName.length > 128) {
+      return json({ statusCode: 400, message: 'Full name must be 128 characters or less' }, 400);
+    }
+    if (organizationName.length > 128) {
+      return json({ statusCode: 400, message: 'Organization name must be 128 characters or less' }, 400);
     }
 
     const slug = slugify(organizationName);
@@ -95,7 +123,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: userErr.message }, 500);
     }
 
-    const ip = getClientIp(context.request);
     await supabase.from('audit_logs').insert(
       auditRow({
         organizationId: orgId,
@@ -157,6 +184,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       ...tokens,
     });
   } catch (err) {
+    if (err instanceof RangeError && err.message.includes('Payload exceeds')) {
+      return json({ statusCode: 413, message: err.message }, 413);
+    }
     const message = err instanceof Error ? err.message : 'Registration failed';
     return json({ statusCode: 500, message }, 500);
   }

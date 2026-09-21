@@ -21,6 +21,7 @@ import {
   PendingInviteDto,
   updateOrgUser,
   deleteOrgUser,
+  resetUserPassword,
 } from '@/lib/api';
 import styles from '../command.module.css';
 import adminStyles from './admin.module.css';
@@ -209,6 +210,29 @@ export default function AdminPage() {
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onResetPassword(user: OrgMember) {
+    if (!confirm(`Send a password reset link to ${user.fullName} (${user.email})?`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await resetUserPassword(user.id);
+      if (result.emailSent) {
+        alert(`Reset email sent to ${user.email}.`);
+      } else if (result.resetLink) {
+        prompt(
+          `No email provider configured. Copy and share this reset link with ${user.fullName}:`,
+          result.resetLink,
+        );
+      } else {
+        alert(result.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password reset failed');
     } finally {
       setBusy(false);
     }
@@ -502,6 +526,14 @@ export default function AdminPage() {
                             onClick={() => void onToggleActive(u)}
                           >
                             {u.isActive ? 'Deactivate' : 'Reactivate'}
+                          </button>
+                          <button
+                            type="button"
+                            className={adminStyles.ghost}
+                            disabled={busy}
+                            onClick={() => void onResetPassword(u)}
+                          >
+                            Reset password
                           </button>
                           <button
                             type="button"

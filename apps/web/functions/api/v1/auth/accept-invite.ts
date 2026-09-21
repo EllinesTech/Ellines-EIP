@@ -1,11 +1,3 @@
-/**
- * Pages Function: POST /api/v1/auth/accept-invite
- *
- * Validates the invite token, sets the user's password, activates the account,
- * and returns a full AuthSession so the UI can log the user in immediately.
- *
- * Body: { token: string; password: string; fullName?: string }
- */
 import {
   getAdminClient,
   hashToken,
@@ -15,6 +7,9 @@ import {
   BCRYPT_ROUNDS,
   type Env,
 } from '../../../shared/auth';
+import {
+  isOrganizationSuspended,
+} from '@ellines-eip/shared';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -96,9 +91,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (!org) return json({ statusCode: 500, message: 'Organization not found' }, 500);
 
-  // Check platform suspension
-  const settings = (org.settings ?? {}) as Record<string, unknown>;
-  if (settings.platformStatus === 'suspended') {
+  // Check platform suspension (using shared helper for consistency with login/sso)
+  if (isOrganizationSuspended(org.settings)) {
     return json({ statusCode: 403, message: 'This organization has been suspended. Contact Ellines support.' }, 403);
   }
 

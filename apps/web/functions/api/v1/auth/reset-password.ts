@@ -1,11 +1,33 @@
-import { getAdminClient, hashToken, json, options, BCRYPT_ROUNDS, type Env } from '../../../shared/auth';
+import { getAdminClient, getClientIp, hashToken, json, options, BCRYPT_ROUNDS, type Env } from '../../../shared/auth';
+import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
+import { checkContentLength } from '../../../shared/validation';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
   if (context.request.method !== 'POST') return json({ message: 'Method not allowed' }, 405);
 
   try {
-    const body = (await context.request.json()) as { token?: string; newPassword?: string };
+    // Check payload size before parsing
+    checkContentLength(context.request, 100_000);
+
+    // Rate limit by IP: 10 attempts per 15 minutes to slow token-guessing
+    const ip = getClientIp(context.request);
+    const limiter = await checkRateLimit(context, {
+      maxRequests: 10,
+      windowMs: 15 * 60 * 1000,
+      keyPrefix: 'ratelimit:auth:reset-password',
+    }, ip);
+    if (!limiter.allowed) {
+      return rateLimitResponse(limiter.remaining, limiter.resetAt);
+    }
+
+    let body: { token?: string; newPassword?: string } = {};
+    try {
+      body = (await context.request.json()) as typeof body;
+    } catch {
+      return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
+    }
+
     const token = (body.token || '').trim();
     const newPassword = body.newPassword || '';
     if (!token || token.length < 32) {
@@ -71,11 +93,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       user_id: record.user_id,
       action: 'auth.reset_password',
       resource: 'user',
+      metadata: null,
       created_at: now,
     });
 
     return json({ message: 'Password updated. You can sign in with your new password.' });
   } catch (err) {
+    if (err instanceof RangeError && err.message.includes('Payload exceeds')) {
+      return json({ statusCode: 413, message: err.message }, 413);
+    }
     const message = err instanceof Error ? err.message : 'Request failed';
     return json({ statusCode: 500, message }, 500);
   }
