@@ -104,13 +104,29 @@ export class DatabaseSwitcherService {
    * Get the default database configuration (localhost PostgreSQL)
    */
   private getDefaultDatabaseConfig(): DatabaseConnectionConfig {
+    const raw = process.env.DATABASE_URL;
+    if (!raw) {
+      throw new Error('No active organization database configuration and DATABASE_URL is not configured');
+    }
+
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new Error('DATABASE_URL is invalid');
+    }
+
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+      throw new Error('DATABASE_URL must use PostgreSQL');
+    }
+
     return {
       type: 'local',
-      host: 'localhost',
-      port: 5432,
-      database: 'ellines_eip',
-      username: 'eip',
-      password: 'eip_dev_password',
+      host: url.hostname,
+      port: Number(url.port || 5432),
+      database: decodeURIComponent(url.pathname.replace(/^\\//, '')),
+      username: decodeURIComponent(url.username),
+      password: url.password ? decodeURIComponent(url.password) : undefined,
     };
   }
 
