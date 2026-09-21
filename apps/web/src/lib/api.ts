@@ -571,6 +571,26 @@ export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspe
   });
 }
 
+export interface PlatformMetrics {
+  generatedAt: string;
+  window: { since: string; durationHours: number };
+  platform: {
+    businesses: number;
+    activeUsers: number;
+    auditEvents24h: number;
+    apiRequests24h: number;
+    rateLimitViolations24h: number;
+  };
+  businessServices: {
+    connectorInstallations: number;
+    failedConnectorInstallations: number;
+  };
+}
+
+export function fetchPlatformMetrics() {
+  return request<PlatformMetrics>('/api/v1/platform/metrics');
+}
+
 export interface PlatformPackage {
   id: string;
   name: string;
