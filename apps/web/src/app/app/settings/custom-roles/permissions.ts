@@ -13,6 +13,23 @@ export interface PermissionGroup {
 }
 
 /**
+ * D.1.1/D.1.4 — ABAC-ready permission entry.
+ * `resources` scopes the permission to specific resource IDs (e.g. branch/department/report IDs);
+ * `attributes` adds conditions (e.g. { department: 'Finance' }) evaluated by PermissionService.
+ * Omitting both means the permission applies org-wide with no extra condition.
+ */
+export interface RolePermissionEntry {
+  permission: string;
+  resources?: string[];
+  attributes?: Record<string, string>;
+}
+
+/** Legacy roles stored permissions as plain strings; normalize either shape to an entry. */
+export function normalizePermissionEntry(p: string | RolePermissionEntry): RolePermissionEntry {
+  return typeof p === 'string' ? { permission: p } : p;
+}
+
+/**
  * All 50+ permissions organized by feature area
  */
 export const PERMISSION_GROUPS: PermissionGroup[] = [

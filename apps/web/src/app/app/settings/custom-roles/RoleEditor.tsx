@@ -5,7 +5,7 @@ import { CustomRole } from './page';
 import settingsStyles from '../settings.module.css';
 import adminStyles from '../../admin/admin.module.css';
 import rolesStyles from './roles.module.css';
-import { ALL_PERMISSIONS, PERMISSION_GROUPS, type RoleTemplate } from './permissions';
+import { ALL_PERMISSIONS, PERMISSION_GROUPS, normalizePermissionEntry, type RoleTemplate } from './permissions';
 
 interface RoleEditorProps {
   role: CustomRole | null;
@@ -14,12 +14,32 @@ interface RoleEditorProps {
   onCancel: () => void;
 }
 
+/** Per-permission ABAC scope, keyed by permission id, as raw editable text. */
+interface ScopeDraft {
+  resources: string; // comma-separated resource IDs
+  attributes: string; // comma-separated key=value pairs
+}
+
 export function RoleEditor({ role, template, onSave, onCancel }: RoleEditorProps) {
   const [name, setName] = useState(role?.name || template?.name || '');
   const [description, setDescription] = useState(role?.description || template?.description || '');
+  const initialEntries = (role?.permissions || template?.permissions || []).map(normalizePermissionEntry);
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(
-    new Set(role?.permissions || template?.permissions || [])
+    new Set(initialEntries.map((e) => e.permission))
   );
+  const [scoping, setScoping] = useState<Record<string, ScopeDraft>>(() => {
+    const out: Record<string, ScopeDraft> = {};
+    for (const e of initialEntries) {
+      if (e.resources?.length || (e.attributes && Object.keys(e.attributes).length)) {
+        out[e.permission] = {
+          resources: (e.resources || []).join(', '),
+          attributes: Object.entries(e.attributes || {}).map(([k, v]) => `${k}=${v}`).join(', '),
+        };
+      }
+    }
+    return out;
+  });
+  const [showScoping, setShowScoping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [colorPreset, setColorPreset] = useState<'violet' | 'blue' | 'teal'>('violet');
@@ -34,6 +54,13 @@ export function RoleEditor({ role, template, onSave, onCancel }: RoleEditorProps
       next.add(permission);
     }
     setSelectedPermissions(next);
+  }
+
+  function setScope(permission: string, field: keyof ScopeDraft, value: string) {
+    setScoping((prev) => {
+      const base = prev[permission] || { resources: '', attributes: '' };
+      return { ...prev, [permission]: { ...base, [field]: value } };
+    });
   }
 
   function toggleGroup(group: string) {
@@ -78,13 +105,36 @@ export function RoleEditor({ role, template, onSave, onCancel }: RoleEditorProps
         : '/api/v1/orgs/me/roles';
       const method = isEditing ? 'PATCH' : 'POST';
 
+      // Build ABAC-ready permission entries: plain permission, plus optional
+      // resource IDs / attribute conditions from the scoping panel below.
+      const permissions = Array.from(selectedPermissions).map((permission) => {
+        const scope = scoping[permission];
+        const entry: { permission: string; resources?: string[]; attributes?: Record<string, string> } = {
+          permission,
+        };
+        const resources = (scope?.resources || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (resources.length) entry.resources = resources;
+
+        const attributes: Record<string, string> = {};
+        for (const pair of (scope?.attributes || '').split(',')) {
+          const [k, v] = pair.split('=').map((s) => s.trim());
+          if (k && v) attributes[k] = v;
+        }
+        if (Object.keys(attributes).length) entry.attributes = attributes;
+
+        return entry;
+      });
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          permissions: Array.from(selectedPermissions),
+          permissions,
         }),
       });
 
@@ -272,6 +322,54 @@ export function RoleEditor({ role, template, onSave, onCancel }: RoleEditorProps
             ))}
           </div>
         </div>
+
+        {selectedPermissions.size > 0 && (
+          <div className={rolesStyles.permissionsSection}>
+            <div className={rolesStyles.permissionsHead}>
+              <h3>Advanced scoping (ABAC)</h3>
+              <button
+                type="button"
+                className={adminStyles.secondary}
+                onClick={() => setShowScoping((v) => !v)}
+                disabled={busy}
+              >
+                {showScoping ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {showScoping && (
+              <>
+                <p className={rolesStyles.permissionGroupHint} style={{ marginBottom: '0.75rem' }}>
+                  Optional. Leave blank to grant a permission org-wide. Scope it to specific resource
+                  IDs (e.g. one branch or report) and/or attribute conditions (e.g. department=Finance)
+                  — matches <code>PermissionService.evaluate()</code> on the backend.
+                </p>
+                <div className={rolesStyles.permissionGrid}>
+                  {Array.from(selectedPermissions).map((permission) => (
+                    <div key={permission} className={rolesStyles.permissionItem} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.35rem' }}>
+                      <span className={rolesStyles.permissionLabel} style={{ fontWeight: 600 }}>
+                        {permission}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Resource IDs (comma-separated) — blank = all"
+                        value={scoping[permission]?.resources || ''}
+                        onChange={(e) => setScope(permission, 'resources', e.target.value)}
+                        disabled={busy}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Attributes e.g. department=Finance, branch=HQ"
+                        value={scoping[permission]?.attributes || ''}
+                        onChange={(e) => setScope(permission, 'attributes', e.target.value)}
+                        disabled={busy}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className={settingsStyles.actions}>
           <button

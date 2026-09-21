@@ -10,13 +10,14 @@ import settingsStyles from '../settings.module.css';
 import rolesStyles from './roles.module.css';
 import { RoleList } from './RoleList';
 import { RoleEditor } from './RoleEditor';
-import type { RoleTemplate } from './permissions';
+import type { RoleTemplate, RolePermissionEntry } from './permissions';
 
 export interface CustomRole {
   id: string;
   name: string;
   description?: string;
-  permissions: string[];
+  /** Legacy roles store plain strings; newer roles store ABAC-ready entries (D.1.4). */
+  permissions: (string | RolePermissionEntry)[];
   isActive: boolean;
   createdBy: string;
   createdAt: string;

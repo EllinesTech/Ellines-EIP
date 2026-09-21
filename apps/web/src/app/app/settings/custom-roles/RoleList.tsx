@@ -4,7 +4,7 @@ import { CustomRole } from './page';
 import settingsStyles from '../settings.module.css';
 import adminStyles from '../../admin/admin.module.css';
 import rolesStyles from './roles.module.css';
-import { ROLE_TEMPLATES, type RoleTemplate } from './permissions';
+import { ROLE_TEMPLATES, normalizePermissionEntry, type RoleTemplate } from './permissions';
 
 interface RoleListProps {
   roles: CustomRole[];
@@ -55,11 +55,16 @@ export function RoleList({ roles, onEdit, onDelete, onCreateNew, onCreateFromTem
                     {role.permissions.length} permission{role.permissions.length !== 1 ? 's' : ''}
                   </p>
                   <div className={rolesStyles.permissionChips}>
-                    {role.permissions.slice(0, 5).map((perm) => (
-                      <span key={perm} className={rolesStyles.permissionChip}>
-                        {perm}
-                      </span>
-                    ))}
+                    {role.permissions.slice(0, 5).map((raw) => {
+                      const perm = normalizePermissionEntry(raw);
+                      const scoped = Boolean(perm.resources?.length || (perm.attributes && Object.keys(perm.attributes).length));
+                      return (
+                        <span key={perm.permission} className={rolesStyles.permissionChip}>
+                          {perm.permission}
+                          {scoped ? ' • scoped' : ''}
+                        </span>
+                      );
+                    })}
                     {role.permissions.length > 5 && (
                       <span className={rolesStyles.permissionChipMore}>
                         +{role.permissions.length - 5} more
