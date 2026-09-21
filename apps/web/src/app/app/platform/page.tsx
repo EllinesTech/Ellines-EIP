@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  askEllineaApi,
   ConnectorPackDto,
   createPlatformConnectorPack,
   FeatureFlag,
@@ -313,16 +314,17 @@ function useTheme() {
   return { theme, setTheme: applyTheme };
 }
 
-// ─── AI Copilot Component with Context Awareness ──────────────────────────
-interface CopilotMessage {
+// ─── Ellinea AI Assistant — real LLM-backed via /api/v1/ellinea/ask, with
+// template grounding as fallback when no LLM key is configured ─────────────
+interface AssistantMessage {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
 
-function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () => void; metrics: DashboardMetrics | null }) {
-  const [messages, setMessages] = useState<CopilotMessage[]>([]);
+function EllineaAssistant({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () => void; metrics: DashboardMetrics | null }) {
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -338,7 +340,7 @@ function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () 
   const handleSendMessage = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
-    const userMessage: CopilotMessage = {
+    const userMessage: AssistantMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: message,
@@ -349,19 +351,33 @@ function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () 
     setInput('');
     setLoading(true);
 
-    try {
-      // Generate contextual response based on metrics with better intelligence
-      const assistantResponse = generateCopilotResponse(message, metrics);
+    // Rule-based platform-metrics answer, used as grounding/fallback for the real AI call.
+    const templateAnswer = generateTemplateResponse(message, metrics);
 
-      const assistantMessage: CopilotMessage = {
+    try {
+      const result = await askEllineaApi({
+        question: message,
+        summary: null,
+        memory: [],
+        templateAnswer,
+        role: 'platform_super_admin',
+        organizationName: 'Ellines Platform',
+      });
+
+      const assistantMessage: AssistantMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: assistantResponse,
+        content: result.answer,
         timestamp: new Date(),
       };
-
-      // Simulate response delay for realistic interaction
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch {
+      const assistantMessage: AssistantMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: templateAnswer,
+        timestamp: new Date(),
+      };
       setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setLoading(false);
@@ -374,12 +390,12 @@ function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () 
     <div className={dashboardStyles.copilotPanel}>
       <div className={dashboardStyles.copilotHeader}>
         <div>
-          <h3>Ellinea Platform Assistant</h3>
+          <h3>Ellinea AI — Platform Assistant</h3>
           <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
             {metrics?.wsConnected ? '🟢 Live' : '⚪ Polling'} • {metrics?.lastUpdateLatency || 0}ms latency
           </small>
         </div>
-        <button className={dashboardStyles.closeBtn} onClick={onClose} aria-label="Close copilot">
+        <button className={dashboardStyles.closeBtn} onClick={onClose} aria-label="Close Ellinea AI">
           ×
         </button>
       </div>
@@ -429,7 +445,7 @@ function AICopilot({ isOpen, onClose, metrics }: { isOpen: boolean; onClose: () 
   );
 }
 
-function generateCopilotResponse(query: string, metrics: DashboardMetrics | null): string {
+function generateTemplateResponse(query: string, metrics: DashboardMetrics | null): string {
   const lowerQuery = query.toLowerCase();
 
   if (!metrics) {
@@ -1062,7 +1078,7 @@ export default function PlatformPage() {
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-secondary)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent-primary)')}
             >
-              {copilotOpen ? '✕ Close Copilot' : '✨ Copilot'}
+              {copilotOpen ? '✕ Close Ellinea AI' : '✨ Ellinea AI'}
             </button>
             <button
               onClick={() => setViewMode('admin')}
@@ -1150,8 +1166,8 @@ export default function PlatformPage() {
           </div>
         ) : null}
 
-        {/* Copilot panel */}
-        <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} metrics={metrics} />
+        {/* Ellinea AI assistant panel */}
+        <EllineaAssistant isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} metrics={metrics} />
       </div>
     );
   }

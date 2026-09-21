@@ -29,11 +29,9 @@ function makeResult(
       : [],
     timeTaken: 1200,
     escalated: !success,
-    beforeSnapshot: { timestamp: new Date(), metrics: {} },
-    afterSnapshot: { timestamp: new Date(), metrics: {} },
-    errorPattern,
-    organizationId: orgId,
-    incidentId: `inc-${Date.now()}-${Math.random()}`,
+    attempts: [],
+    beforeSnapshot: { timestamp: new Date(), metrics: {}, status: 'unhealthy' },
+    afterSnapshot: { timestamp: new Date(), metrics: {}, status: success ? 'healthy' : 'unhealthy' },
     ...overrides,
   };
 }
