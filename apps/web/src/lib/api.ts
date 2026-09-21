@@ -595,7 +595,19 @@ export function listPlatformPackages() {
   return request<PlatformPackage[]>('/api/v1/platform/packages');
 }
 
-export function createPlatformPackage(payload: Partial<PlatformPackage> & { name: string; display_name: string }) {
+export function createPlatformPackage(payload: {
+  name: string;
+  display_name: string;
+  maxUsers?: number | null;
+  maxConnectors?: number | null;
+  requestsPerDay?: number;
+  monthlyPrice?: number;
+  enableSso?: boolean;
+  enableCustomRoles?: boolean;
+  enableAgents?: boolean;
+  enableAdvancedBi?: boolean;
+  enableWebhooks?: boolean;
+}) {
   return request<PlatformPackage>('/api/v1/platform/packages', {
     method: 'POST',
     body: JSON.stringify(payload),
