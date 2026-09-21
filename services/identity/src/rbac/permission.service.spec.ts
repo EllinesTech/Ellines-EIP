@@ -112,6 +112,9 @@ describe('PermissionService.assertPermission', () => {
     user: {
       findFirst: jest.fn(),
     },
+    organization: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
   } as unknown as PrismaService;
 
   const svc = new PermissionService(mockPrisma);
@@ -120,13 +123,56 @@ describe('PermissionService.assertPermission', () => {
 
   it('resolves without throwing when allowed', async () => {
     (mockPrisma.user.findFirst as jest.Mock).mockResolvedValue({ id: 'u1', role: 'owner', organizationId: 'o1' });
+    (mockPrisma.organization.findUnique as jest.Mock).mockResolvedValue({ parentOrgId: null });
     await expect(svc.assertPermission({ userId: 'u1', organizationId: 'o1', permission: 'anything' })).resolves.toBeUndefined();
   });
 
   it('throws ForbiddenException when denied', async () => {
     (mockPrisma.user.findFirst as jest.Mock).mockResolvedValue({ id: 'u1', role: 'viewer', organizationId: 'o1' });
+    (mockPrisma.organization.findUnique as jest.Mock).mockResolvedValue({ parentOrgId: null });
     await expect(
       svc.assertPermission({ userId: 'u1', organizationId: 'o1', permission: 'org:manage_members' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('PermissionService.resolvePermissions — D.1.3 child-org inheritance', () => {
+  it('grants permissions held in the parent org when the child grants none', async () => {
+    const mockPrisma = {
+      organizationMembership: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(null) // no membership in child org
+          .mockResolvedValueOnce(null), // no membership in parent org
+      },
+      user: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(null) // no fixed-role user record in child org
+          .mockResolvedValueOnce({ id: 'u1', role: 'admin', organizationId: 'parent-1' }), // user is admin in parent org
+      },
+      organization: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ parentOrgId: 'parent-1' }) // child org has a parent
+          .mockResolvedValueOnce({ parentOrgId: null }), // parent org has no further parent
+      },
+    } as unknown as PrismaService;
+
+    const svc = new PermissionService(mockPrisma);
+    const perms = await svc.resolvePermissions('u1', 'child-1');
+    expect(svc.evaluate(perms, { userId: 'u1', organizationId: 'child-1', permission: 'connector:install' })).toBe(true);
+  });
+
+  it('does not inherit anything for a top-level org (no parentOrgId)', async () => {
+    const mockPrisma = {
+      organizationMembership: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findFirst: jest.fn().mockResolvedValue({ id: 'u1', role: 'viewer', organizationId: 'o1' }) },
+      organization: { findUnique: jest.fn().mockResolvedValue({ parentOrgId: null }) },
+    } as unknown as PrismaService;
+
+    const svc = new PermissionService(mockPrisma);
+    const perms = await svc.resolvePermissions('u1', 'o1');
+    expect(svc.evaluate(perms, { userId: 'u1', organizationId: 'o1', permission: 'org:manage_members' })).toBe(false);
   });
 });

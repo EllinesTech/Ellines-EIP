@@ -31,8 +31,31 @@ export class PermissionService {
   /**
    * Resolve a user's effective permissions in an org.
    * Priority: customRole.permissions > fixed role default permissions.
+   * D.1.3 — Permission inheritance: if the org is a linked child org
+   * (Organization.parentOrgId set), the user's permissions in the parent
+   * org are additionally granted here, so a role assigned at the parent
+   * level applies across every child business too.
    */
   async resolvePermissions(
+    userId: string,
+    organizationId: string,
+  ): Promise<PermissionEntry[]> {
+    const own = await this.resolveOwnPermissions(userId, organizationId);
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { parentOrgId: true },
+    });
+    if (!org?.parentOrgId) return own;
+
+    // Recurse up the parent chain (naturally terminates when parentOrgId is null).
+    const inherited = await this.resolvePermissions(userId, org.parentOrgId).catch(() => []);
+    if (!inherited.length) return own;
+    return [...own, ...inherited];
+  }
+
+  /** Permissions the user holds directly in this org, with no parent-chain inheritance. */
+  private async resolveOwnPermissions(
     userId: string,
     organizationId: string,
   ): Promise<PermissionEntry[]> {
