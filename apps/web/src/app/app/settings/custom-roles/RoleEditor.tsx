@@ -5,19 +5,20 @@ import { CustomRole } from './page';
 import settingsStyles from '../settings.module.css';
 import adminStyles from '../../admin/admin.module.css';
 import rolesStyles from './roles.module.css';
-import { ALL_PERMISSIONS, PERMISSION_GROUPS } from './permissions';
+import { ALL_PERMISSIONS, PERMISSION_GROUPS, type RoleTemplate } from './permissions';
 
 interface RoleEditorProps {
   role: CustomRole | null;
+  template?: RoleTemplate | null;
   onSave: (role: CustomRole) => void;
   onCancel: () => void;
 }
 
-export function RoleEditor({ role, onSave, onCancel }: RoleEditorProps) {
-  const [name, setName] = useState(role?.name || '');
-  const [description, setDescription] = useState(role?.description || '');
+export function RoleEditor({ role, template, onSave, onCancel }: RoleEditorProps) {
+  const [name, setName] = useState(role?.name || template?.name || '');
+  const [description, setDescription] = useState(role?.description || template?.description || '');
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(
-    new Set(role?.permissions || [])
+    new Set(role?.permissions || template?.permissions || [])
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

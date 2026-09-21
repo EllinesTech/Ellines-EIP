@@ -253,7 +253,13 @@ export const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
 /**
  * Common role templates (suggested starting points for creation)
  */
-export const ROLE_TEMPLATES = [
+export interface RoleTemplate {
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export const ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: 'Finance Manager',
     description: 'Manages financial reports and approvals with visibility into dashboards',
@@ -337,6 +343,27 @@ export const ROLE_TEMPLATES = [
       'org_system.view_people',
       'ellinea.ask',
       'events.view',
+    ],
+  },
+  {
+    name: 'Auditor',
+    description:
+      'Read-only compliance access — sees audit logs, approval/workflow history, and all reports, but cannot create, edit, decide, or delete anything.',
+    permissions: [
+      'org.view',
+      'org.view_audit_logs',
+      'settings.view_audit',
+      'settings.view_org_settings',
+      'approval.view',
+      'approval.view_history',
+      'workflow.view_history',
+      'report.view_all',
+      'dashboard.view_all',
+      'org_system.view',
+      'org_system.view_alerts',
+      'org_system.view_finance',
+      'events.view',
+      'notifications.view',
     ],
   },
 ];

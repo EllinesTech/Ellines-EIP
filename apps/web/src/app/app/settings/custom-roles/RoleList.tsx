@@ -4,15 +4,17 @@ import { CustomRole } from './page';
 import settingsStyles from '../settings.module.css';
 import adminStyles from '../../admin/admin.module.css';
 import rolesStyles from './roles.module.css';
+import { ROLE_TEMPLATES, type RoleTemplate } from './permissions';
 
 interface RoleListProps {
   roles: CustomRole[];
   onEdit: (role: CustomRole) => void;
   onDelete: (roleId: string) => void;
   onCreateNew: () => void;
+  onCreateFromTemplate: (template: RoleTemplate) => void;
 }
 
-export function RoleList({ roles, onEdit, onDelete, onCreateNew }: RoleListProps) {
+export function RoleList({ roles, onEdit, onDelete, onCreateNew, onCreateFromTemplate }: RoleListProps) {
   return (
     <>
       <section className={settingsStyles.card}>
@@ -90,6 +92,41 @@ export function RoleList({ roles, onEdit, onDelete, onCreateNew }: RoleListProps
       <section className={settingsStyles.card}>
         <div className={settingsStyles.cardHead}>
           <p className={settingsStyles.cardEyebrow}>Quick start</p>
+          <h2 className={settingsStyles.cardTitle}>Start from a template</h2>
+          <p className={settingsStyles.cardHint}>
+            Pre-built roles for common needs — including <strong>Auditor</strong> (read-only compliance
+            access). Pick one to prefill the permission set, then adjust and save.
+          </p>
+        </div>
+        <div className={rolesStyles.rolesList}>
+          {ROLE_TEMPLATES.map((tpl) => (
+            <div key={tpl.name} className={rolesStyles.roleCard}>
+              <div className={rolesStyles.roleCardHead}>
+                <div>
+                  <h3 className={rolesStyles.roleName}>{tpl.name}</h3>
+                  <p className={rolesStyles.roleDescription}>{tpl.description}</p>
+                </div>
+              </div>
+              <div className={rolesStyles.rolePermissions}>
+                <p className={rolesStyles.permissionsLabel}>{tpl.permissions.length} permissions</p>
+              </div>
+              <div className={rolesStyles.roleActions}>
+                <button
+                  type="button"
+                  className={adminStyles.primary}
+                  onClick={() => onCreateFromTemplate(tpl)}
+                >
+                  Use this template
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={settingsStyles.card}>
+        <div className={settingsStyles.cardHead}>
+          <p className={settingsStyles.cardEyebrow}>Custom</p>
           <h2 className={settingsStyles.cardTitle}>Create a new role</h2>
           <p className={settingsStyles.cardHint}>
             Define a new role with a custom set of permissions. Choose from 50+ granular permissions

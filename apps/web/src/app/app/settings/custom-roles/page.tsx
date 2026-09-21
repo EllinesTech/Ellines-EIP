@@ -10,6 +10,7 @@ import settingsStyles from '../settings.module.css';
 import rolesStyles from './roles.module.css';
 import { RoleList } from './RoleList';
 import { RoleEditor } from './RoleEditor';
+import type { RoleTemplate } from './permissions';
 
 export interface CustomRole {
   id: string;
@@ -26,6 +27,7 @@ type ViewMode = 'list' | 'create' | 'edit';
 export default function CustomRolesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedRole, setSelectedRole] = useState<CustomRole | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<RoleTemplate | null>(null);
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [orgAdmin, setOrgAdmin] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
@@ -67,6 +69,13 @@ export default function CustomRolesPage() {
 
   function handleCreateNew() {
     setSelectedRole(null);
+    setPendingTemplate(null);
+    setViewMode('create');
+  }
+
+  function handleCreateFromTemplate(template: RoleTemplate) {
+    setSelectedRole(null);
+    setPendingTemplate(template);
     setViewMode('create');
   }
 
@@ -104,6 +113,7 @@ export default function CustomRolesPage() {
   function handleCancel() {
     setViewMode('list');
     setSelectedRole(null);
+    setPendingTemplate(null);
   }
 
   if (!orgAdmin && !isOwner) {
@@ -155,13 +165,14 @@ export default function CustomRolesPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onCreateNew={handleCreateNew}
+              onCreateFromTemplate={handleCreateFromTemplate}
             />
           )}
         </>
       )}
 
       {viewMode === 'create' && (
-        <RoleEditor role={null} onSave={handleSaveRole} onCancel={handleCancel} />
+        <RoleEditor role={null} template={pendingTemplate} onSave={handleSaveRole} onCancel={handleCancel} />
       )}
 
       {viewMode === 'edit' && selectedRole && (
