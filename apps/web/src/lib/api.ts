@@ -667,6 +667,13 @@ export function deactivatePlatformOrgUser(orgId: string, userId: string) {
   return request<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
+export function updatePlatformFlag(key: string, enabled: boolean) {
+  return request<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
+    method: 'PATCH',
+    body: JSON.stringify({ key, enabled }),
+  });
+}
+
 export function listPlatformFlags() {
   return request<FeatureFlag[]>('/api/v1/platform/flags');
 }
