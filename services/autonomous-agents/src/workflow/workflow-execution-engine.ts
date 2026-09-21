@@ -447,8 +447,8 @@ export class WorkflowExecutionEngine {
       actionsExecuted: context.decisions.length,
       decisionsRecorded: context.decisions.length,
       approvalsRequired: context.approvalRequests.length,
-      approvalsGranted: context.approvalRequests.filter((a) => a.approved).length,
-      approvalsRejected: context.approvalRequests.filter((a) => a.approved === false).length,
+      approvalsGranted: context.approvalRequests.filter((a) => a.status === 'approved').length,
+      approvalsRejected: context.approvalRequests.filter((a) => a.status === 'rejected').length,
       errors: context.errorLog.map((e) => ({
         stepId: e.context.stepId || '',
         error: e.message,

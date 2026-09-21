@@ -130,7 +130,7 @@ export class DecisionFacilitator {
   /**
    * Generate recommendations for decision
    */
-  private generateRecommendations(options: DecisionOption[]): string[] {
+  generateRecommendations(options: DecisionOption[]): string[] {
     const recommendations: string[] = [];
 
     if (options.length === 0) {
@@ -168,7 +168,7 @@ export class DecisionFacilitator {
   /**
    * Assess risks for each option
    */
-  private assessRisks(options: DecisionOption[]): string {
+  assessRisks(options: DecisionOption[]): string {
     const risks: string[] = [];
 
     for (const option of options) {
@@ -190,7 +190,7 @@ export class DecisionFacilitator {
   /**
    * Suggest timeline for decision
    */
-  private suggestTimeline(options: DecisionOption[]): string {
+  suggestTimeline(options: DecisionOption[]): string {
     if (options.length === 0) return 'Decision timeline: Unable to determine';
 
     const consensusLevel = (options.reduce((sum, o) => sum + o.proponents.length, 0) /

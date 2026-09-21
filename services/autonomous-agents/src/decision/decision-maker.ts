@@ -344,7 +344,11 @@ export class DecisionMaker {
       explanation,
       alternativeOptions: alternatives.filter((a) => a.confidence > 0.3),
       assumptionsHighlights: decision.reasoning.assumptionsUsed,
-      confidenceBreakdown: decision.reasoning.confidenceFactors,
+      confidenceBreakdown: decision.reasoning.confidenceFactors.map((factor) => ({
+        factor: factor.factor,
+        contribution: factor.impact,
+        description: factor.description,
+      })),
       ruledOutReasons: ruledOut,
     };
   }

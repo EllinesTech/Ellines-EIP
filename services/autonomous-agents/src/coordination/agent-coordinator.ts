@@ -75,7 +75,7 @@ export class AgentCoordinator {
     actionId: string,
     targetResource: ResourceReference,
     agentId: string,
-    action Type: AgentActionType,
+    actionType: AgentActionType,
   ): Promise<ConflictDetectionResult> {
     const registryKey = this.getRegistryKey(targetResource);
     const inFlightAction = this.inFlightRegistry.get(registryKey);

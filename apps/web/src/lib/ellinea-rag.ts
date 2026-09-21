@@ -1,2 +1,7 @@
-/** Re-export Ellinea RAG from the shared package (Phase 6.1 extract). */
-export * from '@ellines-eip/ellinea-ai';
+/** Browser-safe Ellinea RAG exports from the shared package. */
+import * as ellineaCore from '@ellines-eip/ellinea-ai';
+
+export type { RagChunk } from '@ellines-eip/ellinea-ai';
+
+export const retrieveEllineaContext = ellineaCore.retrieveEllineaContext;
+export const formatRagGrounding = ellineaCore.formatRagGrounding;

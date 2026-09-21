@@ -1,4 +1,8 @@
-# Ellines EIP — Master Product & Architecture Specification
+# ELLINESEIP
+
+## Enterprise Intelligence Platform
+
+*Where Enterprise Systems Think Together.*
 
 **Version:** 1.0  
 **Status:** Canonical build specification  
@@ -10,7 +14,7 @@
 
 ## 1. Purpose
 
-Ellines EIP (Enterprise Integration Platform) is an intelligent, live business command center that sits **above** a company's existing business systems.
+ELLINESEIP (Enterprise Intelligence Platform) is an intelligent, live business command center that sits **above** a company's existing business systems.
 
 EIP does **not** replace ERP, POS, HR, CRM, accounting, inventory, or other source systems. Those systems remain the systems of record.
 
