@@ -38,7 +38,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const { data, error } = await supabase.from('rate_limit_tiers').update(updates).eq('id', id).select('*').single();
     if (error) return json({ statusCode: 404, message: error.message }, 404);
     await supabase.from('audit_logs').insert(auditRow({
-      organizationId: auth.sub, userId: auth.sub, action: 'platform.package.update',
+      organizationId: auth.organizationId, userId: auth.sub, action: 'platform.package.update',
       resource: 'rate_limit_tier', metadata: { packageId: id, changes: Object.keys(updates), updatedBy: auth.email }, ip: auth.ip,
     }));
     return json(data);
@@ -50,7 +50,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const { error } = await supabase.from('rate_limit_tiers').delete().eq('id', id);
     if (error) return json({ statusCode: 500, message: error.message }, 500);
     await supabase.from('audit_logs').insert(auditRow({
-      organizationId: auth.sub, userId: auth.sub, action: 'platform.package.delete',
+      organizationId: auth.organizationId, userId: auth.sub, action: 'platform.package.delete',
       resource: 'rate_limit_tier', metadata: { packageId: id, deletedBy: auth.email }, ip: auth.ip,
     }));
     return json({ ok: true });
