@@ -847,6 +847,8 @@ export default function PlatformPage() {
 
   // Dashboard state
   const [viewMode, setViewMode] = useState<'dashboard' | 'admin'>('dashboard');
+  // Admin panel side nav: businesses registered (+ everything under them) vs. system settings
+  const [platformNav, setPlatformNav] = useState<'business' | 'settings'>('business');
   const [copilotOpen, setCopilotOpen] = useState(false);
   const { theme, setTheme: setThemeMode } = useTheme();
   const metrics = useRealtimeMetrics(orgs, allowed && loading === false);
@@ -1234,76 +1236,59 @@ export default function PlatformPage() {
         </div>
       ) : null}
 
-      <section className={adminStyles.tableWrap}>
-        <div className={styles.panelLabel}>Tenant date &amp; time</div>
-        <p className={styles.lede}>
-          Set 12/24-hour and short/log date style for any organization. Org Owner/IT Admin can also
-          change this under Settings for their own tenant.
-        </p>
-        <div className={adminStyles.form}>
-          <label>
-            Organization
-            <select
-              value={settingsOrgId}
-              disabled={settingsBusy || orgs.length === 0}
-              onChange={(e) => setSettingsOrgId(e.target.value)}
-            >
-              {orgs.length === 0 ? <option value="">No tenants</option> : null}
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Time format
-            <select
-              value={timeFormat}
-              disabled={settingsBusy || !settingsOrgId}
-              onChange={(e) =>
-                setTimeFormat(e.target.value as OrgDateTimeSettingsDto['timeFormat'])
-              }
-            >
-              <option value="12h">12-hour</option>
-              <option value="24h">24-hour</option>
-            </select>
-          </label>
-          <label>
-            Date style
-            <select
-              value={dateStyle}
-              disabled={settingsBusy || !settingsOrgId}
-              onChange={(e) =>
-                setDateStyle(e.target.value as OrgDateTimeSettingsDto['dateStyle'])
-              }
-            >
-              <option value="short">Short</option>
-              <option value="medium">Medium</option>
-              <option value="log">Log (YYYY-MM-DD)</option>
-            </select>
-          </label>
-          <label>
-            Preview
-            <input
-              readOnly
-              value={(() => {
-                const p = formatOrgDateTime(new Date(), { timeFormat, dateStyle });
-                return `${p.day} · ${p.time}`;
-              })()}
-            />
-          </label>
+      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+        {/* God-mode side nav: businesses registered (+ everything under them) above the line, system settings below */}
+        <aside style={{
+          width: 200,
+          flexShrink: 0,
+          position: 'sticky',
+          top: '1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.25rem',
+        }}>
           <button
             type="button"
-            className={adminStyles.primary}
-            disabled={settingsBusy || !settingsOrgId}
-            onClick={() => void onSaveOrgDateTime()}
+            onClick={() => setPlatformNav('business')}
+            style={{
+              textAlign: 'left',
+              padding: '0.55rem 0.75rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              background: platformNav === 'business' ? 'var(--accent-primary)' : 'transparent',
+              color: platformNav === 'business' ? 'white' : 'var(--text-primary)',
+            }}
           >
-            {settingsBusy ? 'Saving…' : 'Save for tenant'}
+            🏢 Business Registered
           </button>
-        </div>
-      </section>
 
+          <hr style={{ width: '100%', margin: '0.6rem 0', border: 'none', borderTop: '1px solid var(--border, rgba(255,255,255,0.12))' }} />
+
+          <button
+            type="button"
+            onClick={() => setPlatformNav('settings')}
+            style={{
+              textAlign: 'left',
+              padding: '0.55rem 0.75rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              background: platformNav === 'settings' ? 'var(--accent-primary)' : 'transparent',
+              color: platformNav === 'settings' ? 'white' : 'var(--text-primary)',
+            }}
+          >
+            ⚙️ System Settings
+          </button>
+        </aside>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+      {platformNav === 'business' ? (
+        <>
       <div className={styles.kpis}>
         <article className={styles.kpi}>
           <span>Tenants</span>
@@ -1558,6 +1543,78 @@ export default function PlatformPage() {
           </table>
         )}
       </section>
+        </>
+      ) : (
+        <>
+      <section className={adminStyles.tableWrap}>
+        <div className={styles.panelLabel}>Tenant date &amp; time</div>
+        <p className={styles.lede}>
+          Set 12/24-hour and short/log date style for any organization. Org Owner/IT Admin can also
+          change this under Settings for their own tenant.
+        </p>
+        <div className={adminStyles.form}>
+          <label>
+            Organization
+            <select
+              value={settingsOrgId}
+              disabled={settingsBusy || orgs.length === 0}
+              onChange={(e) => setSettingsOrgId(e.target.value)}
+            >
+              {orgs.length === 0 ? <option value="">No tenants</option> : null}
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Time format
+            <select
+              value={timeFormat}
+              disabled={settingsBusy || !settingsOrgId}
+              onChange={(e) =>
+                setTimeFormat(e.target.value as OrgDateTimeSettingsDto['timeFormat'])
+              }
+            >
+              <option value="12h">12-hour</option>
+              <option value="24h">24-hour</option>
+            </select>
+          </label>
+          <label>
+            Date style
+            <select
+              value={dateStyle}
+              disabled={settingsBusy || !settingsOrgId}
+              onChange={(e) =>
+                setDateStyle(e.target.value as OrgDateTimeSettingsDto['dateStyle'])
+              }
+            >
+              <option value="short">Short</option>
+              <option value="medium">Medium</option>
+              <option value="log">Log (YYYY-MM-DD)</option>
+            </select>
+          </label>
+          <label>
+            Preview
+            <input
+              readOnly
+              value={(() => {
+                const p = formatOrgDateTime(new Date(), { timeFormat, dateStyle });
+                return `${p.day} · ${p.time}`;
+              })()}
+            />
+          </label>
+          <button
+            type="button"
+            className={adminStyles.primary}
+            disabled={settingsBusy || !settingsOrgId}
+            onClick={() => void onSaveOrgDateTime()}
+          >
+            {settingsBusy ? 'Saving…' : 'Save for tenant'}
+          </button>
+        </div>
+      </section>
 
       <section className={adminStyles.tableWrap}>
         <div className={styles.panelLabel}>Feature flags (placeholder)</div>
@@ -1584,6 +1641,10 @@ export default function PlatformPage() {
           </table>
         )}
       </section>
+        </>
+      )}
+        </div>
+      </div>
     </div>
   );
 }
