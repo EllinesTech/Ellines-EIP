@@ -71,5 +71,6 @@ Migration output contains counts and non-secret failure metadata only.
 - Do not log plaintext credentials.
 - Do not include credentials in audit metadata.
 - Decryption failures must fail closed.
+- Tenant database credential failures must never silently switch to another database.
 - Privileged migrations must be audited.
 
