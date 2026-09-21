@@ -18,7 +18,7 @@ import {
   withScheduleAfterSync,
   type InstallConfig,
 } from '../../../../../shared/connectors';
-import { isOrganizationSuspended } from '@ellines-eip/shared';
+import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
 
 // ─── IMAP sync via Cloudflare TCP sockets ─────────────────────────────────────
 
@@ -275,28 +275,109 @@ openDecisions,3
 briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
 `;
 
+type StoredPayload = {
+  healthScore?: number;
+  connectedSystems?: number;
+  openAlerts?: number;
+  openDecisions?: number;
+  briefHighlight?: string;
+  timeline?: { title: string; detail: string }[];
+  model?: import('@ellines-eip/shared').UemModel | null;
+};
+
+/**
+ * Persist this one connector's payload on its installation row, then
+ * recompute the org's single EnterpriseSnapshot as the aggregate across
+ * every connected system — so a business with several different APIs/DBs
+ * connected at once sees a combined view, not just whichever synced last.
+ */
 async function upsertSnapshot(
   env: Env,
   organizationId: string,
   actorUserId: string,
+  installationId: string,
   connectorId: string,
   connectorName: string,
   payload: ReturnType<typeof normalizeEnterprisePayload>,
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
-  const packedTimeline = toTimelineStorage(payload);
+
+  const ownPayload: StoredPayload = { ...payload };
+  await supabase
+    .from('connector_installations')
+    .update({ last_payload: ownPayload })
+    .eq('id', installationId);
+
+  const { data: installs } = await supabase
+    .from('connector_installations')
+    .select('id, display_name, last_payload')
+    .eq('organization_id', organizationId)
+    .eq('status', 'synced');
+
+  const rows = (installs || []) as Array<{ id: string; display_name: string; last_payload: StoredPayload | null }>;
+  // Include this connector's fresh payload even if its own status row hasn't flipped to 'synced' yet.
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  byId.set(installationId, { id: installationId, display_name: connectorName, last_payload: ownPayload });
+  const merged = Array.from(byId.values()).filter((r) => r.last_payload);
+
+  let weightedHealth = 0;
+  let totalWeight = 0;
+  let connectedSystems = 0;
+  let openAlerts = 0;
+  let openDecisions = 0;
+  let bestHighlight = '';
+  let bestAlerts = -1;
+  const names: string[] = [];
+  const timeline: { title: string; detail: string }[] = [];
+  const models: (import('@ellines-eip/shared').UemModel | null)[] = [];
+
+  for (const inst of merged) {
+    const p = inst.last_payload as StoredPayload;
+    const weight = Math.max(1, p.connectedSystems || 1);
+    weightedHealth += (p.healthScore || 0) * weight;
+    totalWeight += weight;
+    connectedSystems += p.connectedSystems || 0;
+    openAlerts += p.openAlerts || 0;
+    openDecisions += p.openDecisions || 0;
+    names.push(inst.display_name || 'System');
+    timeline.push(...(p.timeline || []));
+    models.push(p.model ?? null);
+    if ((p.openAlerts || 0) > bestAlerts) {
+      bestAlerts = p.openAlerts || 0;
+      bestHighlight = p.briefHighlight || '';
+    }
+  }
+
+  const aggHealthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : payload.healthScore;
+  const aggConnectorName =
+    names.length > 1
+      ? `${names.length} connected systems (${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''})`
+      : names[0] || connectorName;
+  const aggConnectorId = names.length > 1 ? 'aggregate' : connectorId;
+  const aggModel = mergeUemModels(models);
+  const aggTimeline = timeline.slice(0, 24);
+  const aggPacked = toTimelineStorage({
+    healthScore: aggHealthScore,
+    connectedSystems,
+    openAlerts,
+    openDecisions,
+    briefHighlight: bestHighlight,
+    timeline: aggTimeline,
+    model: aggModel,
+  });
+
   const row = {
     id: crypto.randomUUID(),
     organization_id: organizationId,
-    connector_id: connectorId,
-    connector_name: connectorName,
-    health_score: payload.healthScore,
-    connected_systems: payload.connectedSystems,
-    open_alerts: payload.openAlerts,
-    open_decisions: payload.openDecisions,
-    brief_highlight: payload.briefHighlight,
-    timeline: packedTimeline,
+    connector_id: aggConnectorId,
+    connector_name: aggConnectorName,
+    health_score: aggHealthScore,
+    connected_systems: connectedSystems,
+    open_alerts: openAlerts,
+    open_decisions: openDecisions,
+    brief_highlight: bestHighlight,
+    timeline: aggPacked,
     synced_at: syncedAt,
     created_at: syncedAt,
     updated_at: syncedAt,
@@ -339,6 +420,8 @@ async function upsertSnapshot(
     metadata: { connectorId },
   });
 
+  // Return this one connector's own result (not the aggregate) so the
+  // installation's own status message reflects what was just synced.
   return {
     organizationId,
     connectorId,
@@ -354,6 +437,7 @@ async function upsertSnapshot(
     status: 'synced' as const,
   };
 }
+
 
 function resolveEndpoint(requestUrl: string, endpoint?: string): string {
   const origin = new URL(requestUrl).origin;
@@ -412,6 +496,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         context.env,
         auth.organizationId,
         auth.sub,
+        id,
         'demo-json',
         displayName || 'Demo JSON Systems',
         normalizeEnterprisePayload(demoSeed),
@@ -439,6 +524,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         context.env,
         auth.organizationId,
         auth.sub,
+        id,
         'rest-api',
         displayName || 'REST API Systems',
         normalizeEnterprisePayload(raw),
@@ -473,6 +559,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         context.env,
         auth.organizationId,
         auth.sub,
+        id,
         'openapi',
         systemName,
         payload,
@@ -483,6 +570,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         context.env,
         auth.organizationId,
         auth.sub,
+        id,
         'csv-file',
         displayName || 'CSV / File Import',
         parseCsvToEnterprisePayload(csvText),
@@ -547,6 +635,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         context.env,
         auth.organizationId,
         auth.sub,
+        id,
         'email-imap',
         displayName || `Email (${config.imapUser})`,
         imapPayload,

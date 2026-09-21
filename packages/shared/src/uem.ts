@@ -249,3 +249,39 @@ export function inferUemFromMetrics(input: {
     objects: [],
   };
 }
+
+/**
+ * Merge multiple connected systems' UEM models into one combined view.
+ * A business with several APIs/DBs connected at once should see summed
+ * counts and a union of objects/capabilities — not just the last-synced one.
+ */
+export function mergeUemModels(models: (UemModel | null | undefined)[]): UemModel | null {
+  const valid = models.filter((m): m is UemModel => Boolean(m));
+  if (!valid.length) return null;
+  if (valid.length === 1) return valid[0];
+
+  const counts = emptyUemCounts();
+  const capabilities = new Set<string>();
+  const objects: UemObject[] = [];
+  const sourceSystems: string[] = [];
+
+  for (const model of valid) {
+    for (const key of Object.keys(counts) as (keyof UemCounts)[]) {
+      counts[key] += model.counts[key] || 0;
+    }
+    for (const cap of model.capabilities) capabilities.add(cap);
+    if (model.sourceSystem) sourceSystems.push(model.sourceSystem);
+    for (const obj of model.objects) {
+      if (objects.length >= 60) break;
+      objects.push(obj);
+    }
+  }
+
+  return {
+    version: '1.0',
+    sourceSystem: sourceSystems.join(', ') || undefined,
+    capabilities: Array.from(capabilities).slice(0, 24),
+    counts,
+    objects,
+  };
+}

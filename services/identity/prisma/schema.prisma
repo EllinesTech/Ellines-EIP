@@ -424,6 +424,8 @@ model ConnectorInstallation {
   oauthRefreshToken   String?   @map("oauth_refresh_token") // Track A: OAuth token storage
   lastError           String?   @map("last_error")       // Track A: last sync error message
   errorCount          Int       @default(0) @map("error_count") // Track A: consecutive error count
+  /** Last normalized sync payload (healthScore, counts, timeline, UEM model) for this one system. Used to aggregate across all of an org's connected systems instead of last-sync-wins. */
+  lastPayload         Json?     @map("last_payload")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 

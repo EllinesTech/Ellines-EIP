@@ -315,6 +315,7 @@ export {
   UEM_OBJECT_KINDS,
   emptyUemCounts,
   inferUemFromMetrics,
+  mergeUemModels,
   normalizeUemModel,
   packTimelineStorage,
   unpackTimelineStorage,

@@ -11,7 +11,7 @@ import type {
   ConnectorStatus,
   EnterpriseSummary,
 } from '@ellines-eip/shared';
-import { isOrganizationSuspended } from '@ellines-eip/shared';
+import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
 import {
   assertReadOnlySql,
   buildAuthHeaders,
@@ -391,12 +391,6 @@ export class EnterpriseService {
     if (!row) throw new NotFoundException('Installation not found');
     const config = asInstallConfig(row.config);
     const summary = await this.runSync(row.catalogId, config, row.displayName);
-    const persisted = await this.persistSync(
-      organizationId,
-      actorUserId,
-      { ...summary, connectorId: row.catalogId, connectorName: row.displayName },
-      row.catalogId,
-    );
     const nextAt = (() => {
       const mins = Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0));
       if (!mins) return undefined;
@@ -407,7 +401,10 @@ export class EnterpriseService {
       data: {
         status: 'synced',
         lastSyncedAt: new Date(),
-        lastMessage: `Synced — health ${persisted.healthScore}`,
+        lastMessage: `Synced — health ${summary.healthScore}`,
+        // Store this one system's payload; the org's snapshot is the aggregate
+        // of every connected system below, not just this one.
+        lastPayload: summary as object,
         config: {
           ...config,
           syncIntervalMinutes: Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0)),
@@ -415,7 +412,85 @@ export class EnterpriseService {
         } as object,
       },
     });
-    return persisted;
+    return this.aggregateAndPersistSnapshot(organizationId, actorUserId);
+  }
+
+  /**
+   * Recompute the org's single EnterpriseSnapshot by aggregating every
+   * connected system's last synced payload — so a business with several
+   * different APIs/DBs connected at once sees a combined view, not just
+   * whichever one synced most recently.
+   */
+  private async aggregateAndPersistSnapshot(organizationId: string, actorUserId: string) {
+    const installs = await this.prisma.connectorInstallation.findMany({
+      where: { organizationId, status: 'synced' },
+    });
+    const withPayload = installs.filter((i) => i.lastPayload);
+
+    if (!withPayload.length) {
+      throw new ServiceUnavailableException('No connected systems have synced data yet');
+    }
+
+    let weightedHealth = 0;
+    let totalWeight = 0;
+    let connectedSystems = 0;
+    let openAlerts = 0;
+    let openDecisions = 0;
+    let bestHighlight = '';
+    let bestAlerts = -1;
+    const names: string[] = [];
+    const timeline: { title: string; detail: string }[] = [];
+    const models: (import('@ellines-eip/shared').UemModel | null)[] = [];
+
+    for (const inst of withPayload) {
+      const p = inst.lastPayload as {
+        healthScore?: number;
+        connectedSystems?: number;
+        openAlerts?: number;
+        openDecisions?: number;
+        briefHighlight?: string;
+        timeline?: { title: string; detail: string }[];
+        model?: import('@ellines-eip/shared').UemModel | null;
+      };
+      const weight = Math.max(1, p.connectedSystems || 1);
+      weightedHealth += (p.healthScore || 0) * weight;
+      totalWeight += weight;
+      connectedSystems += p.connectedSystems || 0;
+      openAlerts += p.openAlerts || 0;
+      openDecisions += p.openDecisions || 0;
+      names.push(inst.displayName);
+      timeline.push(...(p.timeline || []));
+      models.push(p.model ?? null);
+      if ((p.openAlerts || 0) > bestAlerts) {
+        bestAlerts = p.openAlerts || 0;
+        bestHighlight = p.briefHighlight || '';
+      }
+    }
+
+    const healthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : 0;
+    const connectorName =
+      names.length > 1
+        ? `${names.length} connected systems (${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''})`
+        : names[0] || 'Connected systems';
+    const model = mergeUemModels(models);
+    const connectorId = names.length > 1 ? 'aggregate' : withPayload[0].catalogId;
+
+    return this.persistSync(
+      organizationId,
+      actorUserId,
+      {
+        connectorId,
+        connectorName,
+        healthScore,
+        connectedSystems,
+        openAlerts,
+        openDecisions,
+        briefHighlight: bestHighlight,
+        timeline: timeline.slice(0, 24),
+        model,
+      },
+      connectorId,
+    );
   }
 
   async syncConnector(
