@@ -331,22 +331,41 @@ A user may have different permissions in different businesses.
 
 # 12. SuperAdmin / GodMode
 
-SuperAdmin is a platform authority and is separate from business ownership.
+SuperAdmin is the **Ellines EIP platform control plane** and is separate from every business/customer dashboard.
 
-SuperAdmin capabilities may include:
+The SuperAdmin control plane exists to operate **EIP itself**, manage the businesses onboarded to EIP, and provide controlled platform-level intervention.
 
-- organizations;
-- users;
-- businesses;
-- connectors;
-- platform settings;
-- licensing;
-- feature flags;
-- health;
-- global audit;
-- security events;
-- diagnostics;
-- platform limits.
+### SuperAdmin primary responsibilities
+
+- platform/system performance and availability;
+- business onboarding and registration;
+- business lifecycle: activate, suspend, disconnect, reconnect;
+- tenant administration and troubleshooting;
+- tenant users and access control;
+- service packages, licensing, quotas, limits, and capability entitlements;
+- global feature flags and platform configuration;
+- global audit, security events, diagnostics, and incident investigation;
+- platform AI/operator assistance;
+- platform release/configuration controls;
+- controlled business migration and recovery operations;
+- platform-wide cost, usage, rate-limit, and capacity controls.
+
+### Connector boundary
+
+Customer connectors are **not a dependency of EIP itself**.
+
+EIP must be able to start, authenticate, serve its platform UI/API, manage tenants, audit actions, and perform core platform operations without any customer connector being installed or available.
+
+Connectors belong to the **business service layer**:
+
+- a business may require one or more integrations;
+- the business or authorized IT operator supplies its credentials/configuration;
+- SuperAdmin may provide connector templates/service packs, inspect connector health for troubleshooting, disconnect/revoke a business integration, or publish reusable integration offerings;
+- connector installations must never be treated as evidence that the EIP platform itself is healthy.
+
+Therefore, SuperAdmin navigation must place integrations under **Business Services / Service Catalog**, not as the primary Platform Health or Command Center view.
+
+### Privileged control rules
 
 GodMode must **not** become an invisible bypass.
 
@@ -356,9 +375,21 @@ Sensitive privileged actions should support:
 
 - reason;
 - ticket/reference;
-- confirmation;
+- explicit confirmation;
 - optional dual approval;
-- session re-authentication.
+- session re-authentication;
+- reversible action where technically possible;
+- destructive-action safeguards.
+
+The SuperAdmin dashboard must distinguish clearly between:
+
+1. **EIP platform telemetry** — health, uptime, services, queues, API performance, security, infrastructure;
+2. **business lifecycle telemetry** — onboarded businesses, access state, package, usage, account status;
+3. **business integration telemetry** — customer connectors, sync status, integration failures;
+4. **commercial controls** — packages, quotas, entitlements, licensing, usage;
+5. **security/control telemetry** — privileged actions, audit events, suspicious activity, configuration changes.
+
+The dashboard must never synthesize telemetry merely to populate a visual component.
 
 ---
 
