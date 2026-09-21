@@ -57,7 +57,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (error) return json({ statusCode: error.code === '23505' ? 409 : 500, message: error.message }, error.code === '23505' ? 409 : 500);
 
     await supabase.from('audit_logs').insert(auditRow({
-      organizationId: auth.sub,
+      organizationId: auth.organizationId,
       userId: auth.sub,
       action: 'platform.package.create',
       resource: 'rate_limit_tier',
