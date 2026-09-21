@@ -1684,6 +1684,28 @@ export function deleteChildOrg(childOrgId: string) {
   );
 }
 
+export type OrgGroupSummaryEntry = {
+  id: string;
+  name: string;
+  slug: string;
+  isCurrent: boolean;
+  isChild: boolean;
+  healthScore: number | null;
+  connectedSystems: number | null;
+  openAlerts: number | null;
+  openDecisions: number | null;
+  briefHighlight: string | null;
+  syncedAt: string | null;
+};
+
+/**
+ * Owner: combined health summary of the current org's own window plus every
+ * linked child org — see the whole business group at a glance, not just one at a time.
+ */
+export function fetchGroupSummary() {
+  return request<OrgGroupSummaryEntry[]>('/api/v1/orgs/me/group-summary');
+}
+
 // ─── Document Hub API ─────────────────────────────────────────────────────────
 
 export type DocumentRecordDto = {

@@ -186,6 +186,15 @@ export class OrgsController {
     );
   }
 
+  /** GET /api/v1/orgs/me/group-summary — Owner: current org + linked child orgs' health at a glance */
+  @Get('me/group-summary')
+  @Roles('owner')
+  getGroupSummary(
+    @Request() req: { user: { organizationId: string; role: string } },
+  ) {
+    return this.multiOrg.getGroupSummary(req.user.role, req.user.organizationId);
+  }
+
   /** GET /api/v1/orgs/me/alert-correlations — real-time alert correlation engine */
   @Get('me/alert-correlations')
   @Roles('owner', 'admin')

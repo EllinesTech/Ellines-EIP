@@ -190,6 +190,46 @@ export class MultiOrgService {
   }
 
   /**
+   * Owner: a combined health summary of the current org's "window" plus
+   * every child org linked directly under it — so a parent business can see
+   * itself and all of its linked businesses at a glance, not just one at a time.
+   */
+  async getGroupSummary(actorRole: string, currentOrgId: string) {
+    if (actorRole !== 'owner') {
+      throw new ForbiddenException('Only the Organization Owner can view the group summary');
+    }
+
+    const [current, children] = await Promise.all([
+      this.prisma.organization.findUnique({ where: { id: currentOrgId } }),
+      this.prisma.organization.findMany({ where: { parentOrgId: currentOrgId } }),
+    ]);
+    if (!current) throw new NotFoundException('Organization not found');
+
+    const group = [current, ...children];
+    const snapshots = await this.prisma.enterpriseSnapshot.findMany({
+      where: { organizationId: { in: group.map((o) => o.id) } },
+    });
+    const snapByOrg = new Map(snapshots.map((s) => [s.organizationId, s]));
+
+    return group.map((org) => {
+      const snap = snapByOrg.get(org.id);
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        isCurrent: org.id === currentOrgId,
+        isChild: org.parentOrgId === currentOrgId,
+        healthScore: snap?.healthScore ?? null,
+        connectedSystems: snap?.connectedSystems ?? null,
+        openAlerts: snap?.openAlerts ?? null,
+        openDecisions: snap?.openDecisions ?? null,
+        briefHighlight: snap?.briefHighlight ?? null,
+        syncedAt: snap?.syncedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  /**
    * Owner deletes a child organization it directly owns (parentOrgId must
    * match the caller's current org). Cascades to that org's users, branches,
    * departments, etc. per the schema's onDelete: Cascade relations.

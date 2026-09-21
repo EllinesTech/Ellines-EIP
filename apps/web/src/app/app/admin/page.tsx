@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   createOrgBranch,
   createOrgDepartment,
+  fetchGroupSummary,
   getSession,
   inviteOrgUser,
   listOrgBranches,
@@ -17,6 +18,7 @@ import {
   revokeInvite,
   OrgBranch,
   OrgDepartment,
+  OrgGroupSummaryEntry,
   OrgMember,
   PendingInviteDto,
   updateOrgUser,
@@ -54,6 +56,8 @@ export default function AdminPage() {
   const [deptBranchId, setDeptBranchId] = useState('');
   const [childOrgName, setChildOrgName] = useState('');
   const [childOrgNotice, setChildOrgNotice] = useState('');
+  const [groupSummary, setGroupSummary] = useState<OrgGroupSummaryEntry[]>([]);
+  const [groupSummaryError, setGroupSummaryError] = useState('');
   const [csvText, setCsvText] = useState('');
   const [csvBusy, setCsvBusy] = useState(false);
   const [csvResult, setCsvResult] = useState<string | null>(null);
@@ -101,6 +105,13 @@ export default function AdminPage() {
 
   const assignableRoles = rolesAssignableBy(actorRole);
   const isOwner = isOrgOwnerRole(actorRole);
+
+  useEffect(() => {
+    if (!allowed || !isOwner) return;
+    fetchGroupSummary()
+      .then(setGroupSummary)
+      .catch((err) => setGroupSummaryError(err instanceof Error ? err.message : 'Failed to load group summary'));
+  }, [allowed, isOwner]);
 
   async function onInvite(e: FormEvent) {
     e.preventDefault();
@@ -556,6 +567,45 @@ export default function AdminPage() {
           </table>
         )}
       </section>
+
+      {/* v1.1 — Multi-company: group summary — this business's own window + all linked child businesses at a glance */}
+      {isOwner && groupSummary.length > 0 && (
+        <section className={styles.brief} style={{ marginTop: '0.85rem' }}>
+          <div className={styles.panelLabel}>Group summary — all your businesses</div>
+          <p className={styles.lede}>
+            Each business keeps its own window. This is the combined view across the current
+            business and every linked business under it.
+          </p>
+          {groupSummaryError ? <p className={adminStyles.notice}>{groupSummaryError}</p> : null}
+          <table className={adminStyles.table}>
+            <thead>
+              <tr>
+                <th>Business</th>
+                <th>Health</th>
+                <th>Systems</th>
+                <th>Alerts</th>
+                <th>Decisions</th>
+                <th>Last synced</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupSummary.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    {g.name}
+                    {g.isCurrent ? ' (current)' : g.isChild ? ' · linked' : ''}
+                  </td>
+                  <td>{g.healthScore ?? '—'}</td>
+                  <td>{g.connectedSystems ?? '—'}</td>
+                  <td>{g.openAlerts ?? '—'}</td>
+                  <td>{g.openDecisions ?? '—'}</td>
+                  <td>{g.syncedAt ? new Date(g.syncedAt).toLocaleString() : 'Not synced yet'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {/* v1.1 — Multi-company: Owner can create a linked child org */}
       {isOwner && (
