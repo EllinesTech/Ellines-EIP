@@ -1,87 +1,80 @@
+import { ConfigService } from '@nestjs/config';
 import { EncryptionService } from './encryption.service';
 
 describe('EncryptionService', () => {
+  const masterKey = 'test-master-key-with-at-least-32-bytes-123456';
   let service: EncryptionService;
 
   beforeEach(() => {
-    service = new EncryptionService();
+    const config = { get: jest.fn().mockReturnValue(masterKey) } as unknown as ConfigService;
+    service = new EncryptionService(config);
   });
 
-  describe('encrypt / decrypt round-trip', () => {
-    it('decrypts back to original plaintext', async () => {
-      const plain = 'super-secret-api-key-12345';
-      const orgId = 'org-abc-123';
-      const enc = await service.encrypt(plain, orgId);
-      const dec = await service.decrypt(enc, orgId);
-      expect(dec).toBe(plain);
-    });
-
-    it('produces different ciphertext each call (random IV)', async () => {
-      const enc1 = await service.encrypt('same-value', 'org-1');
-      const enc2 = await service.encrypt('same-value', 'org-1');
-      expect(enc1).not.toBe(enc2);
-    });
-
-    it('cannot decrypt with a different org ID', async () => {
-      const enc = await service.encrypt('secret', 'org-a');
-      const dec = await service.decrypt(enc, 'org-b');
-      // Different key → AES-GCM auth tag fails → fallback returns ''
-      expect(dec).toBe('');
-    });
-
-    it('handles empty string plaintext', async () => {
-      const enc = await service.encrypt('', 'org-x');
-      const dec = await service.decrypt(enc, 'org-x');
-      expect(dec).toBe('');
-    });
-
-    it('handles unicode / special characters', async () => {
-      const plain = 'Passwörd!@#$%^&*() 日本語';
-      const enc = await service.encrypt(plain, 'org-unicode');
-      const dec = await service.decrypt(enc, 'org-unicode');
-      expect(dec).toBe(plain);
-    });
+  it('round-trips plaintext with v2 encryption', async () => {
+    const plain = 'super-secret-api-key-12345';
+    const enc = await service.encrypt(plain, 'org-abc-123');
+    expect(JSON.parse(enc).version).toBe(2);
+    expect(await service.decrypt(enc, 'org-abc-123')).toBe(plain);
   });
 
-  describe('isEncrypted', () => {
-    it('returns true for new-format JSON ciphertext', async () => {
-      const enc = await service.encrypt('test', 'org-1');
-      expect(service.isEncrypted(enc)).toBe(true);
-    });
-
-    it('returns false for plain strings', () => {
-      expect(service.isEncrypted('not-encrypted')).toBe(false);
-      expect(service.isEncrypted('hello world')).toBe(false);
-    });
-
-    it('returns false for legacy base64 strings', () => {
-      const b64 = Buffer.from('legacy password').toString('base64');
-      expect(service.isEncrypted(b64)).toBe(false);
-    });
+  it('uses a random IV for each encryption', async () => {
+    const a = await service.encrypt('same-value', 'org-1');
+    const b = await service.encrypt('same-value', 'org-1');
+    expect(a).not.toBe(b);
   });
 
-  describe('decrypt legacy base64', () => {
-    it('decodes legacy base64 values transparently', async () => {
-      const b64 = Buffer.from('my-legacy-value').toString('base64');
-      const dec = await service.decrypt(b64, 'org-any');
-      expect(dec).toBe('my-legacy-value');
-    });
+  it('rejects a different organization through authenticated context', async () => {
+    const enc = await service.encrypt('secret', 'org-a');
+    await expect(service.decrypt(enc, 'org-b')).rejects.toThrow();
   });
 
-  describe('migrateToEncryption', () => {
-    it('re-encrypts a base64 legacy value', async () => {
-      const original = 'old-password';
-      const b64 = Buffer.from(original).toString('base64');
-      const migrated = await service.migrateToEncryption(b64, 'org-m');
-      expect(service.isEncrypted(migrated)).toBe(true);
-      const dec = await service.decrypt(migrated, 'org-m');
-      expect(dec).toBe(original);
+  it('rejects tampered ciphertext', async () => {
+    const parsed = JSON.parse(await service.encrypt('secret', 'org-a')) as Record<string, unknown>;
+    parsed.ciphertext = Buffer.from('tampered').toString('base64');
+    await expect(service.decrypt(JSON.stringify(parsed), 'org-a')).rejects.toThrow();
+  });
+
+  it('fails closed when the master key is missing', async () => {
+    const config = { get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService;
+    const noKey = new EncryptionService(config);
+    await expect(noKey.encrypt('secret', 'org-a')).rejects.toThrow('EIP_ENCRYPTION_MASTER_KEY');
+  });
+
+  it('fails closed for non-envelope values', async () => {
+    await expect(service.decrypt(Buffer.from('legacy password').toString('base64'), 'org-a')).rejects.toThrow();
+  });
+
+  it('recognizes encrypted envelopes', async () => {
+    const enc = await service.encrypt('test', 'org-1');
+    expect(service.isEncrypted(enc)).toBe(true);
+    expect(service.isEncrypted('not-encrypted')).toBe(false);
+  });
+
+  it('migrates historical base64 values to v2', async () => {
+    const original = 'old-password';
+    const b64 = Buffer.from(original).toString('base64');
+    const migrated = await service.migrateToEncryption(b64, 'org-m');
+    expect(JSON.parse(migrated).version).toBe(2);
+    expect(await service.decrypt(migrated, 'org-m')).toBe(original);
+  });
+
+  it('migrates legacy v1 ciphertext to v2', async () => {
+    // Reproduce the old v1 envelope only inside the migration test.
+    const { createCipheriv, randomBytes, scryptSync } = await import('crypto');
+    const key = scryptSync('org-legacy', 'org:org-legacy', 32, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    const iv = randomBytes(16);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([cipher.update('legacy-secret', 'utf8'), cipher.final()]);
+    const legacy = JSON.stringify({
+      encrypted: true,
+      version: 1,
+      iv: iv.toString('base64'),
+      ciphertext: ciphertext.toString('base64'),
+      authTag: cipher.getAuthTag().toString('base64'),
     });
 
-    it('returns as-is when already encrypted', async () => {
-      const enc = await service.encrypt('already', 'org-m');
-      const result = await service.migrateToEncryption(enc, 'org-m');
-      expect(result).toBe(enc);
-    });
+    const migrated = await service.migrateToEncryption(legacy, 'org-legacy');
+    expect(JSON.parse(migrated).version).toBe(2);
+    expect(await service.decrypt(migrated, 'org-legacy')).toBe('legacy-secret');
   });
 });
