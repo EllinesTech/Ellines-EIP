@@ -120,121 +120,76 @@ class MetricsWebSocketManager {
 interface DashboardMetrics {
   timestamp: Date;
   orgDistribution: OrgDistributionMetric[];
-  selfHealingStats: SelfHealingStats;
-  federatedLearningStatus: FederatedLearningStatus;
-  predictiveForecasts: PredictiveForecasts;
+  selfHealingStats: SelfHealingStats | null;
+  federatedLearningStatus: FederatedLearningStatus | null;
+  predictiveForecasts: PredictiveForecasts | null;
   wsConnected?: boolean;
   lastUpdateLatency?: number;
 }
-
 interface OrgDistributionMetric {
-  orgId: string;
-  orgName: string;
-  healthScore: number;
-  userCount: number;
-  connectorCount: number;
-  syncHealth: number;
+  orgId: string; orgName: string; healthScore: number | null;
+  userCount: number; connectorCount: number; syncHealth: number | null;
 }
-
 interface SelfHealingStats {
-  remediationCount: number;
-  successRate: number;
-  escalationCount: number;
-  avgRemediationTime: number;
-  lastIncidentTime: Date | null;
+  remediationCount: number; successRate: number; escalationCount: number;
+  avgRemediationTime: number; lastIncidentTime: Date | null;
 }
-
 interface FederatedLearningStatus {
-  participatingOrgs: number;
-  modelVersion: number;
-  privacyBudgetUsed: number;
-  trainingAccuracy: number;
-  lastTrainingTime: Date | null;
+  participatingOrgs: number; modelVersion: number; privacyBudgetUsed: number;
+  trainingAccuracy: number; lastTrainingTime: Date | null;
 }
-
 interface PredictiveForecasts {
-  operationalRisks: RiskForecast[];
-  resourceConstraints: RiskForecast[];
-  financialIssues: RiskForecast[];
-  nextUpdateTime: Date;
+  operationalRisks: RiskForecast[]; resourceConstraints: RiskForecast[];
+  financialIssues: RiskForecast[]; nextUpdateTime: Date;
 }
-
 interface RiskForecast {
-  name: string;
-  probability: number;
-  timeframe: string;
-  affectedOrgs: number;
+  name: string; probability: number; timeframe: string; affectedOrgs: number;
 }
-
 type Theme = 'dark' | 'light' | 'high-contrast';
 
-// ─── Hooks for Real-time Metrics ──────────────────────────────────────────
+// Live platform metrics. Never fabricate operational telemetry.
 function useRealtimeMetrics(orgs: PlatformOrg[], enabled: boolean) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const wsManagerRef = useRef<MetricsWebSocketManager | null>(null);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateMockMetrics = useCallback((): DashboardMetrics => {
-    const now = new Date();
-    return {
-      timestamp: now,
-      orgDistribution: orgs.map((org) => ({
-        orgId: org.id,
-        orgName: org.name,
-        healthScore: Math.floor(Math.random() * 40 + 60),
-        userCount: Math.floor(Math.random() * 500 + 10),
-        connectorCount: Math.floor(Math.random() * 20 + 1),
-        syncHealth: Math.random() * 0.2 + 0.8,
-      })),
-      selfHealingStats: {
-        remediationCount: Math.floor(Math.random() * 150 + 50),
-        successRate: Math.random() * 0.15 + 0.85,
-        escalationCount: Math.floor(Math.random() * 10 + 1),
-        avgRemediationTime: Math.floor(Math.random() * 180 + 60),
-        lastIncidentTime: new Date(Date.now() - Math.random() * 3600000),
-      },
-      federatedLearningStatus: {
-        participatingOrgs: Math.max(1, orgs.length - 1),
-        modelVersion: 7,
-        privacyBudgetUsed: Math.random() * 0.3 + 0.5,
-        trainingAccuracy: Math.random() * 0.08 + 0.92,
-        lastTrainingTime: new Date(Date.now() - Math.random() * 7200000),
-      },
-      predictiveForecasts: {
-        operationalRisks: [
-          { name: 'Database latency spike', probability: 0.45, timeframe: 'Next 6h', affectedOrgs: Math.floor(Math.random() * orgs.length) },
-          { name: 'Memory pressure on sync', probability: 0.35, timeframe: 'Next 24h', affectedOrgs: Math.floor(Math.random() * orgs.length) },
-        ],
-        resourceConstraints: [
-          { name: 'API rate limit approach', probability: 0.55, timeframe: 'Next 12h', affectedOrgs: Math.floor(Math.random() * orgs.length) },
-        ],
-        financialIssues: [
-          { name: 'Compute cost surge', probability: 0.25, timeframe: 'Next 7d', affectedOrgs: Math.floor(Math.random() * orgs.length) },
-        ],
-        nextUpdateTime: new Date(Date.now() + 300000),
-      },
-      wsConnected: false,
-      lastUpdateLatency: Math.floor(Math.random() * 50 + 10),
-    };
-  }, [orgs]);
+  const loadMetrics = useCallback(async () => {
+    if (!enabled) return;
+    const startedAt = performance.now();
+    try {
+      const orgStats = await Promise.all(orgs.map(async (org) => {
+        try {
+          const result = await fetchPlatformOrgStats(org.id);
+          const total = result.stats.totalConnectors;
+          const synced = result.stats.syncedConnectors;
+          const syncHealth = total > 0 ? Math.max(0, Math.min(1, synced / total)) : null;
+          return {
+            orgId: result.id, orgName: result.name,
+            healthScore: syncHealth === null ? null : syncHealth * 100,
+            userCount: result.stats.activeUsers, connectorCount: total, syncHealth,
+          } satisfies OrgDistributionMetric;
+        } catch {
+          return {
+            orgId: org.id, orgName: org.name, healthScore: null,
+            userCount: org.userCount, connectorCount: 0, syncHealth: null,
+          } satisfies OrgDistributionMetric;
+        }
+      }));
+      setMetrics({
+        timestamp: new Date(), orgDistribution: orgStats,
+        selfHealingStats: null, federatedLearningStatus: null, predictiveForecasts: null,
+        wsConnected: false, lastUpdateLatency: Math.round(performance.now() - startedAt),
+      });
+    } catch (error) {
+      console.error('Failed to load platform metrics:', error);
+    }
+  }, [enabled, orgs]);
 
   useEffect(() => {
-    if (!enabled || orgs.length === 0) return;
-
-    // Simulate real-time updates via polling (WebSocket not available in browser context)
-    updateTimerRef.current = setInterval(() => {
-      setMetrics(generateMockMetrics());
-    }, 2000);
-
-    // Initial metrics
-    setMetrics(generateMockMetrics());
-
-    return () => {
-      if (updateTimerRef.current) {
-        clearInterval(updateTimerRef.current);
-      }
-    };
-  }, [enabled, orgs, generateMockMetrics]);
+    if (!enabled) return;
+    void loadMetrics();
+    updateTimerRef.current = setInterval(() => void loadMetrics(), 10000);
+    return () => { if (updateTimerRef.current) clearInterval(updateTimerRef.current); };
+  }, [enabled, loadMetrics]);
 
   return metrics;
 }
@@ -447,59 +402,24 @@ function EllineaAssistant({ isOpen, onClose, metrics }: { isOpen: boolean; onClo
 
 function generateTemplateResponse(query: string, metrics: DashboardMetrics | null): string {
   const lowerQuery = query.toLowerCase();
-
-  if (!metrics) {
-    return 'Please wait while I load platform metrics...';
-  }
-
+  if (!metrics) return 'Platform telemetry is still loading.';
   if (lowerQuery.includes('health') || lowerQuery.includes('status')) {
-    const avgHealth = metrics.orgDistribution.reduce((sum, org) => sum + org.healthScore, 0) / Math.max(metrics.orgDistribution.length, 1);
-    const unhealthyOrgs = metrics.orgDistribution.filter(o => o.healthScore < 60);
-    if (unhealthyOrgs.length > 0) {
-      return `Platform health score: ${avgHealth.toFixed(1)}%. ⚠️ ${unhealthyOrgs.length} organizations need attention. Remediation success rate is ${(metrics.selfHealingStats.successRate * 100).toFixed(1)}%. Recommend immediate review of low-health organizations.`;
-    }
-    return `Platform health score: ${avgHealth.toFixed(1)}%. All systems nominal. ${metrics.orgDistribution.length} organizations are active. Remediation success rate is ${(metrics.selfHealingStats.successRate * 100).toFixed(1)}%.`;
+    const known = metrics.orgDistribution.filter((o) => o.healthScore !== null);
+    if (!known.length) return `Platform API is reachable, but organization sync-health telemetry is not available yet. ${metrics.orgDistribution.length} organizations are visible.`;
+    const avg = known.reduce((sum, o) => sum + (o.healthScore ?? 0), 0) / known.length;
+    const low = known.filter((o) => (o.healthScore ?? 0) < 60).length;
+    return `Live connector-sync health is ${avg.toFixed(1)}% across ${known.length} organizations. ${low} organization(s) are below 60%. This is a derived sync-health indicator, not a synthetic overall platform health score.`;
   }
-
   if (lowerQuery.includes('organizations') || lowerQuery.includes('orgs')) {
-    const topOrg = metrics.orgDistribution.reduce((prev, current) => (prev.healthScore > current.healthScore ? prev : current), metrics.orgDistribution[0]);
-    const lowHealthOrgs = metrics.orgDistribution.filter(o => o.healthScore < 70);
-    return `You have ${metrics.orgDistribution.length} organizations. Top performer: ${topOrg?.orgName || 'N/A'} (${topOrg?.healthScore || 0}% health). ${lowHealthOrgs.length} organization(s) below 70% health require monitoring.`;
+    const users = metrics.orgDistribution.reduce((sum, o) => sum + o.userCount, 0);
+    const connectors = metrics.orgDistribution.reduce((sum, o) => sum + o.connectorCount, 0);
+    return `The live platform API reports ${metrics.orgDistribution.length} organizations, ${users} active users, and ${connectors} connector installations.`;
   }
-
-  if (lowerQuery.includes('healing') || lowerQuery.includes('remediation') || lowerQuery.includes('incident')) {
-    const escalationRate = (metrics.selfHealingStats.escalationCount / Math.max(metrics.selfHealingStats.remediationCount, 1)) * 100;
-    return `Self-healing metrics: ${metrics.selfHealingStats.remediationCount} remediations performed with ${(metrics.selfHealingStats.successRate * 100).toFixed(1)}% success rate. ${metrics.selfHealingStats.escalationCount} escalations (${escalationRate.toFixed(1)}% escalation rate). Average fix time: ${(metrics.selfHealingStats.avgRemediationTime / 60).toFixed(1)} minutes.`;
-  }
-
-  if (lowerQuery.includes('learning') || lowerQuery.includes('federated') || lowerQuery.includes('model')) {
-    return `Federated learning status: Model v${metrics.federatedLearningStatus.modelVersion} trained across ${metrics.federatedLearningStatus.participatingOrgs} organizations. Training accuracy: ${(metrics.federatedLearningStatus.trainingAccuracy * 100).toFixed(1)}%. Privacy budget usage: ${(metrics.federatedLearningStatus.privacyBudgetUsed * 100).toFixed(1)}%. Model is ${metrics.federatedLearningStatus.trainingAccuracy > 0.95 ? 'performing excellently' : 'performing well'}.`;
-  }
-
-  if (lowerQuery.includes('risk') || lowerQuery.includes('forecast') || lowerQuery.includes('predict')) {
-    const allRisks = metrics.predictiveForecasts.operationalRisks.length +
-                     metrics.predictiveForecasts.resourceConstraints.length +
-                     metrics.predictiveForecasts.financialIssues.length;
-    const highRisks = (metrics.predictiveForecasts.operationalRisks.filter(r => r.probability > 0.7) || []).length +
-                      (metrics.predictiveForecasts.resourceConstraints.filter(r => r.probability > 0.7) || []).length +
-                      (metrics.predictiveForecasts.financialIssues.filter(r => r.probability > 0.7) || []).length;
-    if (highRisks > 0) {
-      return `🚨 Detected ${highRisks} high-probability risks across ${allRisks} total forecasts. Critical attention needed. Recommend reviewing operational and resource constraints immediately in next 24 hours.`;
-    }
-    return `Detected ${allRisks} forecasts total. Risk distribution is healthy with no high-probability alerts. Recommended review cycle: within 48 hours.`;
-  }
-
-  if (lowerQuery.includes('recommendation') || lowerQuery.includes('suggest') || lowerQuery.includes('advise')) {
-    const suggestions = [];
-    if (metrics.selfHealingStats.successRate < 0.85) suggestions.push('Improve self-healing success rate by tuning remediation rules');
-    if (metrics.federatedLearningStatus.privacyBudgetUsed > 0.8) suggestions.push('Monitor privacy budget usage closely - approaching limit');
-    const lowHealthCount = metrics.orgDistribution.filter(o => o.healthScore < 70).length;
-    if (lowHealthCount > 2) suggestions.push('Address multiple organization health issues systematically');
-    if (suggestions.length === 0) suggestions.push('System is performing well. Continue monitoring daily metrics.');
-    return `Recommendations: ${suggestions.join(' • ')}`;
-  }
-
-  return `I can help you monitor platform health, organization metrics, self-healing activities, federated learning performance, and predictive forecasts. What specific aspect would you like to explore?`;
+  if (lowerQuery.includes('healing') || lowerQuery.includes('remediation') || lowerQuery.includes('incident')) return 'Live self-healing telemetry is not exposed to this dashboard, so no remediation or incident figures are invented.';
+  if (lowerQuery.includes('learning') || lowerQuery.includes('federated') || lowerQuery.includes('model')) return 'Live federated-learning telemetry is not exposed to this dashboard, so model performance figures are unavailable here.';
+  if (lowerQuery.includes('risk') || lowerQuery.includes('forecast') || lowerQuery.includes('predict')) return 'Live predictive-risk telemetry is not exposed to this dashboard, so no synthetic forecasts are displayed.';
+  if (lowerQuery.includes('recommendation') || lowerQuery.includes('suggest') || lowerQuery.includes('advise')) return 'Recommendations require live evidence. The dashboard currently has organization and connector-sync data only.';
+  return 'I can report live organization and connector-sync telemetry. Self-healing, federated-learning, and predictive datasets are currently unavailable until their live telemetry endpoints are connected.';
 }
 
 // ─── Geographic Heat Map with Organization Distribution ────────────────────
@@ -546,10 +466,13 @@ function GeoHeatmap({ orgs }: { orgs: OrgDistributionMetric[] }) {
       const x = centerX + Math.cos(angle) * radius;
       const y = centerY + Math.sin(angle) * radius;
 
-      // Color based on health score
-      let color = '#22c55e'; // Success
-      if (org.healthScore < 60) color = '#ef4444'; // Error
-      else if (org.healthScore < 80) color = '#f59e0b'; // Warning
+      // Color from live sync health; unknown health stays neutral.
+      let color = '#64748b';
+      if (org.healthScore !== null) {
+        color = '#22c55e';
+        if (org.healthScore < 60) color = '#ef4444';
+        else if (org.healthScore < 80) color = '#f59e0b';
+      }
 
       // Draw heat point with gradient
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, 20);
@@ -596,225 +519,56 @@ function GeoHeatmap({ orgs }: { orgs: OrgDistributionMetric[] }) {
   );
 }
 
-// ─── Self-Healing Metrics Widget with Animations ───────────────────────────
-function SelfHealingMetrics({ stats }: { stats: SelfHealingStats }) {
-  const successBarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (successBarRef.current) {
-      successBarRef.current.style.width = `${stats.successRate * 100}%`;
-    }
-  }, [stats.successRate]);
-
-  return (
-    <div className={dashboardStyles.widget}>
-      <h3>Self-Healing Activity</h3>
-      <div className={dashboardStyles.metricsGrid}>
-        <div className={dashboardStyles.metric}>
-          <span>Remediations</span>
-          <strong>{stats.remediationCount}</strong>
-          <small>automated actions</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Success Rate</span>
-          <strong>{(stats.successRate * 100).toFixed(1)}%</strong>
-          <small>first-time fixes</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Escalations</span>
-          <strong>{stats.escalationCount}</strong>
-          <small>to administrators</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Avg Fix Time</span>
-          <strong>{(stats.avgRemediationTime / 60).toFixed(1)}m</strong>
-          <small>minutes to resolve</small>
-        </div>
-      </div>
-
-      {/* Success rate progress bar with animation */}
-      <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '0.375rem' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Success Rate Trend</div>
-        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-          <div
-            ref={successBarRef}
-            style={{
-              height: '100%',
-              backgroundColor: 'var(--success)',
-              transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-              borderRadius: '3px',
-            }}
-          />
-        </div>
-      </div>
-
-      {stats.lastIncidentTime && (
-        <div className={dashboardStyles.footer}>
-          Last incident: {stats.lastIncidentTime.toLocaleString()}
-        </div>
-      )}
+// ─── Self-Healing Metrics Widget
+function SelfHealingMetrics({ stats }: { stats: SelfHealingStats | null }) {
+  if (!stats) return <div className={dashboardStyles.widget}><h3>Self-Healing Activity</h3><p className={dashboardStyles.lede}>Live self-healing telemetry is not exposed to the platform dashboard yet. No simulated values are shown.</p></div>;
+  return <div className={dashboardStyles.widget}>
+    <h3>Self-Healing Activity</h3>
+    <div className={dashboardStyles.metricsGrid}>
+      <div className={dashboardStyles.metric}><span>Remediations</span><strong>{stats.remediationCount}</strong><small>automated actions</small></div>
+      <div className={dashboardStyles.metric}><span>Success Rate</span><strong>{(stats.successRate * 100).toFixed(1)}%</strong><small>first-time fixes</small></div>
+      <div className={dashboardStyles.metric}><span>Escalations</span><strong>{stats.escalationCount}</strong><small>to administrators</small></div>
+      <div className={dashboardStyles.metric}><span>Avg Fix Time</span><strong>{(stats.avgRemediationTime / 60).toFixed(1)}m</strong><small>minutes to resolve</small></div>
     </div>
-  );
+    {stats.lastIncidentTime && <div className={dashboardStyles.footer}>Last incident: {stats.lastIncidentTime.toLocaleString()}</div>}
+  </div>;
 }
 
-// ─── Federated Learning Status Widget with Model Performance ────────────────
-function FederatedLearningWidget({ status }: { status: FederatedLearningStatus }) {
-  const privacyBarRef = useRef<HTMLDivElement>(null);
-  const accuracyBarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (privacyBarRef.current) {
-      privacyBarRef.current.style.width = `${status.privacyBudgetUsed * 100}%`;
-    }
-    if (accuracyBarRef.current) {
-      accuracyBarRef.current.style.width = `${status.trainingAccuracy * 100}%`;
-    }
-  }, [status]);
-
-  return (
-    <div className={dashboardStyles.widget}>
-      <h3>Federated Learning Status</h3>
-      <div className={dashboardStyles.metricsGrid}>
-        <div className={dashboardStyles.metric}>
-          <span>Participating Orgs</span>
-          <strong>{status.participatingOrgs}</strong>
-          <small>in training round</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Model Version</span>
-          <strong>v{status.modelVersion}</strong>
-          <small>deployed</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Training Accuracy</span>
-          <strong>{(status.trainingAccuracy * 100).toFixed(1)}%</strong>
-          <small>cross-org performance</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Privacy Budget</span>
-          <strong>{(status.privacyBudgetUsed * 100).toFixed(1)}%</strong>
-          <small>differential privacy</small>
-        </div>
-      </div>
-
-      {/* Progress bars for model performance */}
-      <div style={{ marginTop: '1rem', display: 'grid', gap: '0.75rem' }}>
-        <div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-            Accuracy
-          </div>
-          <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div
-              ref={accuracyBarRef}
-              style={{
-                height: '100%',
-                backgroundColor: 'var(--accent-secondary)',
-                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                borderRadius: '3px',
-              }}
-            />
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-            Privacy Budget
-          </div>
-          <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div
-              ref={privacyBarRef}
-              style={{
-                height: '100%',
-                backgroundColor: status.privacyBudgetUsed > 0.8 ? 'var(--warning)' : 'var(--accent-primary)',
-                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                borderRadius: '3px',
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {status.lastTrainingTime && (
-        <div className={dashboardStyles.footer}>
-          Last training: {status.lastTrainingTime.toLocaleString()}
-        </div>
-      )}
+// ─── Federated Learning Status Widget
+function FederatedLearningWidget({ status }: { status: FederatedLearningStatus | null }) {
+  if (!status) return <div className={dashboardStyles.widget}><h3>Federated Learning Status</h3><p className={dashboardStyles.lede}>Live federated-learning telemetry is not exposed to the platform dashboard yet. No simulated model metrics are shown.</p></div>;
+  return <div className={dashboardStyles.widget}>
+    <h3>Federated Learning Status</h3>
+    <div className={dashboardStyles.metricsGrid}>
+      <div className={dashboardStyles.metric}><span>Participating Orgs</span><strong>{status.participatingOrgs}</strong><small>in training round</small></div>
+      <div className={dashboardStyles.metric}><span>Model Version</span><strong>v{status.modelVersion}</strong><small>deployed</small></div>
+      <div className={dashboardStyles.metric}><span>Training Accuracy</span><strong>{(status.trainingAccuracy * 100).toFixed(1)}%</strong><small>cross-org performance</small></div>
+      <div className={dashboardStyles.metric}><span>Privacy Budget</span><strong>{(status.privacyBudgetUsed * 100).toFixed(1)}%</strong><small>differential privacy</small></div>
     </div>
-  );
+    {status.lastTrainingTime && <div className={dashboardStyles.footer}>Last training: {status.lastTrainingTime.toLocaleString()}</div>}
+  </div>;
 }
 
-// ─── Predictive Analytics Widget with Risk Scoring ─────────────────────────
-function PredictiveAnalyticsWidget({ forecasts }: { forecasts: PredictiveForecasts }) {
+// ─── Predictive Analytics Widget
+function PredictiveAnalyticsWidget({ forecasts }: { forecasts: PredictiveForecasts | null }) {
+  if (!forecasts) return <div className={dashboardStyles.widget}><h3>Predictive Forecasts & Risk Analysis</h3><p className={dashboardStyles.lede}>Live predictive telemetry is not exposed to the platform dashboard yet. No simulated forecasts are shown.</p></div>;
   const allRisks = [
     ...forecasts.operationalRisks.map(r => ({ ...r, type: 'Operational' })),
     ...forecasts.resourceConstraints.map(r => ({ ...r, type: 'Resource' })),
     ...forecasts.financialIssues.map(r => ({ ...r, type: 'Financial' })),
   ];
-
   const highRisks = allRisks.filter(r => r.probability > 0.7);
   const mediumRisks = allRisks.filter(r => r.probability > 0.4 && r.probability <= 0.7);
   const lowRisks = allRisks.filter(r => r.probability <= 0.4);
-
-  const getRiskColor = (probability: number): string => {
-    if (probability > 0.7) return 'var(--error)';
-    if (probability > 0.4) return 'var(--warning)';
-    return 'var(--success)';
-  };
-
-  return (
-    <div className={dashboardStyles.widget}>
-      <h3>Predictive Forecasts & Risk Analysis</h3>
-      <div className={dashboardStyles.metricsGrid}>
-        <div className={dashboardStyles.metric}>
-          <span>High-Risk Alerts</span>
-          <strong style={{ color: 'var(--error)' }}>{highRisks.length}</strong>
-          <small>probability &gt; 70%</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Medium-Risk Alerts</span>
-          <strong style={{ color: 'var(--warning)' }}>{mediumRisks.length}</strong>
-          <small>probability 40-70%</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Low-Risk Alerts</span>
-          <strong style={{ color: 'var(--success)' }}>{lowRisks.length}</strong>
-          <small>probability &lt; 40%</small>
-        </div>
-        <div className={dashboardStyles.metric}>
-          <span>Next Update</span>
-          <strong>{Math.floor((forecasts.nextUpdateTime.getTime() - Date.now()) / 60000)}m</strong>
-          <small>time to rerun</small>
-        </div>
-      </div>
-
-      {allRisks.length > 0 && (
-        <div className={dashboardStyles.riskList}>
-          <h4>Forecast Summary</h4>
-          {allRisks.slice(0, 5).map((risk, idx) => (
-            <div
-              key={idx}
-              className={dashboardStyles.riskItem}
-              style={{
-                paddingLeft: '0.75rem',
-                borderLeftWidth: '3px',
-                borderLeftStyle: 'solid',
-                borderLeftColor: getRiskColor(risk.probability),
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 500 }}>{risk.name}</span>
-                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                  {(risk.probability * 100).toFixed(0)}%
-                </span>
-              </div>
-              <div style={{ fontSize: '0.72rem', opacity: 0.6, marginTop: '0.2rem' }}>
-                {risk.type} • {risk.timeframe} • Affects {risk.affectedOrgs} org(s)
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  return <div className={dashboardStyles.widget}>
+    <h3>Predictive Forecasts & Risk Analysis</h3>
+    <div className={dashboardStyles.metricsGrid}>
+      <div className={dashboardStyles.metric}><span>High-Risk Alerts</span><strong>{highRisks.length}</strong><small>probability &gt; 70%</small></div>
+      <div className={dashboardStyles.metric}><span>Medium-Risk Alerts</span><strong>{mediumRisks.length}</strong><small>probability 40-70%</small></div>
+      <div className={dashboardStyles.metric}><span>Low-Risk Alerts</span><strong>{lowRisks.length}</strong><small>probability &lt; 40%</small></div>
+      <div className={dashboardStyles.metric}><span>Next Update</span><strong>{Math.floor((forecasts.nextUpdateTime.getTime() - Date.now()) / 60000)}m</strong><small>time to rerun</small></div>
     </div>
-  );
+  </div>;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────
@@ -1043,7 +797,7 @@ export default function PlatformPage() {
               Platform Command Center
             </h1>
             <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-              Real-time platform metrics • Self-healing • Federated learning • Predictive insights
+              Live organization telemetry • Connector sync health • Evidence-backed platform status
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1144,8 +898,8 @@ export default function PlatformPage() {
             <div className={dashboardStyles.metricsGrid}>
               <div className={dashboardStyles.metric}>
                 <span>Status</span>
-                <strong style={{ color: 'var(--success)' }}>🟢 Healthy</strong>
-                <small>all systems nominal</small>
+                <strong style={{ color: platformHealth ? 'var(--success)' : 'var(--warning)' }}>🟢 {platformHealth ? 'Reachable' : 'Unknown'}</strong>
+                <small>API health signal</small>
               </div>
               <div className={dashboardStyles.metric}>
                 <span>Uptime</span>
