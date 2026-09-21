@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   FederatedConfig,
   TrainingRound,
@@ -35,7 +35,9 @@ export class FederatedLearningCoordinatorService {
     private poisoningDetector: PoisoningDetectorService,
     private federatedAveraging: FederatedAveragingService,
     private modelDistributor: ModelDistributorService,
+    @Inject(OrgParticipationService)
     private orgParticipation: OrgParticipationService,
+    @Inject(TransparencyReporterService)
     private transparencyReporter: TransparencyReporterService,
   ) {}
 
@@ -176,7 +178,15 @@ export class FederatedLearningCoordinatorService {
       );
 
       // Step 3: Detect poisoning (Req 3.4)
-      const validationResult = await this.poisoningDetector.detectPoisoningByZScore(privateUpdates);
+      const validationResult =
+        privateUpdates.length < 4
+          ? {
+              cleanUpdates: privateUpdates,
+              poisonedUpdates: [],
+              anomalyScores: new Map<string, number>(),
+              threshold: 2.5,
+            }
+          : await this.poisoningDetector.detectPoisoningByZScore(privateUpdates);
 
       this.logger.log(
         `Poisoning detection: ${validationResult.cleanUpdates.length} clean, ${validationResult.poisonedUpdates.length} poisoned`,
@@ -184,7 +194,7 @@ export class FederatedLearningCoordinatorService {
 
       // Step 4: Aggregate clean updates (Req 3.5)
       const cleanDatasetSizes = validationResult.cleanUpdates.map((_, i) => {
-        const idx = updates.findIndex((u) => u === validationResult.cleanUpdates[i]);
+        const idx = privateUpdates.indexOf(validationResult.cleanUpdates[i]);
         return datasetSizes[idx] || 1;
       });
 
@@ -218,6 +228,7 @@ export class FederatedLearningCoordinatorService {
       privacyBudget.consumedBudget += round.config.privacyBudget;
       privacyBudget.remainingBudget = privacyBudget.totalBudget - privacyBudget.consumedBudget;
       privacyBudget.roundsCompleted += 1;
+      privacyBudget.lastUpdated = new Date();
 
       this.logger.log(`Round ${roundId} aggregated successfully. Model ID: ${globalModel.id}`);
       return globalModel;
@@ -341,7 +352,7 @@ export class FederatedLearningCoordinatorService {
    * @returns Privacy budget
    */
   getPrivacyBudgetStatus(): PrivacyBudget {
-    return this.getOrCreatePrivacyBudget();
+    return { ...this.getOrCreatePrivacyBudget() };
   }
 
   /**

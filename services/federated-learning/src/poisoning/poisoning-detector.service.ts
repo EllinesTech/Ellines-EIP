@@ -26,7 +26,7 @@ export class PoisoningDetectorService {
   ): Promise<ValidationResult> {
     this.logger.debug(`Detecting poisoning with Z-score threshold: ${threshold}`);
 
-    const anomalies = this.computeZScores(updates);
+    const anomalies = this.computeZScores(updates, threshold);
     const cleanUpdates: PrivateUpdate[] = [];
     const poisonedUpdates: PrivateUpdate[] = [];
     const anomalyScores = new Map<string, number>();
@@ -104,20 +104,27 @@ export class PoisoningDetectorService {
    * @param updates Private updates
    * @returns Anomaly metadata for each update
    */
-  private computeZScores(updates: PrivateUpdate[]): AnomalyMetadata[] {
+  private computeZScores(updates: PrivateUpdate[], threshold: number): AnomalyMetadata[] {
     // Calculate gradient magnitudes
     const magnitudes = updates.map((u) => this.computeGradientMagnitude(u.noisyGradients));
 
-    // Calculate mean and standard deviation
-    const mean = magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length;
-    const variance =
-      magnitudes.reduce((sum, m) => sum + (m - mean) ** 2, 0) / magnitudes.length;
-    const stdDev = Math.sqrt(variance);
+    const sorted = [...magnitudes].sort((a, b) => a - b);
+    const midpoint = Math.floor(sorted.length / 2);
+    const median =
+      sorted.length % 2 === 0
+        ? (sorted[midpoint - 1] + sorted[midpoint]) / 2
+        : sorted[midpoint];
+    const deviations = sorted.map((value) => Math.abs(value - median)).sort((a, b) => a - b);
+    const madMidpoint = Math.floor(deviations.length / 2);
+    const mad =
+      deviations.length % 2 === 0
+        ? (deviations[madMidpoint - 1] + deviations[madMidpoint]) / 2
+        : deviations[madMidpoint];
 
     // Compute Z-scores
-    const threshold = 2.5;
     return updates.map((u, i) => {
-      const zScore = stdDev === 0 ? 0 : (magnitudes[i] - mean) / stdDev;
+      const zScore = mad === 0 ? (magnitudes[i] === median ? 0 : Infinity) :
+        (magnitudes[i] - median) / (1.4826 * mad);
       const isOutlier = Math.abs(zScore) > threshold;
 
       return {

@@ -109,7 +109,8 @@ export class DifferentialPrivacyService {
     );
 
     // Create anonymized ID based on round and org, but not revealing specific org details
-    const anonymizedId = this.generateAnonymizedId(update.orgId, update.roundId);
+    const roundId = update.roundId || 'unknown-round';
+    const anonymizedId = this.generateAnonymizedId(update.orgId, roundId);
 
     this.logger.debug(
       `Applied differential privacy to update from ${update.orgId} (noise scale: ${noiseScale})`,
@@ -117,7 +118,7 @@ export class DifferentialPrivacyService {
 
     return {
       anonymizedId,
-      roundId: update.roundId,
+      roundId,
       noisyGradients,
       privacyGuarantee: guarantee,
       isClean: true, // Will be verified by poisoning detector

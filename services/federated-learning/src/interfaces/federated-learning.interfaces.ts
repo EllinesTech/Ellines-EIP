@@ -27,6 +27,7 @@ export interface TrainingRound {
 /** Req 3.2: Model update from organization */
 export interface ModelUpdate {
   orgId: string;
+  roundId?: string;
   gradients: number[][];
   datasetSize: number;
   timestamp: Date;
@@ -35,8 +36,11 @@ export interface ModelUpdate {
 /** Req 3.3: Privacy-guaranteed update after differential privacy */
 export interface PrivateUpdate {
   anonymizedId: string;
+  roundId?: string;
   noisyGradients: number[][];
   privacyGuarantee: PrivacyGuarantee;
+  isClean?: boolean;
+  validationScore?: number;
 }
 
 /** Req 3.3: Privacy guarantee parameters (epsilon, delta) */
@@ -58,10 +62,10 @@ export interface ValidationResult {
 /** Req 3.5: Aggregated global model */
 export interface GlobalModel {
   id: string;
-  roundId: string;
+  roundId?: string;
   version: number;
   aggregatedGradients: number[][];
-  weightedParameters: number[][];
+  weightedParameters?: number[][];
   participantCount: number;
   aggregatedAt: Date;
 }

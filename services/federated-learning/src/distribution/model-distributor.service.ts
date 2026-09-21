@@ -22,15 +22,20 @@ export class ModelDistributorService {
     const distributedTo: string[] = [];
     const failedOrgs: string[] = [];
 
-    for (const orgId of orgIds) {
-      try {
-        await this.sendModelToOrganization(model, orgId);
-        distributedTo.push(orgId);
-        this.logger.debug(`Successfully distributed model to ${orgId}`);
-      } catch (error) {
-        failedOrgs.push(orgId);
-        this.logger.error(`Failed to distribute model to ${orgId}: ${error}`);
-      }
+    const results = await Promise.all(
+      orgIds.map(async (orgId) => {
+        try {
+          await this.sendModelToOrganization(model, orgId);
+          this.logger.debug(`Successfully distributed model to ${orgId}`);
+          return { orgId, ok: true };
+        } catch (error) {
+          this.logger.error(`Failed to distribute model to ${orgId}: ${error}`);
+          return { orgId, ok: false };
+        }
+      }),
+    );
+    for (const result of results) {
+      (result.ok ? distributedTo : failedOrgs).push(result.orgId);
     }
 
     return {
@@ -118,7 +123,7 @@ export class ModelDistributorService {
         sum += val;
       }
     }
-    return Buffer.from(sum.toString()).toString('hex').slice(0, 16);
+    return Buffer.from(sum.toString()).toString('hex').padStart(16, '0').slice(-16);
   }
 
   /**
