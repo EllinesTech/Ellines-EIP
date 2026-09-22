@@ -3,9 +3,9 @@
 **Product:** Ellines EIP — Enterprise Intelligence Platform
 **AI engine:** Ellinea AI · **Parent:** Ellines Tech
 **Document class:** Long-term engineering/product architecture specification (control-plane governing document)
-**Status:** Draft for review — created from a verified repository audit; no implementation changes are included in this change set
-**Baseline:** `main` @ `e9ad41d` ("fix: harden platform admin session access")
-**Branch:** `eip/super-admin-god-mode-master-spec`
+**Status:** Phase 1 reviewed — ready for adoption; no application-code changes are included in this change set
+**Baseline:** `main` @ `87ab44cb661b28c138740e27665323f2db09dce3` ("Merge eip/phase-0-foundation: complete phase 0 repository foundation")
+**Branch:** `eip/phase-1-foundation`
 **Supersedes:** nothing (companion to `docs/00_EIP_MASTER_SPEC.md` and `docs/34_Super_Admin_Dashboard_Spec.md`; where those documents conflict with this one on control-plane matters, this document governs until formally revised)
 **Audience:** Ellines engineers, platform operators, reviewers
 
@@ -54,7 +54,7 @@ Changes to this specification are made via pull request to `main` with a summary
 
 | Version | Date | Status | Summary | Branch / commit |
 |---|---|---|---|---|
-| 0.1.0-draft | 2026-09-22 | Draft for review | Initial draft created from a verified repository audit (gap map G-01..G-24, Phases 0–15, full control-plane specification). Review corrections applied: audit-coverage accuracy (tenant settings and package update/delete audit already exist), C-0 redefined as an access-event class, AI server-side authorization and membership truth moved to early roadmap phases, unified permission grammar, silent-fallback prohibition, data-protection and RPO/RTO requirements, onboarding/slug security, health payload minimization, webhook-test SSRF rules, retention enforcement ownership, notification phase ownership, session-management surface, concurrency/conflict rules, search and window performance/accessibility requirements, z-index tokens, single-page split triggers, Register-Business IA classification, secret-rotation classification, actor-model clarification, contract/parity validation mechanisms, synthetic-org and service-role isolation requirements, and gap-map re-verification against current code. | `eip/super-admin-god-mode-master-spec` (uncommitted working draft; no commit hash assigned yet) |
+| 0.1.0-draft | 2026-09-22 | Draft for review | Initial draft created from a verified repository audit (gap map G-01..G-24, Phases 0–15, full control-plane specification). Review corrections applied: audit-coverage accuracy (tenant settings and package update/delete audit already exist), C-0 redefined as an access-event class, AI server-side authorization and membership truth moved to early roadmap phases, unified permission grammar, silent-fallback prohibition, data-protection and RPO/RTO requirements, onboarding/slug security, health payload minimization, webhook-test SSRF rules, retention enforcement ownership, notification phase ownership, session-management surface, concurrency/conflict rules, search and window performance/accessibility requirements, z-index tokens, single-page split triggers, Register-Business IA classification, secret-rotation classification, actor-model clarification, contract/parity validation mechanisms, synthetic-org and service-role isolation requirements, and gap-map re-verification against current code. | `eip/super-admin-god-mode-master-spec` (source draft) |
 
 Future versions MUST be appended here (version, date, status, summary, branch/commit reference) per the change-control rule in 0.4.
 
@@ -1574,15 +1574,15 @@ Each phase defines: objective, dependencies, major deliverables, tests, acceptan
 - **Dependencies:** none.
 - **Deliverables:** fix G-01 (package payload mismatch), G-02 (password policy parity), G-14 (single platform user-API contract), remove dead duplicate exports in `api.ts` (G-06), remove orphan `platform.module.css` (G-07); **structural contract validation** for the dual-backend split (G-14 follow-up): a machine-checkable contract artifact (shared contract definitions / generated types / API schema) plus contract tests and CI validation, so NestJS↔Pages-Functions drift fails the build instead of being caught in review [PLANNED mechanism — select the lightest option that runs in CI].
 - **Tests:** regression tests for each fix; a contract-drift test wired into CI; `verify:pages-functions` extended for the touched routes.
-- **Acceptance:** package creation works end-to-end from the UI; a 6-char password is rejected everywhere; a 7-char password is accepted everywhere; an intentionally divergent contract change fails CI; `npm run build:web` + `verify:pages-functions` pass.
+- **Acceptance:** package creation works end-to-end from the UI; a 7-char password is rejected everywhere; an 8-char password is accepted everywhere; an intentionally divergent contract change fails CI; `npm run build:web` + `verify:pages-functions` pass.
 - **Completion definition:** all Phase-0 fixes merged with tests; contract-validation mechanism active in CI; gap map rows G-01/02/06/07/14 marked resolved with evidence.
 
 ### PHASE 1 — Master Specification
 - **Objective:** this document reviewed, amended as needed, and adopted as the governing control-plane spec.
 - **Dependencies:** Phase 0 findings incorporated.
-- **Deliverables:** reviewed spec on `main`; Section 40 gap map re-verified; `docs/05_Build_Queue.md` seeded from Phase 2+ deliverables.
-- **Acceptance:** every gap row has an owner phase; no [PLANNED] item is described as existing anywhere in docs.
-- **Completion definition:** spec merged to `main`; queue updated.
+- **Deliverables:** reviewed spec prepared on `eip/phase-1-foundation`; Section 40 gap map re-verified against the Phase-0 baseline; `docs/05_Build_Queue.md` seeded from Phase 2+ deliverables.
+- **Acceptance:** every remaining gap row has an owner phase; Phase-0-resolved gaps are no longer classified as open/confirmed; no [PLANNED] capability is represented as existing.
+- **Completion definition:** reviewed spec and Phase-2+ queue are complete on the phase branch and ready for merge to `main`. Adoption occurs when the branch is merged after verification.
 
 ### PHASE 2 — Platform Control Plane Foundation (identity/membership truth, authorization, AI security, audit, hardening)
 - **Objective:** establish the early foundation that removes live authorization and data-integrity risks BEFORE advanced platform features are built: membership truth → role resolution → scoped permissions (Phase 4) → delegated/elevated operations (Phase 8+).
@@ -1737,11 +1737,7 @@ Status legend: **CONFIRMED** = verified in code during this audit (with referenc
 
 | ID | Gap | Evidence | Phase |
 |---|---|---|---|
-| G-01 | Package create payload mismatch: UI sends `display_name`, backend requires `displayName` → UI package creation fails 400 | `page.tsx` pkg state (`display_name`) vs `platform/packages.ts` line 31 | 0 |
-| G-02 | Password-policy mismatch: auth flows require ≥8 (`login/register/reset/change/accept-invite`), user creation requires ≥6 (`platform/orgs/[id]/users.ts` ×2, `platform/orgs/create.ts`) → platform-created users can fail login | direct code inspection of both files (this review) | 0 |
 | G-05 | Health endpoint hardcoded `status:'ok'`; no DB/dependency probes; unauthenticated payload not yet minimized | `functions/api/v1/health.ts` | 2 |
-| G-06 | Duplicate/dead functions in `api.ts`: `listPlatformOrgUsers`↔`listPlatformOrgUsersDetailed`, `createPlatformOrgUser`↔`createPlatformUser`, `updatePlatformOrgUser`↔`updatePlatformUser`, `deactivatePlatformOrgUser`↔`deactivatePlatformUser`, `updatePlatformFlag`↔`togglePlatformFlag`, `fetchPlatformAudit`↔`listPlatformAuditLogs`, `listAgents`↔`listAgentsApi` (+get/create/update/delete), `compareReports`↔`compareReportsApi`, `runReportApi`↔`runReportFullApi` | `apps/web/src/lib/api.ts` export scan | 0 |
-| G-07 | Orphan `apps/web/src/app/app/platform/platform.module.css` — no imports found in `src` | import scan | 0 |
 | G-08 | Audit UI shallow: only action-prefix + fixed limit 100; backend supports orgId/from/to/offset but UI doesn't expose; no export | `page.tsx` `loadAudit` vs `platform/audit-logs.ts` | 2 |
 | G-09 | Missing package edit/delete UI (API + endpoints + audit all exist: `updatePlatformPackage`/`deletePlatformPackage`, `platform/packages/[id].ts` writes `platform.package.update`/`platform.package.delete` audit rows); missing connector-pack management UI (`createPlatformConnectorPack` unused by UI; no update/publish/delete endpoints). Gap is UI/management completeness, NOT missing backend audit | `api.ts`; `platform/packages/[id].ts`; `platform/connector-packs.ts` | 3 |
 | G-11 | Incomplete feature-flag architecture: hardcoded 6-flag catalog, JSON blob in synthetic platform org settings, no tenant flags/rollout/history | `platform/flags.ts` | 2/31 |
@@ -1751,7 +1747,6 @@ Status legend: **CONFIRMED** = verified in code during this audit (with referenc
 | G-19 | CORS wildcard `access-control-allow-origin: *` on all function responses | `shared/auth.ts` AND `shared/errors.ts` (both verified — this review) | 2 |
 | G-13 | Org creation non-transactional: manual best-effort delete rollback; partial-failure orphans possible | `platform/orgs/create.ts` | 5 |
 | G-15 | Membership dual-track: `organization_memberships` written only by `create-child.ts` and `custom-roles/assign.ts`; register + platform user creation skip it — causes custom roles to silently fail for those users (`checkPermission` reads `organization_memberships.custom_role_id`) | membership write scan; `shared/auth.ts` `checkPermission` | 2 (moved early — precedes scoped operator permissions) |
-| G-14 | Platform user API contract split: web calls `PATCH|DELETE /platform/orgs/:id/users?userId=…` (Pages) while NestJS controller exposes `/users/:userId`; two parallel backends (Pages Functions = production, NestJS identity = service) with diverging contracts | `api.ts` vs `platform.controller.ts` | 0 |
 | G-16 | Missing operator surfaces: Licensing/Entitlements, Usage/Quotas, Incidents/Troubleshooting, Platform Insights, Developer/API Operations, Recovery/Maintenance (nav items 5,6,10,12,15,16 of Section 6) | Section 6 table | 7/9/10/11/12 |
 | G-20 | Org status model limited to active/suspended; no maintenance/archived/deleted; org settings as unstructured JSON | `platform/orgs/[id].ts`; `organizations.settings` | 5 |
 | G-21 | No session revocation; JWT in localStorage; no MFA; no step-up | `shared/auth.ts`; `lib/api.ts` session handling | 8 |
@@ -1763,10 +1758,17 @@ Status legend: **CONFIRMED** = verified in code during this audit (with referenc
 
 | Prior finding | Status |
 |---|---|
+| G-01 package create payload mismatch | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
+| G-02 password-policy parity | Resolved in Phase 0; required policy is ≥8 characters; documentation wording corrected here |
+| G-06 duplicate/dead API exports | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
+| G-07 orphan platform.module.css | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
+| G-14 platform user API contract split | Resolved in Phase 0; structural contract validation included in the Phase-0 completion baseline |
+
+| Prior finding | Status |
+|---|---|
 | Synthetic `generateMockMetrics()` in Command Center | Removed; metrics now live [VERIFIED `platform/metrics.ts`] |
 | Encryption key derived only from org ID; Base64 fallback | v2 master-key AES-256-GCM, fail-closed [VERIFIED `shared/encryption.ts`] |
 | Unavailable telemetry rendered as fake | "Unavailable" states introduced in audit pass [VERIFIED `docs/47`] |
-
 ### 40.4 Technical debt (non-deployed services)
 
 The `services/` tree contains modules flagged in `docs/47` (self-healing random health, failover simulation, NLU mock records) and many services not wired to the Pages runtime (api-gateway, integration-hub, knowledge-graph, federated-learning, predictive-analytics, self-healing, document-generation, email-intelligence, model-orchestrator, mock-idp, autonomous-agents). They are **not** part of the production control plane. Rule: they MUST NOT be presented as live capabilities; each is either (a) scheduled for integration in a later phase, or (b) marked dormant in the repository README. Prisma schema models without runtime usage (e.g., `FederatedLearningRound`, `RemediationPlaybook`) are forward-looking and MUST NOT back any UI claims.
