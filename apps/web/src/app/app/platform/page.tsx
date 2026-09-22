@@ -9,7 +9,7 @@ import {
   listPlatformOrgs, listPlatformPackages, migratePlatformEncryption, updatePlatformFlag,
   updatePlatformOrgDateTimeSettings, updatePlatformOrgStatus, updatePlatformOrgUser,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto,
-  type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage,
+  type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
 } from '@/lib/api';
 import styles from './super-admin.module.css';
 
@@ -32,6 +32,7 @@ export default function PlatformSuperAdminPage(){
  const [allowed,setAllowed]=useState<boolean|null>(null),[section,setSection]=useState<Section>('overview');
  const [orgs,setOrgs]=useState<PlatformOrg[]>([]),[packages,setPackages]=useState<PlatformPackage[]>([]),[flags,setFlags]=useState<FeatureFlag[]>([]),[packs,setPacks]=useState<ConnectorPackDto[]>([]);
  const [health,setHealth]=useState<HealthDto|null>(null),[audit,setAudit]=useState<PlatformAuditRow[]>([]),[selected,setSelected]=useState<PlatformOrg|null>(null);
+ const [metrics,setMetrics]=useState<PlatformMetrics|null>(null);
  const [users,setUsers]=useState<OrgMember[]>([]),[stats,setStats]=useState<any>(null),[tier,setTier]=useState<any>(null),[settings,setSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
  const [query,setQuery]=useState(''),[auditQuery,setAuditQuery]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [business,setBusiness]=useState({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});

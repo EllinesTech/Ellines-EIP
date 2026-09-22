@@ -356,7 +356,7 @@ export type AuditLogDto = {
   id: string;
   action: string;
   resource: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: unknown;
   createdAt: string;
   actorUserId: string | null;
   actorName: string | null;
@@ -1206,7 +1206,7 @@ export interface PlatformAuditRow {
   userFullName: string | null;
   action: string;
   resource: string;
-  metadata: Record<string, unknown> | null;
+  metadata: unknown;
   createdAt: string;
 }
 
@@ -1226,8 +1226,8 @@ export interface CreateOrgResult extends PlatformOrg {
   } | null;
 }
 
-/** List users in any org (platform admin). */
-export function listPlatformOrgUsers(orgId: string) {
+/** List users in any org (platform admin), with full detail (isActive, timestamps). */
+export function listPlatformOrgUsersDetailed(orgId: string) {
   return request<PlatformUserDto[]>(`/api/v1/platform/orgs/${orgId}/users`);
 }
 

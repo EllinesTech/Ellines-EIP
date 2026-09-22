@@ -116,7 +116,7 @@ export class DatabaseSwitcherService {
       type: 'local',
       host: url.hostname,
       port: Number(url.port || 5432),
-      database: decodeURIComponent(url.pathname.replace(/^\\//, '')),
+      database: decodeURIComponent(url.pathname.replace(/^\//, '')),
       username: decodeURIComponent(url.username),
       password: url.password ? decodeURIComponent(url.password) : undefined,
     };

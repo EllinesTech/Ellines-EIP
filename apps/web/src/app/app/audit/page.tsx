@@ -16,13 +16,16 @@ import styles from '../command.module.css';
 import adminStyles from '../admin/admin.module.css';
 
 function summarize(entry: AuditLogDto): string {
-  const meta = entry.metadata || {};
+  const meta = entry.metadata;
   const bits: string[] = [];
-  if (typeof meta.email === 'string') bits.push(meta.email);
-  if (typeof meta.role === 'string') bits.push(`role ${meta.role}`);
-  if (typeof meta.name === 'string') bits.push(meta.name);
-  if (typeof meta.branchId === 'string' && typeof meta.name !== 'string') {
-    bits.push(`branch ${meta.branchId.slice(0, 8)}`);
+  if (typeof meta === 'object' && meta !== null) {
+    const m = meta as Record<string, unknown>;
+    if (typeof m.email === 'string') bits.push(m.email);
+    if (typeof m.role === 'string') bits.push(`role ${m.role}`);
+    if (typeof m.name === 'string') bits.push(m.name);
+    if (typeof m.branchId === 'string' && typeof m.name !== 'string') {
+      bits.push(`branch ${m.branchId.slice(0, 8)}`);
+    }
   }
   if (entry.resource) bits.push(entry.resource);
   return bits.length ? bits.join(' · ') : '—';
