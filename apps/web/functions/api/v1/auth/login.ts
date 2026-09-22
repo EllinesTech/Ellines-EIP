@@ -1,10 +1,12 @@
-import { getAdminClient, json, options, platformAdminFromEnv, signAccessToken, getClientIp, auditRow, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, platformAdminFromEnv, signAccessToken, getClientIp, auditRow, hashToken, type Env } from '../../../shared/auth';
 import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
+import { checkLoginLockout, clearLoginFailures, lockoutResponse, recordLoginFailure } from '../../../shared/lockout';
 import { validateEmail, validatePassword, checkContentLength } from '../../../shared/validation';
 import {
   isOrganizationSuspended,
   isPlatformAdminEmail,
   parsePlatformAdminEmails,
+  ttlToMs,
 } from '@ellines-eip/shared';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -45,6 +47,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 400, message: msg }, 400);
     }
 
+    // Account lockout (spec 24.4.1): 5 failures / 15 min -> 15 min lock, keyed on
+    // the submitted email alone so existing and unknown accounts behave identically.
+    const lockout = await checkLoginLockout(context, email);
+    if (lockout.locked) {
+      return lockoutResponse(lockout.retryAfterMs);
+    }
+
     const supabase = getAdminClient(context.env);
     const bcrypt = await import('bcryptjs');
 
@@ -60,13 +69,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: error.message }, 500);
     }
     if (!user || !user.is_active) {
+      await recordLoginFailure(context, email);
       return json({ statusCode: 401, message: 'Invalid email or password' }, 401);
     }
 
     const valid = await bcrypt.compare(password, user.password_hash as string);
     if (!valid) {
+      await recordLoginFailure(context, email);
       return json({ statusCode: 401, message: 'Invalid email or password' }, 401);
     }
+
+    // Successful authentication resets the lockout failure state (spec 24.4.1).
+    await clearLoginFailures(context, email);
 
     const orgRel = user.organizations as
       | { id: string; name: string; slug: string; settings?: unknown }
@@ -102,6 +116,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       organizationId: user.organization_id as string,
       role: user.role as string,
     });
+
+    // Session-registry groundwork (spec 24.2.3): record the issued token hash so
+    // the session can be revoked (POST /auth/logout). Non-fatal until migration
+    // 0003_phase2_session_registry is applied — login never fails because of it.
+    try {
+      const { error: sessionError } = await supabase.from('sessions').insert({
+        id: crypto.randomUUID(),
+        user_id: user.id as string,
+        organization_id: user.organization_id as string,
+        token_hash: await hashToken(tokens.accessToken),
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + ttlToMs(tokens.expiresIn)).toISOString(),
+      });
+      if (sessionError) {
+        console.warn('[login] session registry write skipped:', sessionError.message);
+      }
+    } catch (err) {
+      console.warn('[login] session registry write skipped:', err);
+    }
 
     return json({
       user: {

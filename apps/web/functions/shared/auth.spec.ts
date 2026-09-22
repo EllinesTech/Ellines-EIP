@@ -7,7 +7,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { checkPermission, requireAuth } from './auth';
+import { canByRole, checkPermission, normalizePermission, requireAuth } from './auth';
+import { matchPermission } from '@ellines-eip/shared';
 import { FakeSupabase } from '../test-support/fake-supabase';
 import {
   ORG_A,
@@ -197,4 +198,82 @@ describe('requireAuth — membership truth with primary-org compatibility', () =
     await expect(checkPermission(TEST_ENV, 'u1', ORG_A, 'owner', 'report:run')).resolves.toBe(false);
   });
 
+});
+
+describe('unified permission grammar (§12.2) — G-15 authorization regression', () => {
+  it('normalizePermission accepts canonical dotted platform grants', () => {
+    expect(normalizePermission('platform.tenants:create')).toBe('platform.tenants:create');
+    expect(normalizePermission('platform.*:read')).toBe('platform.*:read');
+    expect(normalizePermission('connector:*')).toBe('connector:*');
+    expect(normalizePermission('*')).toBe('*');
+  });
+
+  it('normalizePermission fails closed on action-less and partial-wildcard grants (rules 4–5)', () => {
+    expect(normalizePermission('platform.tenants')).toBeNull(); // action-less
+    expect(normalizePermission('platform.*')).toBeNull(); // action-less
+    expect(normalizePermission('platform.ten*:read')).toBeNull(); // partial segment wildcard
+    expect(normalizePermission('connector:')).toBeNull();
+    expect(normalizePermission('')).toBeNull();
+  });
+
+  it('canByRole evaluates dotted platform grants through the shared matcher', () => {
+    expect(
+      canByRole('member', 'platform.tenants:create', undefined, [
+        { permission: 'platform.tenants:create' },
+      ]),
+    ).toBe(true);
+    expect(
+      canByRole('member', 'platform.tenants:read', undefined, [
+        { permission: 'platform.*:read' },
+      ]),
+    ).toBe(true);
+    expect(
+      canByRole('member', 'platform.audit:read', undefined, [
+        { permission: 'platform.*:read' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('rule 6: narrower grants never match broader targets (no implicit prefix matching)', () => {
+    expect(
+      canByRole('member', 'platform.tenants.export:read', undefined, [
+        { permission: 'platform.tenants:read' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('rule 4: invalid grants match nothing (fail closed, never prefix-matched)', () => {
+    expect(
+      canByRole('member', 'platform.tenants:read', undefined, [
+        { permission: 'platform.*' },
+      ]),
+    ).toBe(false);
+    expect(
+      canByRole('member', 'platform.tenants:read', undefined, [
+        { permission: 'platform.tenants' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('keeps fixed-role vocabulary behaviour intact', () => {
+    expect(canByRole('owner', 'platform.tenants:create')).toBe(true); // bare *
+    expect(canByRole('admin', 'connector:install')).toBe(true);
+    expect(canByRole('admin', 'platform.tenants:create')).toBe(false); // not in admin's fixed grants
+    expect(canByRole('viewer', 'connector:install')).toBe(false);
+    expect(canByRole('member', 'org:view')).toBe(true);
+  });
+
+  it('resource-ID scope (§12.3) still applies after the string match', () => {
+    const custom = [{ permission: 'connector:read', resources: ['c1'] }];
+    expect(canByRole('member', 'connector:read', 'c1', custom)).toBe(true);
+    expect(canByRole('member', 'connector:read', 'c99', custom)).toBe(false);
+    expect(canByRole('member', 'connector:read', undefined, custom)).toBe(true);
+  });
+
+  it('the shared matcher (used by both backends) agrees with normalizePermission', () => {
+    expect(matchPermission('platform.*:read', 'platform.tenants:read')).toBe(true);
+    expect(matchPermission('platform.*', 'platform.tenants:read')).toBe(false);
+    expect(matchPermission('connector:*', 'connector:install')).toBe(true);
+    expect(matchPermission('*', 'org:view')).toBe(true);
+  });
 });

@@ -387,3 +387,23 @@ export interface ConnectorPack {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Phase 2: unified permission grammar (§12.2) ───────────────────────────────
+export * from './permissions';
+
+// ─── Phase 2: baseline account-lockout policy (§24.4.1) ────────────────────────
+export * from './lockout';
+
+/**
+ * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.
+ * Used to derive session-registry `expiresAt` from the issued token TTL;
+ * unparseable values fall back to 24h (the repository JWT default).
+ */
+export function ttlToMs(ttl: string | undefined, fallbackMs = 86_400_000): number {
+  const match = /^(\d+)\s*([smhd])$/i.exec((ttl ?? '').trim());
+  if (!match) return fallbackMs;
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const factor = unit === 's' ? 1_000 : unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000;
+  return value * factor;
+}

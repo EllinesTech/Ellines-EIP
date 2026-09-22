@@ -175,3 +175,185 @@ describe('AuthService SSO', () => {
     expect(result.user.email).toBe('owner@example.com');
   });
 });
+
+describe('AuthService login lockout & session registry (24.4.1 / 24.2.3)', () => {
+  const PASSWORD = 'Password123!';
+  let passwordHash: string;
+  let prisma: {
+    user: { findUnique: jest.Mock };
+    auditLog: { create: jest.Mock };
+    session: { create: jest.Mock; updateMany: jest.Mock };
+  };
+  let jwt: { sign: jest.Mock };
+  let config: { get: jest.Mock };
+  let auth: AuthService;
+
+  beforeAll(async () => {
+    const bcrypt = await import('bcryptjs');
+    passwordHash = await bcrypt.hash(PASSWORD, 4);
+  });
+
+  beforeEach(() => {
+    prisma = {
+      user: { findUnique: jest.fn() },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      session: { create: jest.fn().mockResolvedValue({}), updateMany: jest.fn() },
+    };
+    jwt = { sign: jest.fn().mockReturnValue('signed-access-token') };
+    config = { get: jest.fn().mockReturnValue('') };
+    // Fresh instance per test — lockout state is per-service-instance.
+    auth = new AuthService(
+      prisma as unknown as PrismaService,
+      jwt as unknown as JwtService,
+      config as unknown as ConfigService,
+    );
+  });
+
+  function knownUser() {
+    return {
+      id: 'u1',
+      email: 'real@example.com',
+      passwordHash,
+      fullName: 'Real User',
+      organizationId: 'o1',
+      role: 'owner',
+      isActive: true,
+      title: null,
+      bio: null,
+      avatarUrl: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      organization: { id: 'o1', name: 'Org', slug: 'org', settings: {} },
+    };
+  }
+
+  async function statusOf(promise: Promise<unknown>): Promise<number> {
+    try {
+      await promise;
+      return 200;
+    } catch (err) {
+      return (err as { getStatus: () => number }).getStatus();
+    }
+  }
+
+  async function responseOf(promise: Promise<unknown>): Promise<{ status: number; body: unknown }> {
+    try {
+      await promise;
+      return { status: 200, body: null };
+    } catch (err) {
+      const e = err as { getStatus: () => number; getResponse: () => unknown };
+      return { status: e.getStatus(), body: e.getResponse() };
+    }
+  }
+
+  it('locks after 5 failed attempts with a generic 429 (unknown email path)', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(await statusOf(auth.login({ email: 'ghost@example.com', password: PASSWORD }))).toBe(401);
+    }
+    expect(await statusOf(auth.login({ email: 'ghost@example.com', password: PASSWORD }))).toBe(429);
+  });
+
+  it('blocks authentication while locked even with the correct password (known account)', async () => {
+    prisma.user.findUnique.mockResolvedValue(knownUser());
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }))).toBe(401);
+    }
+    // Sixth attempt carries the CORRECT password but must still be rejected.
+    expect(await statusOf(auth.login({ email: 'real@example.com', password: PASSWORD }))).toBe(429);
+    expect(prisma.session.create).not.toHaveBeenCalled();
+  });
+
+  it('produces identical locked responses for known and unknown accounts (anti-enumeration)', async () => {
+    prisma.user.findUnique.mockResolvedValue(knownUser());
+    for (let i = 0; i < 5; i += 1) {
+      await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }));
+    }
+    const knownResponse = await responseOf(auth.login({ email: 'real@example.com', password: PASSWORD }));
+    expect(knownResponse.status).toBe(429);
+
+    // Fresh service instance (fresh lockout state), address that does not exist.
+    const auth2 = new AuthService(
+      prisma as unknown as PrismaService,
+      jwt as unknown as JwtService,
+      config as unknown as ConfigService,
+    );
+    prisma.user.findUnique.mockResolvedValue(null);
+    for (let i = 0; i < 5; i += 1) {
+      await responseOf(auth2.login({ email: 'ghost@example.com', password: PASSWORD }));
+    }
+    const unknownResponse = await responseOf(auth2.login({ email: 'ghost@example.com', password: PASSWORD }));
+    expect(unknownResponse.status).toBe(429);
+
+    expect(knownResponse).toEqual(unknownResponse); // identical status + body
+  });
+  it('clears failure state after successful authentication (24.4.1 reset)', async () => {
+    prisma.user.findUnique.mockResolvedValue(knownUser());
+    for (let i = 0; i < 4; i += 1) {
+      expect(await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }))).toBe(401);
+    }
+    await expect(auth.login({ email: 'real@example.com', password: PASSWORD })).resolves.toHaveProperty(
+      'accessToken',
+      'signed-access-token',
+    );
+
+    // Counter restarted: 4 pre-success + 3 post-success failures would lock (≥5)
+    // if the pre-success count had persisted.
+    expect(await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }))).toBe(401);
+    expect(await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }))).toBe(401);
+    expect(await statusOf(auth.login({ email: 'real@example.com', password: 'WrongPass1!' }))).toBe(401);
+    await expect(auth.login({ email: 'real@example.com', password: PASSWORD })).resolves.toHaveProperty(
+      'accessToken',
+      'signed-access-token',
+    );
+  });
+
+  it('creates a session row hashed from the issued access token (24.2.3)', async () => {
+    prisma.user.findUnique.mockResolvedValue(knownUser());
+    const result = await auth.login({ email: 'real@example.com', password: PASSWORD });
+
+    expect(prisma.session.create).toHaveBeenCalledTimes(1);
+    const data = (prisma.session.create as jest.Mock).mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      userId: 'u1',
+      organizationId: 'o1',
+      tokenHash: auth.hashToken(result.accessToken),
+    });
+    expect(data.expiresAt).toBeInstanceOf(Date);
+    expect(data.expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('login survives session-registry write failures (migration 0003 not yet applied)', async () => {
+    prisma.user.findUnique.mockResolvedValue(knownUser());
+    prisma.session.create.mockRejectedValue(new Error('relation "sessions" does not exist'));
+
+    await expect(auth.login({ email: 'real@example.com', password: PASSWORD })).resolves.toHaveProperty(
+      'accessToken',
+      'signed-access-token',
+    );
+  });
+
+  it('revocation primitives update the registry by token hash / user id', async () => {
+    prisma.session.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(auth.revokeSessionByToken('raw.jwt')).resolves.toBe(true);
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { tokenHash: auth.hashToken('raw.jwt'), revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+
+    await expect(auth.revokeUserSessions('u1')).resolves.toBe(1);
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it('revocation primitives degrade gracefully while the registry is unavailable', async () => {
+    prisma.session.updateMany.mockRejectedValue(new Error('relation "sessions" does not exist'));
+    await expect(auth.revokeSessionByToken('raw.jwt')).resolves.toBe(false);
+    await expect(auth.revokeUserSessions('u1')).resolves.toBe(0);
+  });
+});

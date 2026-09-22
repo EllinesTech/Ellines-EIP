@@ -73,6 +73,17 @@ jobs:
         run: npm run test:coverage -w @ellines-eip/identity
         continue-on-error: false
 
+      # Phase 2 tenant-isolation release gate — apps/web Pages Functions suites.
+      # isolation.spec.ts runs inside this suite AND again explicitly below; a
+      # failure in either step fails the job (no continue-on-error: true).
+      - name: Test @ellines-eip/web (Pages Functions suites)
+        run: npm run test -w @ellines-eip/web
+        continue-on-error: false
+
+      - name: Tenant isolation gate (isolation.spec.ts must run)
+        run: npm run test -w @ellines-eip/web -- --testPathPattern=isolation.spec.ts --runInBand
+        continue-on-error: false
+
       # Upload shared coverage
       - name: Upload shared coverage report
         uses: actions/upload-artifact@v4

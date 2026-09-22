@@ -3,12 +3,13 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-import { isPlatformAdminEmail, isOrganizationSuspended, parsePlatformAdminEmails } from '@ellines-eip/shared';
+import { isPlatformAdminEmail, isOrganizationSuspended, parsePlatformAdminEmails, ttlToMs } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -17,6 +18,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SsoRequestDto } from './dto/sso-request.dto';
 import { SsoVerifyDto } from './dto/sso-verify.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AccountLockout } from './account-lockout';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const SSO_TOKEN_TTL = '15m';
@@ -29,6 +31,12 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Baseline account-lockout state (spec 24.4.1) — thresholds come from the
+   * canonical shared policy, storage is in-memory (single-instance legacy backend).
+   */
+  private readonly lockout = new AccountLockout();
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -91,19 +99,36 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const email = dto.email.toLowerCase();
+
+    // Baseline account lockout (spec 24.4.1): 5 failed attempts inside 15 min →
+    // 15 min lock. Checked BEFORE any user lookup so a locked unknown address
+    // behaves exactly like a locked real one — no enumeration oracle (24.3).
+    if (this.lockout.isLocked(email)) {
+      throw new HttpException(
+        'Too many failed login attempts. Try again later.',
+        429,
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email },
       include: { organization: true },
     });
 
     if (!user || !user.isActive) {
+      this.lockout.recordFailure(email); // unknown addresses count too (24.3)
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
+      this.lockout.recordFailure(email);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Successful authentication resets failure state (spec 24.4.1 reset semantics).
+    this.lockout.clear(email);
 
     const allowlist = parsePlatformAdminEmails(
       this.config.get<string>('PLATFORM_ADMIN_EMAILS'),
@@ -127,6 +152,24 @@ export class AuthService {
     });
 
     const tokens = this.signTokens(user.id, user.email, user.organizationId, user.role);
+
+    // Session-registry groundwork (spec 24.2.3): associate the issued token with
+    // a session row for revocation. Non-fatal until migration
+    // 0003_phase2_session_registry is applied (never blocks authentication).
+    try {
+      await this.prisma.session.create({
+        data: {
+          userId: user.id,
+          organizationId: user.organizationId,
+          tokenHash: this.hashToken(tokens.accessToken),
+          expiresAt: new Date(Date.now() + ttlToMs(tokens.expiresIn)),
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[auth] session registry write skipped: ${(err as Error).message}`,
+      );
+    }
 
     return {
       user: this.sanitizeUser(user),
@@ -426,6 +469,43 @@ export class AuthService {
 
   hashToken(rawToken: string): string {
     return createHash('sha256').update(rawToken).digest('hex');
+  }
+
+  // ─── Session registry revocation foundation (spec 24.2.3, Phase 2) ────────────
+
+  /**
+   * Revoke the active session for a raw bearer token (hashed here).
+   * Returns true when a live session row was revoked. Non-fatal before
+   * migration 0003_phase2_session_registry is applied (returns false).
+   */
+  async revokeSessionByToken(rawToken: string): Promise<boolean> {
+    try {
+      const result = await this.prisma.session.updateMany({
+        where: { tokenHash: this.hashToken(rawToken), revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return result.count > 0;
+    } catch (err) {
+      console.warn(`[auth] revokeSessionByToken skipped: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Revoke every active session for a user — foundation for forced sign-out.
+   * Returns the number of rows revoked (0 when the registry is unavailable).
+   */
+  async revokeUserSessions(userId: string): Promise<number> {
+    try {
+      const result = await this.prisma.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return result.count;
+    } catch (err) {
+      console.warn(`[auth] revokeUserSessions skipped: ${(err as Error).message}`);
+      return 0;
+    }
   }
 
   private signTokens(userId: string, email: string, organizationId: string, role: string) {

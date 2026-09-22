@@ -66,6 +66,7 @@ model Organization {
   resilientConnections   ResilientConnection[]   // v2.0: Resilient Connection Manager
   generatedConnectors    GeneratedConnector[]    // v2.0: Auto-generated connectors
   approvalWorkflows      ApprovalWorkflowRequest[] // v2.0: Generated connector approvals
+  sessions               Session[]           // Phase 2: session registry (spec 24.2.3)
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -119,6 +120,7 @@ model User {
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  sessions             Session[]           // Phase 2: session registry (spec 24.2.3)
   memberships         OrganizationMembership[]
   ssoProviderUsers    SsoProviderUser[]
   apiUsage            ApiUsage[]              // B.3.2: API usage tracking
@@ -2189,4 +2191,28 @@ model ConnectionFailoverEvent {
   @@index([connectionId])
   @@index([occurredAt])
   @@map("connection_failover_events")
+}
+
+// ─── Phase 2 — Session registry groundwork (spec 24.2.3) ───────────────────────
+/**
+ * One row per issued access token (JWT stays the credential). The registry
+ * associates tokens with their issuer and supports revocation from Phase 2 on;
+ * operator session listing/surface is Phase 8. `tokenHash` is SHA-256 hex of the
+ * raw JWT — the same hash the Pages Functions auth layer computes (shared/auth.ts).
+ */
+model Session {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  organizationId String    @map("organization_id")
+  tokenHash      String    @unique @map("token_hash")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  expiresAt      DateTime  @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }

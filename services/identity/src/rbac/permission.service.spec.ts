@@ -176,3 +176,32 @@ describe('PermissionService.resolvePermissions — D.1.3 child-org inheritance',
     expect(svc.evaluate(perms, { userId: 'u1', organizationId: 'o1', permission: 'org:manage_members' })).toBe(false);
   });
 });
+
+describe('PermissionService.evaluate — unified §12.2 grammar (shared evaluator)', () => {
+  const svc = new PermissionService({} as PrismaService);
+  const ctx = (permission: string) => ({ userId: 'u1', organizationId: 'o1', permission });
+
+  it('grants canonical dotted platform permissions', () => {
+    expect(svc.evaluate([{ permission: 'platform.tenants:create' }], ctx('platform.tenants:create'))).toBe(true);
+  });
+
+  it('rule 3: resource wildcard matches any resource inside the domain', () => {
+    expect(svc.evaluate([{ permission: 'platform.*:read' }], ctx('platform.tenants:read'))).toBe(true);
+    expect(svc.evaluate([{ permission: 'platform.*:read' }], ctx('platform.audit:read'))).toBe(true);
+  });
+
+  it('rule 6: no implicit prefix matching', () => {
+    expect(svc.evaluate([{ permission: 'platform.tenants:read' }], ctx('platform.tenants.export:read'))).toBe(false);
+  });
+
+  it('rules 4–5: action-less grants and partial wildcards fail closed', () => {
+    expect(svc.evaluate([{ permission: 'platform.*' }], ctx('platform.tenants:read'))).toBe(false);
+    expect(svc.evaluate([{ permission: 'platform.ten*' }], ctx('platform.tenants:read'))).toBe(false);
+    expect(svc.evaluate([{ permission: 'connector:*' }], ctx('platform.tenants:read'))).toBe(false);
+    expect(svc.evaluate([{ permission: 'platform.tenants' }], ctx('platform.tenants:read'))).toBe(false);
+  });
+
+  it('rule 1: bare * still grants everything (Platform Owner)', () => {
+    expect(svc.evaluate([{ permission: '*' }], ctx('platform.tenants:create'))).toBe(true);
+  });
+});

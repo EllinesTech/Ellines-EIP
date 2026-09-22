@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
+import { matchPermission } from '@ellines-eip/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** A single permission entry stored in CustomRole.permissions JSON array */
@@ -99,23 +100,24 @@ export class PermissionService {
     }
   }
 
-  /** Core evaluation logic — pure function, easy to unit-test */
+  /**
+   * Core evaluation logic — pure function, easy to unit-test.
+   *
+   * String matching is the ONE canonical §12.2 matcher from `@ellines-eip/shared`
+   * — the exact same evaluator the Pages Functions auth layer uses. Invalid grants
+   * and invalid targets fail closed inside `matchPermission` and are never
+   * prefix-matched (rules 4–6). Resource scope (§12.3) and ABAC attributes remain
+   * entry-level checks applied after the string match succeeds.
+   */
   evaluate(entries: PermissionEntry[], ctx: EvaluationContext): boolean {
-    const target = ctx.permission.toLowerCase();
-
     for (const entry of entries) {
       const entryPerm = entry.permission.toLowerCase();
 
-      // Wildcard '*' grants everything
+      // Wildcard '*' grants everything (spec rule 1 — evaluated before scope/ABAC)
       if (entryPerm === '*') return true;
 
-      // Prefix wildcard e.g. 'connector:*' matches 'connector:install'
-      if (entryPerm.endsWith(':*')) {
-        const prefix = entryPerm.slice(0, -1); // 'connector:'
-        if (!target.startsWith(prefix)) continue;
-      } else if (entryPerm !== target) {
-        continue;
-      }
+      // Canonical grammar match (exact / action wildcard / resource wildcard).
+      if (!matchPermission(entry.permission, ctx.permission)) continue;
 
       // Permission verb matches — now check resource scope
       if (

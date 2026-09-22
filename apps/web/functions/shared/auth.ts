@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { matchPermission, normalizePermission as canonicalNormalizePermission, isValidPermission as canonicalIsValidPermission } from '@ellines-eip/shared';
 
 export type UserRole = 'owner' | 'admin' | 'executive' | 'manager' | 'member' | 'viewer';
 
@@ -140,6 +141,21 @@ export async function requireAuth(
   try {
     const claims = await verifyAccessToken(env, token);
     const supabase = getAdminClient(env);
+
+    // Session-registry revocation check (spec 24.2.3 groundwork): reject tokens
+    // whose session row is revoked. Tokens issued before the registry have no row
+    // and stay valid; if the sessions table does not exist yet (migration 0003
+    // unapplied) we warn and continue — same transitional treatment as the
+    // membership fallback below. The signature check above always still applies.
+    const sessionHash = await hashToken(token);
+    const { data: session, error: sessionError } = await supabase.from('sessions')
+      .select('revoked_at').eq('token_hash', sessionHash).maybeSingle();
+    if (sessionError) {
+      console.warn('[requireAuth] session-registry lookup unavailable:', sessionError.message);
+    } else if (session?.revoked_at) {
+      return json({ statusCode: 401, message: 'Session has been revoked' }, 401);
+    }
+
     const { data: user, error: userError } = await supabase.from('users')
       .select('id, email, is_active, organization_id, role').eq('id', claims.sub).maybeSingle();
     if (userError || !user || !user.is_active) return json({ statusCode: 401, message: 'Unauthorized' }, 401);
@@ -320,15 +336,16 @@ export interface PermissionEntry {
   attributes?: Record<string, string | number | boolean>;
 }
 
-/** Canonical permission grammar: namespace:action, namespace wildcard, or global wildcard. */
+/**
+ * Canonical §12.2 permission grammar — ONE implementation shared with the NestJS
+ * evaluator (`services/identity/src/rbac/permission.service.ts`) via
+ * `@ellines-eip/shared`. Invalid grants normalize to `null` and fail closed.
+ */
 export function normalizePermission(permission: string): string | null {
-  const value = permission.trim().toLowerCase();
-  if (value === '*') return value;
-  if (!/^[a-z][a-z0-9_-]*:(?:[a-z][a-z0-9_-]*|\*)$/.test(value)) return null;
-  return value;
+  return canonicalNormalizePermission(permission);
 }
 export function isValidPermission(permission: string): boolean {
-  return normalizePermission(permission) !== null;
+  return canonicalIsValidPermission(permission);
 }
 
 /** Default permissions for each fixed role — mirrors PermissionService in NestJS identity. */
@@ -341,19 +358,18 @@ const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
   viewer:    ['org:view', 'connector:read', 'report:view', 'document:view', 'notification:view'],
 };
 
-/** Evaluate a single permission entry against the requested permission + optional resourceId. */
+/**
+ * Evaluate a single permission entry against the requested permission + optional resourceId.
+ * String matching delegates to the canonical `matchPermission` evaluator (§12.2 rules 1–6,
+ * fail-closed on invalid grants/targets); resource-ID scope (§12.3) is applied here.
+ */
 function evalEntry(entry: PermissionEntry | string, permission: string, resourceId?: string): boolean {
   const perm = typeof entry === 'string' ? entry : entry.permission;
   const lowerPerm = normalizePermission(perm);
-  const lowerTarget = normalizePermission(permission);
-  if (!lowerPerm || !lowerTarget) return false;
+  if (!lowerPerm) return false;
 
   if (lowerPerm === '*') return true;
-  if (lowerPerm.endsWith(':*')) {
-    if (!lowerTarget.startsWith(lowerPerm.slice(0, -1))) return false;
-  } else if (lowerPerm !== lowerTarget) {
-    return false;
-  }
+  if (!matchPermission(perm, permission)) return false;
 
   if (typeof entry !== 'string' && resourceId && entry.resources?.length) {
     if (!entry.resources.includes(resourceId)) return false;
