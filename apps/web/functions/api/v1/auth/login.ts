@@ -1,4 +1,4 @@
-import { getAdminClient, json, options, signAccessToken, getClientIp, auditRow, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, platformAdminFromEnv, signAccessToken, getClientIp, auditRow, type Env } from '../../../shared/auth';
 import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
 import { validateEmail, validatePassword, checkContentLength } from '../../../shared/validation';
 import {
@@ -120,6 +120,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         slug: org.slug,
       },
       ...tokens,
+      isPlatformAdmin: platformAdminFromEnv(context.env, user.email as string),
     });
   } catch (err) {
     // Handle payload size errors with 413 status

@@ -6,7 +6,7 @@ import {
   createPlatformPackage, fetchHealth, fetchPlatformOrgDateTimeSettings,
   fetchPlatformMetrics, fetchPlatformOrgPackage, fetchPlatformOrgStats, getSession, listPlatformAuditLogs,
   listPlatformConnectorPacks, listPlatformFlags, listPlatformOrgUsers,
-  listPlatformOrgs, listPlatformPackages, migratePlatformEncryption, updatePlatformFlag,
+  listPlatformOrgs, listPlatformPackages, migratePlatformEncryption, refreshSessionFlags, updatePlatformFlag,
   updatePlatformOrgDateTimeSettings, updatePlatformOrgStatus, updatePlatformOrgUser,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto,
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
@@ -41,7 +41,7 @@ export default function PlatformSuperAdminPage(){
  const [aiQ,setAiQ]=useState(''),[aiA,setAiA]=useState(''),[aiBusy,setAiBusy]=useState(false);
 
  const load=useCallback(async()=>{try{const[o,p,f,h,cp,m]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics()]);setOrgs(o);setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m)}catch(e){setError(e instanceof Error?e.message:'Failed to load platform data')}},[]);
- useEffect(()=>{const s=getSession();setAllowed(Boolean(s?.isPlatformAdmin));if(s?.isPlatformAdmin)void load()},[load]);
+  useEffect(()=>{let live=true;const decide=(s:ReturnType<typeof getSession>)=>{if(!live)return;setAllowed(Boolean(s?.isPlatformAdmin));if(s?.isPlatformAdmin)void load()};const cached=getSession();if(cached?.isPlatformAdmin){decide(cached);return()=>{live=false}}void refreshSessionFlags().then(decide).catch(()=>decide(getSession()));return()=>{live=false}},[load]);
  useEffect(()=>{if(!allowed)return;const t=setInterval(()=>{void fetchHealth().then(setHealth);void fetchPlatformMetrics().then(setMetrics)},30000);return()=>clearInterval(t)},[allowed]);
 
  async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}}
