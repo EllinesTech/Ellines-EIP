@@ -26,6 +26,7 @@ export interface Env {
   EIP_ENCRYPTION_MASTER_KEY?: string;
   /** Comma-separated Ellines operator emails (platform Super Admin). */
   PLATFORM_ADMIN_EMAILS?: string;
+  CORS_ALLOWED_ORIGINS?: string;
   /** Optional OpenAI-compatible key for Ellinea Ask (4.10). */
   ELLINEA_LLM_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -74,10 +75,6 @@ export function json(data: unknown, status = 200, extraHeaders?: Record<string, 
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'access-control-allow-origin': '*',
-      'access-control-allow-headers':
-        'Content-Type, Authorization, X-EIP-Organization-Id, X-EIP-Webhook-Secret',
-      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       ...extraHeaders,
     },
   });
@@ -142,12 +139,17 @@ export async function requireAuth(
   }
   try {
     const claims = await verifyAccessToken(env, token);
-    // Capture IP from Cloudflare header for audit logs
-    const ip =
-      request.headers.get('cf-connecting-ip') ||
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      '';
-    return { ...claims, ip };
+    const supabase = getAdminClient(env);
+    const { data: user, error: userError } = await supabase.from('users')
+      .select('id, email, is_active').eq('id', claims.sub).maybeSingle();
+    if (userError || !user || !user.is_active) return json({ statusCode: 401, message: 'Unauthorized' }, 401);
+    const { data: membership, error: membershipError } = await supabase.from('organization_memberships')
+      .select('organization_id, role, is_active')
+      .eq('user_id', claims.sub).eq('organization_id', claims.organizationId).maybeSingle();
+    if (membershipError || !membership || !membership.is_active) {
+      return json({ statusCode: 401, message: 'Organization membership is inactive or missing' }, 401);
+    }
+    return { sub: claims.sub, email: user.email, organizationId: membership.organization_id, role: membership.role as string, ip: getClientIp(request) };
   } catch {
     return json({ statusCode: 401, message: 'Unauthorized' }, 401);
   }
@@ -301,6 +303,17 @@ export interface PermissionEntry {
   attributes?: Record<string, string | number | boolean>;
 }
 
+/** Canonical permission grammar: namespace:action, namespace wildcard, or global wildcard. */
+export function normalizePermission(permission: string): string | null {
+  const value = permission.trim().toLowerCase();
+  if (value === '*') return value;
+  if (!/^[a-z][a-z0-9_-]*:(?:[a-z][a-z0-9_-]*|\*)$/.test(value)) return null;
+  return value;
+}
+export function isValidPermission(permission: string): boolean {
+  return normalizePermission(permission) !== null;
+}
+
 /** Default permissions for each fixed role — mirrors PermissionService in NestJS identity. */
 const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
   owner:     ['*'],
@@ -314,8 +327,9 @@ const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
 /** Evaluate a single permission entry against the requested permission + optional resourceId. */
 function evalEntry(entry: PermissionEntry | string, permission: string, resourceId?: string): boolean {
   const perm = typeof entry === 'string' ? entry : entry.permission;
-  const lowerPerm = perm.toLowerCase();
-  const lowerTarget = permission.toLowerCase();
+  const lowerPerm = normalizePermission(perm);
+  const lowerTarget = normalizePermission(permission);
+  if (!lowerPerm || !lowerTarget) return false;
 
   if (lowerPerm === '*') return true;
   if (lowerPerm.endsWith(':*')) {
@@ -360,34 +374,20 @@ export async function checkPermission(
   permission: string,
   resourceId?: string,
 ): Promise<boolean> {
-  // Owner always passes — fast path
-  if (role === 'owner') return true;
-
-  // Check if user has a custom role in this org
   const supabase = getAdminClient(env);
-  const { data: membership } = await supabase
-    .from('organization_memberships')
-    .select('custom_role_id')
-    .eq('user_id', userId)
-    .eq('organization_id', organizationId)
-    .maybeSingle();
-
-  if (membership?.custom_role_id) {
-    const { data: customRole } = await supabase
-      .from('custom_roles')
-      .select('permissions')
-      .eq('id', membership.custom_role_id)
-      .eq('is_active', true)
-      .maybeSingle();
-
+  const { data: membership } = await supabase.from('organization_memberships')
+    .select('role, custom_role_id, is_active')
+    .eq('user_id', userId).eq('organization_id', organizationId).maybeSingle();
+  if (!membership || !membership.is_active) return false;
+  if (membership.custom_role_id) {
+    const { data: customRole } = await supabase.from('custom_roles')
+      .select('permissions').eq('id', membership.custom_role_id).eq('is_active', true).maybeSingle();
     if (customRole?.permissions) {
       const perms = customRole.permissions as PermissionEntry[];
       return perms.some((e) => evalEntry(e, permission, resourceId));
     }
   }
-
-  // Fall back to fixed role
-  return canByRole(role, permission, resourceId);
+  return canByRole(membership.role as string, permission, resourceId);
 }
 
 /** Return a 403 Response or null if allowed. Cheap role-only check — no DB. */
