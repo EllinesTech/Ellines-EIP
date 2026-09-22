@@ -80,10 +80,6 @@ export function json(
     status: (typeof body.statusCode === 'number' ? body.statusCode : undefined) || status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'access-control-allow-origin': '*',
-      'access-control-allow-headers':
-        'Content-Type, Authorization, X-EIP-Organization-Id, X-EIP-Webhook-Secret',
-      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     },
   });
 }
