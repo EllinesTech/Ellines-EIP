@@ -4,6 +4,8 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  auditRow,
+  getClientIp,
   type Env,
 } from '../../../shared/auth';
 import { redactConfig, toPackDto, type InstallConfig } from '../../../shared/connectors';
@@ -102,6 +104,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         400,
       );
     }
+    await supabase.from('audit_logs').insert(auditRow({
+      organizationId: auth.organizationId, userId: auth.sub,
+      action: 'platform.connector_pack.create', resource: 'connector_pack',
+      metadata: {
+        correlationId: crypto.randomUUID(),
+        reason: 'connector pack creation', before: null,
+        after: { id: data.id, slug, name: body.name.trim(), catalogId, published: body.published !== false },
+        result: 'success',
+      }, ip: getClientIp(context.request),
+    }));
     return json(toPackDto(data as Record<string, unknown>));
   }
 
