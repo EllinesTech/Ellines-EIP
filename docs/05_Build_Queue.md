@@ -1,55 +1,39 @@
-# Ellines EIP — Build Queue (Agent Worklist)
+# Ellines EIP — Build Queue
 
-**Product:** Ellines EIP v1.0 Foundation
-**Authoritative scope:** [02_MVP_Scope_v1.0.md](./02_MVP_Scope_v1.0.md)
+**Product:** Ellines EIP v1.0 Foundation / Super Admin Control Plane
+**Authoritative scope:** docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md
 **Status key:** `done` · `in_progress` · `next` · `blocked` · `todo`
 
-Cloud Agents and Automations **must pick the first `next` item** (or continue an `in_progress` item), implement it, update status in this file, **verify → build → push `main` (deploy)**, then **immediately start the next `next` item**. Do not stop to ask the human between items.
+This queue is seeded from the Master Specification Phase 2–15 roadmap. Work proceeds in order; no phase is skipped. The active phase is completed, verified, built, and reviewed before the next phase begins.
 
-### Continuous agent loop (mandatory)
+## Phase Queue
 
-```
-while queue has next/in_progress and not blocked:
-  1. Implement the item (one scoped slice)
-  2. Update this file (mark done; set following item to next)
-  3. npm run verify:pages-functions   # if Functions touched
-  4. npm run build:shared             # if shared touched
-  5. npm run build -w @ellines-eip/web
-  6. identity build if identity touched
-  7. git commit + git push origin main   # Pages deploys from Actions
-  8. Start step 1 on the new next item — DO NOT ASK
-```
+| ID | Phase | Scope | Status |
+|---|---|---|---|
+| P2 | Phase 2 — Platform Control Plane Foundation | Membership truth, AI server-side authorization/grounding, auth hardening, audit contract, permission grammar, tenant-isolation gate, health/CORS/audit UI fixes | next |
+| P3 | Phase 3 — Super Admin / God Mode Core | Safeguard engine, confirmation/reason capture, privileged-operation audit fields, package/connector-pack management, window-layer groundwork | todo |
+| P4 | Phase 4 — Internal Ellines Operations | DB-backed platform staff/roles/grants, scoped authorization, expiry, bootstrap | todo |
+| P5 | Phase 5 — Business / Tenant Governance | Transactional onboarding, lifecycle states, deletion/retention, search, concurrency controls | todo |
+| P6 | Phase 6 — Connector Platform | Pack lifecycle, credential rotation, sync history, retries, SoT declarations, diagnostics | todo |
+| P7 | Phase 7 — Licensing / Usage / Entitlements | Entitlements, trials, quotas, overrides, usage statements, licensing/quota notifications | todo |
+| P8 | Phase 8 — Security / Audit / Compliance | MFA, sessions/revocation, step-up, dual approval, security events, audit export, headers | todo |
+| P9 | Phase 9 — Health / Incidents / Operations | Incidents, alert rules, jobs/queues, dead-letter handling, maintenance windows | todo |
+| P10 | Phase 10 — Platform Intelligence / AI | AI audit/cost/quotas, model/prompt registry, insights rollups, evidence-linked AI | todo |
+| P11 | Phase 11 — Developer / API Operations | API catalog/drift checks, endpoint telemetry, service accounts, webhook analytics, sandbox | todo |
+| P12 | Phase 12 — Recovery / Maintenance | Platform maintenance, migrations, backup visibility, restore/repair, replay, cache invalidation | todo |
+| P13 | Phase 13 — Business Owner Dashboard | Governed tenant owner dashboard using existing capabilities | todo |
+| P14 | Phase 14 — Specialized Dashboards | Finance, HR, Operations, Support, Integration, AI, Developer dashboards under governance | todo |
+| P15 | Phase 15 — Full Platform Validation | End-to-end acceptance, isolation sweep, performance/security validation, documentation reconciliation | todo |
 
-**Stop only if:** item is `blocked`, secrets missing, or a build you cannot fix after a genuine attempt. Never pause for "should I continue?" — the answer is always yes until blocked.
+## Phase 2 acceptance gate
 
-Completed items are removed from this file once shipped (kept in git history / commit log, not duplicated here). v1.0, v1.1 multi-company, and the Track A–E parallel tracks (Connectors, BI Dashboards, Autonomous Workflows, Advanced RBAC, OAuth2/SAML SSO) are all **100% complete and live** at [eip.ellines.co.ke](https://eip.ellines.co.ke).
+Phase 2 cannot be marked done until its Master Specification completion definition is satisfied: G-05/G-08/G-12/G-15/G-19 resolved; G-17 core authorization/grounding/rate-limit fixes resolved; membership truth unified; audit contract enforced by tests; tenant-isolation suite green and merge-gating.
 
-For the v2.0 backlog (native mobile, multi-region, governance/ABAC UI, infra scaling), see [18_v2.0_Build_Queue.md](./18_v2.0_Build_Queue.md).
+## Queue rules
 
----
-
-## Remaining work
-
-| ID | Item | Status | Notes |
-|----|------|--------|-------|
-| E.9 | Testing: Mock IdP + real Azure AD / Okta / ADFS | `blocked` | Mock IdP server for local testing is ready and passing. Real external IdP testing needs actual Azure AD / Okta / ADFS test tenants and credentials — out of agent scope; needs a human to provision test tenants. |
-
-Nothing else is outstanding in v1.0 scope.
-
----
-
-## Agent run protocol
-
-1. Read `AGENTS.md` and this queue (especially **Continuous agent loop**).
-2. Take the highest-priority `next` (or continue `in_progress`).
-3. Implement + verify + build.
-4. Update this file; set the following item to `next`.
-5. Commit and push `main` (Pages deploys). Never force-push. Never commit secrets.
-6. **Immediately** go to step 2 for the next item — do not ask the human.
-7. Stop only when blocked or the queue has no `next` / `in_progress`.
-8. Humans: `git pull origin main` to match what shipped.
-
-Automation prompt: [06_Automation_Prompt.md](./06_Automation_Prompt.md)
-Demo login: [07_Demo_Login.md](./07_Demo_Login.md)
-Live Identity: [08_Live_Identity_Setup.md](./08_Live_Identity_Setup.md)
-Access layers: [09_Access_Layers.md](./09_Access_Layers.md)
+1. Work only the current `next` phase.
+2. Do not implement later-phase features early unless the Master Specification explicitly makes them a dependency.
+3. A phase must pass its documented tests, acceptance criteria, and completion definition before its status changes to `done`.
+4. Never represent `[PLANNED]` capabilities as live or implemented.
+5. Keep `/app/platform` as the single Super Admin control-plane architecture; do not create a competing `/app/super-admin` surface.
+6. Before merge to `main`, verify the phase branch against `main`, run the applicable tests/builds, and review the diff.
