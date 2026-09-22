@@ -4,6 +4,8 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  auditRow,
+  getClientIp,
   type Env,
 } from '../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
@@ -132,14 +134,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         | { key: string; enabled: boolean }[];
 
       const updates = Array.isArray(body) ? body : [body];
-      const flags = await getFlags(context.env);
-
+      const before = await getFlags(context.env);
+      const flags = before.map((flag) => ({ ...flag }));
       for (const update of updates) {
         const flag = flags.find((f) => f.key === update.key);
-        if (flag) flag.enabled = update.enabled;
+        if (flag && typeof update.enabled === 'boolean') flag.enabled = update.enabled;
       }
-
       await saveFlags(context.env, flags);
+      const changed = flags.filter((flag) => before.find((b) => b.key === flag.key)?.enabled !== flag.enabled);
+      if (changed.length) {
+        await getAdminClient(context.env).from('audit_logs').insert(auditRow({
+          organizationId: auth.organizationId, userId: auth.sub,
+          action: 'platform.feature_flag.update', resource: 'feature_flag',
+          metadata: {
+            correlationId: crypto.randomUUID(),
+            reason: 'platform feature flag change',
+            before: before.filter((b) => changed.some((c) => c.key === b.key)),
+            after: changed, result: 'success',
+          }, ip: getClientIp(context.request),
+        }));
+      }
       return json({ statusCode: 200, data: flags });
     } catch (err) {
       return json({ statusCode: 400, message: 'Invalid request body' }, 400);
