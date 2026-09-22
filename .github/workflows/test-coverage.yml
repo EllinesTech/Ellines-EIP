@@ -2,7 +2,7 @@ name: Test Coverage
 
 on:
   push:
-    branches: [main, "agent/**"]
+    branches: [main, "agent/**", "eip/**"]
   pull_request:
     branches: [main]
 

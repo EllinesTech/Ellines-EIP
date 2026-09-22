@@ -87,10 +87,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Encrypt password and Supabase key
     const encryptedPassword = password 
-      ? await encrypt(password, auth.organizationId) 
+      ? await encrypt(password, auth.organizationId, context.env) 
       : null;
     const encryptedSupabaseKey = supabaseKey 
-      ? await encrypt(supabaseKey, auth.organizationId) 
+      ? await encrypt(supabaseKey, auth.organizationId, context.env) 
       : null;
 
     // Create config

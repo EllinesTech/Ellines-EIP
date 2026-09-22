@@ -56,33 +56,8 @@ const DEFAULT_FLAGS: FeatureFlag[] = [
 
 const FLAGS_KEY = 'platform_feature_flags';
 
-async function getFlags(env: Env): Promise<FeatureFlag[]> {
-  // Stored in Supabase under a special "platform" org record or as a top-level KV
-  // For simplicity: store in a dedicated row in enterprise_snapshots with org_id = 'platform'
-  // We use the organizations table settings of a well-known platform org, or fall back to defaults.
+async function ensurePlatformSettingsOrg(env: Env): Promise<{ id: string; settings: Record<string, unknown> }> {
   const supabase = getAdminClient(env);
-  const { data } = await supabase
-    .from('organizations')
-    .select('settings')
-    .eq('slug', 'ellines-platform')
-    .maybeSingle();
-
-  if (!data) return DEFAULT_FLAGS;
-
-  const stored = (data.settings as Record<string, unknown>)?.[FLAGS_KEY];
-  if (!Array.isArray(stored)) return DEFAULT_FLAGS;
-
-  // Merge stored values into defaults so new flags appear automatically
-  const storedMap = new Map((stored as FeatureFlag[]).map((f) => [f.key, f.enabled]));
-  return DEFAULT_FLAGS.map((flag) => ({
-    ...flag,
-    enabled: storedMap.has(flag.key) ? (storedMap.get(flag.key) as boolean) : flag.enabled,
-  }));
-}
-
-async function saveFlags(env: Env, flags: FeatureFlag[]): Promise<void> {
-  const supabase = getAdminClient(env);
-  // Upsert a platform org record if it doesn't exist
   const { data: existing } = await supabase
     .from('organizations')
     .select('id, settings')
@@ -90,10 +65,46 @@ async function saveFlags(env: Env, flags: FeatureFlag[]): Promise<void> {
     .maybeSingle();
 
   if (existing) {
-    const settings = { ...(existing.settings as Record<string, unknown>), [FLAGS_KEY]: flags };
-    await supabase.from('organizations').update({ settings }).eq('slug', 'ellines-platform');
+    return {
+      id: existing.id,
+      settings: (existing.settings as Record<string, unknown>) || {},
+    };
   }
-  // If no platform org exists, flags are ephemeral (default on restart) — acceptable for now
+
+  const id = crypto.randomUUID();
+  const { data, error } = await supabase
+    .from('organizations')
+    .insert({
+      id,
+      name: 'Ellines EIP Platform',
+      slug: 'ellines-platform',
+      settings: { systemTenant: true },
+    })
+    .select('id, settings')
+    .single();
+
+  if (error) throw new Error('Unable to initialize platform settings: ' + error.message);
+  return { id: data.id, settings: (data.settings as Record<string, unknown>) || {} };
+}
+
+async function getFlags(env: Env): Promise<FeatureFlag[]> {
+  const platformOrg = await ensurePlatformSettingsOrg(env);
+  const stored = platformOrg.settings[FLAGS_KEY];
+  if (!Array.isArray(stored)) return DEFAULT_FLAGS;
+
+  const storedMap = new Map((stored as FeatureFlag[]).map((f) => [f.key, f.enabled]));
+  return DEFAULT_FLAGS.map((flag) => ({
+    ...flag,
+    enabled: storedMap.has(flag.key) ? Boolean(storedMap.get(flag.key)) : flag.enabled,
+  }));
+}
+
+async function saveFlags(env: Env, flags: FeatureFlag[]): Promise<void> {
+  const platformOrg = await ensurePlatformSettingsOrg(env);
+  const settings = { ...platformOrg.settings, [FLAGS_KEY]: flags, systemTenant: true };
+  const supabase = getAdminClient(env);
+  const { error } = await supabase.from('organizations').update({ settings }).eq('id', platformOrg.id);
+  if (error) throw new Error('Unable to persist platform feature flags: ' + error.message);
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {

@@ -356,7 +356,7 @@ export type AuditLogDto = {
   id: string;
   action: string;
   resource: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: unknown;
   createdAt: string;
   actorUserId: string | null;
   actorName: string | null;
@@ -568,6 +568,141 @@ export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspe
   return request<PlatformOrg>(`/api/v1/platform/orgs/${orgId}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+}
+
+export interface PlatformMetrics {
+  generatedAt: string;
+  window: { since: string; durationHours: number };
+  platform: {
+    businesses: number;
+    activeUsers: number;
+    auditEvents24h: number;
+    apiRequests24h: number;
+    rateLimitViolations24h: number;
+  };
+  businessServices: {
+    connectorInstallations: number;
+    failedConnectorInstallations: number;
+  };
+}
+
+export function fetchPlatformMetrics() {
+  return request<PlatformMetrics>('/api/v1/platform/metrics');
+}
+
+export interface PlatformPackage {
+  id: string;
+  name: string;
+  display_name: string;
+  requests_per_day: number;
+  requests_per_hour: number;
+  requests_per_minute: number;
+  burst_limit: number;
+  max_connectors: number | null;
+  max_users: number | null;
+  max_data_export_per_day: number | null;
+  enable_webhooks: boolean;
+  enable_sso: boolean;
+  enable_custom_roles: boolean;
+  enable_agents: boolean;
+  enable_advanced_bi: boolean;
+  priority: number;
+  monthly_price: number;
+}
+
+export function listPlatformPackages() {
+  return request<PlatformPackage[]>('/api/v1/platform/packages');
+}
+
+export function createPlatformPackage(payload: {
+  name: string;
+  display_name: string;
+  maxUsers?: number | null;
+  maxConnectors?: number | null;
+  requestsPerDay?: number;
+  monthlyPrice?: number;
+  enableSso?: boolean;
+  enableCustomRoles?: boolean;
+  enableAgents?: boolean;
+  enableAdvancedBi?: boolean;
+  enableWebhooks?: boolean;
+}) {
+  return request<PlatformPackage>('/api/v1/platform/packages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePlatformPackage(id: string, payload: Partial<PlatformPackage>) {
+  return request<PlatformPackage>(`/api/v1/platform/packages/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePlatformPackage(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, { method: 'DELETE' });
+}
+
+export function fetchPlatformOrgPackage(orgId: string) {
+  return request<Record<string, unknown> | null>(`/api/v1/platform/orgs/${orgId}/package`);
+}
+
+export function assignPlatformOrgPackage(orgId: string, payload: { tierId: string; expiresAt?: string | null; autoRenew?: boolean; customLimits?: Record<string, unknown> | null }) {
+  return request<Record<string, unknown>>(`/api/v1/platform/orgs/${orgId}/package`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface PlatformAuditRow {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  organizationSlug: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  userFullName: string | null;
+  action: string;
+  resource: string;
+  metadata: unknown;
+  createdAt: string;
+}
+
+export function fetchPlatformAudit(params: { orgId?: string; action?: string; limit?: number; offset?: number } = {}) {
+  const q = new URLSearchParams();
+  if (params.orgId) q.set('orgId', params.orgId);
+  if (params.action) q.set('action', params.action);
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.offset) q.set('offset', String(params.offset));
+  return request<{ total: number; offset: number; limit: number; rows: PlatformAuditRow[] }>(`/api/v1/platform/audit-logs?${q.toString()}`);
+}
+
+export function listPlatformOrgUsers(orgId: string) {
+  return request<OrgMember[]>(`/api/v1/platform/orgs/${orgId}/users`);
+}
+
+export function createPlatformOrgUser(orgId: string, payload: { email: string; fullName: string; password: string; role: string }) {
+  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users`, {
+    method: 'POST', body: JSON.stringify(payload),
+  });
+}
+
+export function updatePlatformOrgUser(orgId: string, userId: string, payload: { fullName?: string; role?: string; isActive?: boolean; password?: string }) {
+  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, {
+    method: 'PATCH', body: JSON.stringify(payload),
+  });
+}
+
+export function deactivatePlatformOrgUser(orgId: string, userId: string) {
+  return request<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export function updatePlatformFlag(key: string, enabled: boolean) {
+  return request<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
+    method: 'PATCH',
+    body: JSON.stringify({ key, enabled }),
   });
 }
 
@@ -1071,7 +1206,7 @@ export interface PlatformAuditRow {
   userFullName: string | null;
   action: string;
   resource: string;
-  metadata: Record<string, unknown> | null;
+  metadata: unknown;
   createdAt: string;
 }
 
@@ -1091,8 +1226,8 @@ export interface CreateOrgResult extends PlatformOrg {
   } | null;
 }
 
-/** List users in any org (platform admin). */
-export function listPlatformOrgUsers(orgId: string) {
+/** List users in any org (platform admin), with full detail (isActive, timestamps). */
+export function listPlatformOrgUsersDetailed(orgId: string) {
   return request<PlatformUserDto[]>(`/api/v1/platform/orgs/${orgId}/users`);
 }
 
@@ -1142,6 +1277,22 @@ export function createPlatformOrg(payload: {
 }
 
 /** Fetch cross-org audit logs (platform admin). */
+export interface EncryptionMigrationResult {
+  dryRun: boolean;
+  scanned: number;
+  migrated: number;
+  alreadyCurrent: number;
+  failed: number;
+  failures: { configId: string; field: string; message: string }[];
+}
+
+export function migratePlatformEncryption(dryRun = false, organizationId?: string) {
+  return request<EncryptionMigrationResult>('/api/v1/platform/security/migrate-encryption', {
+    method: 'POST',
+    body: JSON.stringify({ dryRun, organizationId }),
+  });
+}
+
 export function listPlatformAuditLogs(params?: {
   orgId?: string;
   action?: string;

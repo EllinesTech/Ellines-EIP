@@ -50,40 +50,31 @@ export class DatabaseSwitcherService {
    * Returns the configuration or a fallback to localhost:5432
    */
   async getActiveDatabase(organizationId: string): Promise<DatabaseConnectionConfig> {
+    const config = await this.prisma.databaseConfiguration.findFirst({
+      where: {
+        organizationId,
+        isPrimary: true,
+        isActive: true,
+      },
+    });
+
+    if (!config) {
+      // No tenant-specific database is configured. Use the explicitly configured
+      // process-level DATABASE_URL, never a hardcoded credential.
+      return this.getDefaultDatabaseConfig();
+    }
+
     try {
-      // Look up the primary database for this org
-      const config = await this.prisma.databaseConfiguration.findFirst({
-        where: {
-          organizationId,
-          isPrimary: true,
-          isActive: true,
-        },
-      });
-
-      if (!config) {
-        // No primary DB configured, use default localhost
-        return this.getDefaultDatabaseConfig();
-      }
-
-      // Decrypt password if encrypted
       let decryptedPassword: string | undefined;
       if (config.passwordEncrypted) {
-        decryptedPassword = await this.encryption.decrypt(
-          config.passwordEncrypted,
-          organizationId,
-        );
+        decryptedPassword = await this.encryption.decrypt(config.passwordEncrypted, organizationId);
       }
 
-      // Decrypt Supabase key if encrypted
       let decryptedSupabaseKey: string | undefined;
       if (config.supabaseKeyEncrypted) {
-        decryptedSupabaseKey = await this.encryption.decrypt(
-          config.supabaseKeyEncrypted,
-          organizationId,
-        );
+        decryptedSupabaseKey = await this.encryption.decrypt(config.supabaseKeyEncrypted, organizationId);
       }
 
-      // Build connection config from stored config
       return {
         type: config.type as 'local' | 'supabase' | 'custom_postgres',
         host: config.host || 'localhost',
@@ -94,9 +85,10 @@ export class DatabaseSwitcherService {
         supabaseKey: decryptedSupabaseKey,
       };
     } catch (error) {
-      // On error, fall back to default
-      console.warn(`Failed to load database config for org ${organizationId}:`, error);
-      return this.getDefaultDatabaseConfig();
+      // Never silently switch a tenant to another database after a credential
+      // or integrity failure. That can leak data across environments/tenants.
+      console.error(`Failed to decrypt database config ${config.id} for org ${organizationId}`);
+      throw new Error('Active database configuration could not be securely decrypted');
     }
   }
 
@@ -104,13 +96,29 @@ export class DatabaseSwitcherService {
    * Get the default database configuration (localhost PostgreSQL)
    */
   private getDefaultDatabaseConfig(): DatabaseConnectionConfig {
+    const raw = process.env.DATABASE_URL;
+    if (!raw) {
+      throw new Error('No active organization database configuration and DATABASE_URL is not configured');
+    }
+
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new Error('DATABASE_URL is invalid');
+    }
+
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+      throw new Error('DATABASE_URL must use PostgreSQL');
+    }
+
     return {
       type: 'local',
-      host: 'localhost',
-      port: 5432,
-      database: 'ellines_eip',
-      username: 'eip',
-      password: 'eip_dev_password',
+      host: url.hostname,
+      port: Number(url.port || 5432),
+      database: decodeURIComponent(url.pathname.replace(/^\//, '')),
+      username: decodeURIComponent(url.username),
+      password: url.password ? decodeURIComponent(url.password) : undefined,
     };
   }
 

@@ -1,179 +1,186 @@
 /**
- * Encryption utilities for sensitive database configuration data
- * 
- * Note: This uses SubtleCrypto (Web Crypto API) for encryption.
- * For production with Cloudflare Workers, SubtleCrypto is available as crypto.subtle.
- * 
- * Algorithm: AES-GCM (256-bit)
- * - Authenticated encryption with associated data (AEAD)
- * - Industry standard for secure password storage in cloud environments
- * - Provides both encryption and integrity verification
+ * Tenant secret encryption for Cloudflare Pages Functions.
+ *
+ * Current format: AES-256-GCM + HKDF(SHA-256)
+ * Key material: EIP_ENCRYPTION_MASTER_KEY (secret; never tenant-controlled)
+ * Context: organization ID is used as HKDF info and AES-GCM associated data.
+ *
+ * Version 2 is fail-closed: missing/invalid secrets or authentication failures
+ * throw instead of returning plaintext/Base64 or an empty string.
  */
 
-/**
- * Derive an encryption key from the organization ID.
- * In production, this should use a proper key derivation function (PBKDF2, Argon2, etc.)
- * and a proper master key from secure storage.
- * 
- * For now: Uses a simplified approach with crypto.subtle
- * TODO: Replace with proper key management in production
- */
-async function deriveEncryptionKey(organizationId: string): Promise<CryptoKey> {
-  // In production, you would:
-  // 1. Fetch the organization's master encryption key from secure storage
-  // 2. Use PBKDF2 or similar to derive a database-specific key
-  // 3. Use that key for all database configs for that org
+const CURRENT_VERSION = 2;
+const MASTER_KEY_ENV = 'EIP_ENCRYPTION_MASTER_KEY';
 
-  // For now, we'll use a simple approach with SubtleCrypto
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`org:${organizationId}`);
+function requireMasterSecret(env: { EIP_ENCRYPTION_MASTER_KEY?: string }): string {
+  const secret = env.EIP_ENCRYPTION_MASTER_KEY?.trim();
+  if (!secret) throw new Error(MASTER_KEY_ENV + ' is required');
+  const bytes = new TextEncoder().encode(secret);
+  if (bytes.length < 32) throw new Error(MASTER_KEY_ENV + ' must contain at least 32 UTF-8 bytes');
+  return secret;
+}
 
-  // Hash the organization ID to get a consistent key material
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+function b64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
-  // Import the hash as a key
-  const key = await crypto.subtle.importKey(
-    'raw',
-    hashBuffer,
+function fromB64(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+async function deriveV2Key(env: { EIP_ENCRYPTION_MASTER_KEY?: string }, organizationId: string): Promise<CryptoKey> {
+  const master = new TextEncoder().encode(requireMasterSecret(env));
+  const base = await crypto.subtle.importKey('raw', master, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new TextEncoder().encode('ellines-eip:encryption:v2'),
+      info: new TextEncoder().encode('organization:' + organizationId),
+    },
+    base,
     { name: 'AES-GCM', length: 256 },
-    false, // Not extractable for security
+    false,
     ['encrypt', 'decrypt'],
   );
-
-  return key;
 }
 
-/**
- * Encrypt a sensitive string (password, API key, etc.)
- * Returns a JSON string with base64-encoded ciphertext, IV, and auth tag
- */
-export async function encrypt(plaintext: string, organizationId: string): Promise<string> {
-  try {
-    const key = await deriveEncryptionKey(organizationId);
-    const encoder = new TextEncoder();
-    const plaintextBytes = encoder.encode(plaintext);
+/** Legacy v1 key derivation, retained only for explicit migration. */
+async function deriveLegacyV1Key(organizationId: string): Promise<CryptoKey> {
+  const data = new TextEncoder().encode('org:' + organizationId);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return crypto.subtle.importKey('raw', hash, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
 
-    // Generate a random IV (initialization vector) for each encryption
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+export async function encrypt(
+  plaintext: string,
+  organizationId: string,
+  env: { EIP_ENCRYPTION_MASTER_KEY?: string },
+): Promise<string> {
+  if (!organizationId) throw new Error('organizationId is required');
+  const key = await deriveV2Key(env, organizationId);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const aad = new TextEncoder().encode(organizationId);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
+    key,
+    new TextEncoder().encode(plaintext),
+  );
+  return JSON.stringify({
+    encrypted: true,
+    version: CURRENT_VERSION,
+    algorithm: 'AES-256-GCM',
+    kdf: 'HKDF-SHA-256',
+    iv: b64(iv),
+    ciphertext: b64(new Uint8Array(ciphertext)),
+  });
+}
 
-    // Encrypt using AES-GCM
-    const ciphertext = await crypto.subtle.encrypt(
-      {
-        name: 'AES-GCM',
-        iv,
-      },
-      key,
-      plaintextBytes,
-    );
+async function decryptLegacyV1(encryptedData: Record<string, unknown>, organizationId: string): Promise<string> {
+  const key = await deriveLegacyV1Key(organizationId);
+  const iv = fromB64(String(encryptedData.iv || ''));
+  let ciphertext = fromB64(String(encryptedData.ciphertext || ''));
 
-    // Encode IV and ciphertext as base64 for storage
-    const ivBase64 = btoa(String.fromCharCode(...iv));
-    const ciphertextBase64 = btoa(String.fromCharCode(...new Uint8Array(ciphertext)));
-
-    // Return a JSON object with both values
-    return JSON.stringify({
-      encrypted: true,
-      version: 1, // For future key rotation support
-      iv: ivBase64,
-      ciphertext: ciphertextBase64,
-    });
-  } catch (error) {
-    console.error('Encryption failed:', error);
-    // Fallback to BASE64 for backward compatibility during migration
-    console.warn('Falling back to BASE64 encoding due to encryption error');
-    return btoa(plaintext);
+  // Pages v1 stored the GCM tag inside ciphertext. The older NestJS v1
+  // envelope stored authTag separately and used a 16-byte IV.
+  const legacyAuthTag = encryptedData.authTag ? fromB64(String(encryptedData.authTag)) : null;
+  if (legacyAuthTag) {
+    if (legacyAuthTag.length !== 16 || iv.length !== 16) throw new Error('Invalid legacy Node encryption envelope');
+    const combined = new Uint8Array(ciphertext.length + legacyAuthTag.length);
+    combined.set(ciphertext);
+    combined.set(legacyAuthTag, ciphertext.length);
+    ciphertext = combined;
+  } else if (iv.length !== 12) {
+    throw new Error('Invalid legacy Pages encryption envelope');
   }
+
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(plaintext);
 }
 
-/**
- * Decrypt an encrypted string
- * Handles both new JSON format and legacy BASE64 format
- */
-export async function decrypt(encrypted: string, organizationId: string): Promise<string> {
+export async function decrypt(
+  encrypted: string,
+  organizationId: string,
+  env: { EIP_ENCRYPTION_MASTER_KEY?: string },
+): Promise<string> {
+  if (!encrypted || !organizationId) throw new Error('Encrypted value and organizationId are required');
+
+  let data: Record<string, unknown>;
   try {
-    // Try to parse as JSON (new format)
-    let encryptedData;
-    try {
-      encryptedData = JSON.parse(encrypted);
-    } catch {
-      // Not JSON, try legacy BASE64 format
-      try {
-        return atob(encrypted);
-      } catch {
-        console.error('Could not parse encrypted value');
-        return '';
-      }
+    const parsed = JSON.parse(encrypted);
+    if (!parsed || typeof parsed !== 'object' || parsed.encrypted !== true) {
+      throw new Error('Unsupported encrypted value');
     }
-
-    // Handle JSON format
-    if (typeof encryptedData === 'object' && encryptedData.encrypted) {
-      const key = await deriveEncryptionKey(organizationId);
-      const decoder = new TextDecoder();
-
-      // Decode IV and ciphertext from base64
-      const iv = new Uint8Array(
-        atob(encryptedData.iv)
-          .split('')
-          .map((c) => c.charCodeAt(0)),
-      );
-      const ciphertext = new Uint8Array(
-        atob(encryptedData.ciphertext)
-          .split('')
-          .map((c) => c.charCodeAt(0)),
-      );
-
-      // Decrypt using AES-GCM
-      const plaintext = await crypto.subtle.decrypt(
-        {
-          name: 'AES-GCM',
-          iv,
-        },
-        key,
-        ciphertext,
-      );
-
-      return decoder.decode(plaintext);
-    }
-
-    // Fallback for unknown formats
-    return '';
-  } catch (error) {
-    console.error('Decryption failed:', error);
-    return '';
+    data = parsed as Record<string, unknown>;
+  } catch {
+    throw new Error('Encrypted value is not a supported EIP encryption envelope');
   }
+
+  const version = Number(data.version);
+  if (version === 1) {
+    // Temporary compatibility path. Call migrateToEncryption before persisting again.
+    return decryptLegacyV1(data, organizationId);
+  }
+  if (version !== CURRENT_VERSION) throw new Error('Unsupported encryption version: ' + String(data.version));
+
+  const key = await deriveV2Key(env, organizationId);
+  const iv = fromB64(String(data.iv || ''));
+  const ciphertext = fromB64(String(data.ciphertext || ''));
+  const aad = new TextEncoder().encode(organizationId);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
+    key,
+    ciphertext,
+  );
+  return new TextDecoder().decode(plaintext);
 }
 
-/**
- * Check if a value is encrypted (new format)
- */
 export function isEncrypted(value: string): boolean {
   try {
     const parsed = JSON.parse(value);
-    return typeof parsed === 'object' && parsed.encrypted === true;
+    return Boolean(parsed && typeof parsed === 'object' && parsed.encrypted === true && Number(parsed.version) >= 1);
   } catch {
-    // Legacy BASE64 format is considered "not encrypted" (backward compatible)
     return false;
   }
 }
 
 /**
- * Migration helper: Re-encrypt a value that might be in BASE64 format
+ * Explicit migration helper.
+ * Handles:
+ * - v1 EIP JSON encryption;
+ * - legacy Base64 storage;
+ * - plaintext only when explicitly supplied to the migration command.
+ *
+ * It never returns a Base64/plaintext value as an encrypted result.
  */
 export async function migrateToEncryption(
   value: string,
   organizationId: string,
+  env: { EIP_ENCRYPTION_MASTER_KEY?: string },
 ): Promise<string> {
-  // If already encrypted in new format, return as-is
+  if (!value) throw new Error('Cannot migrate an empty secret');
+  if (!organizationId) throw new Error('organizationId is required');
+
   if (isEncrypted(value)) {
-    return value;
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (Number(parsed.version) === CURRENT_VERSION) {
+      // Validate that the current master key can decrypt it before accepting it.
+      await decrypt(value, organizationId, env);
+      return value;
+    }
+    const plaintext = await decrypt(value, organizationId, env);
+    return encrypt(plaintext, organizationId, env);
   }
 
-  // Otherwise, treat as plaintext/BASE64 and encrypt properly
+  let plaintext: string;
   try {
-    const plaintext = atob(value);
-    return await encrypt(plaintext, organizationId);
+    plaintext = new TextDecoder().decode(fromB64(value));
+    if (!plaintext) throw new Error('empty');
   } catch {
-    // If it fails to decode as BASE64, assume it's already plaintext
-    return await encrypt(value, organizationId);
+    plaintext = value;
   }
+  return encrypt(plaintext, organizationId, env);
 }

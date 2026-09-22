@@ -1,763 +1,321 @@
-# Super Admin Dashboard Specification
+# Ellines EIP — Super Admin Control Plane Specification
 
-**Version:** 1.0  
-**Date:** August 8, 2026  
-**Route:** `/app/super-admin`  
-**Access:** Platform Admin only (email in `PLATFORM_ADMIN_EMAILS`)
+**Version:** 2.0  
+**Status:** Canonical SuperAdmin UX/control specification  
+**Route:** `/app/platform`  
+**Access:** Platform Super Admin only
 
----
+## 1. Purpose
 
-## Overview
+The Super Admin Control Plane is the operator console for **Ellines EIP itself**.
 
-The Super Admin Dashboard provides platform operators with centralized control and visibility across all organizations using Ellines EIP.
+It is intentionally different from every business dashboard.
 
----
-
-## Authentication & Access
-
-### Environment Configuration
-
-```bash
-# .env
-PLATFORM_ADMIN_EMAILS=admin@ellines.co.ke,superadmin@ellines.co.ke
-```
-
-### Access Check
-
-```typescript
-// Client-side route guard
-import { useSession } from '@/lib/api';
-
-export default function SuperAdminPage() {
-  const session = useSession();
-  
-  // Check if user is platform admin
-  const isPlatformAdmin = session?.isPlatformAdmin || false;
-  
-  if (!isPlatformAdmin) {
-    return <AccessDenied />;
-  }
-  
-  return <SuperAdminDashboard />;
-}
-```
-
-### Backend Validation
-
-All platform endpoints validate the JWT user email against `PLATFORM_ADMIN_EMAILS`:
-
-```typescript
-import { isPlatformAdminEmail, parsePlatformAdminEmails } from '@ellines-eip/shared';
-
-const allowlist = parsePlatformAdminEmails(process.env.PLATFORM_ADMIN_EMAILS);
-if (!isPlatformAdminEmail(userEmail, allowlist)) {
-  throw new ForbiddenException('Platform admin only');
-}
-```
-
----
-
-## Dashboard Sections
-
-### 1. Overview / Stats
-
-**API:** Multiple endpoints
-
-**Displays:**
-- Total organizations
-- Total users across all orgs
-- Active organizations (status: "active")
-- Suspended organizations (status: "suspended")
-- System health status
-- Email provider status
-- Service uptime
-
-**API Calls:**
-```typescript
-const orgs = await fetch('/api/v1/platform/orgs');
-const health = await fetch('/api/v1/health');
-```
-
----
-
-### 2. Organizations List
-
-**API:** `GET /api/v1/platform/orgs`
-
-**Features:**
-- Sortable table of all organizations
-- Search/filter by name or slug
-- Status indicator (active/suspended)
-- User count per org
-- Creation date
-- Quick actions (view details, suspend/activate)
-
-**Columns:**
-- Organization Name
-- Slug
-- Status (badge: green for active, red for suspended)
-- Users
-- Created Date
-- Actions
-
-**Example Component:**
-```typescript
-import { useState, useEffect } from 'react';
-
-export function OrganizationsList() {
-  const [orgs, setOrgs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    fetch('/api/v1/platform/orgs', {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-      .then(r => r.json())
-      .then(data => {
-        setOrgs(data);
-        setLoading(false);
-      });
-  }, []);
-  
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th>Organization</th>
-          <th>Status</th>
-          <th>Users</th>
-          <th>Created</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {orgs.map(org => (
-          <tr key={org.id}>
-            <td>
-              <div>{org.name}</div>
-              <div className="text-sm text-gray-500">{org.slug}</div>
-            </td>
-            <td>
-              <StatusBadge status={org.status} />
-            </td>
-            <td>{org.userCount}</td>
-            <td>{formatDate(org.createdAt)}</td>
-            <td>
-              <button onClick={() => viewOrgDetails(org.id)}>
-                View
-              </button>
-              <button onClick={() => toggleOrgStatus(org.id, org.status)}>
-                {org.status === 'active' ? 'Suspend' : 'Activate'}
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-```
-
----
-
-### 3. Organization Details Modal/Page
-
-**API:** 
-- `GET /api/v1/platform/orgs/:id/settings`
-- `PATCH /api/v1/platform/orgs/:id` (for status changes)
-- `PATCH /api/v1/platform/orgs/:id/settings` (for settings)
-
-**Displays:**
-- Organization info (name, slug, ID)
-- Current status
-- Settings (timezone, date format, time format)
-- User count
-- Creation date
-- Last activity
-
-**Actions:**
-- Suspend/Activate organization
-- View/edit settings
-- View audit logs (future)
-
-**Example:**
-```typescript
-function OrgDetailsModal({ orgId, onClose }) {
-  const [org, setOrg] = useState(null);
-  const [settings, setSettings] = useState(null);
-  
-  useEffect(() => {
-    Promise.all([
-      fetch(`/api/v1/platform/orgs/${orgId}/settings`),
-    ]).then(([settingsRes]) => {
-      setSettings(settingsRes.json());
-    });
-  }, [orgId]);
-  
-  const toggleStatus = async () => {
-    const newStatus = org.status === 'active' ? 'suspended' : 'active';
-    await fetch(`/api/v1/platform/orgs/${orgId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify({ status: newStatus })
-    });
-    // Refresh org data
-  };
-  
-  return (
-    <Modal onClose={onClose}>
-      <h2>{org?.name}</h2>
-      <div>Status: <StatusBadge status={org?.status} /></div>
-      <div>Users: {org?.userCount}</div>
-      <div>Timezone: {settings?.timezone}</div>
-      
-      <button onClick={toggleStatus}>
-        {org?.status === 'active' ? 'Suspend Org' : 'Activate Org'}
-      </button>
-    </Modal>
-  );
-}
-```
-
----
-
-### 4. Platform Health
-
-**API:** `GET /api/v1/health`
-
-**Displays:**
-- Service status (OK/Error)
-- Service version
-- Uptime
-- Email provider status
-- Last check timestamp
-
-**Example:**
-```typescript
-function PlatformHealth() {
-  const [health, setHealth] = useState(null);
-  
-  useEffect(() => {
-    const checkHealth = () => {
-      fetch('/api/v1/health')
-        .then(r => r.json())
-        .then(setHealth);
-    };
-    
-    checkHealth();
-    const interval = setInterval(checkHealth, 30000); // Check every 30s
-    return () => clearInterval(interval);
-  }, []);
-  
-  return (
-    <div className="health-panel">
-      <h3>Platform Health</h3>
-      <div>
-        Status: <StatusIndicator status={health?.status} />
-      </div>
-      <div>Version: {health?.version}</div>
-      <div>Uptime: {formatUptime(health?.uptimeSeconds)}</div>
-      <div>
-        Email: {health?.email?.live ? 
-          <span className="text-green-600">Live ({health.email.provider})</span> : 
-          <span className="text-red-600">Not configured</span>
-        }
-      </div>
-      <div className="text-sm text-gray-500">
-        Last checked: {health?.ts}
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-### 5. Feature Flags
-
-**API:** `GET /api/v1/platform/flags`
-
-**Displays:**
-- List of feature flags
-- Current state (enabled/disabled)
-- Description (future)
-
-**Future Enhancement:**
-- Toggle flags on/off
-- Schedule flag changes
-
-**Example:**
-```typescript
-function FeatureFlags() {
-  const [flags, setFlags] = useState(null);
-  
-  useEffect(() => {
-    fetch('/api/v1/platform/flags', {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-      .then(r => r.json())
-      .then(data => setFlags(data.flags));
-  }, []);
-  
-  return (
-    <div className="flags-panel">
-      <h3>Feature Flags</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Flag</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flags && Object.entries(flags).map(([key, value]) => (
-            <tr key={key}>
-              <td>{key}</td>
-              <td>
-                <span className={value ? 'text-green-600' : 'text-gray-400'}>
-                  {value ? 'Enabled' : 'Disabled'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-```
-
----
-
-### 6. Connector Packs
-
-**API:** 
-- `GET /api/v1/platform/connector-packs`
-- `POST /api/v1/platform/connector-packs`
-
-**Displays:**
-- List of connector packs
-- Pack name, slug, description
-- Template count
-- Published status
-
-**Actions:**
-- Create new pack
-- View pack details
-- Publish/unpublish pack (future)
-
-**Example:**
-```typescript
-function ConnectorPacks() {
-  const [packs, setPacks] = useState([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  
-  const createPack = async (data) => {
-    await fetch('/api/v1/platform/connector-packs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify(data)
-    });
-    // Refresh list
-  };
-  
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3>Connector Packs</h3>
-        <button onClick={() => setShowCreateForm(true)}>
-          Create Pack
-        </button>
-      </div>
-      
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Slug</th>
-            <th>Templates</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {packs.map(pack => (
-            <tr key={pack.id}>
-              <td>{pack.name}</td>
-              <td><code>{pack.slug}</code></td>
-              <td>{pack.templateCount}</td>
-              <td>
-                {pack.published ? 
-                  <span className="text-green-600">Published</span> : 
-                  <span className="text-gray-500">Draft</span>
-                }
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
-      {showCreateForm && (
-        <CreatePackModal 
-          onCreate={createPack}
-          onClose={() => setShowCreateForm(false)}
-        />
-      )}
-    </div>
-  );
-}
-```
-
----
-
-## Layout & Navigation
-
-### Dashboard Layout
-
-```
-┌─────────────────────────────────────────────────┐
-│  Ellines EIP - Super Admin                     │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Overview Stats Row                             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐          │
-│  │  Orgs   │ │  Users  │ │ Active  │          │
-│  │   25    │ │   342   │ │   23    │          │
-│  └─────────┘ └─────────┘ └─────────┘          │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Organizations Table                            │
-│  ┌───────────────────────────────────────────┐ │
-│  │ Name    Status  Users  Created   Actions │ │
-│  │ Acme    Active   25    Aug 1     [View] │ │
-│  │ Beta    Active   12    Aug 2     [View] │ │
-│  └───────────────────────────────────────────┘ │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  Platform Health        Feature Flags           │
-│  ┌──────────────────┐  ┌──────────────────────┐│
-│  │ Status: OK       │  │ ellinea_ai: Enabled  ││
-│  │ Uptime: 5d 3h    │  │ multi_org: Enabled   ││
-│  │ Email: Live      │  │ sso: Enabled         ││
-│  └──────────────────┘  └──────────────────────┘│
-│                                                 │
-└─────────────────────────────────────────────────┘
-```
-
-### Navigation Structure
-
-```
-/app/super-admin
-├── /app/super-admin (Overview)
-├── /app/super-admin/orgs (Organizations list)
-├── /app/super-admin/orgs/:id (Organization details)
-├── /app/super-admin/health (Platform health)
-├── /app/super-admin/flags (Feature flags)
-├── /app/super-admin/packs (Connector packs)
-└── /app/super-admin/analytics (Future: Usage analytics)
-```
-
----
-
-## UI Components
-
-### StatusBadge Component
-
-```typescript
-export function StatusBadge({ status }: { status: 'active' | 'suspended' }) {
-  const styles = {
-    active: 'bg-green-100 text-green-800',
-    suspended: 'bg-red-100 text-red-800'
-  };
-  
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  );
-}
-```
-
-### StatCard Component
-
-```typescript
-export function StatCard({ 
-  title, 
-  value, 
-  icon, 
-  trend 
-}: { 
-  title: string; 
-  value: number | string; 
-  icon?: React.ReactNode; 
-  trend?: { value: number; direction: 'up' | 'down' }; 
-}) {
-  return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
-          {trend && (
-            <p className={`text-sm mt-2 ${trend.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-              {trend.direction === 'up' ? '↑' : '↓'} {trend.value}%
-            </p>
-          )}
-        </div>
-        {icon && <div className="text-4xl text-gray-300">{icon}</div>}
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-## Security Considerations
-
-### Access Control
-
-1. **Route Protection**
-   - All `/app/super-admin/*` routes must check `isPlatformAdmin`
-   - Redirect to `/app` if not authorized
-   - Show clear "Access Denied" message
-
-2. **API Authorization**
-   - All API calls include JWT Bearer token
-   - Backend validates email against `PLATFORM_ADMIN_EMAILS`
-   - 403 Forbidden returned for unauthorized access
-
-3. **Audit Logging**
-   - Log all admin actions (suspend org, change settings)
-   - Include timestamp, admin email, action, target
-   - Store in audit_logs table
-
-### Data Privacy
-
-- Do not display sensitive organization data (passwords, secrets, API keys)
-- Hash/mask sensitive configuration values
-- Implement view-only mode for most settings
-- Require confirmation for destructive actions (suspend org)
-
----
-
-## Implementation Checklist
-
-### Phase 1: Basic Dashboard (MVP)
-
-- [ ] Create `/app/super-admin` route
-- [ ] Add platform admin check to route guard
-- [ ] Implement overview stats component
-- [ ] Implement organizations list
-- [ ] Implement org details modal
-- [ ] Add suspend/activate functionality
-- [ ] Implement platform health panel
-- [ ] Implement feature flags panel
-
-### Phase 2: Advanced Features
-
-- [ ] Connector packs management
-- [ ] Org settings editor
-- [ ] Audit log viewer
-- [ ] Search and filtering
-- [ ] Export organization list
-- [ ] Bulk actions (suspend multiple orgs)
-
-### Phase 3: Analytics & Monitoring
-
-- [ ] Usage analytics dashboard
-- [ ] API call volume graphs
-- [ ] User growth trends
-- [ ] Connector usage stats
-- [ ] Alert management
-
----
-
-## File Structure
-
-```
-apps/web/src/app/
-└── app/
-    └── super-admin/
-        ├── page.tsx                    # Main dashboard
-        ├── layout.tsx                  # Super admin layout
-        ├── orgs/
-        │   ├── page.tsx               # Organizations list
-        │   └── [id]/
-        │       └── page.tsx           # Organization details
-        ├── health/
-        │   └── page.tsx               # Platform health
-        ├── flags/
-        │   └── page.tsx               # Feature flags
-        ├── packs/
-        │   └── page.tsx               # Connector packs
-        └── components/
-            ├── StatusBadge.tsx
-            ├── StatCard.tsx
-            ├── OrgTable.tsx
-            ├── OrgDetailsModal.tsx
-            ├── HealthPanel.tsx
-            └── FlagsPanel.tsx
-```
-
----
-
-## API Integration Summary
-
-All super admin features use these endpoints:
-
-| Feature | Endpoint | Method |
-|---------|----------|--------|
-| Organizations list | `/platform/orgs` | GET |
-| Org details | `/platform/orgs/:id/settings` | GET |
-| Suspend/activate org | `/platform/orgs/:id` | PATCH |
-| Update org settings | `/platform/orgs/:id/settings` | PATCH |
-| Platform health | `/health` | GET |
-| Feature flags | `/platform/flags` | GET |
-| Connector packs | `/platform/connector-packs` | GET, POST |
-
----
-
-## Testing
-
-### Manual Testing
-
-1. **Setup:**
-   ```bash
-   # Add your email to platform admins
-   echo "PLATFORM_ADMIN_EMAILS=your@email.com" >> .env
-   
-   # Restart services
-   npm run dev:identity
-   npm run dev:web
-   ```
-
-2. **Login as platform admin:**
-   - Register/login with the admin email
-   - Navigate to `/app/super-admin`
-   - Should see dashboard (not access denied)
-
-3. **Test features:**
-   - View organizations list
-   - Click "View" on an org
-   - Try suspending an organization
-   - Check platform health
-   - View feature flags
-
-### Automated Tests (Future)
-
-```typescript
-describe('Super Admin Dashboard', () => {
-  it('denies access to non-admin users', async () => {
-    // Login as regular user
-    // Try to access /app/super-admin
-    // Expect redirect or 403
-  });
-  
-  it('shows dashboard to platform admin', async () => {
-    // Login as platform admin
-    // Access /app/super-admin
-    // Expect dashboard content
-  });
-  
-  it('can suspend organization', async () => {
-    // Login as platform admin
-    // Suspend an org
-    // Verify status changed
-  });
-});
-```
-
----
-
-## Related Documentation
-
-- [33_Complete_API_Reference.md](./33_Complete_API_Reference.md) — Full API documentation
-- [09_Access_Layers.md](./09_Access_Layers.md) — Access layer definitions
-- [05_Build_Queue.md](./05_Build_Queue.md) — Implementation queue
-
----
-
-## Notes for Implementation
-
-### Environment Variable
-
-The `PLATFORM_ADMIN_EMAILS` environment variable should be:
-- Comma-separated list of emails
-- Set in `.env` (local)
-- Set in Cloudflare Pages environment variables (production)
-- Updated whenever admins are added/removed
-
-**Example:**
-```bash
-PLATFORM_ADMIN_EMAILS=admin@ellines.co.ke,superadmin@ellines.co.ke,ops@ellines.co.ke
-```
-
-### Session Enhancement
-
-Add `isPlatformAdmin` to session object:
-
-```typescript
-// lib/api.ts
-export function getSession() {
-  const token = localStorage.getItem('accessToken');
-  if (!token) return null;
-  
-  const decoded = jwt.decode(token);
-  return {
-    ...decoded,
-    isPlatformAdmin: checkPlatformAdmin(decoded.email)
-  };
-}
-
-function checkPlatformAdmin(email: string): boolean {
-  // Call API or check against known list
-  // For security, backend should be source of truth
-  return false; // Implement properly
-}
-```
-
-### Styling
-
-Use the existing EIP design system:
-- Colors: `#6F2D8D` (primary purple), `#0F172A` (dark), `#2563EB` (blue)
-- Font: Exo 2
-- CSS Modules for component styles
-- Responsive design (mobile-first)
-
----
-
-## Future Enhancements
-
-### Phase 4 (v1.1+)
-
-- **User impersonation:** Allow platform admin to "login as" any user for troubleshooting
-- **Org migration tools:** Move users between organizations
-- **Batch operations:** Bulk suspend/activate orgs
-- **Custom metrics:** Define and track custom platform metrics
-- **Alert system:** Email alerts for platform issues
-- **API rate limit management:** Adjust rate limits per org
-- **Resource quotas:** Set limits on connectors, users, data per org
-- **Billing integration:** Track usage for billing (if SaaS model)
-
-### Phase 5 (v2.0+)
-
-- **Multi-region support:** Manage organizations across regions
-- **Database health:** Monitor database performance
-- **Backup management:** Trigger and monitor backups
-- **Compliance dashboard:** GDPR, data residency tracking
-- **Advanced analytics:** ML-powered insights on platform usage
-
----
-
-**Document Version:** 1.0.0  
-**Status:** Specification Ready  
-**Implementation Priority:** Medium (Track E or later)  
-**Estimated Effort:** 3-5 days for MVP
+A business dashboard answers: **“How is this business operating?”**
+
+The Super Admin console answers:
+
+- Is EIP operating correctly?
+- Which businesses are onboarded?
+- Which businesses are active, suspended, or disconnected?
+- What service package does each business have?
+- Who has access?
+- What needs troubleshooting?
+- What configuration/features are enabled?
+- What privileged actions happened?
+- Which customer integrations require intervention?
+- What platform-level capacity, security, usage, and reliability issues exist?
+
+## 2. Connector boundary
+
+Customer connectors must **not** be presented as EIP infrastructure.
+
+EIP must operate without any customer connector.
+
+Connectors exist because an onboarded business needs EIP to interact with that business's systems.
+
+Therefore:
+
+- **Do not place Connectors as a primary Command Center KPI.**
+- **Do not define platform health from connector availability.**
+- **Do not require a connector for EIP startup, authentication, tenant administration, audit, or core platform operation.**
+- Connector templates/packs belong under **Business Services / Integration Catalog**.
+- SuperAdmin may inspect, troubleshoot, disconnect, revoke, or publish business integrations when authorized.
+
+## 3. Primary navigation
+
+### Platform
+1. **Command Center**
+2. **Businesses**
+3. **Register Business**
+
+### Commercial
+4. **Service Packages**
+5. **Licensing / Entitlements**
+6. **Usage / Quotas**
+
+### Control
+7. **Access & Control**
+8. **System Health**
+9. **Security & Audit**
+10. **Troubleshooting / Incidents**
+
+### Intelligence
+11. **Ellinea AI**
+12. **Platform Insights**
+
+### System
+13. **Feature Controls**
+14. **Platform Configuration**
+15. **Developer / API Operations**
+16. **Recovery / Maintenance**
+
+Customer connector administration is accessed from the relevant business or Service Catalog, not from the EIP core-health navigation.
+
+## 4. Command Center
+
+The first screen must focus on EIP platform operation.
+
+### Core KPIs
+
+- businesses onboarded;
+- active businesses;
+- suspended/disconnected businesses;
+- total tenant users;
+- platform availability;
+- service health;
+- API latency;
+- background-job health;
+- failed jobs;
+- security alerts;
+- pending operator actions;
+- current usage/capacity.
+
+### Business lifecycle summary
+
+Show:
+
+- newly registered;
+- active;
+- suspended;
+- disconnected;
+- onboarding/incomplete;
+- package assigned/unassigned.
+
+### Platform health
+
+Platform health must come from real platform telemetry.
+
+Never use:
+
+- random values;
+- fake percentages;
+- fake latency;
+- synthetic incidents;
+- fabricated predictive forecasts.
+
+Unavailable telemetry must be explicitly displayed as **Unavailable** or **Not connected**.
+
+## 5. Business control
+
+SuperAdmin must be able to:
+
+- register a business;
+- create its initial owner;
+- inspect tenant identity;
+- inspect tenant users;
+- assign/change service package;
+- change tenant settings;
+- activate;
+- suspend;
+- disconnect;
+- reconnect;
+- inspect usage;
+- inspect integration status;
+- inspect recent activity;
+- inspect audit history;
+- troubleshoot the tenant.
+
+### Disconnect behavior
+
+Disconnect/suspend should be reversible where possible.
+
+The normal control plane must not expose irreversible hard deletion without a separate destructive workflow with:
+
+- explicit reason;
+- confirmation;
+- audit event;
+- dependency checks;
+- recovery/backup consideration;
+- elevated re-authentication;
+- optional dual approval.
+
+## 6. Service packages
+
+SuperAdmin must manage commercial capability packages.
+
+A package may define:
+
+- maximum users;
+- maximum integrations;
+- API request limits;
+- burst limits;
+- export limits;
+- SSO;
+- custom roles;
+- autonomous agents;
+- advanced BI;
+- webhooks;
+- support priority;
+- pricing;
+- custom overrides.
+
+A package can be assigned to an onboarded business.
+
+Package changes must be audited.
+
+## 7. Business Service / Integration Catalog
+
+This is where customer-facing integration offerings belong.
+
+SuperAdmin may:
+
+- publish connector/service templates;
+- maintain reusable integration packs;
+- version templates;
+- inspect installation compatibility;
+- troubleshoot customer integrations;
+- disconnect/revoke a business integration;
+- publish or unpublish a service offering.
+
+This area must never be confused with EIP platform health.
+
+## 8. Access & Control
+
+SuperAdmin must be able to inspect and control tenant users:
+
+- list users;
+- create users;
+- activate/deactivate users;
+- change roles;
+- reset credentials through the approved secure flow;
+- inspect recent access activity.
+
+Every privileged change is audited.
+
+## 9. Security & Audit
+
+Provide a cross-business audit center with:
+
+- actor;
+- business;
+- action;
+- resource;
+- timestamp;
+- IP/security metadata where permitted;
+- reason/reference where required;
+- before/after metadata where appropriate.
+
+Support filtering by:
+
+- business;
+- actor;
+- action;
+- resource;
+- date range;
+- security severity.
+
+## 10. Troubleshooting
+
+Provide a dedicated operator troubleshooting workspace.
+
+It should correlate:
+
+- platform health;
+- tenant status;
+- service package;
+- user/access failures;
+- integration health;
+- recent events;
+- audit activity;
+- failed jobs;
+- error signatures;
+- incident history.
+
+AI may summarize evidence, but it must not invent evidence or silently perform privileged actions.
+
+## 11. Feature controls
+
+SuperAdmin may enable/disable global feature flags.
+
+Every change must:
+
+- require platform authorization;
+- be auditable;
+- show current state;
+- show impact/description;
+- avoid silently changing tenant permissions.
+
+## 12. System configuration
+
+SuperAdmin controls platform-wide settings and selected tenant-level administrative settings.
+
+Examples:
+
+- feature flags;
+- date/time defaults;
+- service configuration;
+- quotas;
+- rate limits;
+- notification configuration;
+- maintenance controls;
+- release configuration.
+
+## 13. Modern UX requirements
+
+The console should feel like a high-end platform operations center:
+
+- dense but readable information hierarchy;
+- responsive layout;
+- keyboard accessible;
+- dark/light/high-contrast support where appropriate;
+- clear severity states;
+- live refresh where authoritative telemetry exists;
+- drill-down instead of information overload;
+- command/search capability;
+- persistent context for selected business;
+- safe destructive-action flows;
+- no fake data.
+
+## 14. Control philosophy
+
+SuperAdmin is **not** another business dashboard with more permissions.
+
+It is the **EIP platform operating console**.
+
+Business dashboards operate business data.
+
+SuperAdmin operates:
+
+**Platform → Businesses → Services → Access → Security → Configuration → Recovery.**
+
+## 15. Acceptance criteria
+
+The SuperAdmin implementation is accepted only when:
+
+- EIP works without customer connectors;
+- Command Center focuses on platform performance and lifecycle;
+- business registration works;
+- business activation/suspension/disconnection works;
+- package creation and assignment work;
+- tenant user administration works;
+- feature flags can be controlled;
+- global audit is searchable;
+- system health uses real telemetry;
+- customer integrations are clearly separated from EIP infrastructure;
+- privileged actions are audited;
+- no dashboard telemetry is fabricated;
+- destructive operations have safeguards;
+- UI works on desktop and mobile;
+- build/type-check/tests pass.
 

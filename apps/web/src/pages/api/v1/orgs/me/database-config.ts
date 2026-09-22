@@ -6,14 +6,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { devJson, getDevSupabase, requireDevAuth, isOrgAdmin } from '../../../../../lib/dev-auth';
 
 async function encrypt(plaintext: string, orgId: string): Promise<string> {
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`org:${orgId}`)),
-    { name: 'AES-GCM', length: 256 }, false, ['encrypt'],
+  const master = process.env.EIP_ENCRYPTION_MASTER_KEY?.trim();
+  if (!master || Buffer.byteLength(master, 'utf8') < 32) {
+    throw new Error('EIP_ENCRYPTION_MASTER_KEY is required and must contain at least 32 UTF-8 bytes');
+  }
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    encoder.encode('ellines-eip:dev:v2:' + master + ':organization:' + orgId),
   );
+  const key = await crypto.subtle.importKey('raw', digest, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, keyMaterial, new TextEncoder().encode(plaintext));
-  return JSON.stringify({ encrypted: true, version: 1, iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))) });
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: encoder.encode(orgId), tagLength: 128 },
+    key,
+    encoder.encode(plaintext),
+  );
+  return JSON.stringify({
+    encrypted: true,
+    version: 2,
+    algorithm: 'AES-256-GCM',
+    iv: Buffer.from(iv).toString('base64'),
+    ciphertext: Buffer.from(new Uint8Array(ciphertext)).toString('base64'),
+  });
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
