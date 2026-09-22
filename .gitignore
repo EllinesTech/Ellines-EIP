@@ -38,6 +38,7 @@ desktop.ini
 coverage/
 .wrangler/
 apps/web/.wrangler/
+build*.txt
 
 # Docker volumes
 infra/docker/data/
