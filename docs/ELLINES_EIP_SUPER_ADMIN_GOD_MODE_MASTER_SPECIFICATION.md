@@ -3,9 +3,9 @@
 **Product:** Ellines EIP — Enterprise Intelligence Platform
 **AI engine:** Ellinea AI · **Parent:** Ellines Tech
 **Document class:** Long-term engineering/product architecture specification (control-plane governing document)
-**Status:** Phase 1 reviewed — ready for adoption; no application-code changes are included in this change set
-**Baseline:** `main` @ `87ab44cb661b28c138740e27665323f2db09dce3` ("Merge eip/phase-0-foundation: complete phase 0 repository foundation")
-**Branch:** `eip/phase-1-foundation`
+**Status:** Phases 0–1 **done** — verified 2026-09-22 (status marking pass; no application-code changes in this change set) · Phase 2 is `next` on `eip/phase-2-platform-control-plane`
+**Baseline:** `main` @ `179886897da01da6aec73c258a487fb65eb840a3` ("Merge eip/phase-1-foundation: complete phase 1 master specification review + seed phase 2 build queue")
+**Branch:** `eip/phase-2-platform-control-plane`
 **Supersedes:** nothing (companion to `docs/00_EIP_MASTER_SPEC.md` and `docs/34_Super_Admin_Dashboard_Spec.md`; where those documents conflict with this one on control-plane matters, this document governs until formally revised)
 **Audience:** Ellines engineers, platform operators, reviewers
 
@@ -55,6 +55,8 @@ Changes to this specification are made via pull request to `main` with a summary
 | Version | Date | Status | Summary | Branch / commit |
 |---|---|---|---|---|
 | 0.1.0-draft | 2026-09-22 | Draft for review | Initial draft created from a verified repository audit (gap map G-01..G-24, Phases 0–15, full control-plane specification). Review corrections applied: audit-coverage accuracy (tenant settings and package update/delete audit already exist), C-0 redefined as an access-event class, AI server-side authorization and membership truth moved to early roadmap phases, unified permission grammar, silent-fallback prohibition, data-protection and RPO/RTO requirements, onboarding/slug security, health payload minimization, webhook-test SSRF rules, retention enforcement ownership, notification phase ownership, session-management surface, concurrency/conflict rules, search and window performance/accessibility requirements, z-index tokens, single-page split triggers, Register-Business IA classification, secret-rotation classification, actor-model clarification, contract/parity validation mechanisms, synthetic-org and service-role isolation requirements, and gap-map re-verification against current code. | `eip/super-admin-god-mode-master-spec` (source draft) |
+
+| 0.1.1 | 2026-09-22 | Phases 0–1 recorded done (status marking pass) | Marked roadmap Phase 0 and Phase 1 **done** with recorded evidence (§39.1 phase status index, §40.9 verification log, §40.3 rows strengthened); `docs/05_Build_Queue.md` given `done` rows for P0/P1. Phase 2 scope re-verified deliverable-by-deliverable against code and recorded as still open (§40.9.3) — nothing in Phase 2 is claimed complete. Verification run on this branch: `build:shared`, `build -w @ellines-eip/web`, `build -w @ellines-eip/identity`, `verify:pages-functions`, `test -w @ellines-eip/shared` (37 tests, incl. the Phase-0 contract gate) — all green (§40.9.4). | `eip/phase-2-platform-control-plane` |
 
 Future versions MUST be appended here (version, date, status, summary, branch/commit reference) per the change-control rule in 0.4.
 
@@ -1569,7 +1571,31 @@ These rules bind all current and future development. They may be amended only by
 
 Each phase defines: objective, dependencies, major deliverables, tests, acceptance criteria, completion definition. Phases map to `docs/05_Build_Queue.md` items when work starts. **No phase may be skipped; a phase is complete only when its completion definition is met.**
 
+### 39.1 Phase status index (verified against code 2026-09-22)
+
+Status legend: **done** = completion definition met and evidenced, with the verification recorded (40.9) · **next** = the phase currently open in `docs/05_Build_Queue.md` · **todo** = not started. This index and `docs/05_Build_Queue.md` MUST agree at every merge; per 0.4, an item may only be marked resolved/done when the verifying evidence (test, build, or code reference) is recorded.
+
+| Phase | Status | Completion evidence |
+|---|---|---|
+| Phase 0 — Foundation / Repository Integrity | **done** (verified 2026-09-22) | All six deliverables on `main` (`87ab44c`) with tests + CI gate active; guardrail commands green — §40.9.1 |
+| Phase 1 — Master Specification | **done** (verified 2026-09-22) | Spec review (`906bda6`), gap map re-verified (§40.3), queue seeded from Phase 2+ (`dd5a391`), merged to `main` (`1798868`) — §40.9.2 |
+| Phase 2 — Platform Control Plane Foundation | **next** — branch open, no deliverable complete (§40.9.3) | — |
+| Phase 3 — Super Admin / God Mode Core | todo | — |
+| Phase 4 — Internal Ellines Operations | todo | — |
+| Phase 5 — Business / Tenant Governance | todo | — |
+| Phase 6 — Connector Platform | todo | — |
+| Phase 7 — Licensing / Usage / Entitlements | todo | — |
+| Phase 8 — Security / Audit / Compliance | todo | — |
+| Phase 9 — Health / Incidents / Operations | todo | — |
+| Phase 10 — Platform Intelligence / AI | todo | — |
+| Phase 11 — Developer / API Operations | todo | — |
+| Phase 12 — Recovery / Maintenance | todo | — |
+| Phase 13 — Business Owner Dashboard | todo | — |
+| Phase 14 — Remaining Specialized Dashboards | todo | — |
+| Phase 15 — Full Platform Validation | todo | — |
+
 ### PHASE 0 — Foundation / Repository Integrity
+- **Status:** **done** — verified 2026-09-22 (§39.1, §40.9.1); all six deliverables merged to `main` (`87ab44c`)
 - **Objective:** a trustworthy baseline: builds green, contracts verified, no known broken user flows.
 - **Dependencies:** none.
 - **Deliverables:** fix G-01 (package payload mismatch), G-02 (password policy parity), G-14 (single platform user-API contract), remove dead duplicate exports in `api.ts` (G-06), remove orphan `platform.module.css` (G-07); **structural contract validation** for the dual-backend split (G-14 follow-up): a machine-checkable contract artifact (shared contract definitions / generated types / API schema) plus contract tests and CI validation, so NestJS↔Pages-Functions drift fails the build instead of being caught in review [PLANNED mechanism — select the lightest option that runs in CI].
@@ -1578,6 +1604,7 @@ Each phase defines: objective, dependencies, major deliverables, tests, acceptan
 - **Completion definition:** all Phase-0 fixes merged with tests; contract-validation mechanism active in CI; gap map rows G-01/02/06/07/14 marked resolved with evidence.
 
 ### PHASE 1 — Master Specification
+- **Status:** **done** — verified 2026-09-22 (§39.1, §40.9.2); reviewed spec, re-verified gap map and Phase-2+ queue merged to `main` (`1798868`)
 - **Objective:** this document reviewed, amended as needed, and adopted as the governing control-plane spec.
 - **Dependencies:** Phase 0 findings incorporated.
 - **Deliverables:** reviewed spec prepared on `eip/phase-1-foundation`; Section 40 gap map re-verified against the Phase-0 baseline; `docs/05_Build_Queue.md` seeded from Phase 2+ deliverables.
@@ -1585,6 +1612,7 @@ Each phase defines: objective, dependencies, major deliverables, tests, acceptan
 - **Completion definition:** reviewed spec and Phase-2+ queue are complete on the phase branch and ready for merge to `main`. Adoption occurs when the branch is merged after verification.
 
 ### PHASE 2 — Platform Control Plane Foundation (identity/membership truth, authorization, AI security, audit, hardening)
+- **Status:** **next** — branch `eip/phase-2-platform-control-plane` open; **no deliverable is complete** (each deliverable re-verified against code 2026-09-22 — §40.9.3)
 - **Objective:** establish the early foundation that removes live authorization and data-integrity risks BEFORE advanced platform features are built: membership truth → role resolution → scoped permissions (Phase 4) → delegated/elevated operations (Phase 8+).
 - **Dependencies:** Phase 0/1.
 - **Deliverables:**
@@ -1758,11 +1786,11 @@ Status legend: **CONFIRMED** = verified in code during this audit (with referenc
 
 | Prior finding | Status |
 |---|---|
-| G-01 package create payload mismatch | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
-| G-02 password-policy parity | Resolved in Phase 0; required policy is ≥8 characters; documentation wording corrected here |
-| G-06 duplicate/dead API exports | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
-| G-07 orphan platform.module.css | Resolved in Phase 0; verified in Phase-0 merge 87ab44c |
-| G-14 platform user API contract split | Resolved in Phase 0; structural contract validation included in the Phase-0 completion baseline |
+| G-01 package create payload mismatch | **done** — resolved in Phase 0 (`87ab44c`); re-verified 2026-09-22: `createPlatformPackage` in `apps/web/src/lib/api.ts` sends `displayName`, no `display_name` in the request body; contract test `package creation uses canonical displayName (G-01)` green |
+| G-02 password-policy parity | **done** — resolved in Phase 0; authoritative policy is ≥8 (`PASSWORD_MIN_LENGTH` in `packages/shared/src/contracts/platform-users.contract.ts`); re-verified 2026-09-22 with the boundary tests `password minimum is authoritative 8 (spec 24.1)` + `Pages + NestJS password implementations conform to min 8`, and no `minLength: 6` / `length < 6` remains in `platform/orgs/create.ts` or `platform/orgs/[id]/users.ts` |
+| G-06 duplicate/dead API exports | **done** — resolved in Phase 0 (`87ab44c`); re-verified 2026-09-22 by contract test `dead duplicate exports are gone (G-06)` (canonical exports preserved) |
+| G-07 orphan platform.module.css | **done** — resolved in Phase 0 (`87ab44c`); re-verified 2026-09-22: no `*.module.css` exists under `apps/web/src/app/app/platform/` (the platform route styles live in `super-admin.module.css`) |
+| G-14 platform user API contract split | **done** — resolved in Phase 0; re-verified 2026-09-22: Pages (`platform/orgs/[id]/users.ts`), NestJS (`platform.controller.ts` `@Query('userId')`) and the web client all use the `?userId=` query param (contract test `platform-user param style is query ?userId= (G-14)`), backed by the structural contract artifact + CI gate (§40.9.1 row 6) |
 
 | Prior finding | Status |
 |---|---|
@@ -1797,6 +1825,59 @@ The gap map above uses these classifications; every entry must remain true again
 - **PLANNED** — everything marked [PLANNED] throughout the document; planned items MUST NOT be represented as existing.
 
 Accuracy notes (verified this review): tenant settings audit is NOT missing; package update/delete audit is NOT missing; the remaining confirmed audit gaps are feature-flag changes and connector-pack creation. Password-policy ≥6 checks live in `platform/orgs/[id]/users.ts` (two checks) and `platform/orgs/create.ts` — not `orgs/me/users.ts`. CORS wildcard is present in both `shared/auth.ts` and `shared/errors.ts`.
+
+### 40.9 Phase completion verification log (2026-09-22)
+
+Purpose: record **what is actually done** in this specification, with evidence, so a phase is never marked done by assertion. Verified on branch `eip/phase-2-platform-control-plane` @ `1798868` (equal to `main` @ `1798868`). Every row can be re-checked by running the command or test it names.
+
+#### 40.9.1 Phase 0 — Foundation / Repository Integrity: **done** (marked done 2026-09-22)
+
+| # | Deliverable | Verified evidence |
+|---|---|---|
+| 1 | G-01 package payload mismatch | `createPlatformPackage` (`apps/web/src/lib/api.ts`) sends `displayName`; no `display_name` in the create body — contract test `package creation uses canonical displayName (G-01)` green |
+| 2 | G-02 password-policy parity | `PASSWORD_MIN_LENGTH = 8` (`packages/shared/src/contracts/platform-users.contract.ts`); auth flows + `platform/orgs/create.ts` (`length < 8`) + `platform/orgs/[id]/users.ts` (`length < 8`) all enforce 8; no `minLength: 6` / `< 6` remains in the platform functions; boundary tests green |
+| 3 | G-14 single platform user-API contract | Pages `platform/orgs/[id]/users.ts` + NestJS `platform.controller.ts` (`@Query('userId')`) + web client all use `?userId=`; no `:userId` path param — contract test green |
+| 4 | G-06 dead duplicate API exports | Contract test `dead duplicate exports are gone (G-06)` green; canonical exports preserved |
+| 5 | G-07 orphan `platform.module.css` | Absent: no `*.module.css` under `apps/web/src/app/app/platform/` |
+| 6 | Structural contract validation (G-14 follow-up) | Artifact `packages/shared/src/contracts/platform-users.contract.ts`; tests `packages/shared/src/contracts/__tests__/platform-users.contract.spec.ts` (8 tests); CI gate `.github/workflows/test-coverage.yml` step **"Phase 0 contract validation gate"** (`npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand`, `continue-on-error: false`) |
+
+Phase-0 acceptance (Section 39): package creation works end-to-end from the UI; a 7-char password is rejected everywhere; an 8-char password is accepted everywhere; an intentionally divergent contract change fails CI; `npm run build:web` + `verify:pages-functions` pass — **all confirmed** (§40.9.4).
+
+#### 40.9.2 Phase 1 — Master Specification: **done** (marked done 2026-09-22)
+
+| # | Deliverable | Verified evidence |
+|---|---|---|
+| 1 | Reviewed spec prepared on `eip/phase-1-foundation` | `906bda6` "docs: complete phase 1 master specification review" (status/baseline/branch updated, version-history row corrected, Phase-0 fixes moved into 40.3, G-14 removed from 40.2) |
+| 2 | Section 40 gap map re-verified against the Phase-0 baseline | §40.3 lists G-01/G-02/G-06/G-07/G-14 with resolutions; G-14 is no longer in the §40.2 confirmed-gap list |
+| 3 | `docs/05_Build_Queue.md` seeded from Phase 2+ deliverables | `dd5a391` "docs: seed build queue from phase 2 roadmap" (phases 2–15) |
+| 4 | Adoption (merge to `main`) | `1798868` "Merge eip/phase-1-foundation: complete phase 1 master specification review + seed phase 2 build queue" |
+
+Phase-1 acceptance (Section 39): every remaining gap row has an owner phase (§40.2 Phase column); Phase-0-resolved gaps are no longer classified as open/confirmed; no `[PLANNED]` capability is represented as existing — **all confirmed**.
+
+#### 40.9.3 Phase 2 scope re-verification: **not started** — each deliverable re-checked in code 2026-09-22
+
+| # | Phase-2 deliverable (Section 39) | State verified 2026-09-22 | Evidence pointer |
+|---|---|---|---|
+| 1 | Membership truth (G-15) | **open** — `organization_memberships` is still written only by `orgs/me/create-child.ts` and `orgs/me/custom-roles/assign.ts`; `auth/register.ts` and `platform/orgs/[id]/users.ts` still create users with **no** membership row, so `checkPermission` (`functions/shared/auth.ts`) cannot resolve their custom roles | G-15 (§40.2) |
+| 2 | AI server-side identity/security (G-17 core) | **open** — client-supplied `role` still overrides the JWT role and client `summary`/`memory`/`dna` are still accepted as grounding (`functions/api/v1/ellinea/ask.ts` lines 224/232-234); no AI audit, no AI rate limit | G-17 (§40.2) |
+| 3 | Baseline authentication hardening (24.4.1) | **partial** — login/register/forgot/reset rate limiting exists and is `[VERIFIED]` (`auth/login.ts`, `auth/register.ts`, `auth/forgot-password.ts`, `auth/reset-password.ts`); account-lockout tuning is `[PLANNED]`; session-registry groundwork is **absent** (no session model in `services/identity/prisma/schema.prisma`) | 24.2.3, 24.4.1 |
+| 4 | Audit contract (G-12 + row upgrade + C-0 events) | **open** — `platform/flags.ts` PATCH and `platform/connector-packs.ts` POST still write **no** `audit_logs` row; `auditRow()` (`functions/shared/auth.ts`) still carries only `organization_id/user_id/action/resource/metadata/ip` (no before/after, reason, result, correlation ID); no C-0 access-event mechanism | G-12 (§40.2); 25.1; 9.1.1 |
+| 5 | Unified permission grammar (12.2) | **open** — only the existing fixed-role + custom-role wildcard grammar (`canByRole`/`checkPermission`) exists; no single canonical grammar covering tenant + platform grants and no invalid-grant rejection | 12.2 |
+| 6 | Tenant-isolation test suite as a release gate (36.1) | **open** — no parameterized cross-tenant / negative-authorization / synthetic-org suite exists (current inventory: `packages/shared/src/uem.spec.ts`, `packages/shared/src/contracts/__tests__/platform-users.contract.spec.ts`, `apps/web/functions/api/v1/auth/__tests__/login.spec.ts`, `apps/web/functions/shared/encryption.spec.ts`) | 36.1; 33.2; 20.7 |
+| 7 | Control-plane structural fixes (G-08, G-05, G-19) | **open** — health still returns hardcoded `status: 'ok'` with no DB/dependency probe (`functions/api/v1/health.ts`); audit UI still sends only an action prefix + `limit: 100` with no org/date filters, pagination or export (`platform/page.tsx` `loadAudit`); CORS is still wildcard `access-control-allow-origin: *` in **both** `shared/auth.ts` and `shared/errors.ts` | G-05/G-08/G-19 (§40.2) |
+
+No Phase-2 deliverable is complete, so Phase 2 remains `next` in `docs/05_Build_Queue.md`. Nothing in this section is represented as done.
+
+#### 40.9.4 Verification commands run (all green, 2026-09-22)
+
+```bash
+npm run build:shared                    # tsc for shared, connectors-sdk, ellinea-ai, ellinea-sdk — pass
+npm run build -w @ellines-eip/web       # Next.js production build (static export) — pass
+npm run build -w @ellines-eip/identity  # prisma generate + nest build — pass
+npm run verify:pages-functions          # "Pages Functions import check OK (151 files, 188 relative imports)."
+npm run test -w @ellines-eip/shared     # 2 suites / 37 tests passed (includes the Phase-0 contract suite)
+npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand   # CI-gate equivalent — 8/8 passed
+```
 
 ## 41. Acceptance Criteria for This Specification
 

@@ -18,7 +18,9 @@ function csvEscape(value: unknown): string {
 }
 
 import {
+  auditRow,
   getAdminClient,
+  getClientIp,
   json,
   options,
   platformAdminFromEnv,
@@ -90,6 +92,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     for (const row of rows) {
       lines.push([row.createdAt,row.organizationName || row.organizationId,row.userEmail,row.userFullName,row.action,row.resource,row.metadata].map(csvEscape).join(','));
     }
+    // C-0 access event (spec 9.1.1 rule 3, 25.3 rule 3): a cross-tenant audit EXPORT is itself
+    // the auditable act, so it always writes an explicit audit row. The write is required, not
+    // best-effort — if it fails the export fails, because an unauditable privileged export must
+    // not happen.
+    const { error: auditError } = await supabase.from('audit_logs').insert(auditRow({
+      organizationId: auth.organizationId,
+      userId: auth.sub,
+      action: 'platform.audit.export',
+      resource: 'audit_logs',
+      metadata: {
+        correlationId: crypto.randomUUID(),
+        reason: 'cross-tenant audit export',
+        filters: { orgId, action, from, to },
+        rowCount: rows.length,
+        format: 'csv',
+        result: 'success',
+      },
+      ip: getClientIp(context.request),
+    }));
+    if (auditError) {
+      return json({ statusCode: 500, message: 'Audit export could not be recorded' }, 500);
+    }
     return new Response(lines.join('\n'), {
       status: 200,
       headers: {
@@ -98,5 +122,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       },
     });
   }
+
+  // Routine paged browsing of the cross-tenant audit log is a C-0 controlled access WITHOUT a
+  // per-view audit row (spec 9.1.1 rule 1) — auditing every page would flood the append-only
+  // store. Only the export above, and other exceptional reads, write audit rows.
   return json({ total: count ?? 0, offset, limit, rows });
 };

@@ -141,15 +141,32 @@ export async function requireAuth(
     const claims = await verifyAccessToken(env, token);
     const supabase = getAdminClient(env);
     const { data: user, error: userError } = await supabase.from('users')
-      .select('id, email, is_active').eq('id', claims.sub).maybeSingle();
+      .select('id, email, is_active, organization_id, role').eq('id', claims.sub).maybeSingle();
     if (userError || !user || !user.is_active) return json({ statusCode: 401, message: 'Unauthorized' }, 401);
     const { data: membership, error: membershipError } = await supabase.from('organization_memberships')
       .select('organization_id, role, is_active')
       .eq('user_id', claims.sub).eq('organization_id', claims.organizationId).maybeSingle();
-    if (membershipError || !membership || !membership.is_active) {
+
+    if (membership) {
+      // Membership truth wins: it carries the custom-role binding, so it fails closed.
+      if (!membership.is_active) {
+        return json({ statusCode: 401, message: 'Organization membership is inactive or missing' }, 401);
+      }
+      return { sub: claims.sub, email: user.email, organizationId: membership.organization_id, role: membership.role as string, ip: getClientIp(request) };
+    }
+
+    if (membershipError) return json({ statusCode: 401, message: 'Unauthorized' }, 401);
+
+    // Transitional primary-org fallback (spec 33.1.2): memberships are backfilled by the
+    // `eip_users_primary_membership` trigger in migration 0002, but until that migration is
+    // applied some users have no membership row yet. Resolve from the SERVER-SIDE `users`
+    // record — never client input — and only when it matches the token's organization, so a
+    // stale or tampered token can never reach another tenant. Fails closed otherwise.
+    // Remove this branch once membership truth is fully backfilled (33.1.2).
+    if (!user.organization_id || !user.role || user.organization_id !== claims.organizationId) {
       return json({ statusCode: 401, message: 'Organization membership is inactive or missing' }, 401);
     }
-    return { sub: claims.sub, email: user.email, organizationId: membership.organization_id, role: membership.role as string, ip: getClientIp(request) };
+    return { sub: claims.sub, email: user.email, organizationId: user.organization_id, role: user.role as string, ip: getClientIp(request) };
   } catch {
     return json({ statusCode: 401, message: 'Unauthorized' }, 401);
   }

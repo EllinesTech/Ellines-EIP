@@ -6,10 +6,14 @@
 
 This queue is seeded from the Master Specification Phase 2–15 roadmap. Work proceeds in order; no phase is skipped. The active phase is completed, verified, built, and reviewed before the next phase begins.
 
+**Phases 0 and 1 are done** (P0 and P1 rows below, verified 2026-09-22 with the evidence recorded in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md` §39.1 and §40.9). Phase 2 is the active phase and has **no completed deliverable yet** — each of its deliverables was re-verified against code on 2026-09-22 and recorded as open (§40.9.3), so nothing in Phase 2 may be marked done without new evidence.
+
 ## Phase Queue
 
 | ID | Phase | Scope | Status |
 |---|---|---|---|
+| P0 | Phase 0 — Foundation / Repository Integrity | G-01 package payload, G-02 password parity, G-14 user-API contract, dead-export removal (G-06), orphan CSS removal (G-07), structural contract validation (shared contract artifact + contract tests + CI gate) | done — verified 2026-09-22 (spec §40.9.1) |
+| P1 | Phase 1 — Master Specification | Master spec reviewed and amended; gap map re-verified against the Phase-0 baseline; this queue seeded from the Phase 2+ roadmap | done — verified 2026-09-22 (spec §40.9.2) |
 | P2 | Phase 2 — Platform Control Plane Foundation | Membership truth, AI server-side authorization/grounding, auth hardening, audit contract, permission grammar, tenant-isolation gate, health/CORS/audit UI fixes | next |
 | P3 | Phase 3 — Super Admin / God Mode Core | Safeguard engine, confirmation/reason capture, privileged-operation audit fields, package/connector-pack management, window-layer groundwork | todo |
 | P4 | Phase 4 — Internal Ellines Operations | DB-backed platform staff/roles/grants, scoped authorization, expiry, bootstrap | todo |
@@ -37,3 +41,20 @@ Phase 2 cannot be marked done until its Master Specification completion definiti
 4. Never represent `[PLANNED]` capabilities as live or implemented.
 5. Keep `/app/platform` as the single Super Admin control-plane architecture; do not create a competing `/app/super-admin` surface.
 6. Before merge to `main`, verify the phase branch against `main`, run the applicable tests/builds, and review the diff.
+
+## Verification log
+
+### 2026-09-22 — P0/P1 status marking pass (`eip/phase-2-platform-control-plane` @ `1798868`)
+
+Status marking only: the two completed phases were recorded as `done` with evidence, and the `next` phase was re-verified as still open. Evidence lives in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md`: §39.1 (phase status index), §40.3 (resolved gaps re-verified), §40.9 (phase completion verification log).
+
+| Check | Command | Result |
+|---|---|---|
+| Shared packages build | `npm run build:shared` | pass |
+| Web build | `npm run build -w @ellines-eip/web` | pass |
+| Identity build | `npm run build -w @ellines-eip/identity` | pass |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 151 files, 188 relative imports |
+| Shared tests (incl. Phase-0 contract suite) | `npm run test -w @ellines-eip/shared` | pass — 2 suites / 37 tests |
+| Phase-0 contract gate (CI equivalent) | `npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand` | pass — 8/8 |
+
+Phase-2 deliverables re-checked as **open** (no deliverable complete): membership truth (G-15), AI server-side identity/grounding (G-17 core), auth hardening (partial: rate limits exist, lockout/session-registry absent), audit contract (G-12 flags/packs audit + row upgrade + C-0 events), unified permission grammar, tenant-isolation suite, control-plane fixes (G-05 health probes, G-08 audit UI depth, G-19 CORS allowlist).

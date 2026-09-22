@@ -3,7 +3,8 @@
 **Version:** 2.0  
 **Status:** Canonical SuperAdmin UX/control specification  
 **Route:** `/app/platform`  
-**Access:** Platform Super Admin only
+**Access:** Platform Super Admin only  
+**Acceptance status:** §16 — verified against code 2026-09-22 (11 met · 3 partial · 1 not met)
 
 ## 1. Purpose
 
@@ -318,4 +319,30 @@ The SuperAdmin implementation is accepted only when:
 - destructive operations have safeguards;
 - UI works on desktop and mobile;
 - build/type-check/tests pass.
+
+## 16. Acceptance-criteria status (verified 2026-09-22)
+
+Verified against `main` @ `1798868` (branch `eip/phase-2-platform-control-plane`). This section does not change the criteria in §15 — it records **what is done today**, so the criteria stay the acceptance bar. Roadmap ownership and the full verification log live in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md` (§39, §40.9): Phases 0–1 of that roadmap are **done**; Phase 2 is `next`.
+
+Status legend: **met** = verified working in code today · **partial** = works but incomplete (owning phase + gap id given) · **not met** = verified missing.
+
+| # | Acceptance criterion (§15) | Status | Evidence / gap |
+|---|---|---|---|
+| 1 | EIP works without customer connectors | met | Auth, tenant administration, audit and platform APIs run with no connector installed (master spec §40.1) |
+| 2 | Command Center focuses on platform performance and lifecycle | met | Command Center section of `apps/web/src/app/app/platform/page.tsx`; real 24h metrics from `platform/metrics.ts` (platform org excluded); lifecycle/business table. Deeper health telemetry is G-05 (Phase 2) |
+| 3 | Business registration works | met | `createPlatformOrg` (`lib/api.ts`) → `platform/orgs/create.ts` (org + optional owner) |
+| 4 | Business activation/suspension/disconnection works | met | `platform/orgs/[id].ts` PATCH `status: active\|suspended` via `updatePlatformOrgStatus`; audited as `platform.org.status` |
+| 5 | Package creation and assignment work | met | Creation fixed in Phase 0 (G-01): `platform/packages.ts` reads `displayName`, the client sends `displayName` (contract test green); assignment via `platform/orgs/[id]/package.ts`. Edit/delete UI is still missing (G-09, Phase 3) |
+| 6 | Tenant user administration works | met | `platform/orgs/[id]/users.ts` list/create/update/deactivate with ≥8-character password parity (G-02 resolved) |
+| 7 | Feature flags can be controlled | met | `platform/flags.ts` PATCH + `updatePlatformFlag` client helper. Audit of flag changes is still missing (G-12, Phase 2) |
+| 8 | Global audit is searchable | **partial** | Only action-prefix + fixed `limit: 100` today; the backend supports `orgId`/`from`/`to`/`offset` but the UI does not expose them, and there is no export (G-08, Phase 2) |
+| 9 | System health uses real telemetry | **not met** | `functions/api/v1/health.ts` still returns a hardcoded `status: 'ok'` with no DB/dependency probe and the three-tier payload boundary (G-05, Phase 2) |
+| 10 | Customer integrations are clearly separated from EIP infrastructure | met | §2 of this document is implemented in the UI copy ("Tenant diagnostics — not EIP core infrastructure") and in the navigation model |
+| 11 | Privileged actions are audited | **partial** | Audited: org create/status, tenant settings, package create/update/delete, user create/update/deactivate, credential-encryption migration. Not audited yet: feature-flag changes, connector-pack creation (G-12, Phase 2). Reason/before-after fields are Phase 2/3 |
+| 12 | No dashboard telemetry is fabricated | met | No mock/random generators remain; unavailable telemetry renders as unavailable, with the silent-fallback prohibition (master spec §38) |
+| 13 | Destructive operations have safeguards | **partial** | Confirmation prompts exist (suspend/reconnect, encryption migration); the safeguard matrix, reason capture and dual approval are Phase 3/8 |
+| 14 | UI works on desktop and mobile | met | Responsive breakpoints in `super-admin.module.css`; keyboard-accessible controls (master spec §40.1) |
+| 15 | Build/type-check/tests pass | met | Verified 2026-09-22: `build:shared`, `build -w @ellines-eip/web`, `build -w @ellines-eip/identity`, `verify:pages-functions` (151 files, 188 imports), shared tests 37/37 incl. the Phase-0 contract gate (master spec §40.9.4) |
+
+Rows 8, 9 and 11 are the reason the Super Admin console is **not yet accepted** under §15; each is owned by Phase 2 of the master-specification roadmap (`docs/05_Build_Queue.md` P2).
 
