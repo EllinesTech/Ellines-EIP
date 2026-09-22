@@ -77,7 +77,7 @@ describe('Phase 2 platform security contracts', () => {
     const auth = readRepoFile('apps/web/functions/shared/auth.ts');
     expect(auth).toMatch(/normalizePermission/);
     expect(auth).toMatch(/isValidPermission/);
-    expect(auth).toMatch(/endsWith\(':\\*'\)/);
+    expect(auth).toMatch(/endsWith\(':\*'\)/);
   });
 
   test('audit UI exposes org/date filters, pagination and export', () => {
