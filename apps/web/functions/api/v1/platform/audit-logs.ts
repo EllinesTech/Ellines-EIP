@@ -12,6 +12,11 @@
  *   from     — ISO date start (optional)
  *   to       — ISO date end   (optional)
  */
+function csvEscape(value: unknown): string {
+  const text = value == null ? '' : typeof value === 'string' ? value : JSON.stringify(value);
+  return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+
 import {
   getAdminClient,
   json,
@@ -32,6 +37,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const url = new URL(context.request.url);
+  const format = url.searchParams.get('format') || 'json';
   const orgId = url.searchParams.get('orgId') || null;
   const action = url.searchParams.get('action') || null;
   const from = url.searchParams.get('from') || null;
@@ -79,5 +85,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     };
   });
 
+  if (format === 'csv') {
+    const lines = [['createdAt','organization','actorEmail','actorName','action','resource','metadata'].join(',')];
+    for (const row of rows) {
+      lines.push([row.createdAt,row.organizationName || row.organizationId,row.userEmail,row.userFullName,row.action,row.resource,row.metadata].map(csvEscape).join(','));
+    }
+    return new Response(lines.join('\n'), {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="eip-platform-audit-${new Date().toISOString().slice(0,10)}.csv"`,
+      },
+    });
+  }
   return json({ total: count ?? 0, offset, limit, rows });
 };
