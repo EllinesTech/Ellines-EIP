@@ -195,7 +195,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     dna?: unknown;
     role?: string;
     organizationName?: string;
-    templateAnswer?: string;
   };
   try {
     body = (await context.request.json()) as typeof body;
@@ -288,10 +287,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'LLM failed';
-    const fallbackAnswer =
-      typeof body.templateAnswer === 'string' && body.templateAnswer
-        ? body.templateAnswer
-        : `Ellinea could not reach the LLM provider (${message}). Falling back to template reasoning is recommended on the client.`;
+    const fallbackAnswer = `Ellinea could not reach the LLM provider (${message}). No live model answer is available.`;
     void notifyUser(fallbackAnswer, 'error');
     return json(
       {
@@ -304,10 +300,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     );
   }
 
-  const ragAnswer =
-    typeof body.templateAnswer === 'string' && body.templateAnswer
-      ? body.templateAnswer
-      : `RAG grounding ready (${grounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. Use the template engine answer.`;
+  const ragAnswer = `RAG grounding ready (${grounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. No generated answer is available.`;
   void notifyUser(ragAnswer, 'rag_template');
   return json({
     answer: ragAnswer,
