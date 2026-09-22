@@ -87,10 +87,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const ownerFullName = (body.ownerFullName || 'Org Owner').trim();
     const ownerPassword = (body.ownerPassword || '').trim();
 
-    if (!ownerPassword || ownerPassword.length < 6) {
+    if (!ownerPassword || ownerPassword.length < 8) {
       // Rollback org creation
       await supabase.from('organizations').delete().eq('id', orgId);
-      return json({ statusCode: 400, message: 'ownerPassword must be at least 6 characters' }, 400);
+      return json({ statusCode: 400, message: 'ownerPassword must be at least 8 characters' }, 400);
     }
 
     // Check email uniqueness

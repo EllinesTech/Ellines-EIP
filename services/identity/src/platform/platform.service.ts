@@ -128,8 +128,8 @@ export class PlatformService {
         const existing = await tx.user.findUnique({ where: { email } });
         if (existing) throw new ConflictException(`Email "${email}" is already registered`);
 
-        if (!dto.ownerPassword || dto.ownerPassword.length < 6) {
-          throw new BadRequestException('ownerPassword must be at least 6 characters');
+        if (!dto.ownerPassword || dto.ownerPassword.length < 8) {
+          throw new BadRequestException('ownerPassword must be at least 8 characters');
         }
 
         const passwordHash = await bcrypt.hash(dto.ownerPassword, 8);
@@ -199,8 +199,8 @@ export class PlatformService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
-    if (!dto.password || dto.password.length < 6) {
-      throw new BadRequestException('Password must be at least 6 characters');
+    if (!dto.password || dto.password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
     }
 
     const VALID_ROLES: UserRole[] = ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'];
@@ -238,7 +238,7 @@ export class PlatformService {
     if (dto.role !== undefined) data.role = dto.role as UserRole;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.password !== undefined) {
-      if (dto.password.length < 6) throw new BadRequestException('Password must be at least 6 characters');
+      if (dto.password.length < 8) throw new BadRequestException('Password must be at least 8 characters');
       data.passwordHash = await bcrypt.hash(dto.password, 8);
     }
 

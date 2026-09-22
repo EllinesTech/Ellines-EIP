@@ -617,7 +617,7 @@ export function listPlatformPackages() {
 
 export function createPlatformPackage(payload: {
   name: string;
-  display_name: string;
+  displayName: string;
   maxUsers?: number | null;
   maxConnectors?: number | null;
   requestsPerDay?: number;
@@ -668,15 +668,6 @@ export interface PlatformAuditRow {
   resource: string;
   metadata: unknown;
   createdAt: string;
-}
-
-export function fetchPlatformAudit(params: { orgId?: string; action?: string; limit?: number; offset?: number } = {}) {
-  const q = new URLSearchParams();
-  if (params.orgId) q.set('orgId', params.orgId);
-  if (params.action) q.set('action', params.action);
-  if (params.limit) q.set('limit', String(params.limit));
-  if (params.offset) q.set('offset', String(params.offset));
-  return request<{ total: number; offset: number; limit: number; rows: PlatformAuditRow[] }>(`/api/v1/platform/audit-logs?${q.toString()}`);
 }
 
 export function listPlatformOrgUsers(orgId: string) {
@@ -1226,42 +1217,6 @@ export interface CreateOrgResult extends PlatformOrg {
   } | null;
 }
 
-/** List users in any org (platform admin), with full detail (isActive, timestamps). */
-export function listPlatformOrgUsersDetailed(orgId: string) {
-  return request<PlatformUserDto[]>(`/api/v1/platform/orgs/${orgId}/users`);
-}
-
-/** Create a user in any org (platform admin). */
-export function createPlatformUser(
-  orgId: string,
-  payload: { email: string; fullName: string; password: string; role?: string },
-) {
-  return request<PlatformUserDto>(`/api/v1/platform/orgs/${orgId}/users`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-/** Update a user in any org (platform admin). */
-export function updatePlatformUser(
-  orgId: string,
-  userId: string,
-  payload: { fullName?: string; role?: string; isActive?: boolean; password?: string },
-) {
-  return request<PlatformUserDto>(`/api/v1/platform/orgs/${orgId}/users?userId=${userId}`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  });
-}
-
-/** Deactivate a user in any org (platform admin). */
-export function deactivatePlatformUser(orgId: string, userId: string) {
-  return request<{ ok: boolean; message: string }>(
-    `/api/v1/platform/orgs/${orgId}/users?userId=${userId}`,
-    { method: 'DELETE' },
-  );
-}
-
 /** Create a brand-new organization (platform admin). */
 export function createPlatformOrg(payload: {
   name: string;
@@ -1310,14 +1265,6 @@ export function listPlatformAuditLogs(params?: {
   if (params?.offset !== undefined) q.set('offset', String(params.offset));
   const qs = q.toString();
   return request<PlatformAuditPage>(`/api/v1/platform/audit-logs${qs ? `?${qs}` : ''}`);
-}
-
-/** Toggle a feature flag (platform admin). */
-export function togglePlatformFlag(key: string, enabled: boolean) {
-  return request<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
-    method: 'PATCH',
-    body: JSON.stringify({ key, enabled }),
-  });
 }
 
 // ─── Phase 5 — Workflow & Automation API ─────────────────────────────────────
@@ -1497,13 +1444,6 @@ export function createReportApi(payload: ReportDeliveryPayload) {
   return request<ScheduledReportDto>('/api/v1/orgs/me/reports', {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
-}
-
-export function runReportApi(id: string) {
-  return request<ScheduledReportDto>(`/api/v1/orgs/me/reports/${id}/run`, {
-    method: 'POST',
-    body: '{}',
   });
 }
 
@@ -2554,10 +2494,6 @@ export type CreateAgentPayload = {
   isActive?: boolean;
 };
 
-export function listAgentsApi() {
-  return request<AgentDto[]>('/api/v1/orgs/me/agents');
-}
-
 export function getAgentApi(id: string) {
   return request<AgentDto>(`/api/v1/orgs/me/agents/${id}`);
 }
@@ -2837,32 +2773,3 @@ export function compareReportsApi(payload: {
   });
 }
 
-// ─── Sprint 10 — Report comparison + People contact ──────────────────────────
-
-export type ReportComparisonDto = {
-  reportAId: string;
-  reportBId: string;
-  titleA: string;
-  titleB: string;
-  comparison: string;
-  exportHtml: string;
-  mode: 'llm' | 'template';
-  comparedAt: string;
-};
-
-export function compareReports(payload: {
-  reportAId: string;
-  reportBId: string;
-  titleA: string;
-  titleB: string;
-  contentA: string;
-  contentB: string;
-  dateA?: string;
-  dateB?: string;
-  orgName?: string;
-}) {
-  return request<ReportComparisonDto>('/api/v1/orgs/me/report-compare', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
