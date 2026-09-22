@@ -53,8 +53,12 @@ Status marking only: the two completed phases were recorded as `done` with evide
 | Shared packages build | `npm run build:shared` | pass |
 | Web build | `npm run build -w @ellines-eip/web` | pass |
 | Identity build | `npm run build -w @ellines-eip/identity` | pass |
-| Pages Functions import check | `npm run verify:pages-functions` | pass — 151 files, 188 relative imports |
-| Shared tests (incl. Phase-0 contract suite) | `npm run test -w @ellines-eip/shared` | pass — 2 suites / 37 tests |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 165 files, 221 relative imports |
+| Data layer verification | `npm run verify:data-layer` | pass — all checks green |
+| Shared tests (incl. Phase-0 contract suite) | `npm run test -w @ellines-eip/shared` | pass — 4 suites / 91 tests |
 | Phase-0 contract gate (CI equivalent) | `npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand` | pass — 8/8 |
+| Identity tests | `npm run test -w @ellines-eip/identity` | pass — 17 suites / 262 tests |
+| Web/Pages Functions tests (incl. isolation, lockout, session-registry, cors, health-probe) | `npm run test -w @ellines-eip/web` | pass — 8 suites / 64 tests |
+| Git diff check | `git diff --check` | pass — no whitespace/formatting errors |
 
 Phase-2 deliverables re-checked as **open** (no deliverable complete): membership truth (G-15), AI server-side identity/grounding (G-17 core), auth hardening (partial: rate limits exist, lockout/session-registry absent), audit contract (G-12 flags/packs audit + row upgrade + C-0 events), unified permission grammar, tenant-isolation suite, control-plane fixes (G-05 health probes, G-08 audit UI depth, G-19 CORS allowlist).

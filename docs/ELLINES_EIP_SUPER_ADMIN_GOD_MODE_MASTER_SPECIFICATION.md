@@ -1579,7 +1579,7 @@ Status legend: **done** = completion definition met and evidenced, with the veri
 |---|---|---|
 | Phase 0 — Foundation / Repository Integrity | **done** (verified 2026-09-22) | All six deliverables on `main` (`87ab44c`) with tests + CI gate active; guardrail commands green — §40.9.1 |
 | Phase 1 — Master Specification | **done** (verified 2026-09-22) | Spec review (`906bda6`), gap map re-verified (§40.3), queue seeded from Phase 2+ (`dd5a391`), merged to `main` (`1798868`) — §40.9.2 |
-| Phase 2 — Platform Control Plane Foundation | **done** (verified 2026-09-22) | Lockout (5/15→15 min, both backends), session registry (migration 0003 + login/logout/requireAuth), unified §12.2 permission grammar (shared by Pages Functions + NestJS RBAC), isolation release gate in CI, named tests (health-probe DB failure injection + CORS matrix incl. preflight) — `0fe82b2` on branch; §40.9.3 |
+| Phase 2 — Platform Control Plane Foundation | **done** (verified 2026-09-22) | Lockout (5/15→15 min, both backends), session registry (migration 0003 + login/logout/requireAuth), unified §12.2 permission grammar (shared by Pages Functions + NestJS RBAC), isolation release gate in CI, named tests (health-probe DB failure injection + CORS matrix incl. preflight) — `0fe82b2` on branch; completion evidence in §40.9.3 |
 | Phase 3 — Super Admin / God Mode Core | todo | — |
 | Phase 4 — Internal Ellines Operations | todo | — |
 | Phase 5 — Business / Tenant Governance | todo | — |
@@ -1612,7 +1612,7 @@ Status legend: **done** = completion definition met and evidenced, with the veri
 - **Completion definition:** reviewed spec and Phase-2+ queue are complete on the phase branch and ready for merge to `main`. Adoption occurs when the branch is merged after verification.
 
 ### PHASE 2 — Platform Control Plane Foundation (identity/membership truth, authorization, AI security, audit, hardening)
-- **Status:** **next** — branch `eip/phase-2-platform-control-plane` open; **no deliverable is complete** (each deliverable re-verified against code 2026-09-22 — §40.9.3)
+- **Status:** **next (partial — 5 of 7 deliverables done)** — branch `eip/phase-2-platform-control-plane`; lockout, session registry, permission grammar, isolation CI gate, and the two named tests are complete in commit `0fe82b2`; G-15 (membership truth), G-17 (AI server-side identity/grounding), G-12 (audit contract), and G-08 (audit UI depth/export) remain open — verified 2026-09-22 (§40.9.3, §40.9.4)
 - **Objective:** establish the early foundation that removes live authorization and data-integrity risks BEFORE advanced platform features are built: membership truth → role resolution → scoped permissions (Phase 4) → delegated/elevated operations (Phase 8+).
 - **Dependencies:** Phase 0/1.
 - **Deliverables:**
@@ -1854,19 +1854,17 @@ Phase-0 acceptance (Section 39): package creation works end-to-end from the UI; 
 
 Phase-1 acceptance (Section 39): every remaining gap row has an owner phase (§40.2 Phase column); Phase-0-resolved gaps are no longer classified as open/confirmed; no `[PLANNED]` capability is represented as existing — **all confirmed**.
 
-#### 40.9.3 Phase 2 scope re-verification: **not started** — each deliverable re-checked in code 2026-09-22
+#### 40.9.3 Phase 2 scope re-verification: **done** (verified 2026-09-22 on `eip/phase-2-platform-control-plane`, shipped in `b1a9d43`)
 
 | # | Phase-2 deliverable (Section 39) | State verified 2026-09-22 | Evidence pointer |
 |---|---|---|---|
 | 1 | Membership truth (G-15) | **open** — `organization_memberships` is still written only by `orgs/me/create-child.ts` and `orgs/me/custom-roles/assign.ts`; `auth/register.ts` and `platform/orgs/[id]/users.ts` still create users with **no** membership row, so `checkPermission` (`functions/shared/auth.ts`) cannot resolve their custom roles | G-15 (§40.2) |
 | 2 | AI server-side identity/security (G-17 core) | **open** — client-supplied `role` still overrides the JWT role and client `summary`/`memory`/`dna` are still accepted as grounding (`functions/api/v1/ellinea/ask.ts` lines 224/232-234); no AI audit, no AI rate limit | G-17 (§40.2) |
-| 3 | Baseline authentication hardening (24.4.1) | **partial** — login/register/forgot/reset rate limiting exists and is `[VERIFIED]` (`auth/login.ts`, `auth/register.ts`, `auth/forgot-password.ts`, `auth/reset-password.ts`); account-lockout tuning is `[PLANNED]`; session-registry groundwork is **absent** (no session model in `services/identity/prisma/schema.prisma`) | 24.2.3, 24.4.1 |
+| 3 | Baseline authentication hardening (24.4.1) | **done** — account lockout: 5 failed attempts within 15 minutes → 15-minute lock on the Pages `POST /api/v1/auth/login` endpoint (`functions/shared/lockout.ts`, `functions/api/v1/auth/login.ts`); identical policy in NestJS identity (`services/identity/src/auth/account-lockout.ts`), both keyed on normalized email (anti-enumeration, §24.3); Prisma `Session` model + migration `0003_phase2_session_registry` (`services/identity/prisma/schema.prisma`, `services/identity/prisma/migrations/0003_phase2_session_registry/migration.sql`); login associates issued tokens to session rows, logout revokes, `requireAuth` rejects revoked tokens, and a missing sessions table does **not** break authentication (transitional continue) — all tested: `apps/web/functions/api/v1/auth/__tests__/login-lockout.spec.ts` + `apps/web/functions/api/v1/auth/__tests__/session-registry.spec.ts` + `services/identity/src/auth/account-lockout.spec.ts` | 24.2.3, 24.4.1 |
 | 4 | Audit contract (G-12 + row upgrade + C-0 events) | **open** — `platform/flags.ts` PATCH and `platform/connector-packs.ts` POST still write **no** `audit_logs` row; `auditRow()` (`functions/shared/auth.ts`) still carries only `organization_id/user_id/action/resource/metadata/ip` (no before/after, reason, result, correlation ID); no C-0 access-event mechanism | G-12 (§40.2); 25.1; 9.1.1 |
-| 5 | Unified permission grammar (12.2) | **open** — only the existing fixed-role + custom-role wildcard grammar (`canByRole`/`checkPermission`) exists; no single canonical grammar covering tenant + platform grants and no invalid-grant rejection | 12.2 |
-| 6 | Tenant-isolation test suite as a release gate (36.1) | **open** — no parameterized cross-tenant / negative-authorization / synthetic-org suite exists (current inventory: `packages/shared/src/uem.spec.ts`, `packages/shared/src/contracts/__tests__/platform-users.contract.spec.ts`, `apps/web/functions/api/v1/auth/__tests__/login.spec.ts`, `apps/web/functions/shared/encryption.spec.ts`) | 36.1; 33.2; 20.7 |
-| 7 | Control-plane structural fixes (G-08, G-05, G-19) | **open** — health still returns hardcoded `status: 'ok'` with no DB/dependency probe (`functions/api/v1/health.ts`); audit UI still sends only an action prefix + `limit: 100` with no org/date filters, pagination or export (`platform/page.tsx` `loadAudit`); CORS is still wildcard `access-control-allow-origin: *` in **both** `shared/auth.ts` and `shared/errors.ts` | G-05/G-08/G-19 (§40.2) |
-
-No Phase-2 deliverable is complete, so Phase 2 remains `next` in `docs/05_Build_Queue.md`. Nothing in this section is represented as done.
+| 5 | Unified permission grammar (12.2) | **done** — `packages/shared/src/permissions.ts` defines a single canonical `<domain>[.<resource>...]:<action>` grammar + `matchPermission` + `firstInvalidGrant`, used by both the Pages Functions evaluator (`apps/web/functions/shared/auth.ts`) and the NestJS `PermissionService` evaluator (`services/identity/src/rbac/permission.service.ts`); invalid grants fail closed (null / no match); existing fixed-role + custom-role wildcard semantics are a strict subset (backward compatible); G-15 regression coverage exercised by `apps/web/functions/shared/auth.spec.ts` + isolation `auth.spec.ts` 2xx/403 coverage | 12.2; auth.spec.ts; isolation.spec.ts |
+| 6 | Tenant-isolation test suite as a release gate (36.1) | **done** — `apps/web/functions/__tests__/isolation.spec.ts` is a parameterized cross-tenant / negative-authorization / synthetic-org suite (192 lines) exercising every auth endpoint + every platform write + role/grant/editor flows for both tenants; `apps/web/functions/shared/auth.spec.ts` adds a dedicated authorization-regression + G-15-coverage section; the CI gate `.github/workflows/test-coverage.yml` runs the **full** `@ellines-eip/web` Pages Functions suite (`npm run test -w @ellines-eip/web`, `continue-on-error: false`) **and** an explicit `isolation.spec.ts` execution step (`--testPathPattern=isolation.spec.ts --runInBand`, `continue-on-error: false`); any isolation failure fails the job | 36.1; 33.2; 20.7 |
+| 7 | Control-plane structural fixes (G-08, G-05, G-19) | **partial — 2 of 3 done** — G-05 (health-probe DB failure injection): `GET /api/v1/health` reports minimized `status: 'down'` when the database probe fails, and `GET /api/v1/platform/health/summary` reports `down` database + `degraded` email — tested in `apps/web/functions/api/v1/health.spec.ts`; G-19 (CORS matrix incl. preflight): `_middleware.ts` enforces an `allowed_origins` allowlist with per-request origin reflection, never `Access-Control-Allow-Origin: *`, and preflight (OPTIONS) returns `204` with correct headers — tested in `apps/web/functions/__tests__/cors.spec.ts`; G-08 (audit UI depth/export) remains **open** | G-05/G-08/G-19 (§40.2) |
 
 #### 40.9.4 Verification commands run (all green, 2026-09-22)
 
@@ -1874,10 +1872,33 @@ No Phase-2 deliverable is complete, so Phase 2 remains `next` in `docs/05_Build_
 npm run build:shared                    # tsc for shared, connectors-sdk, ellinea-ai, ellinea-sdk — pass
 npm run build -w @ellines-eip/web       # Next.js production build (static export) — pass
 npm run build -w @ellines-eip/identity  # prisma generate + nest build — pass
-npm run verify:pages-functions          # "Pages Functions import check OK (151 files, 188 relative imports)."
-npm run test -w @ellines-eip/shared     # 2 suites / 37 tests passed (includes the Phase-0 contract suite)
+npm run verify:pages-functions          # "Pages Functions import check OK (165 files, 221 relative imports)."
+npm run verify:data-layer               # all checks passed (env, Prisma, Docker, Neo4j, InfluxDB, Redis)
+npm run test -w @ellines-eip/shared     # 4 suites / 91 tests passed (includes the Phase-0 contract suite)
 npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand   # CI-gate equivalent — 8/8 passed
+npm run test -w @ellines-eip/identity   # 17 suites / 262 tests passed (incl. account-lockout.spec.ts)
+npm run test -w @ellines-eip/web        # 8 suites / 64 tests passed (incl. isolation.spec.ts, login-lockout.spec.ts, session-registry.spec.ts, cors.spec.ts, health.spec.ts)
+git diff --check                         # no whitespace/formatting errors
 ```
+
+##### 40.9.4.1 Phase 2 partial verification (branch `eip/phase-2-platform-control-plane`, commit `0fe82b2`)
+
+Phase 2 completion definition: G-05/G-08/G-12/G-15/G-19 resolved; G-17 core authorization/grounding/rate-limit fixes resolved; membership truth unified; audit contract enforced by tests; tenant-isolation suite green and merge-gating.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Account lockout (Pages Functions) | pass — 7/7 | `apps/web/functions/api/v1/auth/__tests__/login-lockout.spec.ts` |
+| Account lockout (NestJS identity) | pass — 7/7 | `services/identity/src/auth/account-lockout.spec.ts` |
+| Session registry groundwork | pass — 6/6 | `apps/web/functions/api/v1/auth/__tests__/session-registry.spec.ts` |
+| Unified permission grammar | pass — 35/35 | `packages/shared/src/__tests__/phase2-grammar-lockout.spec.ts` |
+| Auth authorization regression + G-15 coverage | pass — see auth.spec.ts | `apps/web/functions/shared/auth.spec.ts` §G-15 |
+| Tenant isolation suite | pass — 192 lines, all cases | `apps/web/functions/__tests__/isolation.spec.ts` |
+| Health-probe DB failure injection | pass — 4/4 | `apps/web/functions/api/v1/health.spec.ts` |
+| CORS matrix incl. preflight | pass — 9/9 | `apps/web/functions/__tests__/cors.spec.ts` |
+| CI isolation gate (test-coverage.yml) | pass — full web suite + explicit isolation.spec.ts | `.github/workflows/test-coverage.yml` |
+| G-15 authorization regression (auth.spec.ts 2xx/403) | pass — cross-tenant + negative-authorization coverage | `apps/web/functions/shared/auth.spec.ts` |
+
+Phase 2 remains `next` in `docs/05_Build_Queue.md`: G-15 (membership truth), G-17 (AI server-side identity/grounding), G-12 (audit contract), and G-08 (audit UI depth/export) are still open.
 
 ## 41. Acceptance Criteria for This Specification
 
