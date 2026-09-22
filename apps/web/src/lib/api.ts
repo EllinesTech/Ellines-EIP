@@ -2773,3 +2773,37 @@ export function compareReportsApi(payload: {
   });
 }
 
+
+
+export interface PlatformHealthSummaryDto {
+  status: 'ok' | 'degraded' | 'down';
+  checkedAt: string;
+  dependencies: Array<{
+    name: string;
+    status: 'up' | 'down' | 'unconfigured';
+    latencyMs?: number | null;
+    provider?: string;
+    error?: string;
+  }>;
+}
+
+export function fetchPlatformHealthSummary() {
+  return request<PlatformHealthSummaryDto>('/api/v1/platform/health/summary');
+}
+
+export async function exportPlatformAuditLogs(params?: {
+  orgId?: string; action?: string; from?: string; to?: string;
+}) {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+  const q = new URLSearchParams({ format: 'csv', limit: '200', offset: '0' });
+  if (params?.orgId) q.set('orgId', params.orgId);
+  if (params?.action) q.set('action', params.action);
+  if (params?.from) q.set('from', params.from);
+  if (params?.to) q.set('to', params.to);
+  const res = await fetch(`${API_URL}/api/v1/platform/audit-logs?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Audit export failed (${res.status})`);
+  return res.blob();
+}
