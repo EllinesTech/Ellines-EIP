@@ -3,10 +3,11 @@ import {
   json,
   options,
   requireAuth,
-  requirePermission,
+  requirePermissionAsync,
   type Env,
 } from '../../../shared/auth';
 import { sendOutboundEmail } from '../../../shared/mail';
+import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
 
 type MemoryNote = { id: string; title: string; body: string; updatedAt: string };
 type DnaTrait = { id?: string; label?: string; detail?: string; source?: string };
@@ -202,6 +203,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 400, message: 'Invalid JSON body' }, 400);
   }
 
+  const permissionError = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'ellinea:ask');
+  if (permissionError) return permissionError;
+  const rate = await checkRateLimit(context.env, auth.organizationId, auth.sub, '/api/v1/ellinea/ask', 'POST');
+  if (!rate.allowed) return rateLimitResponse(rate.remaining, rate.reset.getTime());
+
   const question = typeof body.question === 'string' ? body.question.trim() : '';
   if (question.length < 2) {
     return json({ statusCode: 400, message: 'question is required' }, 400);
@@ -210,26 +216,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
   const { data: org } = await supabase
     .from('organizations')
-    .select('settings')
+    .select('id, name, settings')
     .eq('id', auth.organizationId)
     .maybeSingle();
-  const settings =
-    org?.settings && typeof org.settings === 'object' && !Array.isArray(org.settings)
-      ? (org.settings as Record<string, unknown>)
-      : {};
+  if (!org) return json({ statusCode: 404, message: 'Organization not found' }, 404);
+  const settings = org.settings && typeof org.settings === 'object' && !Array.isArray(org.settings)
+    ? (org.settings as Record<string, unknown>) : {};
   const serverMemory = normalizeNotes(settings.ellineaMemory);
-  const clientMemory = normalizeNotes(body.memory);
-  const memory = serverMemory.length ? serverMemory : clientMemory;
-  const dna = normalizeDna(body.dna);
-  const role = typeof body.role === 'string' ? body.role : auth.role;
-  const organizationName =
-    typeof body.organizationName === 'string' ? body.organizationName : undefined;
+  const { data: snapshot } = await supabase
+    .from('enterprise_snapshots')
+    .select('connector_name, health_score, open_alerts, open_decisions, brief_highlight, timeline')
+    .eq('organization_id', auth.organizationId)
+    .maybeSingle();
+  const serverSummary = snapshot ? {
+    status: 'synced', connectorName: snapshot.connector_name, healthScore: snapshot.health_score,
+    openAlerts: snapshot.open_alerts, openDecisions: snapshot.open_decisions,
+    briefHighlight: snapshot.brief_highlight, timeline: snapshot.timeline,
+  } : null;
+  const memory = serverMemory;
+  const dna = null;
+  const role = auth.role;
+  const organizationName = org.name;
 
   const actorEmail = auth.email;
 
   const grounding = buildGrounding({
     question,
-    summary: body.summary || null,
+    summary: serverSummary,
     memory,
     dna,
     role,
