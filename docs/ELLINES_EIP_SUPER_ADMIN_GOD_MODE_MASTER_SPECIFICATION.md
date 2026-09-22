@@ -1579,7 +1579,7 @@ Status legend: **done** = completion definition met and evidenced, with the veri
 |---|---|---|
 | Phase 0 — Foundation / Repository Integrity | **done** (verified 2026-09-22) | All six deliverables on `main` (`87ab44c`) with tests + CI gate active; guardrail commands green — §40.9.1 |
 | Phase 1 — Master Specification | **done** (verified 2026-09-22) | Spec review (`906bda6`), gap map re-verified (§40.3), queue seeded from Phase 2+ (`dd5a391`), merged to `main` (`1798868`) — §40.9.2 |
-| Phase 2 — Platform Control Plane Foundation | **next** — branch open, no deliverable complete (§40.9.3) | — |
+| Phase 2 — Platform Control Plane Foundation | **done** (verified 2026-09-22) | Lockout (5/15→15 min, both backends), session registry (migration 0003 + login/logout/requireAuth), unified §12.2 permission grammar (shared by Pages Functions + NestJS RBAC), isolation release gate in CI, named tests (health-probe DB failure injection + CORS matrix incl. preflight) — `0fe82b2` on branch; §40.9.3 |
 | Phase 3 — Super Admin / God Mode Core | todo | — |
 | Phase 4 — Internal Ellines Operations | todo | — |
 | Phase 5 — Business / Tenant Governance | todo | — |
