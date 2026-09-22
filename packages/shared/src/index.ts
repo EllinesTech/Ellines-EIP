@@ -327,6 +327,8 @@ export {
   type UemObjectKind,
 } from './uem';
 
+export * from './contracts/platform-users.contract';
+
 import type { UemModel } from './uem';
 
 /** Normalized enterprise summary for Command Center + Ellinea brief. */

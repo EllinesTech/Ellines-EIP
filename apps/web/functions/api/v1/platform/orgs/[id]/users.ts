@@ -78,8 +78,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (!email || !fullName || !password) {
       return json({ statusCode: 400, message: 'email, fullName, and password are required' }, 400);
     }
-    if (password.length < 6) {
-      return json({ statusCode: 400, message: 'Password must be at least 6 characters' }, 400);
+    if (password.length < 8) {
+      return json({ statusCode: 400, message: 'Password must be at least 8 characters' }, 400);
     }
     if (!EIP_ROLES.includes(role)) {
       return json({ statusCode: 400, message: `Invalid role. Must be one of: ${EIP_ROLES.join(', ')}` }, 400);
@@ -174,8 +174,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     if (body.isActive !== undefined) updates.is_active = Boolean(body.isActive);
     if (body.password !== undefined) {
-      if (body.password.length < 6) {
-        return json({ statusCode: 400, message: 'Password must be at least 6 characters' }, 400);
+      if (body.password.length < 8) {
+        return json({ statusCode: 400, message: 'Password must be at least 8 characters' }, 400);
       }
       const bcrypt = await import('bcryptjs');
       updates.password_hash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);

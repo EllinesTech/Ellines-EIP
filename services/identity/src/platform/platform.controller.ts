@@ -179,14 +179,17 @@ export class PlatformController {
     });
   }
 
-  @Patch('orgs/:id/users/:userId')
+  @Patch('orgs/:id/users')
   updateOrgUser(
     @Request() req: { user: { email: string; userId: string } },
     @Param('id') id: string,
-    @Param('userId') userId: string,
+    @Query('userId') userId: string,
     @Body() body: { fullName?: string; role?: string; isActive?: boolean; password?: string },
   ) {
     this.assertPlatformAdmin(req.user.email);
+    if (!userId) {
+      throw new BadRequestException('userId query param required');
+    }
     return this.platform.updateOrgUser(id, userId, {
       ...body,
       actorUserId: req.user.userId,
@@ -194,13 +197,16 @@ export class PlatformController {
     });
   }
 
-  @Delete('orgs/:id/users/:userId')
+  @Delete('orgs/:id/users')
   deactivateOrgUser(
     @Request() req: { user: { email: string; userId: string } },
     @Param('id') id: string,
-    @Param('userId') userId: string,
+    @Query('userId') userId: string,
   ) {
     this.assertPlatformAdmin(req.user.email);
+    if (!userId) {
+      throw new BadRequestException('userId query param required');
+    }
     return this.platform.deactivateOrgUser(id, userId, req.user.userId, req.user.email);
   }
 

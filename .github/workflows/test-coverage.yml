@@ -62,6 +62,12 @@ jobs:
         run: npm run test:coverage -w @ellines-eip/shared
         continue-on-error: false
 
+      # Phase 0 structural contract gate — genuine release gate.
+      # Fails the build on field-name / param-style / password-policy / response drift.
+      - name: Phase 0 contract validation gate
+        run: npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand
+        continue-on-error: false
+
       # Run identity service tests
       - name: Test @ellines-eip/identity
         run: npm run test:coverage -w @ellines-eip/identity
