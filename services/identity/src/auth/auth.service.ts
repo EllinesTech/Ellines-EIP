@@ -82,6 +82,18 @@ export class AuthService {
         },
       });
 
+      // G-15: write the membership row in the same transaction so
+      // `organization_memberships` is the single membership truth from
+      // creation time (not only for child orgs / custom-role assignment).
+      await tx.organizationMembership.create({
+        data: {
+          userId: user.id,
+          organizationId: org.id,
+          role: 'owner',
+          isActive: true,
+        },
+      });
+
       return { org, user };
     });
 

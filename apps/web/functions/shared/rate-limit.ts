@@ -354,12 +354,12 @@ async function recordUsage(
 ): Promise<void> {
   try {
     const now = new Date();
-    const windowStart = getWindowStart(now, 'day');
-    const windowEnd = getWindowEnd(now, 'day');
+    const windowStart = getWindowStart(now, 'minute');
+    const windowEnd = getWindowEnd(now, 'minute');
 
     const supabase = getAdminClient(env);
 
-    // Check if record exists
+    // Check if record exists for the current minute window
     const { data: existing } = await supabase
       .from('api_usage')
       .select('id, request_count')

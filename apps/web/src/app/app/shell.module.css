@@ -205,6 +205,27 @@
   scrollbar-color: rgba(139, 92, 246, 0.45) transparent;
 }
 
+.navGroupLabel {
+  padding: 0.5rem 0.7rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dash-violet);
+  opacity: 0.85;
+}
+
+.navLink[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.navLinkPlanned {
+  opacity: 0.45;
+  cursor: not-allowed;
+  font-style: italic;
+}
+
 .nav::-webkit-scrollbar {
   width: 5px;
 }

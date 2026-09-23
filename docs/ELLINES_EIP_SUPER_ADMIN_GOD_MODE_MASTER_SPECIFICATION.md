@@ -186,6 +186,37 @@ Rules:
 3. The rail MUST show, for the acting operator, only items their role permits (Section 11).
 4. **Businesses vs Register Business:** "Businesses" is the primary capability (7.2); "Register Business" is the onboarding **action** within business management (7.3). The preferred model is a Register/Onboard action inside the Businesses section. If a dedicated rail entry is retained for quick access, it MUST be visually and semantically classified as an action/shortcut (e.g., grouped under Businesses or labeled "Register Business (action)"), never as a second primary capability with its own data domain.
 
+#### 6.1 Single-rail redesign (implemented on `agent/nav-unified-sidebar`)
+
+To eliminate the nested second navigation rail previously rendered inside `apps/web/src/app/app/platform/page.tsx`, the platform control-plane sections are now surfaced **only** from the single primary sidebar in `apps/web/src/app/app/layout.tsx`, gated to platform admins (`isPlatformAdmin`). The internal rail (`<aside className={styles.rail}>`) was removed from the platform page, so its content now expands into the full main pane.
+
+Platform sections are driven by a `?section=` query parameter on the single `/app/platform` route — **no new pages or fake routes are created**. The mapping to this specification's information architecture is:
+
+| Platform section (former nav id) | Unified group | Unified item label | Route | Notes |
+|---|---|---|---|---|
+| overview | PLATFORM | Command Center | `/app/platform` | Landing for the Control Plane |
+| businesses | CLIENT ORGANIZATIONS | Client Portfolio | `/app/platform?section=businesses` | 7.2 |
+| organizations | CLIENT ORGANIZATIONS | Organizations | `/app/platform?section=organizations` | **Planned** — no live route |
+| onboarding | CLIENT ORGANIZATIONS | Register Client (action) | `/app/platform?section=onboarding` | 7.3, classified as an onboarding action |
+| access | CLIENT ORGANIZATIONS | Users & Access | `/app/platform?section=access` | 7.x |
+| services | CLIENT ORGANIZATIONS | Services | `/app/platform?section=services` | **Planned** — no live route |
+| packages | CLIENT ORGANIZATIONS | Service Packages | `/app/platform?section=packages` | 7.4 (Commercial) |
+| health | CLIENT ORGANIZATIONS | Health & Connectivity | `/app/platform?section=health` | 7.x (connectivity belongs to client onboarding) |
+| activity | CLIENT ORGANIZATIONS | Activity & Usage | `/app/platform?section=activity` | **Planned** — no live route |
+| configuration | CLIENT ORGANIZATIONS | Configuration | `/app/platform?section=configuration` | **Planned** — no live route |
+| alerts | CLIENT ORGANIZATIONS | Alerts & Issues | `/app/platform?section=alerts` | **Planned** — no live route |
+| audit | CLIENT ORGANIZATIONS | Client Audit | `/app/platform?section=audit` | 9.1 |
+| configuration | PLATFORM | System Configuration | `/app/platform?section=configuration` | 31 |
+| ai | ELLINEA | Ellinea AI | `/app/platform?section=ai` | 28 |
+
+- **ELLINES ORGANIZATION** is intentionally not duplicated here: it is owned by the workspace-level sidebar (Organization Overview, Organization Data, Organization System, Org Admin, System Settings) in `apps/web/src/app/app/layout.tsx`, which remains the single global rail for the acting operator.
+- The unified sidebar renders group headers (`CLIENT ORGANIZATIONS`, `PLATFORM`, `ELLINEA`) and active-route highlighting derived from the `?section=` parameter. The architecture is extensible: new client capabilities (Services, Activity & Usage, Alerts & Issues, Client Audit expand) and platform capabilities (Compliance, Compliance) can be appended to `@/components/platform-sidebar-nav.ts` under the correct group without reintroducing a second rail.
+- Items marked **Planned** (`available: false`) are reserved in the architecture but render as disabled, non-linkable entries with a "— planned" label. They create **no** route, **no** component, and **no** data — clicking them does nothing. Rule 1 is preserved exactly: missing capabilities are hidden/disabled, never fake.
+- The CLIENT ORGANIZATIONS group is architected for scale: new client capabilities (Services, Activity & Usage, Alerts & Issues, Client Audit expand) can be appended to `@/components/platform-sidebar-nav.ts` under the correct group without reintroducing a second rail. Selecting a specific client is handled in the main content area (tabs, cards, breadcrumbs, contextual headers) — never a second sidebar.
+- Missing capabilities from §6 (Licensing/Entitlements, Usage/Quotas, Troubleshooting/Incidents, Platform Insights, Developer/API Operations, Recovery/Maintenance) are **not** added as nav items and are **not** fake routes — they remain hidden pending their Phase deliverables.
+
+Rules 1, 3 and 4 continue to apply unchanged. Rule 2 (single-page threshold / internal splitting) is unaffected: the platform page is still one user-facing Control Plane; only the rendering of its own navigation moved to the shared global rail.
+
 ## 7. Capability Catalog
 
 ### 7.0 Capability template

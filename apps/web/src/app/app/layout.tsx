@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState, type DragEvent } from 'react';
 import { isOrgAdminRole, isOrgOwnerRole, formatOrgDateTime } from '@ellines-eip/shared';
 import EllineaChatPanel from '@/components/ellinea-chat';
+import { PLATFORM_NAV_ITEMS, type PlatformSection } from '@/components/platform-sidebar-nav';
 import { OrgSwitcher } from '@/components/org-switcher';
 import {
   AuthSession,
@@ -47,6 +48,12 @@ type NavItem = {
   /** Shown for Owner/IT, or work roles when Settings allowWorkRolesOrgSystem is on. */
   orgSystemAccess?: boolean;
   icon: ReactNode;
+  /** Group header rendered in the unified sidebar (platform admin only). */
+  navGroup?: string;
+  /** Platform section used to compute active state via `?section=`. */
+  navSection?: PlatformSection;
+  /** True when the route is genuinely available today; false = planned, hidden. */
+  available?: boolean;
 };
 
 const COLLAPSE_KEY = 'eip_nav_collapsed';
@@ -279,7 +286,6 @@ const NAV: NavItem[] = [
   { href: '/app/admin', label: 'Org Admin', icon: <IconAdmin />, adminOnly: true },
   { href: '/app/audit', label: 'Audit', icon: <IconAudit />, adminOnly: true },
   { href: '/app/compliance', label: 'Compliance', icon: <IconAudit />, adminOnly: true },
-  { href: '/app/platform', label: 'Platform', icon: <IconPlatform />, platformOnly: true },
   { href: '/app/ellinea-console', label: 'Ellinea Console', icon: <IconEllinea />, adminOnly: true },
   { href: '/app/settings', label: 'System Settings', icon: <IconSettings /> },
 ];
@@ -295,6 +301,15 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathnameRaw = usePathname();
   const pathname = pathnameRaw ?? '';
+  const [platformSection, setPlatformSection] = useState('');
+  useEffect(() => {
+    setPlatformSection(() => {
+      if (typeof window === 'undefined') return '';
+      const s = new URLSearchParams(window.location.search);
+      const v = s.get('section');
+      return v ?? '';
+    });
+  }, [pathname]);
   const [session, setSessionState] = useState<AuthSession | null>(null);
   const [ready, setReady] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -437,6 +452,17 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const platformAdmin = Boolean(session.isPlatformAdmin);
   const isClientShell = !orgAdmin && !platformAdmin;
   const orgSystemAllowed = orgAdmin || orgUiPolicy.allowWorkRolesOrgSystem;
+  const platformNav: NavItem[] = platformAdmin
+    ? PLATFORM_NAV_ITEMS.map((i) => ({
+        href: i.href,
+        label: i.label,
+        icon: i.icon,
+        platformOnly: true,
+        navGroup: i.group,
+        navSection: i.section,
+        available: i.available,
+      }))
+    : [];
   const filteredNav = NAV.filter((item) => {
     if (item.orgSystemAccess && !orgSystemAllowed) return false;
     if (item.adminOnly && !orgAdmin) return false;
@@ -451,14 +477,16 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         }
       : item,
   );
-  const defaultHrefs = filteredNav.map((item) => item.href);
+  const allNav = [...filteredNav, ...platformNav.filter((i) => i.available)];
+  const defaultHrefs = allNav.map((item) => item.href);
   const orderedHrefs = orgAdmin
     ? mergeNavOrder(defaultHrefs, navOrder)
     : defaultHrefs;
-  const byHref = new Map(filteredNav.map((item) => [item.href, item]));
+  const byHref = new Map(allNav.map((item) => [item.href, item]));
   const visibleNav = orderedHrefs
     .map((href) => byHref.get(href))
-    .filter((item): item is NavItem => Boolean(item));
+    .filter((item): item is NavItem => Boolean(item))
+    .filter((item) => item.available !== false);
 
   function persistNavOrder(hrefs: string[]) {
     if (!session) return;
@@ -635,55 +663,83 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
               </button>
             </div>
           ) : null}
-          {visibleNav.map((item) => {
-            const active =
-              item.href === '/app'
-                ? pathname === '/app' || pathname === '/app/'
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const dragging = dragHref === item.href;
-            const dropTarget = dropTargetHref === item.href && dragHref !== item.href;
-            if (editingNav) {
-              return (
-                <div
-                  key={item.href}
-                  className={[
-                    styles.navRow,
-                    dragging ? styles.navRowDragging : '',
-                    dropTarget ? styles.navRowDropTarget : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  draggable
-                  onDragStart={(e) => onNavDragStart(item.href, e)}
-                  onDragOver={(e) => onNavDragOver(item.href, e)}
-                  onDrop={(e) => onNavDrop(item.href, e)}
-                  onDragEnd={onNavDragEnd}
-                >
-                  <span className={styles.navHandle} aria-hidden title="Drag to reorder">
-                    <IconDragHandle />
-                  </span>
-                  <span
-                    className={
-                      active ? `${styles.navLink} ${styles.navActive}` : styles.navLink
-                    }
+           {visibleNav.map((item) => {
+             const isPlatformItem = Boolean(item.navSection);
+             const active = isPlatformItem
+               ? pathname === '/app/platform' &&
+                 (item.navSection === 'overview'
+                   ? platformSection === ''
+                   : platformSection === item.navSection)
+               : item.href === '/app'
+                 ? pathname === '/app' || pathname === '/app/'
+                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
+             const dragging = dragHref === item.href;
+             const dropTarget = dropTargetHref === item.href && dragHref !== item.href;
+const isPlanned = item.available === false;
+              const groupHeader =
+                platformAdmin && item.navGroup && !collapsed
+                  ? item.navGroup !== (visibleNav[visibleNav.indexOf(item) - 1]?.navGroup ?? '')
+                  : false;
+              const groupLabel = groupHeader ? (
+                <div className={styles.navGroupLabel}>{item.navGroup}</div>
+              ) : null;
+              const linkClass = [
+                styles.navLink,
+                active ? styles.navActive : '',
+                isPlanned ? styles.navLinkPlanned : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+              const navLabel = isPlanned ? `${item.label} — planned` : item.label;
+              if (editingNav) {
+                return (
+                  <div
+                    key={item.href}
+                    className={[
+                      styles.navRow,
+                      dragging ? styles.navRowDragging : '',
+                      dropTarget ? styles.navRowDropTarget : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    draggable
+                    onDragStart={(e) => onNavDragStart(item.href, e)}
+                    onDragOver={(e) => onNavDragOver(item.href, e)}
+                    onDrop={(e) => onNavDrop(item.href, e)}
+                    onDragEnd={onNavDragEnd}
                   >
+                    {groupLabel}
+                    <span className={styles.navHandle} aria-hidden title="Drag to reorder">
+                      <IconDragHandle />
+                    </span>
+                    <span className={linkClass}>
+                      <span className={styles.navIcon}>{item.icon}</span>
+                      <span className={styles.navLabel}>{navLabel}</span>
+                    </span>
+                  </div>
+                );
+              }
+              if (isPlanned) {
+                return (
+                  <span key={item.href} className={linkClass} title={navLabel}>
+                    {groupLabel}
                     <span className={styles.navIcon}>{item.icon}</span>
-                    <span className={styles.navLabel}>{item.label}</span>
+                    <span className={styles.navLabel}>{navLabel}</span>
                   </span>
-                </div>
+                );
+              }
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={linkClass}
+                  title={item.label}
+                >
+                  {groupLabel}
+                  <span className={styles.navIcon}>{item.icon}</span>
+                  <span className={styles.navLabel}>{item.label}</span>
+                </Link>
               );
-            }
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={active ? `${styles.navLink} ${styles.navActive}` : styles.navLink}
-                title={item.label}
-              >
-                <span className={styles.navIcon}>{item.icon}</span>
-                <span className={styles.navLabel}>{item.label}</span>
-              </Link>
-            );
           })}
         </nav>
 

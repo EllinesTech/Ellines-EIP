@@ -9,6 +9,14 @@ describe('AuthService password reset', () => {
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
+    },
+    organization: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    organizationMembership: {
+      create: jest.fn(),
     },
     passwordResetToken: {
       create: jest.fn(),
@@ -18,6 +26,10 @@ describe('AuthService password reset', () => {
     },
     auditLog: {
       create: jest.fn(),
+    },
+    session: {
+      create: jest.fn(),
+      updateMany: jest.fn(),
     },
     $transaction: jest.fn(async (fn: (tx: typeof prisma) => unknown) => fn(prisma)),
   } as unknown as PrismaService;
@@ -180,9 +192,12 @@ describe('AuthService login lockout & session registry (24.4.1 / 24.2.3)', () =>
   const PASSWORD = 'Password123!';
   let passwordHash: string;
   let prisma: {
-    user: { findUnique: jest.Mock };
+    user: { findUnique: jest.Mock; create: jest.Mock };
+    organization: { findUnique: jest.Mock; create: jest.Mock };
+    organizationMembership: { create: jest.Mock };
     auditLog: { create: jest.Mock };
     session: { create: jest.Mock; updateMany: jest.Mock };
+    $transaction: jest.Mock;
   };
   let jwt: { sign: jest.Mock };
   let config: { get: jest.Mock };
@@ -195,9 +210,12 @@ describe('AuthService login lockout & session registry (24.4.1 / 24.2.3)', () =>
 
   beforeEach(() => {
     prisma = {
-      user: { findUnique: jest.fn() },
+      user: { findUnique: jest.fn(), create: jest.fn() },
+      organization: { findUnique: jest.fn(), create: jest.fn() },
+      organizationMembership: { create: jest.fn() },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       session: { create: jest.fn().mockResolvedValue({}), updateMany: jest.fn() },
+      $transaction: jest.fn(async (fn: (tx: typeof prisma) => unknown) => fn(prisma)),
     };
     jwt = { sign: jest.fn().mockReturnValue('signed-access-token') };
     config = { get: jest.fn().mockReturnValue('') };
@@ -355,5 +373,54 @@ describe('AuthService login lockout & session registry (24.4.1 / 24.2.3)', () =>
     prisma.session.updateMany.mockRejectedValue(new Error('relation "sessions" does not exist'));
     await expect(auth.revokeSessionByToken('raw.jwt')).resolves.toBe(false);
     await expect(auth.revokeUserSessions('u1')).resolves.toBe(0);
+  });
+
+  // G-15: register() must write the membership row in the same transaction.
+  it('creates an organization_membership row for the registering owner (G-15)', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.organization.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.organization.create as jest.Mock).mockResolvedValue({
+      id: 'o1',
+      name: 'Acme Corp',
+      slug: 'acme-corp',
+    });
+    (prisma.user.create as jest.Mock).mockResolvedValue({
+      id: 'u1',
+      email: 'owner@acme.com',
+      fullName: 'Owner',
+      organizationId: 'o1',
+      role: 'owner',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    (prisma.auditLog.create as jest.Mock).mockResolvedValue({});
+    (prisma.organizationMembership.create as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      userId: 'u1',
+      organizationId: 'o1',
+      role: 'owner',
+      isActive: true,
+    });
+
+    const result = await auth.register({
+      email: 'owner@acme.com',
+      password: 'Pass123!',
+      fullName: 'Owner',
+      organizationName: 'Acme Corp',
+    });
+
+    expect(result.user.id).toBe('u1');
+    expect(result.user.organizationId).toBe('o1');
+    expect(result.user.role).toBe('owner');
+    expect(prisma.organizationMembership.create).toHaveBeenCalledTimes(1);
+    expect(prisma.organizationMembership.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'u1',
+        organizationId: 'o1',
+        role: 'owner',
+        isActive: true,
+      },
+    });
   });
 });
