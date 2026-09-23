@@ -4,6 +4,38 @@ export function navOrderStorageKey(orgId: string, userId: string): string {
   return `eip_nav_order:${orgId}:${userId}`;
 }
 
+/**
+ * Super Admin rail: open/closed state of the collapsible navigation groups.
+ * Group ids come from `@/lib/app-navigation`, so this survives IA growth.
+ */
+const NAV_GROUP_STATE_KEY = 'eip_nav_group_state';
+
+export function readNavGroupState(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(NAV_GROUP_STATE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'boolean') out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function writeNavGroupState(state: Record<string, boolean>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(NAV_GROUP_STATE_KEY, JSON.stringify(state));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 export function readNavOrder(orgId: string, userId: string): string[] | null {
   if (typeof window === 'undefined') return null;
   try {

@@ -6,7 +6,27 @@
  * on crypto or module-format support. Used only through `jest.mock('jose', ...)`.
  */
 
-const HEADER = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+export function base64urlEncode(data: string): string {
+  // Cloudflare Workers: no Buffer, use btoa + manual URL-safe encoding
+  const utf8Bytes = new TextEncoder().encode(data);
+  let binary = '';
+  for (let i = 0; i < utf8Bytes.length; i++) {
+    binary += String.fromCharCode(utf8Bytes[i]);
+  }
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+export function base64urlDecode(str: string): string {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - str.length % 4) % 4);
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+const HEADER = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
 
 export class FakeSignJWT {
   constructor(private readonly payload: Record<string, unknown>) {}
@@ -24,7 +44,7 @@ export class FakeSignJWT {
   }
 
   async sign(_secret: unknown): Promise<string> {
-    return `${HEADER}.${Buffer.from(JSON.stringify(this.payload)).toString('base64url')}`;
+    return `${HEADER}.${base64urlEncode(JSON.stringify(this.payload))}`;
   }
 }
 
@@ -34,7 +54,7 @@ export async function jwtVerify(token: string): Promise<{
 }> {
   const parts = String(token).split('.');
   if (parts.length !== 2 || !parts[1]) throw new Error('Invalid token');
-  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<
+  const payload = JSON.parse(base64urlDecode(parts[1])) as Record<
     string,
     unknown
   >;

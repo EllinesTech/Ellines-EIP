@@ -75,7 +75,7 @@ async function runTestCase(
   const response = await fn(context(req, env) as unknown as Parameters<Fn>[0]);
   expect(response.status).toBe(expectStatus);
 
-  if (expectAuditAction && expectStatus === 200) {
+  if (expectAuditAction && response.status >= 200 && response.status < 300) {
     const after = countAuditRows(db, expectAuditAction);
     expect(after).toBeGreaterThan(before);
   }
@@ -122,7 +122,7 @@ describe('platform audit contract (G-12)', () => {
     await runTestCase(
       'flags toggle',
       flagsOnRequest,
-      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false }),
+      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false, reason: 'G-12 contract test' }),
       env,
       db,
       200,
@@ -143,7 +143,7 @@ describe('platform audit contract (G-12)', () => {
     await runTestCase(
       'flags denied',
       flagsOnRequest,
-      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false }),
+      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false, reason: 'denied-path probe' }),
       env,
       db,
       403,
@@ -162,10 +162,11 @@ describe('platform audit contract (G-12)', () => {
         catalogId: 'catalog-test',
         templateConfig: {},
         published: true,
+        reason: 'G-12 contract test',
       }),
       env,
       db,
-      200,
+      201,
       'platform.connector_pack.create',
     );
   });

@@ -171,7 +171,11 @@ export function normalizeEnterprisePayload(raw: unknown) {
   };
 }
 
-export function toTimelineStorage(payload: ReturnType<typeof normalizeEnterprisePayload>) {
+export function toTimelineStorage(payload: {
+  timeline: { title: string; detail: string }[];
+  model: UemModel | null;
+  [key: string]: unknown;
+}) {
   return packTimelineStorage(payload.timeline, payload.model);
 }
 

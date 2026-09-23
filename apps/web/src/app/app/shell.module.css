@@ -19,7 +19,7 @@
   --dash-accent-glow: rgba(124, 58, 237, 0.18);
   /* Enterprise density tokens — comfortable ≈ M365/Atlassian scale */
   --dash-font: 0.9375rem; /* 15px */
-  --dash-rail-w: 220px;
+  --dash-rail-w: 260px;
   --dash-content-pad-y: 1.05rem;
   --dash-content-pad-x: 1.2rem;
   --dash-topbar-pad-y: 0.65rem;
@@ -64,7 +64,7 @@
 
 .shell[data-density='comfortable'] {
   --dash-font: 0.9375rem;
-  --dash-rail-w: 220px;
+  --dash-rail-w: 260px;
   --dash-content-pad-y: 1.05rem;
   --dash-content-pad-x: 1.2rem;
   --dash-topbar-pad-y: 0.65rem;
@@ -73,7 +73,7 @@
 
 .shell[data-density='compact'] {
   --dash-font: 0.875rem; /* 14px — ~20% denser for power users */
-  --dash-rail-w: 200px;
+  --dash-rail-w: 240px;
   --dash-content-pad-y: 0.75rem;
   --dash-content-pad-x: 0.95rem;
   --dash-topbar-pad-y: 0.5rem;
@@ -213,6 +213,103 @@
   letter-spacing: 0.04em;
   color: var(--dash-violet);
   opacity: 0.85;
+}
+
+.navGroup {
+  margin-bottom: 0.1rem;
+}
+
+.navGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+
+.navGroupHeader:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.navGroupHeader .navGroupLabel {
+  padding: 0.55rem 0.7rem 0.3rem;
+  flex: 1;
+  text-align: left;
+}
+
+.navGroupChevron {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--dash-violet);
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-right: 0.4rem;
+}
+
+.navGroupChevron svg {
+  stroke: currentColor;
+}
+
+.navGroupChevronOpen {
+  transform: rotate(0deg);
+}
+
+.navGroupChevron:not(.navGroupChevronOpen) {
+  transform: rotate(-90deg);
+}
+
+.navSubGroup {
+  margin-top: 0.1rem;
+  margin-left: 0.5rem;
+  border-left: 1px solid var(--dash-line);
+  padding-left: 0.35rem;
+}
+
+.navSubGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+
+.navSubGroupHeader:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.navSubGroupHeader .navGroupLabel {
+  padding: 0.45rem 0.7rem 0.25rem;
+  flex: 1;
+  text-align: left;
+}
+
+.shellCollapsed .navGroupHeader,
+.shellCollapsed .navSubGroupHeader {
+  justify-content: center;
+}
+
+.shellCollapsed .navGroupLabel,
+.shellCollapsed .navGroupChevron {
+  display: none;
+}
+
+.shellCollapsed .navSubGroup {
+  margin-left: 0;
+  border-left: 0;
+  padding-left: 0;
 }
 
 .navLink[aria-disabled='true'] {

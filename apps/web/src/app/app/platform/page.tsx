@@ -14,20 +14,19 @@ import {
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
 } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PLATFORM_NAV_ITEMS, type PlatformSection, type PlatformNavGroup } from '@/components/platform-sidebar-nav';
+import {
+  activePlatformSection,
+  PLATFORM_LIVE_SECTIONS,
+  PLATFORM_SECTION_META,
+  type PlatformSectionId,
+} from '@/lib/app-navigation';
 import styles from './super-admin.module.css';
 
-type Section = PlatformSection;
+type Section = PlatformSectionId;
 
-const SECTION_SET: Set<Section> = new Set(
-  PLATFORM_NAV_ITEMS.filter((i) => i.available).map((i) => i.section),
-);
-const SECTION_LABEL: Record<Section, string> = PLATFORM_NAV_ITEMS.filter((i) => i.available).reduce(
-  (acc, i) => {
-    acc[i.section] = i.label;
-    return acc;
-  },
-  {} as Record<Section, string>,
+const SECTION_SET: Set<Section> = new Set(PLATFORM_LIVE_SECTIONS);
+const SECTION_LABEL: Record<string, string> = Object.fromEntries(
+  Object.values(PLATFORM_SECTION_META).map((m) => [m.section, m.label]),
 );
 const roles = ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'] as const;const statusClass = (s: string) =>
   s === 'active' || s === 'ok' || s === 'synced'
@@ -45,7 +44,7 @@ export default function PlatformSuperAdminPage(){
     setSectionParam(new URLSearchParams(window.location.search).get('section') ?? '');
   }, [pathname]);
   const section = sectionParam as Section;
-  const activeSection = (section && SECTION_SET.has(section)) ? section : 'overview';
+  const activeSection = activePlatformSection(section);
   const navigate = (s: Section) =>
     router.replace(s === 'overview' ? '/app/platform' : `/app/platform?section=${s}`, { scroll: false });
 
@@ -124,15 +123,14 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const config=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Global feature controls" hint="Platform-wide switches." />{flags.map(f=><div className={styles.service} key={f.key} style={{marginBottom:8}}><strong>{f.label}</strong><p>{f.note}</p><button className={styles.button+' '+(f.enabled?styles.success:'')} onClick={async()=>{try{const r=await updatePlatformFlag(f.key,!f.enabled);setFlags(r.data);setNotice(f.label+' updated.')}catch(e){setError(e instanceof Error?e.message:'Flag update failed')}}}>{f.enabled?'Enabled':'Disabled'}</button></div>)}</div><div className={styles.card}><CardTitle title="Tenant date & time" hint="Platform operator controls presentation for an onboarded business."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<div className={styles.form} style={{marginTop:12}}><label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>setSettings({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour</option><option value="24h">24-hour</option></select></label><label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>setSettings({...settings,dateStyle:e.target.value as OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short</option><option value="medium">Medium</option><option value="log">Log</option></select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} onClick={()=>void saveDate()}>Save</button></div></div>}</div></div>;
 
-  const plannedSection = !SECTION_SET.has(activeSection);
-  const content = plannedSection
+  const plannedSection = !SECTION_SET.has(activeSection);  const content = plannedSection
     ? <div className={styles.card}><CardTitle title="Planned" hint="This capability is in the build queue but has no live route yet." /><p className={styles.cardHint}>The navigation architecture is reserved for it. No fake routes or data are created.</p></div>
     : activeSection==='overview'?overview:activeSection==='businesses'?businesses:activeSection==='onboarding'?onboarding:activeSection==='packages'?packagesPage:activeSection==='access'?access:activeSection==='health'?healthPage:activeSection==='audit'?auditPage:activeSection==='ai'?aiPage:config;
   const activeLabel=SECTION_LABEL[activeSection] ?? 'Planned';
-  return <div className={styles.shell}><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>Ellines EIP control-plane operations</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} businesses</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
+  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>Ellines EIP control-plane operations</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} businesses</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
   <ConfirmDialog operationId="platform.package.create" open={pkgDialog} onConfirm={createPackage} onCancel={()=>setPkgDialog(false)} context={pkg.displayName||pkg.name}/>
   <ConfirmDialog operationId={safeguardOp||'platform.package.delete'} open={Boolean(safeguardOp)} onConfirm={reason=>runSafeguarded(reason,safeguardOp||'platform.package.delete')} onCancel={()=>setSafeguardOp(null)} context={safeguardOp&&safeguardOp.indexOf('package')>=0?(selectedPkg?.display_name||''):(selectedPack?.name||'')}/>
-  {selected&&<><div className={styles.backdrop} onClick={()=>setSelected(null)}/><aside className={styles.drawer}><div className={styles.cardHeader}><div><div className={styles.eyebrow}>Business control</div><h2 className={styles.title} style={{fontSize:22}}>{selected.name}</h2><p className={styles.sub}>{selected.slug} · {selected.status}</p></div><button className={styles.button} onClick={()=>setSelected(null)}>Close</button></div><div className={styles.grid2}><Kpi label="Users" value={stats?.stats?.totalUsers??selected.userCount} hint="total"/><Kpi label="Integrations" value={stats?.stats?.totalConnectors??'—'} hint="customer services"/><Kpi label="Events" value={stats?.stats?.totalEvents??'—'} hint="audit/events"/><Kpi label="Pending approvals" value={stats?.stats?.pendingApprovals??'—'} hint="attention"/></div><div className={styles.card+' '+styles.section}><CardTitle title="Service package" hint="Assign the commercial capability envelope."/><select className={styles.select} value={tier?.rate_limit_tiers?.id||''} onChange={async e=>{try{await assignPlatformOrgPackage(selected.id,{tierId:e.target.value});setNotice('Package assigned.');await open(selected)}catch(err){setError(err instanceof Error?err.message:'Package assignment failed')}}}><option value="">No package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select></div><div className={styles.card+' '+styles.section}><CardTitle title="Tenant lifecycle" hint="Disconnect is reversible; normal control plane does not expose hard deletion."/><button className={styles.button+' '+(selected.status==='active'?styles.danger:styles.success)} onClick={()=>void toggle(selected)}>{selected.status==='active'?'Disconnect / Suspend':'Reconnect'}</button></div></aside></>}</div>;
+  {selected&&<><div className={styles.backdrop} onClick={()=>setSelected(null)}/><aside className={styles.drawer}><div className={styles.cardHeader}><div><div className={styles.eyebrow}>Business control</div><h2 className={styles.title} style={{fontSize:22}}>{selected.name}</h2><p className={styles.sub}>{selected.slug} · {selected.status}</p></div><button className={styles.button} onClick={()=>setSelected(null)}>Close</button></div><div className={styles.grid2}><Kpi label="Users" value={stats?.stats?.totalUsers??selected.userCount} hint="total"/><Kpi label="Integrations" value={stats?.stats?.totalConnectors??'—'} hint="customer services"/><Kpi label="Events" value={stats?.stats?.totalEvents??'—'} hint="audit/events"/><Kpi label="Pending approvals" value={stats?.stats?.pendingApprovals??'—'} hint="attention"/></div><div className={styles.card+' '+styles.section}><CardTitle title="Service package" hint="Assign the commercial capability envelope."/><select className={styles.select} value={tier?.rate_limit_tiers?.id||''} onChange={async e=>{try{await assignPlatformOrgPackage(selected.id,{tierId:e.target.value});setNotice('Package assigned.');await open(selected)}catch(err){setError(err instanceof Error?err.message:'Package assignment failed')}}}><option value="">No package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select></div><div className={styles.card+' '+styles.section}><CardTitle title="Tenant lifecycle" hint="Disconnect is reversible; normal control plane does not expose hard deletion."/><button className={styles.button+' '+(selected.status==='active'?styles.danger:styles.success)} onClick={()=>void toggle(selected)}>{selected.status==='active'?'Disconnect / Suspend':'Reconnect'}</button></div></aside></>}</>;
 }
 
 function Kpi({label,value,hint,cls}:{label:string;value:string|number;hint:string;cls?:string}){return <div className={styles.kpi}><span>{label}</span><strong className={cls}>{value}</strong><small>{hint}</small></div>}

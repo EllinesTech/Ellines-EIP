@@ -25,6 +25,8 @@ export function envWith(overrides: Record<string, unknown> = {}): TestEnv {
 
 export interface TestContextOptions {
   next?: () => Promise<Response>;
+  /** Route params for dynamic routes (`/packages/[id]` → `{ id }`). */
+  params?: Record<string, string>;
 }
 
 /** Build a PagesFunction EventContext with a passthrough `next`. */
@@ -37,7 +39,7 @@ export function context(
   return {
     request,
     env,
-    params: {},
+    params: options.params ?? {},
     data: {},
     functionPath: new URL(request.url).pathname,
     next,
