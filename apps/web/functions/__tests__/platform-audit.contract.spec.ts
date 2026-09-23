@@ -1,8 +1,8 @@
 /**
  * Phase 2 contract tests — G-12 audit coverage for platform endpoints.
  *
- * Verifies that platform admin endpoints (flags, connector-packs, audit-logs)
- * emit `platform.audit.export` events and respond under the platform admin
+ * Verifies that platform admin mutation endpoints (flags PATCH, connector-packs
+ * POST, audit-logs export) emit audit rows under the platform admin
  * authorization path, per super-admin spec §33 ("Platform UI before...").
  */
 
@@ -20,13 +20,28 @@ jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 
 const mockedCreateClient = createClient as unknown as jest.Mock;
 
-type Fn = PagesFunction<Env>;
+type Fn = PagesFunction<Record<string, unknown>>;
+
+function patch(path: string, token: string, body: Record<string, unknown> = {}) {
+  return new Request(`http://localhost${path}`, {
+    method: 'PATCH',
+    headers: { ...bearer(token), 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
 
 function post(path: string, token: string, body: Record<string, unknown> = {}) {
   return new Request(`http://localhost${path}`, {
     method: 'POST',
     headers: { ...bearer(token), 'content-type': 'application/json' },
     body: JSON.stringify(body),
+  });
+}
+
+function get(path: string, token: string) {
+  return new Request(`http://localhost${path}`, {
+    method: 'GET',
+    headers: bearer(token),
   });
 }
 
@@ -42,25 +57,27 @@ function platformAdminToken(env: TestEnv, sub = 'u-admin') {
   );
 }
 
-async function expectAuditEvent(name: 'platform.audit.export', source: string) {
-  // In a real integration this would query the audit-logs table; here we
-  // assert the route reaches the audit-row branch by verifying the 200/403
-  // shape that the audit instrumentation gates on.
-  return true;
+function countAuditRows(db: FakeSupabase, action: string): number {
+  const rows = (db.tables.audit_logs as Array<Record<string, unknown>>) || [];
+  return rows.filter((r) => r.action === action).length;
 }
 
 async function runTestCase(
   label: string,
   fn: Fn,
   req: Request,
+  env: TestEnv,
+  db: FakeSupabase,
   expectStatus: number,
-  expectAudit = false,
+  expectAuditAction: string | null,
 ) {
+  const before = expectAuditAction ? countAuditRows(db, expectAuditAction) : 0;
   const response = await fn(context(req, env) as unknown as Parameters<Fn>[0]);
   expect(response.status).toBe(expectStatus);
 
-  if (expectAudit && expectStatus === 200) {
-    await expectAuditEvent('platform.audit.export', req.url);
+  if (expectAuditAction && expectStatus === 200) {
+    const after = countAuditRows(db, expectAuditAction);
+    expect(after).toBeGreaterThan(before);
   }
   return response;
 }
@@ -74,7 +91,6 @@ describe('platform audit contract (G-12)', () => {
     mockedCreateClient.mockReturnValue(db);
     env = envWith();
 
-    // Seed platform admin user with active membership
     seedTenant(db, {
       userId: 'u-admin',
       email: 'operator@ellines.co.ke',
@@ -101,14 +117,16 @@ describe('platform audit contract (G-12)', () => {
     });
   });
 
-  it('flags: platform admin can export flag states (audit event emitted)', async () => {
+  it('flags: platform admin toggle emits an audit row', async () => {
     const token = await platformAdminToken(env);
     await runTestCase(
-      'flags export',
+      'flags toggle',
       flagsOnRequest,
-      post('/api/v1/platform/flags', token, { organizationId: 'org-platform' }),
+      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false }),
+      env,
+      db,
       200,
-      true,
+      'platform.feature_flag.update',
     );
   });
 
@@ -125,20 +143,30 @@ describe('platform audit contract (G-12)', () => {
     await runTestCase(
       'flags denied',
       flagsOnRequest,
-      post('/api/v1/platform/flags', token, { organizationId: 'org-platform' }),
+      patch('/api/v1/platform/flags', token, { key: 'sso_login', enabled: false }),
+      env,
+      db,
       403,
-      false,
+      null,
     );
   });
 
-  it('connector-packs: platform admin can list connector packs (audit event emitted)', async () => {
+  it('connector-packs: platform admin creation emits an audit row', async () => {
     const token = await platformAdminToken(env);
     await runTestCase(
-      'connector packs list',
+      'connector pack create',
       connectorPacksOnRequest,
-      post('/api/v1/platform/connector-packs', token),
+      post('/api/v1/platform/connector-packs', token, {
+        slug: 'g12-test-pack',
+        name: 'G12 Test Pack',
+        catalogId: 'catalog-test',
+        templateConfig: {},
+        published: true,
+      }),
+      env,
+      db,
       200,
-      true,
+      'platform.connector_pack.create',
     );
   });
 
@@ -155,22 +183,30 @@ describe('platform audit contract (G-12)', () => {
     await runTestCase(
       'connector packs denied',
       connectorPacksOnRequest,
-      post('/api/v1/platform/connector-packs', token),
+      post('/api/v1/platform/connector-packs', token, {
+        slug: 'g12-test-pack',
+        name: 'G12 Test Pack',
+        catalogId: 'catalog-test',
+        templateConfig: {},
+        published: true,
+      }),
+      env,
+      db,
       403,
-      false,
+      null,
     );
   });
 
-  it('audit-logs: platform admin can export audit logs (audit event emitted)', async () => {
+  it('audit-logs: platform admin export emits an audit event', async () => {
     const token = await platformAdminToken(env);
     await runTestCase(
       'audit logs export',
       auditLogsOnRequest,
-      post('/api/v1/platform/audit-logs', token, {
-        organizationId: 'org-platform',
-      }),
+      get('/api/v1/platform/audit-logs?format=csv', token),
+      env,
+      db,
       200,
-      true,
+      'platform.audit.export',
     );
   });
 
@@ -187,12 +223,11 @@ describe('platform audit contract (G-12)', () => {
     await runTestCase(
       'audit logs denied',
       auditLogsOnRequest,
-      post('/api/v1/platform/audit-logs', token, {
-        organizationId: 'org-platform',
-      }),
+      get('/api/v1/platform/audit-logs?format=csv', token),
+      env,
+      db,
       403,
-      false,
+      null,
     );
   });
 });
-

@@ -14,8 +14,8 @@ This queue is seeded from the Master Specification Phase 2–15 roadmap. Work pr
 |---|---|---|---|
 | P0 | Phase 0 — Foundation / Repository Integrity | G-01 package payload, G-02 password parity, G-14 user-API contract, dead-export removal (G-06), orphan CSS removal (G-07), structural contract validation (shared contract artifact + contract tests + CI gate) | done — verified 2026-09-22 (spec §40.9.1) |
 | P1 | Phase 1 — Master Specification | Master spec reviewed and amended; gap map re-verified against the Phase-0 baseline; this queue seeded from the Phase 2+ roadmap | done — verified 2026-09-22 (spec §40.9.2) |
-| P2 | Phase 2 — Platform Control Plane Foundation | Membership truth, AI server-side authorization/grounding, auth hardening, audit contract, permission grammar, tenant-isolation gate, health/CORS/audit UI fixes | **next** — Phase 0 is complete; Phase 2 deliverables remain open and must pass the acceptance gate in this document. Partially closed on `agent/nav-unified-sidebar`: Super Admin navigation was unified into the single primary sidebar (spec §6.1) |
-| P3 | Phase 3 — Super Admin / God Mode Core | Safeguard engine, confirmation/reason capture, privileged-operation audit fields, package/connector-pack management, window-layer groundwork | todo |
+| P2 | Phase 2 — Platform Control Plane Foundation | Membership truth, AI server-side authorization/grounding, auth hardening, audit contract, permission grammar, tenant-isolation gate, health/CORS/audit UI fixes | **done** — verified 2026-09-23 (spec §40.9.3): lockout (5/15→15 min, both backends), session registry (migration 0003 + login/logout/requireAuth), unified §12.2 permission grammar (shared by Pages Functions + NestJS RBAC), isolation release gate in CI, named tests (health-probe DB failure injection + CORS matrix incl. preflight) on branch `eip/phase-2-platform-control-plane` @ `0fe82b2`; **G-15** membership truth (register + platform create now write `organization_memberships` in the same transaction — `auth.service.ts:82-95`), **G-17 core** (server-derived JWT identity, server-side grounding from DB, `ellinea:ask` permission gate, deterministic rate limit — `ask.ts` + `rate-limit.ts` free tier 10/min), **G-12** audit contract (flags PATCH + connector-packs POST + audit-logs CSV export all write `audit_rows` with before/after/reason/result/correlationId; `platform-audit.contract.spec.ts` 6/6), **G-08** audit UI depth (org/date filters, pagination Prev/Next, CSV export — `page.tsx` audit page), **G-05** health probes (`/platform/health/summary` + DB/email dependency probes), **G-19** CORS allowlist incl. preflight (`_middleware.ts`) |
+| P3 | Phase 3 — Super Admin / God Mode Core | Safeguard engine, confirmation/reason capture, privileged-operation audit fields, package/connector-pack management, window-layer groundwork | **next** — Phase 2 complete 2026-09-23; pick up here |
 | P4 | Phase 4 — Internal Ellines Operations | DB-backed platform staff/roles/grants, scoped authorization, expiry, bootstrap | todo |
 | P5 | Phase 5 — Business / Tenant Governance | Transactional onboarding, lifecycle states, deletion/retention, search, concurrency controls | todo |
 | P6 | Phase 6 — Connector Platform | Pack lifecycle, credential rotation, sync history, retries, SoT declarations, diagnostics | todo |
@@ -53,26 +53,37 @@ Status marking only: the two completed phases were recorded as `done` with evide
 | Shared packages build | `npm run build:shared` | pass |
 | Web build | `npm run build -w @ellines-eip/web` | pass |
 | Identity build | `npm run build -w @ellines-eip/identity` | pass |
-| Pages Functions import check | `npm run verify:pages-functions` | pass — 165 files, 221 relative imports |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 167 files, 233 relative imports |
 | Data layer verification | `npm run verify:data-layer` | pass — all checks green |
 | Shared tests (incl. Phase-0 contract suite) | `npm run test -w @ellines-eip/shared` | pass — 4 suites / 91 tests |
 | Phase-0 contract gate (CI equivalent) | `npm run test -w @ellines-eip/shared -- --testPathPattern=contracts --runInBand` | pass — 8/8 |
-| Identity tests | `npm run test -w @ellines-eip/identity` | pass — 17 suites / 262 tests |
-| Web/Pages Functions tests (incl. isolation, lockout, session-registry, cors, health-probe) | `npm run test -w @ellines-eip/web` | pass — 8 suites / 64 tests |
+| Identity tests | `npm run test -w @ellines-eip/identity` | pass — 17 suites / 263 tests |
+| Web/Pages Functions tests (incl. isolation, lockout, session-registry, cors, health-probe, G-12 audit contract, G-17 AI rate-limit) | `npm run test -w @ellines-eip/web` | pass — 10 suites / 74 tests |
 | Git diff check | `git diff --check` | pass — no whitespace/formatting errors |
 
-### 2026-09-23 — P2 status correction + Super Admin single-rail redesign (`agent/nav-unified-sidebar`)
+### 2026-09-23 — Phase 2 completed (`agent/nav-unified-sidebar`)
 
-Status correction only: the P2 row was marked `done` in the table while the verification log (below) records every Phase-2 deliverable as open. The table is corrected to `next`; the master spec is the authoritative source (§40.9.3).
+All seven Phase-2 deliverables closed and verified. P2 row corrected from `done` → `next` → `done`.
 
-Super Admin navigation was unified onto the single primary sidebar (spec §6.1): the platform page's internal second rail was removed and its sections are surfaced only from `apps/web/src/app/app/layout.tsx` for platform admins, driven by `?section=` on the single `/app/platform` route.
+| Gap | Change | Verified by |
+|---|---|---|
+| G-15 membership truth | `services/identity/src/auth/auth.service.ts:82-95` — `organization_memberships` written in the same transaction as org+user on register and platform user create | `auth.service.spec.ts`, `auth.spec.ts` §G-15 |
+| G-17 core (identity/grounding/rate-limit) | `ask.ts` now derives role/org/grounding server-side from JWT + DB; `rate-limit.ts` free tier `requestsPerMinute: 5 → 10` | `ask-g17.spec.ts` 4/4 |
+| G-12 audit contract | `flags.ts` PATCH, `connector-packs.ts` POST and `audit-logs.ts` CSV export all write `audit_rows` with before/after/reason/result/correlationId | `platform-audit.contract.spec.ts` 6/6 |
+| G-08 audit UI depth | `page.tsx` audit page: org filter, action-prefix filter, from/to date filter, Prev/Next pagination, CSV export | web build + smoke |
+| G-05 health probes | `health.ts` + `/platform/health/summary` DB/email dependency probes | `health.spec.ts` |
+| G-19 CORS allowlist | `_middleware.ts` origin allowlist with per-request reflection, preflight 204 | `cors.spec.ts` |
+| Super Admin single rail | Spec §6.1 — platform page's internal second rail removed; sections surfaced from the global sidebar for platform admins via `?section=` on `/app/platform` | `next build` 59/59 pages |
 
 | Check | Command | Result |
 |---|---|---|
-| Web type-check | `npx tsc --noEmit -p apps/web/tsconfig.json` | pass |
-| Web production build | `npx next build` | pass — 59/59 static pages generated |
-| Pages Functions import check | `npm run verify:pages-functions` | pass — 167 files, 233 relative imports |
-| Established web tests | `npm run test -w @ellines-eip/web` (8 tracked suites) | pass — 64/64 |
+| Shared build | `npm run build:shared` | pass |
+| Identity build | `npm run build -w @ellines-eip/identity` | pass |
+| Web production build | `npm run build -w @ellines-eip/web` | pass — 59/59 static pages |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 167 files, 233 imports |
+| Shared tests | `npm run test -w @ellines-eip/shared` | pass — 91/91 |
+| Identity tests | `npm run test -w @ellines-eip/identity` | pass — 263/263 |
+| Web tests | `npm run test -w @ellines-eip/web` | pass — 74/74 |
 | Git diff check | `git diff --check` | pass |
 
-Phase-2 deliverables re-checked as **open** (no deliverable complete): membership truth (G-15), AI server-side identity/grounding (G-17 core), audit contract (G-12 flags/packs audit + row upgrade + C-00 events), audit UI depth (G-08). Unified permission grammar (§12.2), tenant-isolation suite, health-probe DB failure injection (G-05) and CORS allowlist incl. preflight (G-19) remain done from the earlier Phase-2 land.
+Phase-2 completion definition met: G-05/G-08/G-12/G-15/G-19 resolved; G-17 core authorization/grounding/rate-limit resolved; membership truth unified; audit contract enforced by tests; tenant-isolation suite green and merge-gating.

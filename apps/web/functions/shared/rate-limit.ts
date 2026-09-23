@@ -189,7 +189,7 @@ const DEFAULT_TIERS: Record<string, RateLimitTier> = {
     displayName: 'Free',
     requestsPerDay: 100,
     requestsPerHour: 20,
-    requestsPerMinute: 5,
+    requestsPerMinute: 10,
   },
   starter: {
     name: 'starter',
