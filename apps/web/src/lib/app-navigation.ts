@@ -36,6 +36,7 @@ export type PlatformSectionId =
   | 'alerts'
   | 'audit'
   | 'client-audit'
+  | 'client'   /* full-page client org workspace — ?section=client&id=ORG_ID */
   | 'ai';
 
 /** The four Super Admin contexts. They must never be mixed. */
@@ -415,28 +416,7 @@ export const SUPER_ADMIN_NAV: NavGroupDef[] = [
     collapsible: true,
     defaultOpen: true,
     itemIds: ['overview', 'org-data', 'org-system', 'org-admin', 'settings'],
-    subGroups: [
-      {
-        id: 'work-console',
-        label: 'WORK CONSOLE',
-        collapsible: true,
-        defaultOpen: false,
-        itemIds: [
-          'glance',
-          'timeline',
-          'notifications',
-          'approvals',
-          'fleet',
-          'people',
-          'inbox',
-          'rules',
-          'reports',
-          'automation',
-          'connectors',
-          'documents',
-        ],
-      },
-    ],
+    subGroups: [],
   },
   {
     id: 'client-organizations',

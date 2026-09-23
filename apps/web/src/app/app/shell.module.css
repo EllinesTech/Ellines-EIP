@@ -19,9 +19,9 @@
   --dash-accent-glow: rgba(124, 58, 237, 0.18);
   /* Enterprise density tokens — comfortable ≈ M365/Atlassian scale */
   --dash-font: 0.9375rem; /* 15px */
-  --dash-rail-w: 260px;
+  --dash-rail-w: 288px;
   --dash-content-pad-y: 1.05rem;
-  --dash-content-pad-x: 1.2rem;
+  --dash-content-pad-x: 1.4rem;
   --dash-topbar-pad-y: 0.65rem;
   --dash-search-h: 42px;
 
@@ -64,18 +64,18 @@
 
 .shell[data-density='comfortable'] {
   --dash-font: 0.9375rem;
-  --dash-rail-w: 260px;
+  --dash-rail-w: 288px;
   --dash-content-pad-y: 1.05rem;
-  --dash-content-pad-x: 1.2rem;
+  --dash-content-pad-x: 1.4rem;
   --dash-topbar-pad-y: 0.65rem;
   --dash-search-h: 42px;
 }
 
 .shell[data-density='compact'] {
   --dash-font: 0.875rem; /* 14px — ~20% denser for power users */
-  --dash-rail-w: 240px;
+  --dash-rail-w: 264px;
   --dash-content-pad-y: 0.75rem;
-  --dash-content-pad-x: 0.95rem;
+  --dash-content-pad-x: 1.1rem;
   --dash-topbar-pad-y: 0.5rem;
   --dash-search-h: 40px;
 }
@@ -340,15 +340,16 @@
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  min-height: 40px;
-  padding: 0.55rem 0.7rem;
+  min-height: 36px;
+  padding: 0.5rem 0.7rem;
   border-radius: 10px;
   color: var(--dash-muted);
   font-weight: 600;
   font-size: 0.84rem;
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-  white-space: nowrap;
+  /* Do NOT add white-space: nowrap here — labels must be able to wrap
+     for long Super Admin items like "Health & Connectivity". */
 }
 
 .navLink:hover {
@@ -461,8 +462,15 @@
 }
 
 .navLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Allow labels to wrap to a second line rather than truncate.
+     This is essential for the Super Admin rail where labels like
+     "Health & Connectivity" and "System Configuration" must be
+     fully readable. The sidebar width budget (--dash-rail-w) is
+     the correct fix for overflow, not silent ellipsis. */
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
 .shellCollapsed .navLink {
@@ -896,7 +904,7 @@
 }
 
 .content {
-  padding: var(--dash-content-pad-y, 1.05rem) var(--dash-content-pad-x, 1.2rem) 4.75rem;
+  padding: var(--dash-content-pad-y, 1.05rem) var(--dash-content-pad-x, 1.4rem) 4.75rem;
   animation: rise 0.4s ease both;
   flex: 1 1 auto;
   min-height: 0;
@@ -1086,6 +1094,7 @@
   .shellCollapsed .navLabel,
   .navLabel {
     display: inline;
+    white-space: normal;
   }
 
   .navActive {

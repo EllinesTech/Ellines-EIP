@@ -2173,6 +2173,103 @@ export function fetchPlatformOrgStats(orgId: string) {
   return request<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
 }
 
+// ─── Platform cross-org Work Console reads ────────────────────────────────────
+
+export type PlatformOrgConnectorDto = {
+  id: string;
+  catalogId: string;
+  displayName: string;
+  status: string;
+  lastSyncedAt: string | null;
+  lastMessage: string | null;
+  lastError: string | null;
+  errorCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformOrgApprovalDto = {
+  id: string;
+  title: string;
+  detail: string;
+  requester: string;
+  status: string;
+  templateId: string;
+  source: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  createdAt: string;
+};
+
+export type PlatformOrgRuleDto = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  when: string;
+  threshold: number;
+  then: string;
+  createdAt: string;
+};
+
+export type PlatformOrgReportDto = {
+  id: string;
+  title: string;
+  cadence: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  createdAt: string;
+};
+
+export type PlatformOrgAgentDto = {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  isActive: boolean;
+  isPaused: boolean;
+  executionCount: number;
+  successCount: number;
+  lastExecutedAt: string | null;
+  createdAt: string;
+};
+
+export type PlatformOrgSnapshotDto = {
+  organizationId: string;
+  connectorId: string;
+  connectorName: string;
+  healthScore: number;
+  connectedSystems: number;
+  openAlerts: number;
+  openDecisions: number;
+  briefHighlight: string;
+  timeline: unknown;
+  syncedAt: string;
+} | null;
+
+export function fetchPlatformOrgConnectors(orgId: string) {
+  return request<PlatformOrgConnectorDto[]>(`/api/v1/platform/orgs/${orgId}/connectors`);
+}
+
+export function fetchPlatformOrgApprovals(orgId: string) {
+  return request<PlatformOrgApprovalDto[]>(`/api/v1/platform/orgs/${orgId}/approvals`);
+}
+
+export function fetchPlatformOrgRules(orgId: string) {
+  return request<PlatformOrgRuleDto[]>(`/api/v1/platform/orgs/${orgId}/rules`);
+}
+
+export function fetchPlatformOrgReports(orgId: string) {
+  return request<PlatformOrgReportDto[]>(`/api/v1/platform/orgs/${orgId}/reports`);
+}
+
+export function fetchPlatformOrgAgents(orgId: string) {
+  return request<PlatformOrgAgentDto[]>(`/api/v1/platform/orgs/${orgId}/agents`);
+}
+
+export function fetchPlatformOrgSnapshot(orgId: string) {
+  return request<PlatformOrgSnapshotDto>(`/api/v1/platform/orgs/${orgId}/snapshot`);
+}
+
 // ─── v2.0 Phase A — Ellinea Agents (Autonomous AI) ──────────────────────────
 
 export type EllineaAgentDto = {

@@ -25,7 +25,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { data: orgs, error } = await supabase
     .from('organizations')
     .select('id, name, slug, created_at, settings')
-    .neq('slug', 'ellines-platform')
+    // Exclude the platform operator's own org — it is not a client organization.
+    .neq('id', auth.organizationId)
     .order('created_at', { ascending: false });
 
   if (error) {

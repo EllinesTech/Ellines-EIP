@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   askEllineaApi, assignPlatformOrgPackage, createPlatformOrg, createPlatformOrgUser,
   createPlatformPackage, deletePlatformPackage, fetchHealth, fetchPlatformOrgDateTimeSettings, updatePlatformPackage,
@@ -10,8 +10,12 @@ import {
   listPlatformOrgs, listPlatformPackages, migratePlatformEncryption, refreshSessionFlags, updatePlatformFlag,
   updatePlatformOrgDateTimeSettings, updatePlatformOrgStatus, updatePlatformOrgUser,
   updatePlatformConnectorPack, publishPlatformConnectorPack, deprecatePlatformConnectorPack, deletePlatformConnectorPack,
+  fetchPlatformOrgConnectors, fetchPlatformOrgApprovals, fetchPlatformOrgRules,
+  fetchPlatformOrgReports, fetchPlatformOrgAgents, fetchPlatformOrgSnapshot,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto, type PlatformHealthSummaryDto,
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
+  type PlatformOrgConnectorDto, type PlatformOrgApprovalDto, type PlatformOrgRuleDto,
+  type PlatformOrgReportDto, type PlatformOrgAgentDto, type PlatformOrgSnapshotDto,
 } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -35,18 +39,23 @@ const roles = ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'] as 
     ? styles.statusBad
     : styles.statusNeutral;
 
-export default function PlatformSuperAdminPage(){
+function PlatformSuperAdminPage(){
   const router = useRouter();
-  const pathname = usePathname();
-  const [sectionParam, setSectionParam] = useState('');
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setSectionParam(new URLSearchParams(window.location.search).get('section') ?? '');
-  }, [pathname]);
+  const searchParams = useSearchParams();
+  // Read URL params synchronously — no useEffect round-trip, no 2-cycle delay.
+  const sectionParam = searchParams?.get('section') ?? '';
+  const clientOrgId = searchParams?.get('id') ?? '';
   const section = sectionParam as Section;
   const activeSection = activePlatformSection(section);
-  const navigate = (s: Section) =>
-    router.replace(s === 'overview' ? '/app/platform' : `/app/platform?section=${s}`, { scroll: false });
+  const navigate = (s: Section, id?: string) =>
+    router.replace(
+      s === 'overview'
+        ? '/app/platform'
+        : id
+        ? `/app/platform?section=${s}&id=${encodeURIComponent(id)}`
+        : `/app/platform?section=${s}`,
+      { scroll: false },
+    );
 
   const [allowed,setAllowed]=useState<boolean|null>(null);
  const [orgs,setOrgs]=useState<PlatformOrg[]>([]),[packages,setPackages]=useState<PlatformPackage[]>([]),[flags,setFlags]=useState<FeatureFlag[]>([]),[packs,setPacks]=useState<ConnectorPackDto[]>([]);
@@ -54,7 +63,23 @@ export default function PlatformSuperAdminPage(){
  const [metrics,setMetrics]=useState<PlatformMetrics|null>(null);
  const [users,setUsers]=useState<OrgMember[]>([]),[stats,setStats]=useState<any>(null),[tier,setTier]=useState<any>(null),[settings,setSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
  const [query,setQuery]=useState(''),[auditQuery,setAuditQuery]=useState(''),[auditOrg,setAuditOrg]=useState(''),[auditFrom,setAuditFrom]=useState(''),[auditTo,setAuditTo]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- const [business,setBusiness]=useState({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});
+ // ── Client workspace state (loaded when entering ?section=client&id=ORG_ID) ──
+ const [wsOrg,setWsOrg]=useState<PlatformOrg|null>(null);
+ const [wsUsers,setWsUsers]=useState<OrgMember[]>([]);
+ const [wsStats,setWsStats]=useState<any>(null);
+ const [wsTier,setWsTier]=useState<any>(null);
+ const [wsSettings,setWsSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
+ const [wsAudit,setWsAudit]=useState<PlatformAuditRow[]>([]);
+ const [wsAuditTotal,setWsAuditTotal]=useState(0);
+ const [wsConnectors,setWsConnectors]=useState<PlatformOrgConnectorDto[]>([]);
+ const [wsApprovals,setWsApprovals]=useState<PlatformOrgApprovalDto[]>([]);
+ const [wsRules,setWsRules]=useState<PlatformOrgRuleDto[]>([]);
+ const [wsReports,setWsReports]=useState<PlatformOrgReportDto[]>([]);
+ const [wsAgents,setWsAgents]=useState<PlatformOrgAgentDto[]>([]);
+ const [wsSnapshot,setWsSnapshot]=useState<PlatformOrgSnapshotDto>(null);
+ const [wsTab,setWsTab]=useState<'overview'|'glance'|'timeline'|'notifications'|'approvals'|'fleet'|'people'|'inbox'|'connectors'|'rules'|'reports'|'agents'|'documents'|'users'|'audit'|'settings'|'lifecycle'>('overview');
+ const [wsUser,setWsUser]=useState({email:'',fullName:'',password:'',role:'member'});
+ const [wsLoading,setWsLoading]=useState(false); const [business,setBusiness]=useState({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});
  const [user,setUser]=useState({email:'',fullName:'',password:'',role:'member'});
 const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,requestsPerDay:10000,monthlyPrice:0,enableSso:false,enableCustomRoles:false,enableAgents:false,enableAdvancedBi:false,enableWebhooks:false});
  const [pkgDialog,setPkgDialog]=useState(false);
@@ -79,12 +104,42 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     await load();
   }catch(e){setError(e instanceof Error?e.message:'Operation failed')}finally{setSafeguardOp(null);setBusy(false)}}
 
- const load=useCallback(async()=>{try{const[o,p,f,h,cp,m,hs]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics(),fetchPlatformHealthSummary()]);setOrgs(o);setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m);setHealthSummary(hs)}catch(e){setError(e instanceof Error?e.message:'Failed to load platform data')}},[]);
+ const load=useCallback(async()=>{try{const[o,p,f,h,cp,m,hs]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics(),fetchPlatformHealthSummary()]);
+    // Filter out the platform operator's own org — it is Ellines itself, not a client.
+    const ownOrgId = getSession()?.user?.organizationId;
+    setOrgs(ownOrgId ? o.filter(x => x.id !== ownOrgId) : o);
+    setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m);setHealthSummary(hs)}catch(e){setError(e instanceof Error?e.message:'Failed to load platform data')}},[]);
   useEffect(()=>{let live=true;const decide=(s:ReturnType<typeof getSession>)=>{if(!live)return;setAllowed(Boolean(s?.isPlatformAdmin));if(s?.isPlatformAdmin)void load()};const cached=getSession();if(cached?.isPlatformAdmin){decide(cached);return()=>{live=false}}void refreshSessionFlags().then(decide).catch(()=>decide(getSession()));return()=>{live=false}},[load]);
+
+  // Load client workspace data when navigating to ?section=client&id=ORG_ID
+  useEffect(() => {
+    if (activeSection !== 'client' || !clientOrgId) return;
+    const org = orgs.find(o => o.id === clientOrgId) ?? null;
+    setWsOrg(org);
+    setWsTab('overview');
+    setWsLoading(true);
+    Promise.all([
+      fetchPlatformOrgStats(clientOrgId),
+      listPlatformOrgUsers(clientOrgId),
+      fetchPlatformOrgPackage(clientOrgId),
+      fetchPlatformOrgDateTimeSettings(clientOrgId),
+      fetchPlatformOrgConnectors(clientOrgId),
+      fetchPlatformOrgApprovals(clientOrgId),
+      fetchPlatformOrgRules(clientOrgId),
+      fetchPlatformOrgReports(clientOrgId),
+      fetchPlatformOrgAgents(clientOrgId),
+      fetchPlatformOrgSnapshot(clientOrgId),
+    ]).then(([s,u,t,d,conn,appr,rules,reports,agents,snap])=>{
+      setWsStats(s);setWsUsers(u);setWsTier(t);setWsSettings(d);
+      setWsConnectors(conn);setWsApprovals(appr);setWsRules(rules);
+      setWsReports(reports);setWsAgents(agents);setWsSnapshot(snap);
+    }).catch(e=>setError(e instanceof Error?e.message:'Failed to load client workspace'))
+      .finally(()=>setWsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientOrgId, activeSection]);
  useEffect(()=>{if(!allowed)return;const t=setInterval(()=>{void fetchHealth().then(setHealth);void fetchPlatformMetrics().then(setMetrics);void fetchPlatformHealthSummary().then(setHealthSummary)},30000);return()=>clearInterval(t)},[allowed]);
 
- async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}}
- async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
+ async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
  async function register(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await createPlatformOrg({name:business.name,slug:business.slug||undefined,ownerEmail:business.ownerEmail||undefined,ownerFullName:business.ownerFullName||undefined,ownerPassword:business.ownerPassword||undefined});setNotice('Business “'+r.name+'” registered.');setBusiness({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});await load();navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Registration failed')}finally{setBusy(false)}}
   async function createPackage(reason:string){setBusy(true);try{await createPlatformPackage({...pkg,reason});setNotice('Package “'+pkg.displayName+'” created.');setPkg({name:'',displayName:'',maxUsers:25,maxConnectors:5,requestsPerDay:10000,monthlyPrice:0,enableSso:false,enableCustomRoles:false,enableAgents:false,enableAdvancedBi:false,enableWebhooks:false});await load();setPkgDialog(false)}catch(e){setError(e instanceof Error?e.message:'Package creation failed');setPkgDialog(false)}finally{setBusy(false)}}
  async function addUser(e:React.FormEvent){e.preventDefault();if(!selected)return;setBusy(true);try{const u=await createPlatformOrgUser(selected.id,user);setUsers(x=>[u,...x]);setUser({email:'',fullName:'',password:'',role:'member'});setNotice('User created.')}catch(e){setError(e instanceof Error?e.message:'User creation failed')}finally{setBusy(false)}}
@@ -99,9 +154,9 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
  if(allowed===null)return <main className={styles.main}>Checking platform access…</main>;
  if(!allowed)return <main className={styles.main}><div className={styles.card}><h2>Platform access denied</h2><p className={styles.cardHint}>Ellines platform operator access is required.</p></div></main>;
 
- const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button} onClick={()=>void open(o)}>Control</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No businesses found.</td></tr>}</tbody></table></div>;
+ const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button+' '+styles.primary} onClick={()=>navigate('client',o.id)}>Open workspace</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No client organizations found.</td></tr>}</tbody></table></div>;
 
- const overview=<><div className={styles.hero}><h2>Ellines EIP Control Plane</h2><p>This is the platform operating system — not a customer dashboard. Operate EIP itself, onboard businesses, assign services, troubleshoot tenants, control access, inspect security activity and configure the platform. Customer connectors are business services, not EIP infrastructure.</p><div className={styles.quick}><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register business</button><button className={styles.button} onClick={()=>navigate('businesses')}>Manage businesses</button><button className={styles.button} onClick={()=>navigate('packages')}>Service packages</button><button className={styles.button} onClick={()=>navigate('health')}>Diagnostics</button></div></div>
+ const overview=<><div className={styles.hero}><h2>Ellines EIP Control Plane</h2><p>This is the platform operating system — not a customer dashboard. Operate EIP itself, onboard businesses, assign services, troubleshoot tenants, control access, inspect security activity and configure the platform. Customer connectors are business services, not EIP infrastructure.</p><div className={styles.quick}><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register client</button><button className={styles.button} onClick={()=>navigate('businesses')}>Client portfolio</button><button className={styles.button} onClick={()=>navigate('packages')}>Service packages</button><button className={styles.button} onClick={()=>navigate('health')}>Diagnostics</button></div></div>
  <div className={styles.grid4}><Kpi label="Businesses onboarded" value={metrics?.platform?.businesses ?? orgs.length} hint="tenant accounts"/><Kpi label="Active tenant users" value={metrics?.platform?.activeUsers ?? totalUsers} hint="currently active" cls={styles.ok}/><Kpi label="Disconnected" value={suspended} hint="access blocked" cls={suspended?styles.warn:styles.ok}/><Kpi label="API requests / 24h" value={metrics?.platform?.apiRequests24h ?? '—'} hint="real platform usage"/></div>
  <div className={styles.grid4+' '+styles.section}><Kpi label="Audit events / 24h" value={metrics?.platform?.auditEvents24h ?? '—'} hint="operator/system activity"/><Kpi label="Rate-limit violations" value={metrics?.platform?.rateLimitViolations24h ?? '—'} hint="last 24 hours" cls={metrics?.platform?.rateLimitViolations24h?styles.warn:styles.ok}/><Kpi label="Customer integrations" value={metrics?.businessServices?.connectorInstallations ?? '—'} hint="business service layer"/><Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations ?? '—'} hint="customer troubleshooting" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/></div>
  <div className={styles.grid2+' '+styles.section}><div className={styles.card}><CardTitle title="Core EIP health" hint="System performance of EIP itself."/><div className={styles.grid2}><Service title="API" text={health?.status||'unknown'}/><Service title="Version" text={health?.version||'—'}/><Service title="Email" text={health?.email?.live?'Live · '+health.email.provider:'Not configured'}/><Service title="Feature controls" text={flags.filter(f=>f.enabled).length+'/'+flags.length+' enabled'}/></div></div><div className={styles.card}><CardTitle title="Operator attention" hint="Issues visible from current telemetry."/><Service title={suspended?suspended+' disconnected business'+(suspended===1?'':'es'):'No disconnected businesses'} text={suspended?'Review and reconnect where appropriate.':'Tenant lifecycle is clear.'}/><Service title={health?.status==='ok'?'Platform healthy':'Platform health requires attention'} text={health?.status==='ok'?'Health endpoint reports OK.':'Open diagnostics for investigation.'}/></div></div>
@@ -123,17 +178,917 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const config=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Global feature controls" hint="Platform-wide switches." />{flags.map(f=><div className={styles.service} key={f.key} style={{marginBottom:8}}><strong>{f.label}</strong><p>{f.note}</p><button className={styles.button+' '+(f.enabled?styles.success:'')} onClick={async()=>{try{const r=await updatePlatformFlag(f.key,!f.enabled);setFlags(r.data);setNotice(f.label+' updated.')}catch(e){setError(e instanceof Error?e.message:'Flag update failed')}}}>{f.enabled?'Enabled':'Disabled'}</button></div>)}</div><div className={styles.card}><CardTitle title="Tenant date & time" hint="Platform operator controls presentation for an onboarded business."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<div className={styles.form} style={{marginTop:12}}><label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>setSettings({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour</option><option value="24h">24-hour</option></select></label><label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>setSettings({...settings,dateStyle:e.target.value as OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short</option><option value="medium">Medium</option><option value="log">Log</option></select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} onClick={()=>void saveDate()}>Save</button></div></div>}</div></div>;
 
-  const plannedSection = !SECTION_SET.has(activeSection);  const content = plannedSection
-    ? <div className={styles.card}><CardTitle title="Planned" hint="This capability is in the build queue but has no live route yet." /><p className={styles.cardHint}>The navigation architecture is reserved for it. No fake routes or data are created.</p></div>
-    : activeSection==='overview'?overview:activeSection==='businesses'?businesses:activeSection==='onboarding'?onboarding:activeSection==='packages'?packagesPage:activeSection==='access'?access:activeSection==='health'?healthPage:activeSection==='audit'?auditPage:activeSection==='ai'?aiPage:config;
-  const activeLabel=SECTION_LABEL[activeSection] ?? 'Planned';
-  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>Ellines EIP control-plane operations</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} businesses</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
+  // ── section resolver ────────────────────────────────────────────────────────
+  // Every live section maps to a JSX variable. Reserved sections (available:false
+  // in app-navigation.ts) render an honest "Planned" state — no fake data.
+  const meta = PLATFORM_SECTION_META[activeSection];
+  const isReserved = meta ? !meta.available : false;
+
+  const clientHealthPage = (
+    <div className={styles.grid2}>
+      <div className={styles.card}>
+        <CardTitle title="Client health overview" hint="Cross-tenant integration health visible from the platform layer." />
+        {businessTable(orgs)}
+      </div>
+      <div className={styles.card}>
+        <CardTitle title="Platform health" hint="EIP control-plane status." />
+        <div className={styles.grid2}>
+          <Service title="API" text={health?.status || 'unknown'} />
+          <Service title="Version" text={health?.version || '—'} />
+          <Service title="Email" text={health?.email?.live ? `Live · ${health.email.provider}` : 'Not configured'} />
+          <Service title="DB" text={healthSummary?.dependencies.find(d => d.name === 'database')?.status || 'unknown'} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const clientConfigurationPage = (
+    <div className={styles.grid2}>
+      <div className={styles.card}>
+        <CardTitle title="Tenant date & time" hint="Override presentation settings for a specific business." />
+        <select className={styles.select} value={selected?.id || ''} onChange={e => { const o = orgs.find(x => x.id === e.target.value); if (o) void open(o); }}>
+          <option value="">Select client organization</option>
+          {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        {selected && (
+          <div className={styles.form} style={{ marginTop: 12 }}>
+            <label className={styles.field}>
+              <span>Time format</span>
+              <select className={styles.select} value={settings.timeFormat} onChange={e => setSettings({ ...settings, timeFormat: e.target.value as '12h' | '24h' })}>
+                <option value="12h">12-hour</option>
+                <option value="24h">24-hour</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>Date style</span>
+              <select className={styles.select} value={settings.dateStyle} onChange={e => setSettings({ ...settings, dateStyle: e.target.value as OrgDateTimeSettingsDto['dateStyle'] })}>
+                <option value="short">Short</option>
+                <option value="medium">Medium</option>
+                <option value="log">Log</option>
+              </select>
+            </label>
+            <div className={styles.full}>
+              <button className={`${styles.button} ${styles.primary}`} onClick={() => void saveDate()}>Save</button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className={styles.card}>
+        <CardTitle title="Package assignment" hint="Assign a service package to any client organization." />
+        <select className={styles.select} value={selected?.id || ''} onChange={e => { const o = orgs.find(x => x.id === e.target.value); if (o) void open(o); }}>
+          <option value="">Select client organization</option>
+          {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        {selected && (
+          <div style={{ marginTop: 12 }}>
+            <select className={styles.select} value={tier?.rate_limit_tiers?.id || ''} onChange={async e => { try { await assignPlatformOrgPackage(selected.id, { tierId: e.target.value }); setNotice('Package assigned.'); await open(selected); } catch (err) { setError(err instanceof Error ? err.message : 'Assignment failed'); } }}>
+              <option value="">No package</option>
+              {packages.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const clientAuditPage = (
+    <div className={styles.card}>
+      <CardTitle title="Client audit log" hint="Activity across all client organizations visible from the platform layer." />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginBottom: 12 }}>
+        <input className={styles.input} placeholder="Action prefix e.g. org." value={auditQuery} onChange={e => setAuditQuery(e.target.value)} />
+        <select className={styles.select} value={auditOrg} onChange={e => setAuditOrg(e.target.value)}>
+          <option value="">All client organizations</option>
+          {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <input className={styles.input} type="date" value={auditFrom} onChange={e => setAuditFrom(e.target.value)} />
+        <input className={styles.input} type="date" value={auditTo} onChange={e => setAuditTo(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button className={`${styles.button} ${styles.primary}`} onClick={() => void loadAudit(0)}>Search</button>
+        <button className={styles.button} onClick={() => void exportAudit()}>Export CSV</button>
+        <span className={styles.muted}>{auditTotal} matching events</span>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead><tr><th>Time</th><th>Client org</th><th>Actor</th><th>Action</th><th>Resource</th></tr></thead>
+          <tbody>
+            {audit.map(a => (
+              <tr key={a.id}>
+                <td>{new Date(a.createdAt).toLocaleString()}</td>
+                <td>{a.organizationName || a.organizationId}</td>
+                <td>{a.userEmail || 'system'}</td>
+                <td>{a.action}</td>
+                <td>{a.resource}</td>
+              </tr>
+            ))}
+            {!audit.length && <tr><td colSpan={5}>No rows loaded. Run a search above.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <button className={styles.button} disabled={auditPageIndex === 0} onClick={() => void loadAudit(auditPageIndex - 1)}>Previous</button>
+        <button className={styles.button} disabled={(auditPageIndex + 1) * 50 >= auditTotal} onClick={() => void loadAudit(auditPageIndex + 1)}>Next</button>
+      </div>
+    </div>
+  );
+
+  const Planned = ({ title, note }: { title: string; note?: string }) => (
+    <div className={styles.planned}>
+      <h3>{title}</h3>
+      <p>{note || 'This capability is in the build queue. The navigation architecture is reserved for it. No fake routes or data are created here.'}</p>
+    </div>
+  );
+
+  function resolveContent() {
+    if (isReserved) return <Planned title={meta?.label ?? 'Planned'} note={meta?.note} />;
+    switch (activeSection) {
+      case 'overview':         return overview;
+      case 'businesses':       return businesses;
+      case 'onboarding':       return onboarding;
+      case 'packages':         return packagesPage;
+      case 'access':           return access;
+      case 'health':           return healthPage;
+      case 'client-health':    return clientHealthPage;
+      case 'client-configuration': return clientConfigurationPage;
+      case 'client-audit':     return clientAuditPage;
+      case 'audit':            return auditPage;
+      case 'configuration':    return config;
+      case 'ai':               return aiPage;
+      case 'client':           return <ClientWorkspace
+          org={wsOrg}
+          orgId={clientOrgId}
+          users={wsUsers}
+          stats={wsStats}
+          tier={wsTier}
+          settings={wsSettings}
+          audit={wsAudit}
+          auditTotal={wsAuditTotal}
+          connectors={wsConnectors}
+          approvals={wsApprovals}
+          rules={wsRules}
+          reports={wsReports}
+          agents={wsAgents}
+          snapshot={wsSnapshot}
+          packages={packages}
+          loading={wsLoading}
+          busy={busy}
+          tab={wsTab}
+          setTab={setWsTab}
+          wsUser={wsUser}
+          setWsUser={setWsUser}
+          error={error}
+          notice={notice}
+          onBack={() => navigate('businesses')}
+          onToggle={(o) => void toggle(o)}
+          onAddUser={async (e) => {
+            e.preventDefault();
+            if (!clientOrgId) return;
+            setBusy(true);
+            try {
+              const u = await createPlatformOrgUser(clientOrgId, wsUser);
+              setWsUsers(v => [u, ...v]);
+              setWsUser({ email: '', fullName: '', password: '', role: 'member' });
+              setNotice('User created.');
+            } catch (err) { setError(err instanceof Error ? err.message : 'User creation failed'); }
+            finally { setBusy(false); }
+          }}
+          onToggleUser={async (u) => {
+            if (!clientOrgId) return;
+            setBusy(true);
+            try {
+              const x = await updatePlatformOrgUser(clientOrgId, u.id, { isActive: !u.isActive });
+              setWsUsers(v => v.map(z => z.id === x.id ? x : z));
+            } catch (err) { setError(err instanceof Error ? err.message : 'User update failed'); }
+            finally { setBusy(false); }
+          }}
+          onAssignPackage={async (tierId) => {
+            if (!clientOrgId) return;
+            try {
+              await assignPlatformOrgPackage(clientOrgId, { tierId });
+              setNotice('Package assigned.');
+              const t = await fetchPlatformOrgPackage(clientOrgId);
+              setWsTier(t);
+            } catch (err) { setError(err instanceof Error ? err.message : 'Assignment failed'); }
+          }}
+          onSaveSettings={async () => {
+            if (!clientOrgId) return;
+            setBusy(true);
+            try {
+              await updatePlatformOrgDateTimeSettings(clientOrgId, wsSettings);
+              setNotice('Settings saved.');
+            } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); }
+            finally { setBusy(false); }
+          }}
+          onSettingsChange={setWsSettings}
+          onLoadAudit={async () => {
+            try {
+              const r = await listPlatformAuditLogs({ orgId: clientOrgId, limit: 50, offset: 0 });
+              setWsAudit(r.rows);
+              setWsAuditTotal(r.total);
+            } catch (err) { setError(err instanceof Error ? err.message : 'Audit load failed'); }
+          }}
+        />;
+      default:                 return overview;
+    }
+  }
+
+  const content = resolveContent();
+  const activeLabel = activeSection === 'client'
+    ? (wsOrg?.name ?? 'Client Workspace')
+    : (SECTION_LABEL[activeSection] ?? meta?.label ?? 'Platform');
+  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>{activeSection === 'client' ? (wsOrg ? `${wsOrg.slug} · ${wsOrg.status}` : 'Loading…') : 'Ellines EIP control-plane operations'}</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} clients</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
   <ConfirmDialog operationId="platform.package.create" open={pkgDialog} onConfirm={createPackage} onCancel={()=>setPkgDialog(false)} context={pkg.displayName||pkg.name}/>
   <ConfirmDialog operationId={safeguardOp||'platform.package.delete'} open={Boolean(safeguardOp)} onConfirm={reason=>runSafeguarded(reason,safeguardOp||'platform.package.delete')} onCancel={()=>setSafeguardOp(null)} context={safeguardOp&&safeguardOp.indexOf('package')>=0?(selectedPkg?.display_name||''):(selectedPack?.name||'')}/>
-  {selected&&<><div className={styles.backdrop} onClick={()=>setSelected(null)}/><aside className={styles.drawer}><div className={styles.cardHeader}><div><div className={styles.eyebrow}>Business control</div><h2 className={styles.title} style={{fontSize:22}}>{selected.name}</h2><p className={styles.sub}>{selected.slug} · {selected.status}</p></div><button className={styles.button} onClick={()=>setSelected(null)}>Close</button></div><div className={styles.grid2}><Kpi label="Users" value={stats?.stats?.totalUsers??selected.userCount} hint="total"/><Kpi label="Integrations" value={stats?.stats?.totalConnectors??'—'} hint="customer services"/><Kpi label="Events" value={stats?.stats?.totalEvents??'—'} hint="audit/events"/><Kpi label="Pending approvals" value={stats?.stats?.pendingApprovals??'—'} hint="attention"/></div><div className={styles.card+' '+styles.section}><CardTitle title="Service package" hint="Assign the commercial capability envelope."/><select className={styles.select} value={tier?.rate_limit_tiers?.id||''} onChange={async e=>{try{await assignPlatformOrgPackage(selected.id,{tierId:e.target.value});setNotice('Package assigned.');await open(selected)}catch(err){setError(err instanceof Error?err.message:'Package assignment failed')}}}><option value="">No package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select></div><div className={styles.card+' '+styles.section}><CardTitle title="Tenant lifecycle" hint="Disconnect is reversible; normal control plane does not expose hard deletion."/><button className={styles.button+' '+(selected.status==='active'?styles.danger:styles.success)} onClick={()=>void toggle(selected)}>{selected.status==='active'?'Disconnect / Suspend':'Reconnect'}</button></div></aside></>}</>;
+  </>;
 }
 
 function Kpi({label,value,hint,cls}:{label:string;value:string|number;hint:string;cls?:string}){return <div className={styles.kpi}><span>{label}</span><strong className={cls}>{value}</strong><small>{hint}</small></div>}
 function CardTitle({title,hint}:{title:string;hint:string}){return <div className={styles.cardHeader}><div><h3 className={styles.cardTitle}>{title}</h3><p className={styles.cardHint}>{hint}</p></div></div>}
 function Service({title,text,tags=[]}:{title:string;text:string;tags?:string[]}){return <div className={styles.service}><h4>{title}</h4><p>{text}</p>{tags.map(t=><span className={styles.tag} key={t}>{t}</span>)}</div>}
 function Field({label,value,set,placeholder,type='text'}:{label:string;value:string;set:(v:string)=>void;placeholder?:string;type?:string}){return <label className={styles.field}><span>{label}</span><input className={styles.input} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} type={type}/></label>}
+
+// ── Full-page Client Workspace ───────────────────────────────────────────────
+// Opened when the operator clicks "Open workspace" on any client org.
+// Full Work Console view per client: every section the client's own users see,
+// but scoped to their org and read via platform cross-org APIs.
+
+type WsTab = 'overview'|'glance'|'timeline'|'notifications'|'approvals'|'fleet'|'people'|'inbox'|'connectors'|'rules'|'reports'|'agents'|'documents'|'users'|'audit'|'settings'|'lifecycle';
+
+function ClientWorkspace({
+  org, orgId, users, stats, tier, settings, audit, auditTotal,
+  connectors, approvals, rules, reports, agents, snapshot,
+  packages, loading, busy, tab, setTab, wsUser, setWsUser,
+  error: _e, notice: _n,
+  onBack, onToggle, onAddUser, onToggleUser, onAssignPackage,
+  onSaveSettings, onSettingsChange, onLoadAudit,
+}: {
+  org: import('@/lib/api').PlatformOrg | null;
+  orgId: string;
+  users: import('@/lib/api').OrgMember[];
+  stats: any; tier: any;
+  settings: import('@/lib/api').OrgDateTimeSettingsDto;
+  audit: import('@/lib/api').PlatformAuditRow[];
+  auditTotal: number;
+  connectors: import('@/lib/api').PlatformOrgConnectorDto[];
+  approvals: import('@/lib/api').PlatformOrgApprovalDto[];
+  rules: import('@/lib/api').PlatformOrgRuleDto[];
+  reports: import('@/lib/api').PlatformOrgReportDto[];
+  agents: import('@/lib/api').PlatformOrgAgentDto[];
+  snapshot: import('@/lib/api').PlatformOrgSnapshotDto;
+  packages: import('@/lib/api').PlatformPackage[];
+  loading: boolean; busy: boolean;
+  tab: WsTab; setTab: (t: WsTab) => void;
+  wsUser: {email:string;fullName:string;password:string;role:string};
+  setWsUser: (u: {email:string;fullName:string;password:string;role:string}) => void;
+  error: string; notice: string;
+  onBack: () => void;
+  onToggle: (o: import('@/lib/api').PlatformOrg) => void;
+  onAddUser: (e: React.FormEvent) => Promise<void>;
+  onToggleUser: (u: import('@/lib/api').OrgMember) => Promise<void>;
+  onAssignPackage: (tierId: string) => Promise<void>;
+  onSaveSettings: () => Promise<void>;
+  onSettingsChange: (s: import('@/lib/api').OrgDateTimeSettingsDto) => void;
+  onLoadAudit: () => Promise<void>;
+}) {
+  // ── Work Console tabs (mirror what the client's own users see) ──
+  const WC_TABS: {id: WsTab; label: string}[] = [
+    {id:'overview',      label:'Overview'},
+    {id:'glance',        label:'Glance'},
+    {id:'timeline',      label:'Timeline'},
+    {id:'notifications', label:'Notifications'},
+    {id:'approvals',     label:'Approvals'},
+    {id:'fleet',         label:'Fleet'},
+    {id:'people',        label:'People'},
+    {id:'inbox',         label:'Inbox'},
+    {id:'connectors',    label:'Connectors'},
+    {id:'rules',         label:'Rules'},
+    {id:'reports',       label:'Reports'},
+    {id:'agents',        label:'Automation'},
+    {id:'documents',     label:'Documents'},
+  ];
+  // ── Operator-only control tabs ──
+  const OP_TABS: {id: WsTab; label: string}[] = [
+    {id:'users',     label:'Users & Access'},
+    {id:'audit',     label:'Audit Log'},
+    {id:'settings',  label:'Settings'},
+    {id:'lifecycle', label:'Lifecycle'},
+  ];
+
+  if (!orgId) return (
+    <div className={styles.card}>
+      <p className={styles.cardHint}>No client selected.</p>
+      <button className={styles.button} onClick={onBack}>← Back to portfolio</button>
+    </div>
+  );
+
+  const roles = ['owner','admin','executive','manager','member','viewer'] as const;
+
+  const tabBtn = (t: WsTab) => ({
+    className: styles.button,
+    onClick: () => setTab(t),
+    style: tab === t
+      ? {background:'linear-gradient(135deg,#7c3aed,#2563eb)', border:'none', color:'#fff'}
+      : undefined,
+  } as React.ButtonHTMLAttributes<HTMLButtonElement>);
+
+  return (
+    <div>
+      {/* ── Client identity banner — always visible ── */}
+      <div style={{
+        background:'linear-gradient(135deg,rgba(124,58,237,.18),rgba(37,99,235,.1))',
+        border:'1px solid rgba(124,58,237,.25)',
+        borderRadius:14,
+        padding:'14px 18px',
+        marginBottom:16,
+        display:'flex',
+        alignItems:'center',
+        gap:14,
+        flexWrap:'wrap',
+      }}>
+        <button className={styles.button} onClick={onBack} style={{fontSize:11,flexShrink:0}}>← Portfolio</button>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.12em',color:'#8b9bb0',fontWeight:800,marginBottom:2}}>
+            Client Workspace
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <strong style={{fontSize:20,color:'#fff',letterSpacing:'-.02em'}}>{org?.name ?? '…'}</strong>
+            {org && <span className={`${styles.status} ${org.status==='active'?styles.statusOk:styles.statusBad}`}>{org.status}</span>}
+            {org && <span style={{fontSize:11,color:'#8795aa'}}>{org.slug}</span>}
+            {org && <span style={{fontSize:11,color:'#8795aa'}}>{org.userCount} users</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Work Console tabs (mirrors client's own nav) ── */}
+      <div style={{marginBottom:4}}>
+        <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2}}>Work Console</div>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+          {WC_TABS.map(t => <button key={t.id} {...tabBtn(t.id)}>{t.label}</button>)}
+        </div>
+      </div>
+
+      {/* ── Operator control tabs ── */}
+      <div style={{marginBottom:18}}>
+        <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2,marginTop:10}}>Operator Controls</div>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:12,borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+          {OP_TABS.map(t => <button key={t.id} {...tabBtn(t.id)}>{t.label}</button>)}
+        </div>
+      </div>
+
+      {loading && <div style={{padding:'32px 0',color:'#8795aa',textAlign:'center'}}>Loading {org?.name ?? 'client'} workspace…</div>}
+
+      {/* ── OVERVIEW ── */}
+      {!loading && tab==='overview' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Users" value={stats?.stats?.totalUsers??'—'} hint="total accounts"/>
+            <Kpi label="Active users" value={stats?.stats?.activeUsers??'—'} hint="currently active" cls={styles.ok}/>
+            <Kpi label="Connectors" value={connectors.length} hint="integrations configured"/>
+            <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="last sync ok" cls={styles.ok}/>
+          </div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Pending approvals" value={approvals.filter(a=>a.status==='pending').length} hint="awaiting decision" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
+            <Kpi label="Active agents" value={agents.filter(a=>a.isActive&&!a.isPaused).length} hint="automation running"/>
+            <Kpi label="Active rules" value={rules.filter(r=>r.enabled).length} hint="business rules on"/>
+            <Kpi label="Reports" value={reports.filter(r=>r.enabled).length} hint="scheduled active"/>
+          </div>
+          <div className={styles.grid2} style={{marginBottom:12}}>
+            <div className={styles.card}>
+              <CardTitle title="Ellinea Glance" hint="Latest enterprise snapshot for this client."/>
+              {snapshot ? (
+                <>
+                  <div className={styles.grid2} style={{marginTop:8}}>
+                    <Kpi label="Health score" value={snapshot.healthScore+'/100'} hint="enterprise health" cls={snapshot.healthScore>=70?styles.ok:snapshot.healthScore>=40?styles.warn:styles.bad}/>
+                    <Kpi label="Connected systems" value={snapshot.connectedSystems} hint="active integrations"/>
+                    <Kpi label="Open alerts" value={snapshot.openAlerts} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
+                    <Kpi label="Open decisions" value={snapshot.openDecisions} hint="pending" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
+                  </div>
+                  <div className={styles.service} style={{marginTop:10}}>
+                    <h4>Brief highlight</h4>
+                    <p>{snapshot.briefHighlight||'No brief available.'}</p>
+                  </div>
+                  <p style={{fontSize:10,color:'#64738a',marginTop:8}}>Synced {new Date(snapshot.syncedAt).toLocaleString()}</p>
+                </>
+              ) : <p className={styles.cardHint}>No snapshot yet. Client needs at least one synced connector.</p>}
+            </div>
+            <div className={styles.card}>
+              <CardTitle title="Role breakdown" hint="User distribution across roles."/>
+              {stats?.stats?.roleBreakdown
+                ? Object.entries(stats.stats.roleBreakdown as Record<string,number>).map(([role,count])=>(
+                    <div key={role} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',fontSize:11}}>
+                      <span style={{textTransform:'capitalize',color:'#c8d2e0'}}>{role}</span>
+                      <strong>{count as number}</strong>
+                    </div>
+                  ))
+                : <p className={styles.cardHint}>No data loaded.</p>}
+              <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:6}}>
+                <button className={`${styles.button} ${styles.primary}`} onClick={()=>setTab('connectors')}>Manage connectors</button>
+                <button className={styles.button} onClick={()=>setTab('approvals')}>Review approvals</button>
+                <button className={styles.button} onClick={()=>setTab('users')}>Manage users</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GLANCE (Enterprise Snapshot) ── */}
+      {!loading && tab==='glance' && (
+        <div>
+          {snapshot ? (
+            <>
+              <div className={styles.grid4} style={{marginBottom:12}}>
+                <Kpi label="Health score" value={snapshot.healthScore+'/100'} hint="enterprise health" cls={snapshot.healthScore>=70?styles.ok:snapshot.healthScore>=40?styles.warn:styles.bad}/>
+                <Kpi label="Connected systems" value={snapshot.connectedSystems} hint="active integrations"/>
+                <Kpi label="Open alerts" value={snapshot.openAlerts} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
+                <Kpi label="Open decisions" value={snapshot.openDecisions} hint="pending decisions" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
+              </div>
+              <div className={styles.card} style={{marginBottom:12}}>
+                <CardTitle title="Brief highlight" hint={`Last synced ${new Date(snapshot.syncedAt).toLocaleString()}`}/>
+                <p style={{fontSize:13,lineHeight:1.6,color:'#c8d2e0',marginTop:4}}>{snapshot.briefHighlight||'No brief available.'}</p>
+              </div>
+              <div className={styles.card}>
+                <CardTitle title="Timeline" hint="Recent activity from the enterprise snapshot."/>
+                {Array.isArray(snapshot.timeline) && (snapshot.timeline as {title:string;detail:string}[]).length > 0
+                  ? (snapshot.timeline as {title:string;detail:string}[]).map((t,i)=>(
+                      <div key={i} className={styles.service} style={{marginBottom:6}}>
+                        <h4>{t.title}</h4>
+                        <p>{t.detail}</p>
+                      </div>
+                    ))
+                  : <p className={styles.cardHint}>No timeline entries available.</p>}
+              </div>
+            </>
+          ) : (
+            <div className={styles.planned}>
+              <h3>No enterprise snapshot</h3>
+              <p>This client has no synced enterprise snapshot yet. They need to install and sync at least one connector from their Work Console for Glance data to appear here.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TIMELINE ── */}
+      {!loading && tab==='timeline' && (
+        <div>
+          <div className={styles.card} style={{marginBottom:12}}>
+            <CardTitle title="Activity timeline" hint={`Recent events and activity for ${org?.name ?? 'this client'}.`}/>
+            {snapshot && Array.isArray(snapshot.timeline) && (snapshot.timeline as {title:string;detail:string}[]).length > 0
+              ? (snapshot.timeline as {title:string;detail:string}[]).map((t,i)=>(
+                  <div key={i} className={styles.service} style={{marginBottom:8,display:'flex',gap:12,alignItems:'flex-start'}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:'#7c3aed',flexShrink:0,marginTop:3}}/>
+                    <div><h4 style={{margin:0,fontSize:12}}>{t.title}</h4><p style={{margin:'3px 0 0'}}>{t.detail}</p></div>
+                  </div>
+                ))
+              : <p className={styles.cardHint}>No timeline events. Client needs at least one synced connector to populate the enterprise timeline.</p>}
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Recent audit events" hint="Platform-level activity log for this client."/>
+            <div style={{display:'flex',gap:8,marginBottom:10}}>
+              <button className={`${styles.button} ${styles.primary}`} onClick={()=>void onLoadAudit()}>Load events</button>
+              <span className={styles.muted}>{auditTotal} total</span>
+            </div>
+            {audit.slice(0,10).map(a=>(
+              <div key={a.id} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#2563eb',flexShrink:0,marginTop:4}}/>
+                <div style={{fontSize:11}}>
+                  <span style={{color:'#c8d2e0'}}>{a.action}</span>
+                  <span style={{color:'#8795aa',marginLeft:8}}>{a.userEmail??'system'}</span>
+                  <span style={{color:'#5f6d83',marginLeft:8}}>{new Date(a.createdAt).toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+            {!audit.length && <p className={styles.cardHint}>Click "Load events" to fetch the audit log.</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ── NOTIFICATIONS ── */}
+      {!loading && tab==='notifications' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Pending approvals" value={approvals.filter(a=>a.status==='pending').length} hint="require attention" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
+            <Kpi label="Open alerts" value={snapshot?.openAlerts??'—'} hint="from snapshot" cls={snapshot?.openAlerts?styles.warn:styles.ok}/>
+            <Kpi label="Open decisions" value={snapshot?.openDecisions??'—'} hint="pending" cls={snapshot?.openDecisions?styles.warn:styles.ok}/>
+            <Kpi label="Connector errors" value={connectors.filter(c=>c.errorCount>0).length} hint="need attention" cls={connectors.filter(c=>c.errorCount>0).length?styles.warn:styles.ok}/>
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Pending approvals" hint="Items awaiting decision in this client organization."/>
+            {approvals.filter(a=>a.status==='pending').length > 0
+              ? approvals.filter(a=>a.status==='pending').map(a=>(
+                  <div key={a.id} className={styles.service} style={{marginBottom:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div>
+                        <strong style={{fontSize:12}}>{a.title}</strong>
+                        <p style={{margin:'3px 0 0',fontSize:10}}>{a.requester} · {a.source}</p>
+                      </div>
+                      <span className={`${styles.status} ${styles.statusNeutral}`}>pending</span>
+                    </div>
+                  </div>
+                ))
+              : <p className={styles.cardHint}>No pending approvals.</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ── FLEET ── */}
+      {!loading && tab==='fleet' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Connected systems" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
+            <Kpi label="Health score" value={snapshot?(snapshot.healthScore+'/100'):'—'} hint="enterprise health" cls={snapshot?.healthScore&&snapshot.healthScore>=70?styles.ok:snapshot?.healthScore&&snapshot.healthScore>=40?styles.warn:styles.bad}/>
+            <Kpi label="Connectors" value={connectors.length} hint="installed"/>
+            <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="ok"/>
+          </div>
+          {snapshot ? (
+            <div className={styles.card}>
+              <CardTitle title="Fleet overview" hint="Systems and assets visible from the enterprise snapshot."/>
+              <Service title="Enterprise health" text={`Score: ${snapshot.healthScore}/100 · ${snapshot.connectedSystems} connected systems`}/>
+              <Service title="Brief" text={snapshot.briefHighlight||'No brief available.'}/>
+              <p style={{marginTop:12,fontSize:11,color:'#5f6d83'}}>
+                Full fleet detail (individual assets, vehicles, equipment) requires the client to have their fleet management system connected as a connector. The data shown here is aggregated from the enterprise snapshot.
+              </p>
+            </div>
+          ) : <div className={styles.planned}><h3>No fleet data</h3><p>Fleet data appears once this client syncs a connector that provides fleet/asset information.</p></div>}
+        </div>
+      )}
+
+      {/* ── PEOPLE ── */}
+      {!loading && tab==='people' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="EIP users" value={stats?.stats?.totalUsers??'—'} hint="registered accounts"/>
+            <Kpi label="Active" value={stats?.stats?.activeUsers??'—'} hint="currently active" cls={styles.ok}/>
+            <Kpi label="Roles" value={Object.keys(stats?.stats?.roleBreakdown??{}).length} hint="role types"/>
+            <Kpi label="Connected people" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
+          </div>
+          <div className={styles.grid2}>
+            <div className={styles.card}>
+              <CardTitle title="EIP user directory" hint="Accounts registered in this client organization."/>
+              {users.slice(0,15).map(u=>(
+                <div key={u.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.05)',fontSize:11}}>
+                  <div>
+                    <span style={{color:'#c8d2e0',fontWeight:600}}>{u.fullName}</span>
+                    <span style={{color:'#8795aa',marginLeft:8}}>{u.email}</span>
+                  </div>
+                  <span style={{textTransform:'capitalize',color:'#a5b4fc'}}>{u.role}</span>
+                </div>
+              ))}
+              {users.length > 15 && <p className={styles.cardHint} style={{marginTop:8}}>+{users.length-15} more — go to Users & Access for full management.</p>}
+              {!users.length && <p className={styles.cardHint}>No users loaded.</p>}
+            </div>
+            <div className={styles.card}>
+              <CardTitle title="Role breakdown" hint="How people are distributed across roles."/>
+              {stats?.stats?.roleBreakdown
+                ? Object.entries(stats.stats.roleBreakdown as Record<string,number>).map(([role,count])=>(
+                    <div key={role} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',fontSize:11}}>
+                      <span style={{textTransform:'capitalize',color:'#c8d2e0'}}>{role}</span>
+                      <strong>{count as number}</strong>
+                    </div>
+                  ))
+                : <p className={styles.cardHint}>No data.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── INBOX ── */}
+      {!loading && tab==='inbox' && (
+        <div className={styles.card}>
+          <CardTitle title="Inbox" hint="Email and message activity for this client (requires email connector)."/>
+          <div className={styles.planned}>
+            <h3>Inbox — operator view</h3>
+            <p>The client&apos;s inbox is populated by their own email connector syncs. As a platform operator you can see connector sync status in the Connectors tab. The client&apos;s users access their own inbox from their Work Console.</p>
+          </div>
+          <div style={{marginTop:14}}>
+            <Service title="Connector sync status" text={connectors.length?`${connectors.filter(c=>c.status==='synced').length} of ${connectors.length} connectors synced`:'No connectors installed.'}/>
+            <Service title="Last sync" text={connectors.filter(c=>c.lastSyncedAt).sort((a,b)=>new Date(b.lastSyncedAt!).getTime()-new Date(a.lastSyncedAt!).getTime())[0]?.lastSyncedAt ? new Date(connectors.filter(c=>c.lastSyncedAt)[0].lastSyncedAt!).toLocaleString() : 'Never'}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── DOCUMENTS ── */}
+      {!loading && tab==='documents' && (
+        <div className={styles.card}>
+          <CardTitle title="Documents" hint="Documents stored by this client organization."/>
+          <div className={styles.planned}>
+            <h3>Document vault — operator view</h3>
+            <p>Document management is done by the client&apos;s users from their own Work Console. As a platform operator, you can see storage statistics once the document sync connector is active for this org.</p>
+          </div>
+          <div style={{marginTop:14}}>
+            <Service title="Audit events" text={`${stats?.stats?.totalEvents??0} total recorded events for this org`}/>
+            <Service title="Connectors" text={`${connectors.length} connector${connectors.length!==1?'s':''} installed`}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── CONNECTORS ── */}
+      {!loading && tab==='connectors' && (        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Total" value={connectors.length} hint="installed"/>
+            <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="last sync ok" cls={styles.ok}/>
+            <Kpi label="Errors" value={connectors.filter(c=>c.status==='error'||c.errorCount>0).length} hint="needs attention" cls={connectors.filter(c=>c.errorCount>0).length?styles.warn:styles.ok}/>
+            <Kpi label="Draft" value={connectors.filter(c=>c.status==='draft').length} hint="not yet active"/>
+          </div>
+          {connectors.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr><th>Connector</th><th>Catalog</th><th>Status</th><th>Last synced</th><th>Errors</th><th>Last message</th></tr>
+                </thead>
+                <tbody>
+                  {connectors.map(c=>(
+                    <tr key={c.id}>
+                      <td><strong>{c.displayName}</strong></td>
+                      <td><span className={styles.muted}>{c.catalogId}</span></td>
+                      <td><span className={`${styles.status} ${c.status==='synced'?styles.statusOk:c.status==='error'?styles.statusBad:styles.statusNeutral}`}>{c.status}</span></td>
+                      <td>{c.lastSyncedAt?new Date(c.lastSyncedAt).toLocaleString():'Never'}</td>
+                      <td className={c.errorCount>0?styles.warn:''}>{c.errorCount}</td>
+                      <td><span className={styles.muted} style={{fontSize:10}}>{c.lastMessage||c.lastError||'—'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={styles.planned}><h3>No connectors installed</h3><p>This client has not installed any connectors yet. They can do so from their own Work Console → Connectors page.</p></div>}
+        </div>
+      )}
+
+      {/* ── APPROVALS ── */}
+      {!loading && tab==='approvals' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Total" value={approvals.length} hint="all time"/>
+            <Kpi label="Pending" value={approvals.filter(a=>a.status==='pending').length} hint="awaiting decision" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
+            <Kpi label="Approved" value={approvals.filter(a=>a.status==='approved').length} hint="resolved" cls={styles.ok}/>
+            <Kpi label="Rejected" value={approvals.filter(a=>a.status==='rejected').length} hint="declined"/>
+          </div>
+          {approvals.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Title</th><th>Requester</th><th>Status</th><th>Source</th><th>Created</th><th>Decided</th></tr></thead>
+                <tbody>
+                  {approvals.map(a=>(
+                    <tr key={a.id}>
+                      <td><strong>{a.title}</strong><br/><span className={styles.muted} style={{fontSize:10}}>{a.detail}</span></td>
+                      <td>{a.requester}</td>
+                      <td><span className={`${styles.status} ${a.status==='approved'?styles.statusOk:a.status==='pending'?styles.statusNeutral:styles.statusBad}`}>{a.status}</span></td>
+                      <td><span className={styles.muted}>{a.source}</span></td>
+                      <td>{new Date(a.createdAt).toLocaleDateString()}</td>
+                      <td>{a.decidedAt?new Date(a.decidedAt).toLocaleDateString():'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={styles.planned}><h3>No approvals yet</h3><p>This client has no approval requests. Approvals are created via their Work Console or triggered by business rules.</p></div>}
+        </div>
+      )}
+
+      {/* ── USERS & ACCESS ── */}
+      {!loading && tab==='users' && (
+        <div className={styles.grid2}>
+          <div className={styles.card}>
+            <CardTitle title="Add user" hint="Create a new account in this client organization."/>
+            <form onSubmit={onAddUser}>
+              <div className={styles.form} style={{marginTop:8}}>
+                <Field label="Full name" value={wsUser.fullName} set={v=>setWsUser({...wsUser,fullName:v})}/>
+                <Field label="Email" value={wsUser.email} set={v=>setWsUser({...wsUser,email:v})} type="email"/>
+                <Field label="Password" value={wsUser.password} set={v=>setWsUser({...wsUser,password:v})} type="password"/>
+                <label className={styles.field}>
+                  <span>Role</span>
+                  <select className={styles.select} value={wsUser.role} onChange={e=>setWsUser({...wsUser,role:e.target.value})}>
+                    {roles.map(r=><option key={r}>{r}</option>)}
+                  </select>
+                </label>
+                <div className={styles.full}>
+                  <button className={`${styles.button} ${styles.primary}`} disabled={busy||!wsUser.email||!wsUser.fullName||!wsUser.password}>Add user</button>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Users" hint={`${users.length} accounts in this organization`}/>
+            <div style={{maxHeight:500,overflowY:'auto'}}>
+              {users.map(u=>(
+                <div key={u.id} className={styles.service} style={{marginBottom:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                    <div>
+                      <strong style={{fontSize:12}}>{u.fullName}</strong>
+                      <p style={{margin:'3px 0 0',fontSize:10,color:'#8795aa'}}>{u.email} · <span style={{textTransform:'capitalize'}}>{u.role}</span></p>
+                    </div>
+                    <button className={`${styles.button} ${u.isActive?styles.danger:styles.success}`} style={{fontSize:10,padding:'5px 8px'}} disabled={busy} onClick={()=>void onToggleUser(u)}>
+                      {u.isActive?'Deactivate':'Activate'}
+                    </button>
+                  </div>
+                  <span className={`${styles.status} ${u.isActive?styles.statusOk:styles.statusBad}`}>{u.isActive?'active':'inactive'}</span>
+                </div>
+              ))}
+              {!users.length && <p className={styles.cardHint}>No users loaded.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── RULES ── */}
+      {!loading && tab==='rules' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Total rules" value={rules.length} hint="defined"/>
+            <Kpi label="Active" value={rules.filter(r=>r.enabled).length} hint="currently on" cls={styles.ok}/>
+            <Kpi label="Inactive" value={rules.filter(r=>!r.enabled).length} hint="turned off"/>
+            <Kpi label="Connectors" value={connectors.length} hint="data sources"/>
+          </div>
+          {rules.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Rule name</th><th>When</th><th>Threshold</th><th>Then</th><th>Status</th><th>Created</th></tr></thead>
+                <tbody>
+                  {rules.map(r=>(
+                    <tr key={r.id}>
+                      <td><strong>{r.name}</strong></td>
+                      <td><span className={styles.muted}>{r.when}</span></td>
+                      <td>{r.threshold}</td>
+                      <td><span className={styles.muted}>{r.then}</span></td>
+                      <td><span className={`${styles.status} ${r.enabled?styles.statusOk:styles.statusNeutral}`}>{r.enabled?'Active':'Off'}</span></td>
+                      <td>{new Date(r.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={styles.planned}><h3>No business rules</h3><p>This client has not created any business rules yet. Rules are configured from their Work Console → Rules page.</p></div>}
+        </div>
+      )}
+
+      {/* ── REPORTS ── */}
+      {!loading && tab==='reports' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Total" value={reports.length} hint="defined"/>
+            <Kpi label="Active" value={reports.filter(r=>r.enabled).length} hint="scheduled" cls={styles.ok}/>
+            <Kpi label="Paused" value={reports.filter(r=>!r.enabled).length} hint="disabled"/>
+            <Kpi label="Last run" value={reports.filter(r=>r.lastRunAt).length} hint="have run at least once"/>
+          </div>
+          {reports.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Report title</th><th>Cadence</th><th>Status</th><th>Last run</th><th>Created</th></tr></thead>
+                <tbody>
+                  {reports.map(r=>(
+                    <tr key={r.id}>
+                      <td><strong>{r.title}</strong></td>
+                      <td><span className={styles.muted}>{r.cadence}</span></td>
+                      <td><span className={`${styles.status} ${r.enabled?styles.statusOk:styles.statusNeutral}`}>{r.enabled?'Active':'Paused'}</span></td>
+                      <td>{r.lastRunAt?new Date(r.lastRunAt).toLocaleString():'Never'}</td>
+                      <td>{new Date(r.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={styles.planned}><h3>No scheduled reports</h3><p>This client has not set up any reports yet. Reports are configured from their Work Console → Reports page.</p></div>}
+        </div>
+      )}
+
+      {/* ── AUTOMATION / AGENTS ── */}
+      {!loading && tab==='agents' && (
+        <div>
+          <div className={styles.grid4} style={{marginBottom:12}}>
+            <Kpi label="Total agents" value={agents.length} hint="defined"/>
+            <Kpi label="Active" value={agents.filter(a=>a.isActive&&!a.isPaused).length} hint="running" cls={styles.ok}/>
+            <Kpi label="Paused" value={agents.filter(a=>a.isPaused).length} hint="temporarily off"/>
+            <Kpi label="Executions" value={agents.reduce((n,a)=>n+a.executionCount,0)} hint="all time"/>
+          </div>
+          {agents.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Agent name</th><th>Trigger</th><th>Status</th><th>Executions</th><th>Success</th><th>Last run</th></tr></thead>
+                <tbody>
+                  {agents.map(a=>(
+                    <tr key={a.id}>
+                      <td>
+                        <strong>{a.name}</strong>
+                        {a.description&&<><br/><span className={styles.muted} style={{fontSize:10}}>{a.description}</span></>}
+                      </td>
+                      <td><span className={styles.muted}>{a.trigger}</span></td>
+                      <td>
+                        <span className={`${styles.status} ${a.isActive&&!a.isPaused?styles.statusOk:a.isPaused?styles.statusNeutral:styles.statusBad}`}>
+                          {a.isPaused?'Paused':a.isActive?'Active':'Inactive'}
+                        </span>
+                      </td>
+                      <td>{a.executionCount}</td>
+                      <td className={a.successCount<a.executionCount?styles.warn:''}>{a.successCount}</td>
+                      <td>{a.lastExecutedAt?new Date(a.lastExecutedAt).toLocaleString():'Never'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={styles.planned}><h3>No automation agents</h3><p>This client has not created any Ellinea Agents yet. Agents are configured from their Work Console → Automation page.</p></div>}
+        </div>
+      )}
+
+      {/* ── AUDIT ── */}
+      {!loading && tab==='audit' && (
+        <div className={styles.card}>
+          <CardTitle title="Client audit log" hint={`Activity log for ${org?.name??'this client'}.`}/>
+          <div style={{display:'flex',gap:8,marginBottom:12}}>
+            <button className={`${styles.button} ${styles.primary}`} onClick={()=>void onLoadAudit()}>Load audit log</button>
+            <span className={styles.muted}>{auditTotal} events total</span>
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th></tr></thead>
+              <tbody>
+                {audit.map(a=>(
+                  <tr key={a.id}>
+                    <td>{new Date(a.createdAt).toLocaleString()}</td>
+                    <td>{a.userEmail??'system'}</td>
+                    <td>{a.action}</td>
+                    <td>{a.resource}</td>
+                  </tr>
+                ))}
+                {!audit.length&&<tr><td colSpan={4} style={{color:'#718096'}}>Click &quot;Load audit log&quot; to fetch events.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── SETTINGS ── */}
+      {!loading && tab==='settings' && (
+        <div className={styles.grid2}>
+          <div className={styles.card}>
+            <CardTitle title="Service package" hint="Assign a commercial capability tier to this client."/>
+            <select className={styles.select} value={tier?.rate_limit_tiers?.id??''} onChange={e=>void onAssignPackage(e.target.value)}>
+              <option value="">No package</option>
+              {packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}
+            </select>
+            {tier?.rate_limit_tiers&&(
+              <div style={{marginTop:12}}>
+                <Service title={packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.display_name??'Current package'} text={`${packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.requests_per_day?.toLocaleString()??'—'} req/day`}/>
+              </div>
+            )}
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Date & time preferences" hint="Controls how dates and times display in this client's Work Console."/>
+            <div className={styles.form} style={{marginTop:8}}>
+              <label className={styles.field}>
+                <span>Time format</span>
+                <select className={styles.select} value={settings.timeFormat} onChange={e=>onSettingsChange({...settings,timeFormat:e.target.value as '12h'|'24h'})}>
+                  <option value="12h">12-hour (3:45 PM)</option>
+                  <option value="24h">24-hour (15:45)</option>
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>Date style</span>
+                <select className={styles.select} value={settings.dateStyle} onChange={e=>onSettingsChange({...settings,dateStyle:e.target.value as import('@/lib/api').OrgDateTimeSettingsDto['dateStyle']})}>
+                  <option value="short">Short (9/21/2026)</option>
+                  <option value="medium">Medium (Sep 21, 2026)</option>
+                  <option value="log">Log (2026-09-21)</option>
+                </select>
+              </label>
+              <div className={styles.full}>
+                <button className={`${styles.button} ${styles.primary}`} disabled={busy} onClick={()=>void onSaveSettings()}>Save settings</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── LIFECYCLE ── */}
+      {!loading && tab==='lifecycle' && org && (
+        <div className={styles.grid2}>
+          <div className={styles.card}>
+            <CardTitle title="Tenant lifecycle" hint="Control this client organization's access to EIP services."/>
+            <Service title="Current status" text={org.status}/>
+            <Service title="Registered" text={new Date(org.createdAt).toLocaleDateString()}/>
+            <Service title="Total users" text={String(org.userCount)}/>
+            <Service title="Service package" text={packages.find(p=>p.id===tier?.rate_limit_tiers?.id)?.display_name??'None assigned'}/>
+            <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}>
+              <button className={`${styles.button} ${org.status==='active'?styles.danger:styles.success}`} disabled={busy} onClick={()=>onToggle(org)}>
+                {org.status==='active'?'Disconnect / Suspend':'Reconnect'}
+              </button>
+            </div>
+            <p className={styles.cardHint} style={{marginTop:10}}>Disconnect is reversible. Data is preserved. Reconnect restores access immediately.</p>
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Status notes" hint="What each state means for this client."/>
+            <Service title="Active" text="Client has full access to their EIP Work Console and all configured connectors."/>
+            <Service title="Disconnected" text="Client login is blocked. Data is preserved. No integrations run. Reconnect at any time."/>
+            <Service title="Hard delete" text="Not available from this interface. Contact a platform engineer for irreversible removal."/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary in the Next.js App Router.
+export default function PlatformPage() {
+  return (
+    <Suspense fallback={<div style={{padding:24,color:'#8795aa'}}>Loading platform…</div>}>
+      <PlatformSuperAdminPage />
+    </Suspense>
+  );
+}
