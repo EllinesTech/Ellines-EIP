@@ -2270,6 +2270,113 @@ export function fetchPlatformOrgSnapshot(orgId: string) {
   return request<PlatformOrgSnapshotDto>(`/api/v1/platform/orgs/${orgId}/snapshot`);
 }
 
+// ─── Platform cross-org connector management ──────────────────────────────────
+
+export function fetchPlatformOrgConnectorInstallations(orgId: string) {
+  return request<ConnectorInstallationDto[]>(`/api/v1/platform/orgs/${orgId}/connector-installations`);
+}
+
+export function createPlatformOrgConnector(orgId: string, body: {
+  catalogId: string;
+  displayName: string;
+  config?: ConnectorInstallConfigDto;
+  packId?: string;
+}) {
+  return request<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePlatformOrgConnector(orgId: string, connId: string, body: {
+  displayName?: string;
+  config?: ConnectorInstallConfigDto;
+}) {
+  return request<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePlatformOrgConnector(orgId: string, connId: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function testPlatformOrgConnector(orgId: string, connId: string) {
+  return request<{ ok: boolean; message?: string; installation: ConnectorInstallationDto }>(
+    `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}/test`,
+    { method: 'POST' },
+  );
+}
+
+export function syncPlatformOrgConnector(orgId: string, connId: string) {
+  return request<EnterpriseSummaryDto>(
+    `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}/sync`,
+    { method: 'POST' },
+  );
+}
+
+// ─── Platform cross-org document management ───────────────────────────────────
+
+export type PlatformDocumentDto = {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  tags: string[];
+  branch?: string;
+  department?: string;
+  summary?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+};
+
+export function listPlatformOrgDocuments(orgId: string) {
+  return request<PlatformDocumentDto[]>(`/api/v1/platform/orgs/${orgId}/documents`);
+}
+
+export function uploadPlatformOrgDocument(orgId: string, body: {
+  name: string;
+  mimeType: string;
+  content: string;
+  tags?: string[];
+  branch?: string;
+  summary?: string;
+}) {
+  return request<PlatformDocumentDto>(`/api/v1/platform/orgs/${orgId}/documents`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePlatformOrgDocument(orgId: string, docId: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/documents/${docId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Platform cross-org org profile ──────────────────────────────────────────
+
+export type PlatformOrgProfileDto = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+};
+
+export function fetchPlatformOrgProfile(orgId: string) {
+  return request<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`);
+}
+
+export function updatePlatformOrgProfile(orgId: string, name: string) {
+  return request<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
 // ─── v2.0 Phase A — Ellinea Agents (Autonomous AI) ──────────────────────────
 
 export type EllineaAgentDto = {

@@ -385,7 +385,131 @@ export class PlatformController {
     return this.platform.migrateEncryption(body.dryRun ?? true, body.organizationId);
   }
 
-  // ── Cross-org Work Console reads (god-mode, platform-admin only) ──────────
+  // ── Cross-org connector management (god-mode, platform-admin only) ──────────
+
+  @Get('orgs/:id/connector-installations')
+  listOrgConnectorInstallations(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.enterprise.listInstallations(id);
+  }
+
+  @Post('orgs/:id/connector-installations')
+  createOrgConnectorInstallation(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { catalogId: string; displayName: string; config?: Record<string, unknown>; packId?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    if (!body.catalogId || !body.displayName?.trim()) {
+      throw new BadRequestException('catalogId and displayName are required');
+    }
+    return this.enterprise.createInstallation(id, req.user.userId, {
+      catalogId: body.catalogId,
+      displayName: body.displayName,
+      config: (body.config || {}) as import('@ellines-eip/connectors-sdk').ConnectorInstallConfig,
+      packId: body.packId,
+    });
+  }
+
+  @Patch('orgs/:id/connector-installations/:connId')
+  updateOrgConnectorInstallation(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+    @Param('connId') connId: string,
+    @Body() body: { displayName?: string; config?: Record<string, unknown> },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.enterprise.updateInstallation(id, connId, {
+      displayName: body.displayName,
+      config: body.config as import('@ellines-eip/connectors-sdk').ConnectorInstallConfig | undefined,
+    });
+  }
+
+  @Delete('orgs/:id/connector-installations/:connId')
+  deleteOrgConnectorInstallation(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+    @Param('connId') connId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.enterprise.deleteInstallation(id, connId);
+  }
+
+  @Post('orgs/:id/connector-installations/:connId/test')
+  testOrgConnectorInstallation(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+    @Param('connId') connId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.enterprise.testInstallation(id, connId);
+  }
+
+  @Post('orgs/:id/connector-installations/:connId/sync')
+  syncOrgConnectorInstallation(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Param('connId') connId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.enterprise.syncInstallation(id, req.user.userId, connId);
+  }
+
+  // ── Cross-org document management (god-mode, platform-admin only) ──────────
+
+  @Get('orgs/:id/documents')
+  listOrgDocuments(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.orgs.listDocuments(id);
+  }
+
+  @Post('orgs/:id/documents')
+  uploadOrgDocument(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { name?: string; mimeType?: string; content?: string; tags?: string[]; branch?: string; summary?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.orgs.uploadDocument(id, req.user.userId, req.user.email, body);
+  }
+
+  @Delete('orgs/:id/documents/:docId')
+  deleteOrgDocument(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    // Platform admin always has permission to delete any document
+    return this.orgs.deleteDocument(id, req.user.userId, req.user.email, 'admin', docId);
+  }
+
+  // ── Cross-org org profile management ─────────────────────────────────────
+
+  @Get('orgs/:id/profile')
+  getOrgProfile(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.platform.getOrgProfile(id);
+  }
+
+  @Patch('orgs/:id/profile')
+  updateOrgProfile(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { name?: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.platform.updateOrgProfile(id, body.name, req.user.userId, req.user.email);
+  }
 
   @Get('orgs/:id/connectors')
   listOrgConnectors(

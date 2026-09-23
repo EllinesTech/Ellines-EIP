@@ -12,10 +12,16 @@ import {
   updatePlatformConnectorPack, publishPlatformConnectorPack, deprecatePlatformConnectorPack, deletePlatformConnectorPack,
   fetchPlatformOrgConnectors, fetchPlatformOrgApprovals, fetchPlatformOrgRules,
   fetchPlatformOrgReports, fetchPlatformOrgAgents, fetchPlatformOrgSnapshot,
+  fetchPlatformOrgConnectorInstallations, createPlatformOrgConnector, updatePlatformOrgConnector,
+  deletePlatformOrgConnector, testPlatformOrgConnector, syncPlatformOrgConnector,
+  listPlatformOrgDocuments, uploadPlatformOrgDocument, deletePlatformOrgDocument,
+  fetchPlatformOrgProfile, updatePlatformOrgProfile, parseOpenApi,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto, type PlatformHealthSummaryDto,
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
   type PlatformOrgConnectorDto, type PlatformOrgApprovalDto, type PlatformOrgRuleDto,
   type PlatformOrgReportDto, type PlatformOrgAgentDto, type PlatformOrgSnapshotDto,
+  type ConnectorInstallationDto, type ConnectorInstallConfigDto, type OpenApiParseResult,
+  type PlatformDocumentDto, type PlatformOrgProfileDto,
 } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -77,6 +83,10 @@ function PlatformSuperAdminPage(){
  const [wsReports,setWsReports]=useState<PlatformOrgReportDto[]>([]);
  const [wsAgents,setWsAgents]=useState<PlatformOrgAgentDto[]>([]);
  const [wsSnapshot,setWsSnapshot]=useState<PlatformOrgSnapshotDto>(null);
+ // Full connector installations (writable — for wizard)
+ const [wsInstallations,setWsInstallations]=useState<ConnectorInstallationDto[]>([]);
+ const [wsDocuments,setWsDocuments]=useState<PlatformDocumentDto[]>([]);
+ const [wsOrgProfile,setWsOrgProfile]=useState<PlatformOrgProfileDto|null>(null);
  const [wsTab,setWsTab]=useState<'overview'|'glance'|'timeline'|'notifications'|'approvals'|'fleet'|'people'|'inbox'|'connectors'|'rules'|'reports'|'agents'|'documents'|'users'|'audit'|'settings'|'lifecycle'>('overview');
  const [wsUser,setWsUser]=useState({email:'',fullName:'',password:'',role:'member'});
  const [wsLoading,setWsLoading]=useState(false); const [business,setBusiness]=useState({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});
@@ -129,10 +139,14 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       fetchPlatformOrgReports(clientOrgId),
       fetchPlatformOrgAgents(clientOrgId),
       fetchPlatformOrgSnapshot(clientOrgId),
-    ]).then(([s,u,t,d,conn,appr,rules,reports,agents,snap])=>{
+      fetchPlatformOrgConnectorInstallations(clientOrgId),
+      listPlatformOrgDocuments(clientOrgId),
+      fetchPlatformOrgProfile(clientOrgId),
+    ]).then(([s,u,t,d,conn,appr,rules,reports,agents,snap,inst,docs,profile])=>{
       setWsStats(s);setWsUsers(u);setWsTier(t);setWsSettings(d);
       setWsConnectors(conn);setWsApprovals(appr);setWsRules(rules);
       setWsReports(reports);setWsAgents(agents);setWsSnapshot(snap);
+      setWsInstallations(inst);setWsDocuments(docs);setWsOrgProfile(profile);
     }).catch(e=>setError(e instanceof Error?e.message:'Failed to load client workspace'))
       .finally(()=>setWsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -329,6 +343,10 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
           reports={wsReports}
           agents={wsAgents}
           snapshot={wsSnapshot}
+          installations={wsInstallations}
+          documents={wsDocuments}
+          orgProfile={wsOrgProfile}
+          availablePacks={packs}
           packages={packages}
           loading={wsLoading}
           busy={busy}
@@ -380,6 +398,55 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
             finally { setBusy(false); }
           }}
           onSettingsChange={setWsSettings}
+          onSaveOrgName={async (name) => {
+            if (!clientOrgId) return;
+            setBusy(true);
+            try {
+              const p = await updatePlatformOrgProfile(clientOrgId, name);
+              setWsOrgProfile(p);
+              setNotice('Organization name saved.');
+            } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); }
+            finally { setBusy(false); }
+          }}
+          onInstallConnector={async (body) => {
+            if (!clientOrgId) return null;
+            const inst = await createPlatformOrgConnector(clientOrgId, body);
+            setWsInstallations(v => [inst, ...v]);
+            return inst;
+          }}
+          onUpdateConnector={async (connId, body) => {
+            if (!clientOrgId) return null;
+            const inst = await updatePlatformOrgConnector(clientOrgId, connId, body);
+            setWsInstallations(v => v.map(x => x.id === inst.id ? inst : x));
+            return inst;
+          }}
+          onDeleteConnector={async (connId) => {
+            if (!clientOrgId) return;
+            await deletePlatformOrgConnector(clientOrgId, connId);
+            setWsInstallations(v => v.filter(x => x.id !== connId));
+          }}
+          onTestConnector={async (connId) => {
+            if (!clientOrgId) return { ok: false, message: 'No org' };
+            return testPlatformOrgConnector(clientOrgId, connId);
+          }}
+          onSyncConnector={async (connId) => {
+            if (!clientOrgId) return;
+            const summary = await syncPlatformOrgConnector(clientOrgId, connId);
+            // Refresh installations after sync
+            const updated = await fetchPlatformOrgConnectorInstallations(clientOrgId);
+            setWsInstallations(updated);
+            return summary;
+          }}
+          onUploadDocument={async (body) => {
+            if (!clientOrgId) return;
+            const doc = await uploadPlatformOrgDocument(clientOrgId, body);
+            setWsDocuments(v => [doc, ...v]);
+          }}
+          onDeleteDocument={async (docId) => {
+            if (!clientOrgId) return;
+            await deletePlatformOrgDocument(clientOrgId, docId);
+            setWsDocuments(v => v.filter(d => d.id !== docId));
+          }}
           onLoadAudit={async () => {
             try {
               const r = await listPlatformAuditLogs({ orgId: clientOrgId, limit: 50, offset: 0 });
@@ -414,13 +481,55 @@ function Field({label,value,set,placeholder,type='text'}:{label:string;value:str
 
 type WsTab = 'overview'|'glance'|'timeline'|'notifications'|'approvals'|'fleet'|'people'|'inbox'|'connectors'|'rules'|'reports'|'agents'|'documents'|'users'|'audit'|'settings'|'lifecycle';
 
+const CONNECTOR_TYPES = [
+  { id:'openapi',    title:'OpenAPI / Swagger',  tag:'Best when docs exist',       blurb:'Upload vendor OpenAPI JSON. EIP maps capabilities automatically.' },
+  { id:'rest-api',   title:'REST / HTTP API',     tag:'When API exists',            blurb:'Point at any JSON HTTPS URL IT can reach.' },
+  { id:'postgres',   title:'PostgreSQL',          tag:'No API needed',              blurb:'Read-only connection to a reporting DB or replica.' },
+  { id:'sqlserver',  title:'SQL Server',          tag:'No API needed',              blurb:'T-SQL reporting DB for on-prem ERPs and HIS backends.' },
+  { id:'mysql',      title:'MySQL',               tag:'No API needed',              blurb:'MySQL reporting DB when vendor has no API.' },
+  { id:'csv-file',   title:'CSV / File export',   tag:'No API needed',              blurb:'Paste a nightly CSV/Excel dump the business already produces.' },
+  { id:'email-imap', title:'Email (IMAP)',        tag:'Legacy reports',             blurb:'Ingest mailed reports and alerts from the prime system.' },
+  { id:'sftp',       title:'SFTP / folder drop',  tag:'Healthcare / supply chain',  blurb:'Pull CSV dumps from an SFTP inbox the HIS or ERP already fills.' },
+  { id:'demo-json',  title:'Demo JSON seed',      tag:'Smoke test only',            blurb:'Built-in sample data — not for production.' },
+] as const;
+
+const DEFAULT_CSV = 'metric,value\nhealthScore,81\nconnectedSystems,4\nopenAlerts,1\nopenDecisions,3\nbriefHighlight,"CSV export from nightly ERP dump."';
+const DEFAULT_SQL = 'SELECT 72 AS "healthScore", 1 AS "connectedSystems", 2 AS "openAlerts", 1 AS "openDecisions", \'Read-only SQL.\' AS "briefHighlight"';
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { const r = reader.result as string; resolve(r.split(',')[1]); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1048576).toFixed(1)} MB`;
+}
+
+function mimeIcon(mime: string): string {
+  if (mime.includes('pdf')) return '📄';
+  if (mime.includes('word')||mime.includes('document')) return '📝';
+  if (mime.includes('sheet')||mime.includes('excel')||mime.includes('csv')) return '📊';
+  if (mime.includes('image')) return '🖼️';
+  if (mime.includes('text')) return '📃';
+  return '📁';
+}
+
 function ClientWorkspace({
   org, orgId, users, stats, tier, settings, audit, auditTotal,
   connectors, approvals, rules, reports, agents, snapshot,
+  installations, documents, orgProfile, availablePacks,
   packages, loading, busy, tab, setTab, wsUser, setWsUser,
   error: _e, notice: _n,
   onBack, onToggle, onAddUser, onToggleUser, onAssignPackage,
-  onSaveSettings, onSettingsChange, onLoadAudit,
+  onSaveSettings, onSettingsChange, onSaveOrgName,
+  onInstallConnector, onUpdateConnector, onDeleteConnector, onTestConnector, onSyncConnector,
+  onUploadDocument, onDeleteDocument, onLoadAudit,
 }: {
   org: import('@/lib/api').PlatformOrg | null;
   orgId: string;
@@ -435,6 +544,10 @@ function ClientWorkspace({
   reports: import('@/lib/api').PlatformOrgReportDto[];
   agents: import('@/lib/api').PlatformOrgAgentDto[];
   snapshot: import('@/lib/api').PlatformOrgSnapshotDto;
+  installations: import('@/lib/api').ConnectorInstallationDto[];
+  documents: import('@/lib/api').PlatformDocumentDto[];
+  orgProfile: import('@/lib/api').PlatformOrgProfileDto | null;
+  availablePacks: import('@/lib/api').ConnectorPackDto[];
   packages: import('@/lib/api').PlatformPackage[];
   loading: boolean; busy: boolean;
   tab: WsTab; setTab: (t: WsTab) => void;
@@ -448,9 +561,135 @@ function ClientWorkspace({
   onAssignPackage: (tierId: string) => Promise<void>;
   onSaveSettings: () => Promise<void>;
   onSettingsChange: (s: import('@/lib/api').OrgDateTimeSettingsDto) => void;
+  onSaveOrgName: (name: string) => Promise<void>;
+  onInstallConnector: (body: {catalogId:string;displayName:string;config?:import('@/lib/api').ConnectorInstallConfigDto;packId?:string}) => Promise<import('@/lib/api').ConnectorInstallationDto|null>;
+  onUpdateConnector: (connId:string, body:{displayName?:string;config?:import('@/lib/api').ConnectorInstallConfigDto}) => Promise<import('@/lib/api').ConnectorInstallationDto|null>;
+  onDeleteConnector: (connId:string) => Promise<void>;
+  onTestConnector: (connId:string) => Promise<{ok:boolean;message?:string;installation?:import('@/lib/api').ConnectorInstallationDto}>;
+  onSyncConnector: (connId:string) => Promise<unknown>;
+  onUploadDocument: (body:{name:string;mimeType:string;content:string;tags?:string[];branch?:string;summary?:string}) => Promise<void>;
+  onDeleteDocument: (docId:string) => Promise<void>;
   onLoadAudit: () => Promise<void>;
 }) {
-  // ── Work Console tabs (mirror what the client's own users see) ──
+  // ── Internal wizard state for Connectors tab ──
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizStep, setWizStep] = useState<1|2|3|4>(1);
+  const [wizCatalogId, setWizCatalogId] = useState('openapi');
+  const [wizDisplayName, setWizDisplayName] = useState('');
+  const [wizEditingId, setWizEditingId] = useState<string|null>(null);
+  const [wizPackId, setWizPackId] = useState('');
+  const [wizEndpoint, setWizEndpoint] = useState('');
+  const [wizAuthType, setWizAuthType] = useState<import('@/lib/api').ConnectorInstallConfigDto['authType']>('none');
+  const [wizApiKey, setWizApiKey] = useState('');
+  const [wizBearer, setWizBearer] = useState('');
+  const [wizBasicUser, setWizBasicUser] = useState('');
+  const [wizBasicPass, setWizBasicPass] = useState('');
+  const [wizCsv, setWizCsv] = useState(DEFAULT_CSV);
+  const [wizConnStr, setWizConnStr] = useState('');
+  const [wizSql, setWizSql] = useState(DEFAULT_SQL);
+  const [wizOpenApiText, setWizOpenApiText] = useState('');
+  const [wizOpenApiBaseUrl, setWizOpenApiBaseUrl] = useState('');
+  const [wizParsed, setWizParsed] = useState<import('@/lib/api').OpenApiParseResult|null>(null);
+  const [wizSelectedPaths, setWizSelectedPaths] = useState<string[]>([]);
+  const [wizImapHost, setWizImapHost] = useState('');
+  const [wizImapPort, setWizImapPort] = useState('993');
+  const [wizImapUser, setWizImapUser] = useState('');
+  const [wizImapPass, setWizImapPass] = useState('');
+  const [wizImapMailbox, setWizImapMailbox] = useState('INBOX');
+  const [wizSftpHost, setWizSftpHost] = useState('');
+  const [wizSftpPort, setWizSftpPort] = useState('22');
+  const [wizSftpUser, setWizSftpUser] = useState('');
+  const [wizSftpPass, setWizSftpPass] = useState('');
+  const [wizSftpPath, setWizSftpPath] = useState('');
+  const [wizSyncMins, setWizSyncMins] = useState(0);
+  const [wizTestOk, setWizTestOk] = useState<boolean|null>(null);
+  const [wizBusy, setWizBusy] = useState(false);
+  const [wizError, setWizError] = useState('');
+  const [wizNotice, setWizNotice] = useState('');
+  // Document upload state
+  const [docUploadOpen, setDocUploadOpen] = useState(false);
+  const [docFile, setDocFile] = useState<File|null>(null);
+  const [docName, setDocName] = useState('');
+  const [docTags, setDocTags] = useState('');
+  const [docBranch, setDocBranch] = useState('');
+  const [docSummary, setDocSummary] = useState('');
+  const [docBusy, setDocBusy] = useState(false);
+  const [docError, setDocError] = useState('');
+  // Settings: org name edit
+  const [editOrgName, setEditOrgName] = useState('');
+  const [orgNameBusy, setOrgNameBusy] = useState(false);
+
+  useEffect(() => { if (orgProfile) setEditOrgName(orgProfile.name); }, [orgProfile]);
+
+  function resetWizard() {
+    setWizStep(1); setWizCatalogId('openapi'); setWizDisplayName(''); setWizEditingId(null); setWizPackId('');
+    setWizEndpoint(''); setWizAuthType('none'); setWizApiKey(''); setWizBearer(''); setWizBasicUser(''); setWizBasicPass('');
+    setWizCsv(DEFAULT_CSV); setWizConnStr(''); setWizSql(DEFAULT_SQL); setWizOpenApiText(''); setWizOpenApiBaseUrl('');
+    setWizParsed(null); setWizSelectedPaths([]); setWizImapHost(''); setWizImapPort('993'); setWizImapUser(''); setWizImapPass(''); setWizImapMailbox('INBOX');
+    setWizSftpHost(''); setWizSftpPort('22'); setWizSftpUser(''); setWizSftpPass(''); setWizSftpPath('');
+    setWizSyncMins(0); setWizTestOk(null); setWizError(''); setWizNotice('');
+  }
+
+  function buildWizConfig(): import('@/lib/api').ConnectorInstallConfigDto {
+    const c: import('@/lib/api').ConnectorInstallConfigDto = { authType: wizAuthType, systemName: wizDisplayName||undefined };
+    if (wizAuthType==='apiKey'&&wizApiKey&&wizApiKey!=='***') c.apiKey=wizApiKey;
+    if (wizAuthType==='bearer'&&wizBearer&&wizBearer!=='***') c.bearerToken=wizBearer;
+    if (wizAuthType==='basic') { if (wizBasicUser) c.basicUser=wizBasicUser; if (wizBasicPass&&wizBasicPass!=='***') c.basicPass=wizBasicPass; }
+    if (wizCatalogId==='rest-api') c.endpoint=wizEndpoint.trim();
+    if (wizCatalogId==='csv-file') c.csvText=wizCsv;
+    if (['postgres','sqlserver','mysql'].includes(wizCatalogId)) { if (wizConnStr&&wizConnStr!=='***') c.connectionString=wizConnStr; c.sql=wizSql; }
+    if (wizCatalogId==='email-imap') { c.imapHost=wizImapHost; c.imapPort=Number(wizImapPort)||993; c.imapUser=wizImapUser; if (wizImapPass&&wizImapPass!=='***') c.imapPassword=wizImapPass; c.imapMailbox=wizImapMailbox||'INBOX'; c.imapSecure=true; }
+    if (wizCatalogId==='sftp') { c.sftpHost=wizSftpHost; c.sftpPort=Number(wizSftpPort)||22; c.sftpUsername=wizSftpUser; if (wizSftpPass&&wizSftpPass!=='***') c.sftpPassword=wizSftpPass; c.sftpRemotePath=wizSftpPath; }
+    if (wizCatalogId==='openapi') {
+      if (wizOpenApiText.trim()) { try { c.openApiDocument=JSON.parse(wizOpenApiText); } catch { /* handled below */ } }
+      c.openApiBaseUrl=wizOpenApiBaseUrl.trim()||wizParsed?.baseUrl||'';
+      c.selectedRoutes=(wizParsed?.endpoints||[]).filter(e=>wizSelectedPaths.includes(`${e.method} ${e.path}`)).map(e=>({method:e.method,path:e.path,capability:e.capability}));
+    }
+    c.syncIntervalMinutes=wizSyncMins;
+    return c;
+  }
+
+  async function wizSaveDraft(): Promise<string> {
+    const config = buildWizConfig();
+    const name = wizDisplayName.trim()||CONNECTOR_TYPES.find(t=>t.id===wizCatalogId)?.title||wizCatalogId;
+    if (wizEditingId) { await onUpdateConnector(wizEditingId,{displayName:name,config}); return wizEditingId; }
+    const inst = await onInstallConnector({catalogId:wizCatalogId,displayName:name,config,packId:wizPackId||undefined});
+    if (inst) { setWizEditingId(inst.id); return inst.id; }
+    throw new Error('Installation failed');
+  }
+
+  async function wizTest() {
+    setWizBusy(true); setWizError(''); setWizNotice(''); setWizTestOk(null);
+    try {
+      const id = await wizSaveDraft();
+      const res = await onTestConnector(id);
+      setWizTestOk(res.ok); setWizNotice(res.message||(res.ok?'Connection test OK':'Test failed'));
+      if (res.ok) setWizStep(4);
+    } catch(e) { setWizTestOk(false); setWizError(e instanceof Error?e.message:'Test failed'); }
+    finally { setWizBusy(false); }
+  }
+
+  async function wizSync() {
+    setWizBusy(true); setWizError(''); setWizNotice('');
+    try {
+      const id = await wizSaveDraft();
+      await onSyncConnector(id);
+      setWizNotice('Synced successfully.'); setWizardOpen(false); resetWizard();
+    } catch(e) { setWizError(e instanceof Error?e.message:'Sync failed'); }
+    finally { setWizBusy(false); }
+  }
+
+  function editInstallation(inst: import('@/lib/api').ConnectorInstallationDto) {
+    resetWizard();
+    setWizEditingId(inst.id); setWizCatalogId(inst.catalogId); setWizDisplayName(inst.displayName); setWizPackId(inst.packId||'');
+    const c=inst.config||{};
+    if (c.endpoint) setWizEndpoint(String(c.endpoint)); if (c.authType) setWizAuthType(c.authType); if (c.apiKey) setWizApiKey(String(c.apiKey));
+    if (c.bearerToken) setWizBearer(String(c.bearerToken)); if (c.basicUser) setWizBasicUser(String(c.basicUser)); if (c.basicPass) setWizBasicPass(String(c.basicPass));
+    if (c.csvText) setWizCsv(String(c.csvText)); if (c.connectionString) setWizConnStr(String(c.connectionString)); if (c.sql) setWizSql(String(c.sql));
+    if (c.openApiBaseUrl) setWizOpenApiBaseUrl(String(c.openApiBaseUrl)); if (c.selectedRoutes?.length) setWizSelectedPaths(c.selectedRoutes.map(r=>`${r.method} ${r.path}`));
+    setWizSyncMins(Number(c.syncIntervalMinutes)||0); setWizStep(2); setWizardOpen(true);
+  }
+
   const WC_TABS: {id: WsTab; label: string}[] = [
     {id:'overview',      label:'Overview'},
     {id:'glance',        label:'Glance'},
@@ -768,51 +1007,32 @@ function ClientWorkspace({
 
       {/* ── DOCUMENTS ── */}
       {!loading && tab==='documents' && (
-        <div className={styles.card}>
-          <CardTitle title="Documents" hint="Documents stored by this client organization."/>
-          <div className={styles.planned}>
-            <h3>Document vault — operator view</h3>
-            <p>Document management is done by the client&apos;s users from their own Work Console. As a platform operator, you can see storage statistics once the document sync connector is active for this org.</p>
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
+            <div><strong style={{fontSize:14}}>{documents.length} document{documents.length!==1?'s':''}</strong><span className={styles.muted} style={{marginLeft:8,fontSize:11}}>{documents.reduce((n,d)=>n+d.sizeBytes,0)/1024<1024?`${(documents.reduce((n,d)=>n+d.sizeBytes,0)/1024).toFixed(1)} KB`:`${(documents.reduce((n,d)=>n+d.sizeBytes,0)/1048576).toFixed(1)} MB`} total</span></div>
+            <button className={`${styles.button} ${styles.primary}`} onClick={()=>setDocUploadOpen(v=>!v)}>{docUploadOpen?'Cancel':'+ Upload document'}</button>
           </div>
-          <div style={{marginTop:14}}>
-            <Service title="Audit events" text={`${stats?.stats?.totalEvents??0} total recorded events for this org`}/>
-            <Service title="Connectors" text={`${connectors.length} connector${connectors.length!==1?'s':''} installed`}/>
-          </div>
+          {docUploadOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.25)'}}><CardTitle title="Upload document" hint="Max 500 KB. Ellinea can reference documents added with a summary."/>{docError&&<div className={styles.alert}>{docError}</div>}<div className={styles.form} style={{marginTop:8}}><label className={styles.field}><span>File (max 500 KB)</span><input type="file" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.json,.png,.jpg" onChange={e=>{const f=e.target.files?.[0]??null;setDocFile(f);if(f&&!docName)setDocName(f.name);}} required/></label><Field label="Display name" value={docName} set={setDocName}/><Field label="Tags (comma-separated)" value={docTags} set={setDocTags} placeholder="finance, Q3, Nairobi"/><Field label="Branch / site" value={docBranch} set={setDocBranch} placeholder="Nairobi HQ"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>Summary (for Ellinea)</span><textarea className={styles.input} value={docSummary} onChange={e=>setDocSummary(e.target.value)} rows={2} placeholder="Brief description for AI context…"/></label><div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={docBusy||!docFile} onClick={async()=>{if(!docFile)return;if(docFile.size>500*1024){setDocError('File exceeds 500 KB');return;}setDocBusy(true);setDocError('');try{const content=await fileToBase64(docFile);await onUploadDocument({name:docName||docFile.name,mimeType:docFile.type||'application/octet-stream',content,tags:docTags?docTags.split(',').map(t=>t.trim()).filter(Boolean):[],branch:docBranch||undefined,summary:docSummary||undefined});setDocUploadOpen(false);setDocFile(null);setDocName('');setDocTags('');setDocBranch('');setDocSummary('');}catch(e){setDocError(e instanceof Error?e.message:'Upload failed');}finally{setDocBusy(false);}}}>{docBusy?'Uploading…':'Upload'}</button>{docFile&&<span className={styles.muted} style={{marginLeft:8,fontSize:11}}>{docFile.name} ({formatBytes(docFile.size)}){docFile.size>500*1024?' — ⚠️ Too large':''}</span>}</div></div></div>)}
+          {documents.length>0?(<div style={{display:'flex',flexDirection:'column',gap:8}}>{documents.map(doc=>(<div key={doc.id} className={styles.card} style={{padding:'10px 14px'}}><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><span style={{fontSize:'1.3rem',lineHeight:1}}>{mimeIcon(doc.mimeType)}</span><div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{doc.name}</div><div style={{fontSize:10,color:'#8795aa'}}>{formatBytes(doc.sizeBytes)} · {doc.mimeType} · {doc.uploadedBy} · {new Date(doc.uploadedAt).toLocaleDateString()}{doc.branch?` · ${doc.branch}`:''}</div>{doc.summary&&<p style={{fontSize:10,color:'#8795aa',margin:'4px 0 0'}}>{doc.summary}</p>}{doc.tags.length>0&&<div style={{marginTop:4}}>{doc.tags.map(t=><span key={t} className={styles.tag}>{t}</span>)}</div>}</div><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px',flexShrink:0}} disabled={busy} onClick={async()=>{if(confirm(`Delete "${doc.name}"?`))await onDeleteDocument(doc.id);}}>Delete</button></div></div>))}</div>):(!docUploadOpen&&<div className={styles.planned}><h3>No documents</h3><p>Upload the first document for this client org using the button above.</p></div>)}
         </div>
       )}
-
       {/* ── CONNECTORS ── */}
-      {!loading && tab==='connectors' && (        <div>
-          <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="Total" value={connectors.length} hint="installed"/>
-            <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="last sync ok" cls={styles.ok}/>
-            <Kpi label="Errors" value={connectors.filter(c=>c.status==='error'||c.errorCount>0).length} hint="needs attention" cls={connectors.filter(c=>c.errorCount>0).length?styles.warn:styles.ok}/>
-            <Kpi label="Draft" value={connectors.filter(c=>c.status==='draft').length} hint="not yet active"/>
-          </div>
-          {connectors.length > 0 ? (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Connector</th><th>Catalog</th><th>Status</th><th>Last synced</th><th>Errors</th><th>Last message</th></tr>
-                </thead>
-                <tbody>
-                  {connectors.map(c=>(
-                    <tr key={c.id}>
-                      <td><strong>{c.displayName}</strong></td>
-                      <td><span className={styles.muted}>{c.catalogId}</span></td>
-                      <td><span className={`${styles.status} ${c.status==='synced'?styles.statusOk:c.status==='error'?styles.statusBad:styles.statusNeutral}`}>{c.status}</span></td>
-                      <td>{c.lastSyncedAt?new Date(c.lastSyncedAt).toLocaleString():'Never'}</td>
-                      <td className={c.errorCount>0?styles.warn:''}>{c.errorCount}</td>
-                      <td><span className={styles.muted} style={{fontSize:10}}>{c.lastMessage||c.lastError||'—'}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {!loading && tab==='connectors' && (
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
+            <div className={styles.grid4} style={{gap:8}}>
+              <Kpi label="Total" value={installations.length} hint="installed"/>
+              <Kpi label="Synced" value={installations.filter(c=>c.status==='synced').length} hint="ok" cls={styles.ok}/>
+              <Kpi label="Errors" value={installations.filter(c=>c.status==='error').length} hint="needs attention" cls={installations.filter(c=>c.status==='error').length?styles.warn:styles.ok}/>
+              <Kpi label="Draft" value={installations.filter(c=>c.status==='draft').length} hint="not active"/>
             </div>
-          ) : <div className={styles.planned}><h3>No connectors installed</h3><p>This client has not installed any connectors yet. They can do so from their own Work Console → Connectors page.</p></div>}
+            <button className={`${styles.button} ${styles.primary}`} onClick={()=>{resetWizard();setWizardOpen(true);}}>+ Install connector</button>
+          </div>
+          {availablePacks.length>0&&(<div className={styles.card} style={{marginBottom:12}}><CardTitle title="Platform packs" hint="Pre-configured connectors — enter credentials only."/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{availablePacks.map(p=>(<button key={p.id} className={styles.button} onClick={()=>{resetWizard();setWizCatalogId(p.catalogId);setWizDisplayName(p.name);setWizPackId(p.id);const c=p.templateConfig||{};if(c.endpoint)setWizEndpoint(String(c.endpoint));if(c.sql)setWizSql(String(c.sql));if(c.openApiBaseUrl)setWizOpenApiBaseUrl(String(c.openApiBaseUrl));setWizStep(2);setWizardOpen(true);setWizNotice(`Pack "${p.name}" — enter credentials, then Test & Sync.`);}}>📦 {p.name}</button>))}</div></div>)}
+          {wizardOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.35)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong style={{fontSize:13}}>Install wizard · Step {wizStep} of 4{wizEditingId?' · editing':''}</strong><button className={styles.button} onClick={()=>{setWizardOpen(false);resetWizard();}}>Close</button></div><div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>{['Type','Credentials','Capabilities','Test & sync'].map((l,i)=>(<span key={l} style={{fontSize:10,padding:'3px 8px',borderRadius:99,background:wizStep===i+1?'rgba(124,58,237,.35)':'rgba(255,255,255,.05)',color:wizStep===i+1?'#c4b5fd':'#8795aa',fontWeight:700}}>{i+1}. {l}</span>))}</div>{wizError&&<div className={styles.alert}>{wizError}</div>}{wizNotice&&<div className={styles.notice}>{wizNotice}</div>}{wizStep===1&&(<div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:12}}>{CONNECTOR_TYPES.map(t=>(<button key={t.id} className={styles.button} onClick={()=>{setWizCatalogId(t.id);if(!wizDisplayName)setWizDisplayName(t.title);}} style={{textAlign:'left',padding:10,background:wizCatalogId===t.id?'rgba(124,58,237,.25)':undefined,border:wizCatalogId===t.id?'1px solid rgba(124,58,237,.55)':undefined}}><span style={{fontSize:9,fontWeight:800,color:'#8b9bb0',textTransform:'uppercase',display:'block',marginBottom:3}}>{t.tag}</span><strong style={{fontSize:12,display:'block'}}>{t.title}</strong><span style={{fontSize:10,color:'#8795aa'}}>{t.blurb}</span></button>))}</div><div className={styles.form} style={{marginBottom:10}}><Field label="Display name" value={wizDisplayName} set={setWizDisplayName} placeholder="e.g. Clinical HIS production"/></div><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(2)}>Continue →</button></div>)}{wizStep===2&&(<div><div className={styles.form} style={{marginBottom:10}}>{(wizCatalogId==='rest-api'||wizCatalogId==='openapi')&&(<><label className={styles.field}><span>Auth</span><select className={styles.select} value={wizAuthType||'none'} onChange={e=>setWizAuthType(e.target.value as import('@/lib/api').ConnectorInstallConfigDto['authType'])}><option value="none">None</option><option value="apiKey">API key</option><option value="bearer">Bearer token</option><option value="basic">Basic</option></select></label>{wizAuthType==='apiKey'&&<Field label="API key" value={wizApiKey} set={setWizApiKey}/>}{wizAuthType==='bearer'&&<Field label="Bearer token" value={wizBearer} set={setWizBearer}/>}{wizAuthType==='basic'&&<><Field label="Username" value={wizBasicUser} set={setWizBasicUser}/><Field label="Password" value={wizBasicPass} set={setWizBasicPass} type="password"/></>}</>)}{wizCatalogId==='rest-api'&&<Field label="Endpoint URL" value={wizEndpoint} set={setWizEndpoint} placeholder="https://vendor.example/api"/>}{wizCatalogId==='openapi'&&(<><label className={styles.field} style={{gridColumn:'1/-1'}}><span>OpenAPI JSON</span><textarea className={styles.input} value={wizOpenApiText} onChange={e=>setWizOpenApiText(e.target.value)} rows={6} placeholder="Paste openapi.json here"/></label><Field label="Base URL" value={wizOpenApiBaseUrl} set={setWizOpenApiBaseUrl} placeholder="https://vendor.example/api"/><div className={styles.full}><button className={styles.button} disabled={wizBusy||!wizOpenApiText.trim()} onClick={async()=>{setWizBusy(true);setWizError('');try{const doc=JSON.parse(wizOpenApiText);const r=await parseOpenApi(doc);setWizParsed(r);if(!wizOpenApiBaseUrl&&r.baseUrl)setWizOpenApiBaseUrl(r.baseUrl);if(!wizDisplayName)setWizDisplayName(r.title);setWizSelectedPaths(r.endpoints.filter(e=>e.selectable).slice(0,5).map(e=>`${e.method} ${e.path}`));setWizNotice(`Parsed ${r.endpoints.length} operations.`);}catch(e){setWizError(e instanceof Error?e.message:'Parse failed');}finally{setWizBusy(false);}}}>Parse capabilities</button></div></>)}{wizCatalogId==='csv-file'&&<label className={styles.field} style={{gridColumn:'1/-1'}}><span>CSV content</span><textarea className={styles.input} value={wizCsv} onChange={e=>setWizCsv(e.target.value)} rows={6}/></label>}{['postgres','sqlserver','mysql'].includes(wizCatalogId)&&(<><Field label="Connection string (read-only)" value={wizConnStr} set={setWizConnStr} placeholder="postgresql://reader:…@host:5432/dbname"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>SELECT query</span><textarea className={styles.input} value={wizSql} onChange={e=>setWizSql(e.target.value)} rows={5}/></label></>)}{wizCatalogId==='email-imap'&&(<><Field label="IMAP host" value={wizImapHost} set={setWizImapHost}/><Field label="Port" value={wizImapPort} set={setWizImapPort}/><Field label="Username" value={wizImapUser} set={setWizImapUser}/><Field label="Password" value={wizImapPass} set={setWizImapPass} type="password"/><Field label="Mailbox" value={wizImapMailbox} set={setWizImapMailbox}/></>)}{wizCatalogId==='sftp'&&(<><Field label="SFTP host" value={wizSftpHost} set={setWizSftpHost}/><Field label="Port" value={wizSftpPort} set={setWizSftpPort}/><Field label="Username" value={wizSftpUser} set={setWizSftpUser}/><Field label="Password" value={wizSftpPass} set={setWizSftpPass} type="password"/><Field label="Remote path" value={wizSftpPath} set={setWizSftpPath}/></>)}{wizCatalogId==='demo-json'&&<p className={styles.cardHint} style={{gridColumn:'1/-1'}}>Demo seed — no credentials needed.</p>}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(1)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:4)}>Continue →</button></div></div>)}{wizStep===3&&wizParsed&&(<div><p className={styles.cardHint} style={{marginBottom:10}}>Select capabilities to expose.</p><div style={{maxHeight:260,overflowY:'auto',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:10,marginBottom:12}}>{wizParsed.endpoints.map(e=>{const key=`${e.method} ${e.path}`;return(<label key={key} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:11,cursor:e.selectable?'pointer':'default',opacity:e.selectable?1:.45}}><input type="checkbox" disabled={!e.selectable} checked={wizSelectedPaths.includes(key)} onChange={ev=>setWizSelectedPaths(prev=>ev.target.checked?[...prev,key]:prev.filter(p=>p!==key))} style={{marginTop:2}}/><span><code style={{color:'#a5b4fc'}}>{e.method}</code> <span style={{color:'#c8d2e0'}}>{e.path}</span><br/><span style={{color:'#8795aa'}}>{e.summary}</span></span></label>);})}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(2)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(4)}>Continue →</button></div></div>)}{wizStep===4&&(<div><div className={styles.form} style={{marginBottom:12}}><label className={styles.field}><span>Sync schedule</span><select className={styles.select} value={String(wizSyncMins)} onChange={e=>setWizSyncMins(Number(e.target.value))}><option value="0">Manual only</option><option value="15">Every 15 min</option><option value="60">Every hour</option><option value="360">Every 6 hrs</option><option value="1440">Daily</option></select></label>{wizTestOk!==null&&<div className={styles.full}><span style={{color:wizTestOk?'#34d399':'#fb7185',fontWeight:700}}>{wizTestOk?'✓ Test passed':'✗ Test failed'}</span></div>}</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className={styles.button} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:2)}>← Back</button><button className={styles.button} disabled={wizBusy} onClick={()=>void wizTest()}>Test connection</button><button className={`${styles.button} ${styles.primary}`} disabled={wizBusy} onClick={()=>void wizSync()}>Sync now</button></div></div>)}</div>)}
+          {installations.length>0?(<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Last synced</th><th>Schedule</th><th>Actions</th></tr></thead><tbody>{installations.map(inst=>(<tr key={inst.id}><td><strong>{inst.displayName}</strong>{inst.lastMessage&&<><br/><span className={styles.muted} style={{fontSize:10}}>{inst.lastMessage}</span></>}</td><td><span className={styles.muted}>{inst.catalogId}</span></td><td><span className={`${styles.status} ${inst.status==='synced'?styles.statusOk:inst.status==='error'?styles.statusBad:styles.statusNeutral}`}>{inst.status}</span></td><td style={{fontSize:11}}>{inst.lastSyncedAt?new Date(inst.lastSyncedAt).toLocaleString():'Never'}</td><td style={{fontSize:11}}>{inst.config?.syncIntervalMinutes?`${inst.config.syncIntervalMinutes} min`:'Manual'}</td><td style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} onClick={()=>editInstallation(inst)}>Edit</button><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{try{await onSyncConnector(inst.id);}catch(e){console.error(e);}}}>Sync</button><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{if(confirm(`Remove "${inst.displayName}"?`))await onDeleteConnector(inst.id);}}>Remove</button></td></tr>))}</tbody></table></div>):(!wizardOpen&&<div className={styles.planned}><h3>No connectors yet</h3><p>Click &quot;+ Install connector&quot; above to connect this client&apos;s first system.</p></div>)}
         </div>
       )}
-
       {/* ── APPROVALS ── */}
       {!loading && tab==='approvals' && (
         <div>
@@ -1017,46 +1237,46 @@ function ClientWorkspace({
 
       {/* ── SETTINGS ── */}
       {!loading && tab==='settings' && (
-        <div className={styles.grid2}>
-          <div className={styles.card}>
-            <CardTitle title="Service package" hint="Assign a commercial capability tier to this client."/>
-            <select className={styles.select} value={tier?.rate_limit_tiers?.id??''} onChange={e=>void onAssignPackage(e.target.value)}>
-              <option value="">No package</option>
-              {packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}
-            </select>
-            {tier?.rate_limit_tiers&&(
-              <div style={{marginTop:12}}>
-                <Service title={packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.display_name??'Current package'} text={`${packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.requests_per_day?.toLocaleString()??'—'} req/day`}/>
+        <div>
+          <div className={styles.grid2} style={{marginBottom:14}}>
+            <div className={styles.card}>
+              <CardTitle title="Organization profile" hint="Edit this client organization's display name."/>
+              <div className={styles.form} style={{marginTop:8}}>
+                <Field label="Organization name" value={editOrgName} set={setEditOrgName} placeholder="Acme Holdings Ltd"/>
+                <label className={styles.field}><span>Slug (read-only)</span><input className={styles.input} value={orgProfile?.slug??org?.slug??'—'} disabled/></label>
+                <div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={orgNameBusy||!editOrgName.trim()} onClick={async()=>{setOrgNameBusy(true);try{await onSaveOrgName(editOrgName);}catch(e){console.error(e);}finally{setOrgNameBusy(false);}}}>{orgNameBusy?'Saving…':'Save name'}</button></div>
               </div>
-            )}
+            </div>
+            <div className={styles.card}>
+              <CardTitle title="Service package" hint="Assign a commercial capability tier to this client."/>
+              <select className={styles.select} value={tier?.rate_limit_tiers?.id??''} onChange={e=>void onAssignPackage(e.target.value)}>
+                <option value="">No package</option>
+                {packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}
+              </select>
+              {tier?.rate_limit_tiers&&<div style={{marginTop:10}}><Service title={packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.display_name??'Current package'} text={`${packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.requests_per_day?.toLocaleString()??'—'} req/day`}/></div>}
+            </div>
           </div>
-          <div className={styles.card}>
-            <CardTitle title="Date & time preferences" hint="Controls how dates and times display in this client's Work Console."/>
-            <div className={styles.form} style={{marginTop:8}}>
-              <label className={styles.field}>
-                <span>Time format</span>
-                <select className={styles.select} value={settings.timeFormat} onChange={e=>onSettingsChange({...settings,timeFormat:e.target.value as '12h'|'24h'})}>
-                  <option value="12h">12-hour (3:45 PM)</option>
-                  <option value="24h">24-hour (15:45)</option>
-                </select>
-              </label>
-              <label className={styles.field}>
-                <span>Date style</span>
-                <select className={styles.select} value={settings.dateStyle} onChange={e=>onSettingsChange({...settings,dateStyle:e.target.value as import('@/lib/api').OrgDateTimeSettingsDto['dateStyle']})}>
-                  <option value="short">Short (9/21/2026)</option>
-                  <option value="medium">Medium (Sep 21, 2026)</option>
-                  <option value="log">Log (2026-09-21)</option>
-                </select>
-              </label>
-              <div className={styles.full}>
-                <button className={`${styles.button} ${styles.primary}`} disabled={busy} onClick={()=>void onSaveSettings()}>Save settings</button>
+          <div className={styles.grid2}>
+            <div className={styles.card}>
+              <CardTitle title="Date & time preferences" hint="Controls how dates and times display in this client's Work Console."/>
+              <div className={styles.form} style={{marginTop:8}}>
+                <label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>onSettingsChange({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour (3:45 PM)</option><option value="24h">24-hour (15:45)</option></select></label>
+                <label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>onSettingsChange({...settings,dateStyle:e.target.value as import('@/lib/api').OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short (9/21/2026)</option><option value="medium">Medium (Sep 21, 2026)</option><option value="log">Log (2026-09-21)</option></select></label>
+                <div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={busy} onClick={()=>void onSaveSettings()}>Save date & time</button></div>
               </div>
+            </div>
+            <div className={styles.card}>
+              <CardTitle title="Organization stats" hint="Current usage for this client org."/>
+              <Service title="Registered" text={org?new Date(org.createdAt).toLocaleDateString():'—'}/>
+              <Service title="Users" text={`${stats?.stats?.totalUsers??0} total, ${stats?.stats?.activeUsers??0} active`}/>
+              <Service title="Connectors" text={`${installations.length} installed, ${installations.filter(c=>c.status==='synced').length} synced`}/>
+              <Service title="Documents" text={`${documents.length} uploaded`}/>
+              <Service title="Rules" text={`${rules.length} defined, ${rules.filter(r=>r.enabled).length} active`}/>
+              <Service title="Agents" text={`${agents.length} agents, ${agents.filter(a=>a.isActive&&!a.isPaused).length} running`}/>
             </div>
           </div>
         </div>
       )}
-
-      {/* ── LIFECYCLE ── */}
       {!loading && tab==='lifecycle' && org && (
         <div className={styles.grid2}>
           <div className={styles.card}>

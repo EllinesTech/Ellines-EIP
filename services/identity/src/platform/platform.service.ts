@@ -573,6 +573,35 @@ export class PlatformService {
     return { statusCode: 200, data: flags };
   }
 
+  // ── Org profile management ───────────────────────────────────────────────
+
+  async getOrgProfile(orgId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    if (!org) throw new NotFoundException('Organization not found');
+    return { id: org.id, name: org.name, slug: org.slug, createdAt: org.createdAt.toISOString() };
+  }
+
+  async updateOrgProfile(orgId: string, name: string | undefined, actorUserId: string, actorEmail: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    if (!org) throw new NotFoundException('Organization not found');
+    const trimmed = name?.trim();
+    if (!trimmed) throw new BadRequestException('name is required');
+    const updated = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: { name: trimmed },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        userId: actorUserId,
+        action: 'platform.org.update_profile',
+        resource: 'organization',
+        metadata: { previousName: org.name, newName: trimmed, updatedBy: actorEmail },
+      },
+    });
+    return { id: updated.id, name: updated.name, slug: updated.slug, createdAt: updated.createdAt.toISOString() };
+  }
+
   // ── Cross-org Work Console resources (platform-admin god-mode reads) ────────
 
   async listOrgConnectors(orgId: string) {
