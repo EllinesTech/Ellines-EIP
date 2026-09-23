@@ -517,16 +517,22 @@ function buildSectionMeta(): Record<PlatformSectionId, PlatformSectionMeta> {
 export const PLATFORM_SECTION_META = buildSectionMeta();
 
 /** Sections backed by a real live view today. Everything else renders the honest "Planned" state. */
-export const PLATFORM_LIVE_SECTIONS: PlatformSectionId[] = NAV_ITEMS
-  .filter((item): item is NavItem & { section: PlatformSectionId } => Boolean(item.section) && item.available)
-  .map((item) => item.section);
+export const PLATFORM_LIVE_SECTIONS: PlatformSectionId[] = [
+  ...NAV_ITEMS
+    .filter((item): item is NavItem & { section: PlatformSectionId } => Boolean(item.section) && item.available)
+    .map((item) => item.section),
+  'client', // dynamic — always live, driven by ?id= param
+];
 
 /** Reserved sections: architecture is in place, no live route yet. */
 export const PLATFORM_RESERVED_SECTIONS: PlatformSectionId[] = NAV_ITEMS
   .filter((item): item is NavItem & { section: PlatformSectionId } => Boolean(item.section) && !item.available)
   .map((item) => item.section);
 
-const SECTION_ID_SET = new Set<string>(NAV_ITEMS.flatMap((item) => (item.section ? [item.section] : [])));
+const SECTION_ID_SET = new Set<string>([
+  ...NAV_ITEMS.flatMap((item) => (item.section ? [item.section] : [])),
+  'client', // dynamic client workspace — ?section=client&id=ORG_ID (no sidebar nav item)
+]);
 
 export function isPlatformSection(value: string | null | undefined): value is PlatformSectionId {
   return typeof value === 'string' && SECTION_ID_SET.has(value);
