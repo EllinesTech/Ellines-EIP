@@ -627,6 +627,7 @@ export function createPlatformPackage(payload: {
   enableAgents?: boolean;
   enableAdvancedBi?: boolean;
   enableWebhooks?: boolean;
+  reason?: string;
 }) {
   return request<PlatformPackage>('/api/v1/platform/packages', {
     method: 'POST',
@@ -634,15 +635,41 @@ export function createPlatformPackage(payload: {
   });
 }
 
-export function updatePlatformPackage(id: string, payload: Partial<PlatformPackage>) {
+/** PATCH /platform/packages/:id payload — camelCase keys mapped server-side to snake_case columns. */
+export interface PlatformPackageUpdatePayload {
+  displayName?: string;
+  requestsPerDay?: number;
+  requestsPerHour?: number;
+  requestsPerMinute?: number;
+  burstLimit?: number;
+  maxConnectors?: number | null;
+  maxUsers?: number | null;
+  maxDataExportPerDay?: number | null;
+  enableWebhooks?: boolean;
+  enableSso?: boolean;
+  enableCustomRoles?: boolean;
+  enableAgents?: boolean;
+  enableAdvancedBi?: boolean;
+  priority?: number;
+  monthlyPrice?: number;
+  allowedEndpoints?: string[];
+  blockedEndpoints?: string[];
+  /** Required by the safeguard engine (platform.package.update). */
+  reason?: string;
+}
+
+export function updatePlatformPackage(id: string, payload: PlatformPackageUpdatePayload) {
   return request<PlatformPackage>(`/api/v1/platform/packages/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
-export function deletePlatformPackage(id: string) {
-  return request<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, { method: 'DELETE' });
+export function deletePlatformPackage(id: string, reason: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export function fetchPlatformOrgPackage(orgId: string) {
@@ -690,10 +717,10 @@ export function deactivatePlatformOrgUser(orgId: string, userId: string) {
   return request<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
-export function updatePlatformFlag(key: string, enabled: boolean) {
+export function updatePlatformFlag(key: string, enabled: boolean, reason = 'platform feature flag change') {
   return request<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
     method: 'PATCH',
-    body: JSON.stringify({ key, enabled }),
+    body: JSON.stringify({ key, enabled, reason }),
   });
 }
 
@@ -1168,10 +1195,45 @@ export function createPlatformConnectorPack(body: {
   templateConfig?: ConnectorInstallConfigDto;
   fromInstallationId?: string;
   published?: boolean;
+  reason?: string;
 }) {
   return request<ConnectorPackDto>('/api/v1/platform/connector-packs', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export function updatePlatformConnectorPack(id: string, body: {
+  name?: string;
+  description?: string;
+  templateConfig?: ConnectorInstallConfigDto;
+  published?: boolean;
+  reason?: string;
+}) {
+  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function publishPlatformConnectorPack(id: string, reason: string) {
+  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'publish', reason }),
+  });
+}
+
+export function deprecatePlatformConnectorPack(id: string, reason: string) {
+  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'deprecate', reason }),
+  });
+}
+
+export function deletePlatformConnectorPack(id: string, reason: string) {
+  return request<{ ok: boolean }>(`/api/v1/platform/connector-packs/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
   });
 }
 

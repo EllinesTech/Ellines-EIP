@@ -4,6 +4,7 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  enforceSafeguards,
   auditRow,
   getClientIp,
   type Env,
@@ -128,10 +129,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // PATCH — toggle one or many flags
   // Body: [{ key: string, enabled: boolean }, ...]  OR  { key: string, enabled: boolean }
   if (context.request.method === 'PATCH') {
+    const reasonErr = await enforceSafeguards(context, 'platform.feature_flag.update');
+    if (reasonErr) return reasonErr;
+
     try {
       const body = await context.request.json() as
-        | { key: string; enabled: boolean }
-        | { key: string; enabled: boolean }[];
+        | { key: string; enabled: boolean; reason?: string }
+        | { key: string; enabled: boolean; reason?: string }[];
 
       const updates = Array.isArray(body) ? body : [body];
       const before = await getFlags(context.env);
@@ -143,12 +147,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       await saveFlags(context.env, flags);
       const changed = flags.filter((flag) => before.find((b) => b.key === flag.key)?.enabled !== flag.enabled);
       if (changed.length) {
+        const reasons = updates
+          .filter((u) => typeof u.reason === 'string' && u.reason.trim())
+          .map((u) => u.reason!.trim());
         await getAdminClient(context.env).from('audit_logs').insert(auditRow({
           organizationId: auth.organizationId, userId: auth.sub,
           action: 'platform.feature_flag.update', resource: 'feature_flag',
           metadata: {
             correlationId: crypto.randomUUID(),
-            reason: 'platform feature flag change',
+            reason: reasons.join('; ') || 'platform feature flag change',
             before: before.filter((b) => changed.some((c) => c.key === b.key)),
             after: changed, result: 'success',
           }, ip: getClientIp(context.request),

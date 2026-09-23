@@ -394,6 +394,9 @@ export * from './permissions';
 // ─── Phase 2: baseline account-lockout policy (§24.4.1) ────────────────────────
 export * from './lockout';
 
+// ─── Phase 3: safeguard engine & operation-class registry ────────────────────────
+export * from './safeguards';
+
 /**
  * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.
  * Used to derive session-registry `expiresAt` from the issued token TTL;
