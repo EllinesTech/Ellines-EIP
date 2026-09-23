@@ -5,6 +5,7 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  enforceSafeguards,
   type Env,
 } from '../../../../shared/auth';
 
@@ -18,6 +19,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   if (context.request.method === 'PATCH') {
+    const reasonErr = await enforceSafeguards(context, 'platform.package.update');
+    if (reasonErr) return reasonErr;
+
     let body: Record<string, unknown>;
     try { body = await context.request.json() as Record<string, unknown>; }
     catch { return json({ statusCode: 400, message: 'Invalid JSON body' }, 400); }
@@ -39,19 +43,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (error) return json({ statusCode: 404, message: error.message }, 404);
     await supabase.from('audit_logs').insert(auditRow({
       organizationId: auth.organizationId, userId: auth.sub, action: 'platform.package.update',
-      resource: 'rate_limit_tier', metadata: { packageId: id, changes: Object.keys(updates), updatedBy: auth.email }, ip: auth.ip,
+      resource: 'rate_limit_tier', metadata: { packageId: id, changes: Object.keys(updates), updatedBy: auth.email, reason: (body.reason ?? '').toString().trim() }, ip: auth.ip,
     }));
     return json(data);
   }
 
   if (context.request.method === 'DELETE') {
+    const reasonErr = await enforceSafeguards(context, 'platform.package.delete');
+    if (reasonErr) return reasonErr;
+
     const { count } = await supabase.from('organization_tiers').select('id', { count: 'exact', head: true }).eq('tier_id', id);
     if ((count ?? 0) > 0) return json({ statusCode: 409, message: 'Package is assigned to organizations and cannot be deleted.' }, 409);
     const { error } = await supabase.from('rate_limit_tiers').delete().eq('id', id);
     if (error) return json({ statusCode: 500, message: error.message }, 500);
+    const body = (await context.request.clone().json().catch(() => ({}))) as Record<string, unknown>;
     await supabase.from('audit_logs').insert(auditRow({
       organizationId: auth.organizationId, userId: auth.sub, action: 'platform.package.delete',
-      resource: 'rate_limit_tier', metadata: { packageId: id, deletedBy: auth.email }, ip: auth.ip,
+      resource: 'rate_limit_tier', metadata: { packageId: id, deletedBy: auth.email, reason: (body.reason ?? '').toString().trim() }, ip: auth.ip,
     }));
     return json({ ok: true });
   }

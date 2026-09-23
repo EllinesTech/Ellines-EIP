@@ -1665,6 +1665,7 @@ Status legend: **done** = completion definition met and evidenced, with the veri
 - **Tests:** safeguard matrix tests (each class × each safeguard); pack lifecycle API tests.
 - **Acceptance:** a C-2 operation without a reason is rejected server-side; every operation in 9.3 enforces its class safeguards; packages and packs are fully manageable from the control plane.
 - **Completion definition:** safeguard engine is the only path for privileged mutations; G-09 resolved.
+- **Status:** **DONE** — verified 2026-09-23: `packages/shared/src/safeguards.ts` (C-0 through C-5, 17 registry entries), `apps/web/functions/shared/auth.ts` (`enforceSafeguards()`), `apps/web/functions/api/v1/platform/connector-packs.ts` (PATCH publish/deprecate/update/DELETE), `apps/web/functions/api/v1/platform/packages/[id].ts` (PATCH/DELETE with safeguards), `apps/web/src/components/confirm-dialog.tsx` + `useSafeguardedAction`, `apps/web/src/app/app/platform/page.tsx` (package edit/delete + connector-pack management UI), `apps/web/src/app/app/platform/super-admin.module.css` (z-index tokens `--z-base` through `--z-system`); `safeguard-enforcement.spec.ts` 12/12, `platform-audit.contract.spec.ts` 6/6; all builds green.
 
 ### PHASE 4 — Internal Ellines Operations
 - **Objective:** DB-backed internal staff model replacing the env allowlist as primary mechanism.
@@ -1811,7 +1812,7 @@ Status legend: **CONFIRMED** = verified in code during this audit (with referenc
 | G-21 | No session revocation; JWT in localStorage; no MFA; no step-up | `shared/auth.ts`; `lib/api.ts` session handling | 8 |
 | G-22 | No incidents/alerts/jobs/queues models or surfaces | repo scan | 9 |
 | G-23 | No platform-wide search / command palette | repo scan | 3/10 |
-| G-24 | No window-management system (single drawer only); no z-index/window-layer token system (16.3.3) | `super-admin.module.css` | 3/16 |
+| G-24 | No window-management system (single drawer only); no z-index/window-layer token system (16.3.3) | `super-admin.module.css` | 3/16 | **resolved** — z-index token system (`--z-base` through `--z-system`) established in `super-admin.module.css`; window-manager groundwork deferred to Phase 8 |
 
 ### 40.3 RESOLVED-PRIOR (verified fixed; keep regression tests)
 

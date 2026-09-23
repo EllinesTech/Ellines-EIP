@@ -5,6 +5,7 @@ import {
   options,
   platformAdminFromEnv,
   requireAuth,
+  enforceSafeguards,
   type Env,
 } from '../../../shared/auth';
 
@@ -23,6 +24,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   if (context.request.method === 'POST') {
+    const reasonErr = await enforceSafeguards(context, 'platform.package.create');
+    if (reasonErr) return reasonErr;
+
     let body: Record<string, unknown>;
     try { body = await context.request.json() as Record<string, unknown>; }
     catch { return json({ statusCode: 400, message: 'Invalid JSON body' }, 400); }
@@ -61,7 +65,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       userId: auth.sub,
       action: 'platform.package.create',
       resource: 'rate_limit_tier',
-      metadata: { packageId: data.id, name: data.name, displayName: data.display_name, createdBy: auth.email },
+      metadata: { packageId: data.id, name: data.name, displayName: data.display_name, createdBy: auth.email, reason: (body.reason ?? '').toString().trim() },
       ip: auth.ip,
     }));
     return json(data, 201);

@@ -1,5 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { matchPermission, normalizePermission as canonicalNormalizePermission, isValidPermission as canonicalIsValidPermission } from '@ellines-eip/shared';
+import {
+  matchPermission,
+  normalizePermission as canonicalNormalizePermission,
+  isValidPermission as canonicalIsValidPermission,
+  getOperation,
+} from '@ellines-eip/shared';
 
 export type UserRole = 'owner' | 'admin' | 'executive' | 'manager' | 'member' | 'viewer';
 
@@ -201,6 +206,70 @@ export function requireOrgAdmin(role: string): Response | null {
   }
   return null;
 }
+
+/**
+ * Phase 3: Safeguard enforcement — validates required reason for privileged operations.
+ *
+ * Usage:
+ *   const reasonErr = await enforceSafeguards(context, 'platform.feature_flag.update');
+ *   if (reasonErr) return reasonErr;
+ *
+ * When the caller has already parsed the request body it MUST pass it as `parsedBody`:
+ * a `Request` whose body has been read can no longer be cloned, so cloning inside this
+ * helper would throw (fail-closed 400) even when a valid reason was supplied.
+ */
+export async function enforceSafeguards(
+  context: { request: Request; env: Env },
+  operationId: string,
+  parsedBody?: unknown,
+): Promise<Response | null> {
+  const op = getOperation(operationId);
+  if (!op) return null; // unknown operation — skip enforcement
+
+  const needsReason = op.safeguards.safeguards.includes('reason_required');
+  if (!needsReason) return null;
+
+  let body = parsedBody;
+  if (body === undefined) {
+    try {
+      body = await context.request.clone().json();
+    } catch {
+      // Body absent, unreadable, or already consumed — treated as a missing reason.
+      body = undefined;
+    }
+  }
+
+  const reason = extractReason(body);
+  if (!reason) {
+    return json(
+      {
+        statusCode: 400,
+        message: `Operation "${op.label}" requires a non-empty reason.`,
+        operationId,
+      },
+      400,
+    );
+  }
+  return null;
+}
+
+/**
+ * Pull a non-empty reason out of a request body. `flags` PATCH accepts an array of
+ * `{ key, enabled, reason }` updates, so a collective reason is joined.
+ */
+function extractReason(body: unknown): string {
+  if (Array.isArray(body)) {
+    return body
+      .map((entry) => (entry as Record<string, unknown> | null)?.reason)
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim())
+      .join('; ');
+  }
+  if (!body || typeof body !== 'object') return '';
+  const raw = (body as Record<string, unknown>).reason;
+  return raw === undefined || raw === null ? '' : String(raw).trim();
+}
+
 
 export function assertCanAssignRole(actorRole: string, nextRole: UserRole): string | null {
   if (actorRole === 'owner') return null;
