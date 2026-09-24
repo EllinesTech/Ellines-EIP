@@ -4,7 +4,9 @@
 **Authoritative scope:** docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md
 **Status key:** `done` · `in_progress` · `next` · `blocked` · `todo`
 
-This queue is seeded from the Master Specification Phase 2–15 roadmap. Work proceeds in order; no phase is skipped. The active phase is completed, verified, built, and reviewed before the next phase begins.
+> **Current execution authority:** [`docs/REAL_WORLD_EXECUTION_ROADMAP.md`](./REAL_WORLD_EXECUTION_ROADMAP.md). This roadmap combines the remaining platform work with the real-world connector experiment, first reference business system, online/offline/hybrid architecture, and advanced EIP capabilities. The historical phase table below remains useful for traceability, but it is no longer a reason to delay the real-world proof.
+
+The execution model is now: **green main → real connector → connector engine → tiny business system → offline/hybrid → platform operations → intelligence → generalization**. Work in small complete slices; do not create another long planning cycle before the current acceptance gate is met.
 
 **Phases 0 and 1 are done** (P0 and P1 rows below, verified 2026-09-22 with the evidence recorded in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md` §39.1 and §40.9). Phase 2 is the active phase and has **no completed deliverable yet** — each of its deliverables was re-verified against code on 2026-09-22 and recorded as open (§40.9.3), so nothing in Phase 2 may be marked done without new evidence.
 
@@ -35,12 +37,13 @@ Phase 2 cannot be marked done until its Master Specification completion definiti
 
 ## Queue rules
 
-1. Work only the current `next` phase.
-2. Do not implement later-phase features early unless the Master Specification explicitly makes them a dependency.
-3. A phase must pass its documented tests, acceptance criteria, and completion definition before its status changes to `done`.
+1. Follow `docs/REAL_WORLD_EXECUTION_ROADMAP.md` for active execution order.
+2. Prefer the smallest complete, testable slice over large speculative implementations.
+3. A task is done only after its documented acceptance criteria and applicable tests pass.
 4. Never represent `[PLANNED]` capabilities as live or implemented.
 5. Keep `/app/platform` as the single Super Admin control-plane architecture; do not create a competing `/app/super-admin` surface.
-6. Before merge to `main`, verify the phase branch against `main`, run the applicable tests/builds, and review the diff.
+6. Before merge to `main`, verify the branch against `main`, run applicable tests/builds, and review the diff.
+7. Real connector and business-system work may expose dependencies in later historical phases; implement only the smallest dependency required to keep the real-world experiment moving, and record the evidence.
 
 ## Verification log
 
@@ -119,3 +122,10 @@ New reachable Phase-3 surface (previously dead wiring): `/app/platform?section=p
 | Web tests | `npm run test -w @ellines-eip/web` | pass — 11 suites / 86 tests; new `functions/__tests__/safeguard-enforcement.spec.ts` 12/12 |
 
 Phase 3 remains **`next`**: window-layer groundwork is outstanding, and the registry declares reason/confirmation for operations whose endpoints are still unsafeguarded — `platform.org.suspend`/`resume`, `platform.package.assign`, `platform.cors.update`, `platform.encryption.migrate` — which belong to the tenant-governance, security and recovery phases (P5/P8/P12) and were deliberately not switched on in this slice.
+
+
+## Current execution pointer
+
+**Start here:** `docs/REAL_WORLD_EXECUTION_ROADMAP.md` → **T0 Green Main** → **P1 Real Connector Experiment**.
+
+The target is not to finish documentation. The target is to produce a working real-world integration and then use that proof to drive the reusable connector and business-system architecture.
