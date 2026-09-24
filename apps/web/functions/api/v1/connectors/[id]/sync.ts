@@ -18,6 +18,11 @@ import {
 } from '../../../../shared/connectors';
 import { sendOutboundEmail } from '../../../../shared/mail';
 import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../shared/egress';
+import {
+  isFirestoreResponse,
+  normalizeFirestoreResponse,
+  mapHavenBooksCatalogueToEipPayload,
+} from '../../../../shared/firestore-normalizer';
 
 const CSV_SAMPLE = `metric,value
 healthScore,81
@@ -136,6 +141,11 @@ async function upsertSnapshot(
  * Fetch any HTTPS endpoint from the Cloudflare edge through the shared SSRF-safe
  * egress policy. Private / localhost / cloud-metadata targets are blocked.
  * Redirects are validated hop-by-hop.
+ *
+ * If the response is a Firestore REST API response (document or collection),
+ * it is automatically unpacked via the generic Firestore normalizer before
+ * returning. This handles typed Firestore value envelopes without any
+ * source-system-specific logic in this function.
  */
 async function proxyFetch(
   url: string,
@@ -159,8 +169,9 @@ async function proxyFetch(
     throw new Error(`Upstream ${url} returned ${res.status} ${res.statusText}`);
   }
   const text = await res.text();
+  let parsed: unknown;
   try {
-    return JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch {
     // Non-JSON: wrap in a minimal enterprise-compatible envelope
     return {
@@ -168,6 +179,29 @@ async function proxyFetch(
       timeline: [{ title: 'HTTP sync', detail: `${res.status} from ${new URL(url).hostname}` }],
     };
   }
+
+  // ── Firestore REST response detection and unpacking ──────────────────────
+  // The Firestore REST API wraps field values in typed envelopes
+  // ({ stringValue, integerValue, arrayValue, mapValue, … }). Detect that
+  // shape and normalize it into plain JS before handing off to
+  // normalizeEnterprisePayload — which only understands plain objects.
+  if (isFirestoreResponse(parsed)) {
+    const unpacked = normalizeFirestoreResponse(parsed);
+    // Single document that looks like a Haven books_catalogue payload
+    if (
+      !Array.isArray(unpacked) &&
+      typeof (unpacked as Record<string, unknown>)._firestoreName === 'string' &&
+      (unpacked as Record<string, unknown>)._firestoreName.endsWith('/books_catalogue')
+    ) {
+      // Apply the Haven books→EIP field mapping for a rich enterprise summary
+      return mapHavenBooksCatalogueToEipPayload(unpacked as Record<string, unknown>);
+    }
+    // Any other Firestore document or collection — return the plain unpacked form
+    // so normalizeEnterprisePayload can pick up whatever fields match its schema.
+    return unpacked;
+  }
+
+  return parsed;
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
