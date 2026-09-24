@@ -67,6 +67,7 @@ model Organization {
   generatedConnectors    GeneratedConnector[]    // v2.0: Auto-generated connectors
   approvalWorkflows      ApprovalWorkflowRequest[] // v2.0: Generated connector approvals
   sessions               Session[]           // Phase 2: session registry (spec 24.2.3)
+  integrationRequests    IntegrationRequest[]     // TASK-09: integration request workflow
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -127,6 +128,7 @@ model User {
   rateLimitViolations RateLimitViolation[]    // B.3.2: Rate limit violations
   contextProfile      UserContextProfile?    // v2.0: Personalization context
   shortcutSuggestions ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
+  integrationRequests IntegrationRequest[]    @relation("IntegrationRequestedBy") // TASK-09
 
   @@index([organizationId])
   @@map("users")
@@ -2215,4 +2217,26 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model IntegrationRequest {
+  id             String    @id @default(uuid())
+  organizationId String
+  requestedById  String
+  systemName     String
+  purpose        String?
+  catalogId      String?
+  status         String    @default("pending")
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  requestedBy  User         @relation("IntegrationRequestedBy", fields: [requestedById], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("integration_requests")
 }

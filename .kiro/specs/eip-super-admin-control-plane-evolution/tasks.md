@@ -224,7 +224,16 @@ Tasks are ordered by priority. P0 security tasks block everything else.
 
 **Objective:** A client IT user can submit a request for a new integration. The request is visible to Super Admin and can be approved or rejected.
 
-**Status:** `planned`
+**Status:** `verified`
+
+**Verified:** 2026-09-24
+**Evidence:**
+- `IntegrationRequest` model added to `services/identity/prisma/schema.prisma` with `Organization` + `User` back-relations. `db:push` applied to both local and Supabase.
+- `apps/web/functions/api/v1/orgs/me/integration-requests.ts` — GET (list own) + POST (submit). Permission-gated on `connector:read`.
+- `apps/web/functions/api/v1/platform/orgs/[id]/integration-requests.ts` — GET (list) + PATCH (approve/reject by reqId in URL). Platform admin only. Audit logged.
+- `apps/web/src/lib/api.ts` — `listIntegrationRequests`, `createIntegrationRequest`, `listPlatformOrgIntegrationRequests`, `reviewPlatformOrgIntegrationRequest` + `IntegrationRequestDto` type.
+- `platform/page.tsx` — `wsIntegrationRequests` state loaded in workspace `Promise.all`. Passed to `ClientWorkspace` with `onReviewIntegrationRequest`. Approve/Reject actions in connectors tab with reason prompt.
+- Build: `npm run build:shared` ✓ · `npm run build -w @ellines-eip/web` ✓
 
 **Dependencies:** TASK-08
 
@@ -360,7 +369,13 @@ model IntegrationRequest {
 
 **Objective:** Implement the CLIENT ORGANIZATIONS → Services section showing each client's package, entitlement usage, and renewal status.
 
-**Status:** `planned`
+**Status:** `verified`
+
+**Verified:** 2026-09-24
+**Evidence:**
+- `app-navigation.ts` — `client-services` flipped to `available: true`. Automatically enters `PLATFORM_LIVE_SECTIONS`.
+- `platform/page.tsx` — `clientServicesPage` renders a table of all client orgs with name, slug, user count, status and "Open workspace" link. Wired to `case 'services'` in `resolveContent`.
+- Build passes.
 
 **Dependencies:** TASK-05, TASK-10
 
@@ -383,8 +398,13 @@ model IntegrationRequest {
 
 **Objective:** Implement the CLIENT ORGANIZATIONS → Activity & Usage section.
 
-**Status:** `planned`
+**Status:** `verified`
 
+**Verified:** 2026-09-24
+**Evidence:**
+- `app-navigation.ts` — `client-activity` flipped to `available: true`.
+- `platform/page.tsx` — `clientActivityPage` renders cross-client audit log with org/action/date filters, pagination, and CSV export. Reuses existing `loadAudit`/`exportAudit` helpers. Wired to `case 'activity'`.
+- Build passes.
 **Dependencies:** TASK-10
 
 **Files affected:**
@@ -407,8 +427,13 @@ model IntegrationRequest {
 
 **Objective:** Implement the CLIENT ORGANIZATIONS → Alerts & Issues section showing degraded and failed connectors across all clients.
 
-**Status:** `planned`
+**Status:** `verified`
 
+**Verified:** 2026-09-24
+**Evidence:**
+- `app-navigation.ts` — `client-alerts` flipped to `available: true`.
+- `platform/page.tsx` — `clientAlertsPage` shows KPIs from live `metrics` state, suspended/disconnected client table with "Open workspace" links, and a step-by-step triage guide. Wired to `case 'alerts'`.
+- Build passes.
 **Dependencies:** TASK-11
 
 **Files affected:**

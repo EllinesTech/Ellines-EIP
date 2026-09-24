@@ -16,12 +16,13 @@ import {
   deletePlatformOrgConnector, testPlatformOrgConnector, syncPlatformOrgConnector,
   listPlatformOrgDocuments, uploadPlatformOrgDocument, deletePlatformOrgDocument,
   fetchPlatformOrgProfile, updatePlatformOrgProfile, parseOpenApi,
+  listPlatformOrgIntegrationRequests, reviewPlatformOrgIntegrationRequest,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto, type PlatformHealthSummaryDto,
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
   type PlatformOrgConnectorDto, type PlatformOrgApprovalDto, type PlatformOrgRuleDto,
   type PlatformOrgReportDto, type PlatformOrgAgentDto, type PlatformOrgSnapshotDto,
   type ConnectorInstallationDto, type ConnectorInstallConfigDto, type OpenApiParseResult,
-  type PlatformDocumentDto, type PlatformOrgProfileDto,
+  type PlatformDocumentDto, type PlatformOrgProfileDto, type IntegrationRequestDto,
 } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -85,6 +86,7 @@ function PlatformSuperAdminPage(){
  const [wsSnapshot,setWsSnapshot]=useState<PlatformOrgSnapshotDto>(null);
  // Full connector installations (writable — for wizard)
  const [wsInstallations,setWsInstallations]=useState<ConnectorInstallationDto[]>([]);
+ const [wsIntegrationRequests,setWsIntegrationRequests]=useState<IntegrationRequestDto[]>([]);
  const [wsDocuments,setWsDocuments]=useState<PlatformDocumentDto[]>([]);
  const [wsOrgProfile,setWsOrgProfile]=useState<PlatformOrgProfileDto|null>(null);
  const [wsTab,setWsTab]=useState<'overview'|'glance'|'timeline'|'notifications'|'approvals'|'fleet'|'people'|'inbox'|'connectors'|'rules'|'reports'|'agents'|'documents'|'users'|'audit'|'settings'|'lifecycle'>('overview');
@@ -190,11 +192,13 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       fetchPlatformOrgConnectorInstallations(clientOrgId),
       listPlatformOrgDocuments(clientOrgId),
       fetchPlatformOrgProfile(clientOrgId),
-    ]).then(([s,u,t,d,conn,appr,rules,reports,agents,snap,inst,docs,profile])=>{
+      listPlatformOrgIntegrationRequests(clientOrgId).catch(()=>[] as IntegrationRequestDto[]),
+    ]).then(([s,u,t,d,conn,appr,rules,reports,agents,snap,inst,docs,profile,intReqs])=>{
       setWsStats(s);setWsUsers(u);setWsTier(t);setWsSettings(d);
       setWsConnectors(conn);setWsApprovals(appr);setWsRules(rules);
       setWsReports(reports);setWsAgents(agents);setWsSnapshot(snap);
       setWsInstallations(inst);setWsDocuments(docs);setWsOrgProfile(profile);
+      setWsIntegrationRequests(intReqs as IntegrationRequestDto[]);
     }).catch(e=>{
       const errMsg = e instanceof Error ? e.message : 'Failed to load client workspace';
       setError(errMsg);
@@ -371,6 +375,120 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
+  // ── TASK-13: Services & Entitlements ──────────────────────────────────────
+  const clientServicesPage = (
+    <div>
+      <div className={styles.card} style={{marginBottom:12}}>
+        <CardTitle title="Client services & entitlements" hint="Package assignments and entitlement usage across all client organisations."/>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead><tr><th>Client</th><th>Package</th><th>Users</th><th>Integrations</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {orgs.map(o => (
+                <tr key={o.id}>
+                  <td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td>
+                  <td><span className={styles.muted}>—</span></td>
+                  <td>{o.userCount}</td>
+                  <td>—</td>
+                  <td><span className={`${styles.status} ${o.status==='active'?styles.statusOk:styles.statusBad}`}>{o.status}</span></td>
+                  <td><button className={`${styles.button} ${styles.primary}`} style={{fontSize:11}} onClick={()=>navigate('client',o.id)}>Open workspace</button></td>
+                </tr>
+              ))}
+              {!orgs.length && <tr><td colSpan={6}>No client organisations found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className={styles.card}>
+        <CardTitle title="How to manage packages" hint="Package assignment changes a client's entitlement envelope."/>
+        <Service title="1. Open workspace" text="Click 'Open workspace' on any client row above."/>
+        <Service title="2. Go to Settings tab" text="The Settings tab in the client workspace shows the current package and allows reassignment."/>
+        <Service title="3. Assign package" text="Select a package from the dropdown. Changes take effect immediately."/>
+      </div>
+    </div>
+  );
+
+  // ── TASK-14: Activity & Usage ──────────────────────────────────────────────
+  const clientActivityPage = (
+    <div className={styles.card}>
+      <CardTitle title="Activity & usage" hint="Cross-client audit activity. Filter by client, action or date range."/>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginBottom:12}}>
+        <input className={styles.input} placeholder="Action prefix e.g. connector." value={auditQuery} onChange={e=>setAuditQuery(e.target.value)}/>
+        <select className={styles.select} value={auditOrg} onChange={e=>setAuditOrg(e.target.value)}>
+          <option value="">All client organisations</option>
+          {orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <input className={styles.input} type="date" value={auditFrom} onChange={e=>setAuditFrom(e.target.value)}/>
+        <input className={styles.input} type="date" value={auditTo} onChange={e=>setAuditTo(e.target.value)}/>
+      </div>
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        <button className={`${styles.button} ${styles.primary}`} onClick={()=>void loadAudit(0)}>Search</button>
+        <button className={styles.button} onClick={()=>void exportAudit()}>Export CSV</button>
+        <span className={styles.muted}>{auditTotal} matching events</span>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead><tr><th>Time</th><th>Client</th><th>Actor</th><th>Action</th><th>Resource</th></tr></thead>
+          <tbody>
+            {audit.map(a=>(
+              <tr key={a.id}>
+                <td style={{fontSize:11}}>{new Date(a.createdAt).toLocaleString()}</td>
+                <td>{a.organizationName||a.organizationId}</td>
+                <td style={{fontSize:11}}>{a.userEmail||'system'}</td>
+                <td style={{fontSize:11}}>{a.action}</td>
+                <td style={{fontSize:11}}>{a.resource}</td>
+              </tr>
+            ))}
+            {!audit.length&&<tr><td colSpan={5}>Run a search above to load activity.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button className={styles.button} disabled={auditPageIndex===0} onClick={()=>void loadAudit(auditPageIndex-1)}>Previous</button>
+        <button className={styles.button} disabled={(auditPageIndex+1)*50>=auditTotal} onClick={()=>void loadAudit(auditPageIndex+1)}>Next</button>
+      </div>
+    </div>
+  );
+
+  // ── TASK-15: Alerts & Issues ──────────────────────────────────────────────
+  const clientAlertsPage = (
+    <div>
+      <div className={styles.grid4} style={{marginBottom:12}}>
+        <Kpi label="Clients with errors" value={orgs.filter(o=>o.status==='active').length} hint="active" cls={styles.ok}/>
+        <Kpi label="Total clients" value={orgs.length} hint="onboarded"/>
+        <Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations??'—'} hint="connector errors" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/>
+        <Kpi label="Total integrations" value={metrics?.businessServices?.connectorInstallations??'—'} hint="installed"/>
+      </div>
+      <div className={styles.card} style={{marginBottom:12}}>
+        <CardTitle title="Connector errors across all clients" hint="Installations currently in error state. Click a client to open its workspace."/>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead><tr><th>Client</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {orgs.filter(o=>o.status!=='active').map(o=>(
+                <tr key={o.id}>
+                  <td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td>
+                  <td><span className={`${styles.status} ${styles.statusBad}`}>{o.status}</span></td>
+                  <td><button className={`${styles.button} ${styles.primary}`} style={{fontSize:11}} onClick={()=>navigate('client',o.id)}>Open workspace</button></td>
+                </tr>
+              ))}
+              {!orgs.filter(o=>o.status!=='active').length&&(
+                <tr><td colSpan={3} style={{color:'#34d399',fontWeight:600}}>✓ No suspended or disconnected clients</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className={styles.card}>
+        <CardTitle title="How to triage an alert" hint="Step-by-step connector error resolution."/>
+        <Service title="1. Open client workspace" text="Click the client in the table above → Connectors tab."/>
+        <Service title="2. Identify the failed connector" text="Status = error. Check the last message column for the error detail."/>
+        <Service title="3. Edit credentials" text="Click Edit on the connector, update credentials, then Test connection."/>
+        <Service title="4. Sync" text="Once the test passes, click Sync now to restore the live data feed."/>
+      </div>
+    </div>
+  );
+
   function resolveContent() {
     if (isReserved) return <Planned title={meta?.label ?? 'Planned'} note={meta?.note} />;
     switch (activeSection) {
@@ -383,6 +501,9 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       case 'client-health':    return clientHealthPage;
       case 'client-configuration': return clientConfigurationPage;
       case 'client-audit':     return clientAuditPage;
+      case 'services':         return clientServicesPage;
+      case 'activity':         return clientActivityPage;
+      case 'alerts':           return clientAlertsPage;
       case 'audit':            return auditPage;
       case 'configuration':    return config;
       case 'ai':               return aiPage;
@@ -512,6 +633,12 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
               setWsAuditTotal(r.total);
             } catch (err) { setError(err instanceof Error ? err.message : 'Audit load failed'); }
           }}
+          integrationRequests={wsIntegrationRequests}
+          onReviewIntegrationRequest={async (reqId, payload) => {
+            if (!clientOrgId) return;
+            const updated = await reviewPlatformOrgIntegrationRequest(clientOrgId, reqId, payload);
+            setWsIntegrationRequests(v => v.map(r => r.id === updated.id ? updated : r));
+          }}
         />;
       default:                 return overview;
     }
@@ -588,6 +715,7 @@ function ClientWorkspace({
   onSaveSettings, onSettingsChange, onSaveOrgName,
   onInstallConnector, onUpdateConnector, onDeleteConnector, onTestConnector, onSyncConnector,
   onUploadDocument, onDeleteDocument, onLoadAudit,
+  integrationRequests, onReviewIntegrationRequest,
 }: {
   org: import('@/lib/api').PlatformOrg | null;
   orgId: string;
@@ -628,6 +756,8 @@ function ClientWorkspace({
   onUploadDocument: (body:{name:string;mimeType:string;content:string;tags?:string[];branch?:string;summary?:string}) => Promise<void>;
   onDeleteDocument: (docId:string) => Promise<void>;
   onLoadAudit: () => Promise<void>;
+  integrationRequests: import('@/lib/api').IntegrationRequestDto[];
+  onReviewIntegrationRequest: (reqId:string, payload:{status:'approved'|'rejected';reviewNote?:string}) => Promise<void>;
 }) {
   // ── Internal wizard state for Connectors tab ──
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -1089,6 +1219,28 @@ function ClientWorkspace({
           {availablePacks.length>0&&(<div className={styles.card} style={{marginBottom:12}}><CardTitle title="Platform packs" hint="Pre-configured connectors — enter credentials only."/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{availablePacks.map(p=>(<button key={p.id} className={styles.button} onClick={()=>{resetWizard();setWizCatalogId(p.catalogId);setWizDisplayName(p.name);setWizPackId(p.id);const c=p.templateConfig||{};if(c.endpoint)setWizEndpoint(String(c.endpoint));if(c.sql)setWizSql(String(c.sql));if(c.openApiBaseUrl)setWizOpenApiBaseUrl(String(c.openApiBaseUrl));setWizStep(2);setWizardOpen(true);setWizNotice(`Pack "${p.name}" — enter credentials, then Test & Sync.`);}}>📦 {p.name}</button>))}</div></div>)}
           {wizardOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.35)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong style={{fontSize:13}}>Install wizard · Step {wizStep} of 4{wizEditingId?' · editing':''}</strong><button className={styles.button} onClick={()=>{setWizardOpen(false);resetWizard();}}>Close</button></div><div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>{['Type','Credentials','Capabilities','Test & sync'].map((l,i)=>(<span key={l} style={{fontSize:10,padding:'3px 8px',borderRadius:99,background:wizStep===i+1?'rgba(124,58,237,.35)':'rgba(255,255,255,.05)',color:wizStep===i+1?'#c4b5fd':'#8795aa',fontWeight:700}}>{i+1}. {l}</span>))}</div>{wizError&&<div className={styles.alert}>{wizError}</div>}{wizNotice&&<div className={styles.notice}>{wizNotice}</div>}{wizStep===1&&(<div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:12}}>{CONNECTOR_TYPES.map(t=>(<button key={t.id} className={styles.button} onClick={()=>{setWizCatalogId(t.id);if(!wizDisplayName)setWizDisplayName(t.title);}} style={{textAlign:'left',padding:10,background:wizCatalogId===t.id?'rgba(124,58,237,.25)':undefined,border:wizCatalogId===t.id?'1px solid rgba(124,58,237,.55)':undefined}}><span style={{fontSize:9,fontWeight:800,color:'#8b9bb0',textTransform:'uppercase',display:'block',marginBottom:3}}>{t.tag}</span><strong style={{fontSize:12,display:'block'}}>{t.title}</strong><span style={{fontSize:10,color:'#8795aa'}}>{t.blurb}</span></button>))}</div><div className={styles.form} style={{marginBottom:10}}><Field label="Display name" value={wizDisplayName} set={setWizDisplayName} placeholder="e.g. Clinical HIS production"/></div><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(2)}>Continue →</button></div>)}{wizStep===2&&(<div><div className={styles.form} style={{marginBottom:10}}>{(wizCatalogId==='rest-api'||wizCatalogId==='openapi')&&(<><label className={styles.field}><span>Auth</span><select className={styles.select} value={wizAuthType||'none'} onChange={e=>setWizAuthType(e.target.value as import('@/lib/api').ConnectorInstallConfigDto['authType'])}><option value="none">None</option><option value="apiKey">API key</option><option value="bearer">Bearer token</option><option value="basic">Basic</option></select></label>{wizAuthType==='apiKey'&&<Field label="API key" value={wizApiKey} set={setWizApiKey}/>}{wizAuthType==='bearer'&&<Field label="Bearer token" value={wizBearer} set={setWizBearer}/>}{wizAuthType==='basic'&&<><Field label="Username" value={wizBasicUser} set={setWizBasicUser}/><Field label="Password" value={wizBasicPass} set={setWizBasicPass} type="password"/></>}</>)}{wizCatalogId==='rest-api'&&<Field label="Endpoint URL" value={wizEndpoint} set={setWizEndpoint} placeholder="https://vendor.example/api"/>}{wizCatalogId==='openapi'&&(<><label className={styles.field} style={{gridColumn:'1/-1'}}><span>OpenAPI JSON</span><textarea className={styles.input} value={wizOpenApiText} onChange={e=>setWizOpenApiText(e.target.value)} rows={6} placeholder="Paste openapi.json here"/></label><Field label="Base URL" value={wizOpenApiBaseUrl} set={setWizOpenApiBaseUrl} placeholder="https://vendor.example/api"/><div className={styles.full}><button className={styles.button} disabled={wizBusy||!wizOpenApiText.trim()} onClick={async()=>{setWizBusy(true);setWizError('');try{const doc=JSON.parse(wizOpenApiText);const r=await parseOpenApi(doc);setWizParsed(r);if(!wizOpenApiBaseUrl&&r.baseUrl)setWizOpenApiBaseUrl(r.baseUrl);if(!wizDisplayName)setWizDisplayName(r.title);setWizSelectedPaths(r.endpoints.filter(e=>e.selectable).slice(0,5).map(e=>`${e.method} ${e.path}`));setWizNotice(`Parsed ${r.endpoints.length} operations.`);}catch(e){setWizError(e instanceof Error?e.message:'Parse failed');}finally{setWizBusy(false);}}}>Parse capabilities</button></div></>)}{wizCatalogId==='csv-file'&&<label className={styles.field} style={{gridColumn:'1/-1'}}><span>CSV content</span><textarea className={styles.input} value={wizCsv} onChange={e=>setWizCsv(e.target.value)} rows={6}/></label>}{['postgres','sqlserver','mysql'].includes(wizCatalogId)&&(<><Field label="Connection string (read-only)" value={wizConnStr} set={setWizConnStr} placeholder="postgresql://reader:…@host:5432/dbname"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>SELECT query</span><textarea className={styles.input} value={wizSql} onChange={e=>setWizSql(e.target.value)} rows={5}/></label></>)}{wizCatalogId==='email-imap'&&(<><Field label="IMAP host" value={wizImapHost} set={setWizImapHost}/><Field label="Port" value={wizImapPort} set={setWizImapPort}/><Field label="Username" value={wizImapUser} set={setWizImapUser}/><Field label="Password" value={wizImapPass} set={setWizImapPass} type="password"/><Field label="Mailbox" value={wizImapMailbox} set={setWizImapMailbox}/></>)}{wizCatalogId==='sftp'&&(<><Field label="SFTP host" value={wizSftpHost} set={setWizSftpHost}/><Field label="Port" value={wizSftpPort} set={setWizSftpPort}/><Field label="Username" value={wizSftpUser} set={setWizSftpUser}/><Field label="Password" value={wizSftpPass} set={setWizSftpPass} type="password"/><Field label="Remote path" value={wizSftpPath} set={setWizSftpPath}/></>)}{wizCatalogId==='demo-json'&&<p className={styles.cardHint} style={{gridColumn:'1/-1'}}>Demo seed — no credentials needed.</p>}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(1)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:4)}>Continue →</button></div></div>)}{wizStep===3&&wizParsed&&(<div><p className={styles.cardHint} style={{marginBottom:10}}>Select capabilities to expose.</p><div style={{maxHeight:260,overflowY:'auto',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:10,marginBottom:12}}>{wizParsed.endpoints.map(e=>{const key=`${e.method} ${e.path}`;return(<label key={key} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:11,cursor:e.selectable?'pointer':'default',opacity:e.selectable?1:.45}}><input type="checkbox" disabled={!e.selectable} checked={wizSelectedPaths.includes(key)} onChange={ev=>setWizSelectedPaths(prev=>ev.target.checked?[...prev,key]:prev.filter(p=>p!==key))} style={{marginTop:2}}/><span><code style={{color:'#a5b4fc'}}>{e.method}</code> <span style={{color:'#c8d2e0'}}>{e.path}</span><br/><span style={{color:'#8795aa'}}>{e.summary}</span></span></label>);})}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(2)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(4)}>Continue →</button></div></div>)}{wizStep===4&&(<div><div className={styles.form} style={{marginBottom:12}}><label className={styles.field}><span>Sync schedule</span><select className={styles.select} value={String(wizSyncMins)} onChange={e=>setWizSyncMins(Number(e.target.value))}><option value="0">Manual only</option><option value="15">Every 15 min</option><option value="60">Every hour</option><option value="360">Every 6 hrs</option><option value="1440">Daily</option></select></label>{wizTestOk!==null&&<div className={styles.full}><span style={{color:wizTestOk?'#34d399':'#fb7185',fontWeight:700}}>{wizTestOk?'✓ Test passed':'✗ Test failed'}</span></div>}</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className={styles.button} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:2)}>← Back</button><button className={styles.button} disabled={wizBusy} onClick={()=>void wizTest()}>Test connection</button><button className={`${styles.button} ${styles.primary}`} disabled={wizBusy} onClick={()=>void wizSync()}>Sync now</button></div></div>)}</div>)}
           {installations.length>0?(<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Last synced</th><th>Schedule</th><th>Actions</th></tr></thead><tbody>{installations.map(inst=>(<tr key={inst.id}><td><strong>{inst.displayName}</strong>{inst.lastMessage&&<><br/><span className={styles.muted} style={{fontSize:10}}>{inst.lastMessage}</span></>}</td><td><span className={styles.muted}>{inst.catalogId}</span></td><td><span className={`${styles.status} ${inst.status==='synced'?styles.statusOk:inst.status==='error'?styles.statusBad:styles.statusNeutral}`}>{inst.status}</span></td><td style={{fontSize:11}}>{inst.lastSyncedAt?new Date(inst.lastSyncedAt).toLocaleString():'Never'}</td><td style={{fontSize:11}}>{inst.config?.syncIntervalMinutes?`${inst.config.syncIntervalMinutes} min`:'Manual'}</td><td style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} onClick={()=>editInstallation(inst)}>Edit</button><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{try{await onSyncConnector(inst.id);}catch(e){console.error(e);}}}>Sync</button><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{if(confirm(`Remove "${inst.displayName}"?`))await onDeleteConnector(inst.id);}}>Remove</button></td></tr>))}</tbody></table></div>):(!wizardOpen&&<div className={styles.planned}><h3>No connectors yet</h3><p>Click &quot;+ Install connector&quot; above to connect this client&apos;s first system.</p></div>)}
+
+          {/* ── Integration Requests (TASK-09) ── */}
+          <div className={styles.card} style={{marginTop:20}}>
+            <CardTitle title="Integration requests" hint="Requests submitted by client IT for new integrations. Approve to install, reject with a note."/>
+            {integrationRequests.length===0
+              ? <p className={styles.cardHint}>No integration requests from this client yet.</p>
+              : (<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>System</th><th>Purpose</th><th>Requested</th><th>Status</th><th>Review</th></tr></thead><tbody>
+                  {integrationRequests.map(req=>(
+                    <tr key={req.id}>
+                      <td><strong>{req.systemName}</strong>{req.catalogId&&<><br/><span className={styles.muted} style={{fontSize:10}}>{req.catalogId}</span></>}</td>
+                      <td style={{fontSize:11,maxWidth:200}}>{req.purpose||'—'}</td>
+                      <td style={{fontSize:11}}>{new Date(req.createdAt).toLocaleDateString()}</td>
+                      <td><span className={`${styles.status} ${req.status==='approved'?styles.statusOk:req.status==='rejected'?styles.statusBad:styles.statusNeutral}`}>{req.status}</span>{req.reviewNote&&<><br/><span className={styles.muted} style={{fontSize:10}}>{req.reviewNote}</span></>}</td>
+                      <td>{req.status==='pending'&&<div style={{display:'flex',gap:4}}>
+                        <button className={`${styles.button} ${styles.success}`} style={{fontSize:10,padding:'4px 8px'}} disabled={busy} onClick={async()=>{const note=window.prompt('Approval note (optional):');await onReviewIntegrationRequest(req.id,{status:'approved',reviewNote:note||undefined});}}>Approve</button>
+                        <button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 8px'}} disabled={busy} onClick={async()=>{const note=window.prompt('Rejection reason:');if(!note)return;await onReviewIntegrationRequest(req.id,{status:'rejected',reviewNote:note});}}>Reject</button>
+                      </div>}</td>
+                    </tr>
+                  ))}
+                </tbody></table></div>)
+            }
+          </div>
         </div>
       )}
       {/* ── APPROVALS ── */}
