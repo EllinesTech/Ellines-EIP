@@ -21,6 +21,10 @@ import {
   type InstallConfig,
 } from '../../../../../shared/connectors';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
+import {
+  isFirestoreResponse,
+  normalizeFirestoreResponse,
+} from '../../../../../shared/firestore-normalizer';
 
 // ─── IMAP sync via Cloudflare TCP sockets ─────────────────────────────────────
 
@@ -542,7 +546,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             502,
           );
         }
-        raw = await res.json();
+        const text = await res.text();
+        try {
+          raw = JSON.parse(text);
+        } catch {
+          raw = {
+            briefHighlight: text.slice(0, 400) || `Sync from ${new URL(endpoint).hostname}`,
+            timeline: [{ title: 'HTTP sync', detail: `200 from ${new URL(endpoint).hostname}` }],
+          };
+        }
+        // Unpack Firestore REST typed-value envelopes if present — applies to any
+        // endpoint backed by Firestore's REST API regardless of which system it is.
+        if (isFirestoreResponse(raw)) {
+          raw = normalizeFirestoreResponse(raw);
+        }
       }
       summary = await upsertSnapshot(
         context.env,

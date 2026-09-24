@@ -162,40 +162,111 @@ export function normalizeEnterprisePayload(raw: unknown) {
         ? (root.enterprise as Record<string, unknown>)
         : root;
 
+  // ── Timeline ────────────────────────────────────────────────────────────────
+  // Primary: look for a top-level array field named timeline / events / activity.
+  // Fallback: derive timeline entries from common top-level record arrays that
+  // many REST APIs return (books, products, records, items, orders, users, tickets).
+  // Each array element is treated as an event — title from name/title/id fields,
+  // detail from description/status/type/category or a concise field summary.
   const timelineRaw = data.timeline ?? data.events ?? data.activity ?? [];
-  const timeline = Array.isArray(timelineRaw)
-    ? timelineRaw
-        .map((item) => {
-          if (!item || typeof item !== 'object') return null;
-          const row = item as Record<string, unknown>;
-          const title = asString(row.title ?? row.name ?? row.event, '');
-          const detail = asString(row.detail ?? row.description ?? row.message, '');
-          if (!title) return null;
-          return { title, detail: detail || title };
-        })
-        .filter((x): x is { title: string; detail: string } => Boolean(x))
-        .slice(0, 12)
-    : [];
+  let timeline: { title: string; detail: string }[] = [];
 
+  if (Array.isArray(timelineRaw) && timelineRaw.length > 0) {
+    timeline = timelineRaw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const row = item as Record<string, unknown>;
+        const title = asString(row.title ?? row.name ?? row.event, '');
+        const detail = asString(row.detail ?? row.description ?? row.message, '');
+        if (!title) return null;
+        return { title, detail: detail || title };
+      })
+      .filter((x): x is { title: string; detail: string } => Boolean(x))
+      .slice(0, 12);
+  } else {
+    // No explicit timeline field — try common record-array field names.
+    // This handles APIs like {"books":[{title,author,status,...}],...} or
+    // {"products":[{name,sku,price,...}],...} where each record becomes a timeline entry.
+    const RECORD_ARRAY_KEYS = [
+      'books', 'products', 'records', 'items', 'orders',
+      'users', 'tickets', 'tasks', 'transactions', 'entries',
+    ] as const;
+    for (const key of RECORD_ARRAY_KEYS) {
+      const arr = data[key];
+      if (Array.isArray(arr) && arr.length > 0) {
+        timeline = arr
+          .slice(0, 12)
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const row = item as Record<string, unknown>;
+            const title = asString(
+              row.title ?? row.name ?? row.subject ?? String(row.id ?? ''),
+              '',
+            );
+            if (!title) return null;
+            const detail = asString(
+              row.detail ?? row.author ?? row.description ?? row.genre ??
+              row.type ?? row.category ?? row.status ?? '',
+              key,
+            );
+            return { title, detail };
+          })
+          .filter((x): x is { title: string; detail: string } => Boolean(x));
+        break;
+      }
+    }
+  }
+
+  // ── Numeric KPIs ─────────────────────────────────────────────────────────────
+  // Aliases in priority order — check schema-native names first, then common
+  // field names used by real-world REST APIs (count, total, length, size, num_*).
   const healthScore = Math.min(
     100,
     Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
   );
   const connectedSystems = Math.max(
     0,
-    asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
+    asNumber(
+      data.connectedSystems ?? data.connected_systems ?? data.systems ??
+      // Many catalogue / inventory APIs return a top-level count of their records.
+      // Use it as connectedSystems when no native field exists and a record array is present.
+      (
+        data.count !== undefined
+          ? data.count
+          : data.total !== undefined
+            ? data.total
+            : data.length !== undefined
+              ? data.length
+              : undefined
+      ),
+      0,
+    ),
   );
-  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0));
+  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts ?? data.issues, 0));
   const openDecisions = Math.max(
     0,
-    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
-  );
-  const briefHighlight = asString(
-    data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-    'REST sync completed with no brief text.',
+    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions ?? data.pending, 0),
   );
 
-  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system, '');
+  // ── Brief highlight ───────────────────────────────────────────────────────────
+  // Fallback chain: schema-native → common prose fields → synthesised from
+  // business/api name + count so the Command Center shows something useful
+  // even when the upstream API returns no prose field.
+  const businessName = asString(
+    data.business ?? data.name ?? data.api ?? data.source ?? data.system ?? data.systemName,
+    '',
+  );
+  const briefHighlight = asString(
+    data.briefHighlight ?? data.brief ?? data.summary ?? data.message ??
+    (businessName && connectedSystems > 0
+      ? `${businessName}: ${connectedSystems} record${connectedSystems !== 1 ? 's' : ''} synced.`
+      : businessName
+        ? `${businessName}: sync completed.`
+        : undefined),
+    'REST sync completed.',
+  );
+
+  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system ?? businessName, '');
   let model: UemModel | null = null;
   if (data.model || data.uem || data.objects || data.counts) {
     model = normalizeUemModel(data, {
