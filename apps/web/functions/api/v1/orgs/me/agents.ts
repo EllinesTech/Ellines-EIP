@@ -12,6 +12,7 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../../shared/auth';
+import { getOrgEntitlement } from '../../../../shared/entitlements';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -44,6 +45,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // ── POST: create agent ─────────────────────────────────────────────────────
   if (context.request.method !== 'POST') {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
+  }
+
+  // Entitlement check: enable_agents must be true for this org's package
+  {
+    const supabase = getAdminClient(context.env);
+    const entitlement = await getOrgEntitlement(supabase, auth.organizationId);
+    if (!entitlement.enableAgents) {
+      return json(
+        {
+          statusCode: 422,
+          message: 'Ellinea Agents are not included in your plan. Contact Ellines to upgrade your package.',
+        },
+        422,
+      );
+    }
   }
 
   let body: {

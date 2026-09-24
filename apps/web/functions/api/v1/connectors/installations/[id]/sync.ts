@@ -6,10 +6,12 @@ import {
   requirePermissionAsync,
   type Env,
 } from '../../../../../shared/auth';
+import { isSafeEgressTarget, safeFetch, SsrfError, isSafeTcpHost, isSafeTcpPort } from '../../../../../shared/egress';
 import demoSeed from '../../../../../shared/demo-enterprise.json';
 import restSample from '../../../../../shared/rest-enterprise-sample.json';
 import {
   buildAuthHeaders,
+  decryptConnectorConfig,
   normalizeEnterprisePayload,
   parseCsvToEnterprisePayload,
   parseOpenApiDocument,
@@ -60,6 +62,16 @@ async function fetchImapMessages(config: InstallConfig, limit = 30): Promise<{
   const secure = config.imapSecure !== false; // default TLS
 
   if (!host || !user || !pass) throw new Error('IMAP host, user, and password are required for sync');
+
+  // Egress policy for TCP hosts (same private-range rules, no URL parsing needed)
+  const hostCheck = isSafeTcpHost(host);
+  if (!hostCheck.safe) {
+    throw new SsrfError(hostCheck.reason ?? 'IMAP host blocked by egress policy', host);
+  }
+  const portCheck = isSafeTcpPort(port);
+  if (!portCheck.safe) {
+    throw new SsrfError(portCheck.reason ?? 'IMAP port blocked by egress policy', `${host}:${port}`);
+  }
 
   // Check if cloudflare:sockets is available
   let mod: { connect: (opts: any) => SocketLike } | null = null;
@@ -485,7 +497,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .maybeSingle();
   if (!existing) return json({ statusCode: 404, message: 'Installation not found' }, 404);
 
-  const config = (existing.config || {}) as InstallConfig;
+  const config = await decryptConnectorConfig(
+    (existing.config || {}) as InstallConfig,
+    existing.organization_id as string,
+    context.env,
+  );
   const catalogId = existing.catalog_id as string;
   const displayName = existing.display_name as string;
 
@@ -508,7 +524,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         endpoint.endsWith('/connectors/rest-sample');
       let raw: unknown = restSample;
       if (!isSample) {
-        const res = await fetch(endpoint, {
+        // Egress policy check before fetch
+        const egressCheck = isSafeEgressTarget(endpoint);
+        if (!egressCheck.safe) {
+          return json(
+            { statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' },
+            400,
+          );
+        }
+        const res = await safeFetch(endpoint, {
           method: 'GET',
           headers: { Accept: 'application/json', ...buildAuthHeaders(config) },
         });
@@ -676,7 +700,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     const msg = err instanceof Error ? err.message : 'Sync failed';
     const stack = err instanceof Error ? err.stack : '';
     console.error(`[sync] Error syncing ${catalogId} connector ${id}:`, msg, stack?.slice(0, 200));
-    
+
+    // SSRF policy violations are a 400, not a 500
+    const statusCode = err instanceof SsrfError ? 400 : 500;
+
     // Mark installation as error so the UI shows a clear status
     try {
       await supabase
@@ -691,15 +718,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     } catch (updateErr) {
       console.error('[sync] Failed to mark connector as error:', updateErr);
     }
-    
+
     return json(
-      { 
-        statusCode: 500, 
+      {
+        statusCode,
         message: msg,
         catalogId,
         installationId: id
       },
-      500,
+      statusCode,
     );
   }
 };

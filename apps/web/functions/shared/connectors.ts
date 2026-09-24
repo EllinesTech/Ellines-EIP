@@ -4,6 +4,8 @@ import {
   packTimelineStorage,
   type UemModel,
 } from './uem';
+import { isSafeEgressTarget, safeFetch, SsrfError } from './egress';
+import { encrypt, decrypt, isEncrypted } from './encryption';
 
 /** Connector helpers for Cloudflare Pages Functions (mirrors connectors-sdk). */
 
@@ -52,6 +54,8 @@ const SECRET_KEYS = [
   'sftpPrivateKey',
 ] as const;
 
+type SecretKey = typeof SECRET_KEYS[number];
+
 export function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...config };
   for (const key of SECRET_KEYS) {
@@ -61,6 +65,54 @@ export function redactConfig(config: Record<string, unknown>): Record<string, un
   }
   if (out.openApiDocument !== undefined) {
     out.openApiDocument = { _present: true };
+  }
+  return out;
+}
+
+/**
+ * Encrypt all credential fields in a connector config before writing to the database.
+ * Already-encrypted values (valid EIP envelopes) are left untouched.
+ * Empty or undefined values are left as-is.
+ *
+ * @param config         The InstallConfig to encrypt credentials within.
+ * @param organizationId The owning org — used as HKDF context for key derivation.
+ * @param env            Cloudflare env (requires EIP_ENCRYPTION_MASTER_KEY).
+ */
+export async function encryptConnectorConfig(
+  config: InstallConfig,
+  organizationId: string,
+  env: { EIP_ENCRYPTION_MASTER_KEY?: string },
+): Promise<InstallConfig> {
+  const out: InstallConfig = { ...config };
+  for (const key of SECRET_KEYS) {
+    const val = out[key];
+    if (typeof val === 'string' && val.length > 0 && !isEncrypted(val)) {
+      (out as Record<string, unknown>)[key] = await encrypt(val, organizationId, env);
+    }
+  }
+  return out;
+}
+
+/**
+ * Decrypt all encrypted credential fields in a connector config for internal use only.
+ * Used immediately before making an outbound connection — decrypted values must
+ * NEVER be returned in an API response (use redactConfig for responses).
+ *
+ * @param config         The InstallConfig with potentially encrypted credential fields.
+ * @param organizationId The owning org — must match the org used during encryption.
+ * @param env            Cloudflare env (requires EIP_ENCRYPTION_MASTER_KEY).
+ */
+export async function decryptConnectorConfig(
+  config: InstallConfig,
+  organizationId: string,
+  env: { EIP_ENCRYPTION_MASTER_KEY?: string },
+): Promise<InstallConfig> {
+  const out: InstallConfig = { ...config };
+  for (const key of SECRET_KEYS) {
+    const val = out[key];
+    if (typeof val === 'string' && isEncrypted(val)) {
+      (out as Record<string, unknown>)[key] = await decrypt(val, organizationId, env);
+    }
   }
   return out;
 }
@@ -322,6 +374,12 @@ export async function syncOpenApiRoutes(options: {
   const gets = options.routes.filter((r) => r.method.toUpperCase() === 'GET');
   if (!gets.length) throw new Error('Select at least one GET endpoint');
 
+  // Validate the base URL against the shared SSRF policy before iterating routes
+  const schemeCheck = isSafeEgressTarget(base);
+  if (!schemeCheck.safe) {
+    throw new SsrfError(schemeCheck.reason ?? 'Base URL blocked by egress policy', base);
+  }
+
   const timeline: { title: string; detail: string }[] = [];
   let best = normalizeEnterprisePayload({});
   let okCount = 0;
@@ -335,7 +393,8 @@ export async function syncOpenApiRoutes(options: {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), ROUTE_TIMEOUT_MS);
 
-      const res = await fetch(url, {
+      // safeFetch validates every redirect hop
+      const res = await safeFetch(url, {
         method: 'GET',
         headers: { Accept: 'application/json', ...(options.headers || {}) },
         signal: controller.signal,
@@ -356,7 +415,9 @@ export async function syncOpenApiRoutes(options: {
       });
     } catch (err) {
       const errMsg =
-        err instanceof Error
+        err instanceof SsrfError
+          ? `SSRF policy blocked: ${err.blockedUrl}`
+          : err instanceof Error
           ? err.name === 'AbortError'
             ? 'Request timeout'
             : err.message

@@ -17,6 +17,7 @@ import {
   type InstallConfig,
 } from '../../../../shared/connectors';
 import { sendOutboundEmail } from '../../../../shared/mail';
+import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../shared/egress';
 
 const CSV_SAMPLE = `metric,value
 healthScore,81
@@ -132,16 +133,21 @@ async function upsertSnapshot(
 }
 
 /**
- * Fetch any HTTP/HTTPS endpoint from the Cloudflare edge.
- * This bypasses browser Mixed Content restrictions and can reach private IPs
- * when the Cloudflare network has a pathway (site-to-site VPN / DMZ exposure).
+ * Fetch any HTTPS endpoint from the Cloudflare edge through the shared SSRF-safe
+ * egress policy. Private / localhost / cloud-metadata targets are blocked.
+ * Redirects are validated hop-by-hop.
  */
 async function proxyFetch(
   url: string,
   config: InstallConfig,
 ): Promise<unknown> {
+  // Validate before fetching — shared policy covers IPv4, IPv6, metadata, .local, protocol
+  const check = isSafeEgressTarget(url);
+  if (!check.safe) {
+    throw new SsrfError(check.reason ?? 'Egress policy blocked URL', url);
+  }
   const headers = buildAuthHeaders(config);
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json, text/plain, */*',
@@ -409,8 +415,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         .eq('organization_id', auth.organizationId);
     }
     return json(
-      { statusCode: 500, message: err instanceof Error ? err.message : 'Sync failed' },
-      500,
+      {
+        statusCode: err instanceof SsrfError ? 400 : 500,
+        message: err instanceof Error ? err.message : 'Sync failed',
+      },
+      err instanceof SsrfError ? 400 : 500,
     );
   }
 };

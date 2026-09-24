@@ -1,0 +1,40 @@
+import {
+  getAdminClient,
+  json,
+  options,
+  platformAdminFromEnv,
+  requireAuth,
+  type Env,
+} from '../../../../../shared/auth';
+
+export const onRequest: PagesFunction<Env> = async (context) => {
+  if (context.request.method === 'OPTIONS') return options();
+  if (context.request.method !== 'GET') {
+    return json({ message: 'Method not allowed' }, 405);
+  }
+
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
+
+  if (!platformAdminFromEnv(context.env, auth.email)) {
+    return json({ statusCode: 403, message: 'Platform admin only' }, 403);
+  }
+
+  const orgId = context.params.id as string;
+  const supabase = getAdminClient(context.env);
+
+  const { data, error } = await supabase
+    .from('agents')
+    .select('id, name, description, type, status, created_at')
+    .eq('organization_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    // If table doesn't exist yet, return empty rather than 500
+    if (error.code === '42P01') return json([]);
+    return json({ statusCode: 500, message: error.message }, 500);
+  }
+
+  return json(data || []);
+};

@@ -8,11 +8,13 @@ import {
 } from '../../../../../shared/auth';
 import {
   buildAuthHeaders,
+  decryptConnectorConfig,
   parseOpenApiDocument,
   toInstallationDto,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 import { sendOutboundEmail } from '../../../../../shared/mail';
+import { isSafeEgressTarget, safeFetch, isSafeTcpHost, isSafeTcpPort, SsrfError } from '../../../../../shared/egress';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -43,7 +45,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .maybeSingle();
   if (!existing) return json({ statusCode: 404, message: 'Installation not found' }, 404);
 
-  const config = (existing.config || {}) as InstallConfig;
+  const config = await decryptConnectorConfig(
+    (existing.config || {}) as InstallConfig,
+    existing.organization_id as string,
+    context.env,
+  );
   const catalogId = existing.catalog_id as string;
   let ok = false;
   let message = 'Connection test OK';
@@ -55,7 +61,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const endpoint = (config.endpoint || '').trim();
       if (!endpoint || endpoint.includes('rest-sample')) ok = true;
       else {
-        const res = await fetch(endpoint, {
+        const egressCheck = isSafeEgressTarget(endpoint);
+        if (!egressCheck.safe) {
+          throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
+        }
+        const res = await safeFetch(endpoint, {
           method: 'GET',
           headers: buildAuthHeaders(config),
         });
@@ -68,7 +78,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const base = (config.openApiBaseUrl || '').trim();
       if (!base) ok = true;
       else {
-        const res = await fetch(base, { method: 'GET', headers: buildAuthHeaders(config) });
+        const egressCheck = isSafeEgressTarget(base);
+        if (!egressCheck.safe) {
+          throw new Error(egressCheck.reason ?? 'OpenAPI base URL blocked by egress policy');
+        }
+        const res = await safeFetch(base, { method: 'GET', headers: buildAuthHeaders(config) });
         ok = res.ok || [401, 403, 404].includes(res.status);
       }
     } else if (catalogId === 'postgres' || catalogId === 'sqlserver' || catalogId === 'mysql') {
@@ -98,6 +112,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           const user = config.imapUser.trim();
           const pass = config.imapPassword.trim();
           const secure = config.imapSecure !== false;
+
+          // Egress policy for TCP (same private-range rules as HTTP paths)
+          const hostCheck = isSafeTcpHost(host);
+          if (!hostCheck.safe) {
+            throw new SsrfError(hostCheck.reason ?? 'IMAP host blocked by egress policy', host);
+          }
+          const portCheck = isSafeTcpPort(port);
+          if (!portCheck.safe) {
+            throw new SsrfError(portCheck.reason ?? 'IMAP port blocked by egress policy', `${host}:${port}`);
+          }
 
           const mod = (await import('cloudflare:sockets')) as {
             connect: (opts: { hostname: string; port: number; secureTransport?: 'on' | 'starttls' | 'off' }) => {
@@ -165,6 +189,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     } else if (catalogId === 'sftp') {
       if (!config.sftpHost?.trim() || !config.sftpUsername?.trim() || !config.sftpRemotePath?.trim()) {
         throw new Error('SFTP host, username, and remotePath are required');
+      }
+      // Egress policy — block private/metadata hosts before any TCP attempt
+      const hostCheck = isSafeTcpHost(config.sftpHost.trim());
+      if (!hostCheck.safe) {
+        throw new SsrfError(hostCheck.reason ?? 'SFTP host blocked by egress policy', config.sftpHost.trim());
+      }
+      const sftpPort = Number(config.sftpPort) || 22;
+      const portCheck = isSafeTcpPort(sftpPort);
+      if (!portCheck.safe) {
+        throw new SsrfError(portCheck.reason ?? 'SFTP port blocked by egress policy', `${config.sftpHost}:${sftpPort}`);
       }
       message =
         'Config saved. SFTP TCP test/sync requires the Identity API (Nest). Format looks ready.';

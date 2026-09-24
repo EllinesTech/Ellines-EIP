@@ -70,6 +70,8 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
       auth.organizationId,
       auth.role,
       'approval:view',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
     const { data, error } = await supabase
@@ -94,6 +96,8 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
     auth.organizationId,
     auth.role,
     'approval:request',
+    undefined,
+    auth.email,
   );
   if (permErr) return permErr;
 

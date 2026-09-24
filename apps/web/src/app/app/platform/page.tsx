@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  askEllineaApi, assignPlatformOrgPackage, createPlatformOrg, createPlatformOrgUser,
+  askEllineaApi, assignPlatformOrgPackage, clearSession, createPlatformOrg, createPlatformOrgUser,
   createPlatformPackage, deletePlatformPackage, fetchHealth, fetchPlatformOrgDateTimeSettings, updatePlatformPackage,
   fetchPlatformMetrics, fetchPlatformHealthSummary, fetchPlatformOrgPackage, fetchPlatformOrgStats, getSession, listPlatformAuditLogs, exportPlatformAuditLogs,
   listPlatformConnectorPacks, listPlatformFlags, listPlatformOrgUsers,
@@ -114,12 +114,60 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     await load();
   }catch(e){setError(e instanceof Error?e.message:'Operation failed')}finally{setSafeguardOp(null);setBusy(false)}}
 
- const load=useCallback(async()=>{try{const[o,p,f,h,cp,m,hs]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics(),fetchPlatformHealthSummary()]);
+ const load=useCallback(async()=>{try{
+    // Verify session token exists before making API calls
+    const session = getSession();
+    if (!session?.accessToken) {
+      setError('Session expired. Please log in again.');
+      setAllowed(false);
+      router.push('/login');
+      return;
+    }
+    
+    const[o,p,f,h,cp,m,hs]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics(),fetchPlatformHealthSummary()]);
     // Filter out the platform operator's own org — it is Ellines itself, not a client.
     const ownOrgId = getSession()?.user?.organizationId;
     setOrgs(ownOrgId ? o.filter(x => x.id !== ownOrgId) : o);
-    setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m);setHealthSummary(hs)}catch(e){setError(e instanceof Error?e.message:'Failed to load platform data')}},[]);
-  useEffect(()=>{let live=true;const decide=(s:ReturnType<typeof getSession>)=>{if(!live)return;setAllowed(Boolean(s?.isPlatformAdmin));if(s?.isPlatformAdmin)void load()};const cached=getSession();if(cached?.isPlatformAdmin){decide(cached);return()=>{live=false}}void refreshSessionFlags().then(decide).catch(()=>decide(getSession()));return()=>{live=false}},[load]);
+    setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m);setHealthSummary(hs)}catch(e){
+      const errMsg = e instanceof Error ? e.message : 'Failed to load platform data';
+      setError(errMsg);
+      // If unauthorized, redirect to login
+      if (errMsg.includes('Unauthorized') || errMsg.includes('401')) {
+        clearSession();
+        setAllowed(false);
+        router.push('/login?redirect=/app/platform');
+      }
+    }},[router]);
+  useEffect(()=>{
+    let live=true;
+    const decide=(s:ReturnType<typeof getSession>)=>{
+      if(!live)return;
+      if (!s) {
+        setAllowed(false);
+        setError('No active session. Please log in.');
+        router.push('/login?redirect=/app/platform');
+        return;
+      }
+      setAllowed(Boolean(s?.isPlatformAdmin));
+      if(s?.isPlatformAdmin)void load()
+    };
+    const cached=getSession();
+    if(cached?.isPlatformAdmin){
+      decide(cached);
+      return()=>{live=false}
+    }
+    void refreshSessionFlags().then(decide).catch(()=>{
+      const fallback = getSession();
+      if (!fallback) {
+        setAllowed(false);
+        setError('Session refresh failed. Please log in again.');
+        router.push('/login?redirect=/app/platform');
+      } else {
+        decide(fallback);
+      }
+    });
+    return()=>{live=false}
+  },[load, router]);
 
   // Load client workspace data when navigating to ?section=client&id=ORG_ID
   useEffect(() => {
@@ -147,10 +195,17 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       setWsConnectors(conn);setWsApprovals(appr);setWsRules(rules);
       setWsReports(reports);setWsAgents(agents);setWsSnapshot(snap);
       setWsInstallations(inst);setWsDocuments(docs);setWsOrgProfile(profile);
-    }).catch(e=>setError(e instanceof Error?e.message:'Failed to load client workspace'))
-      .finally(()=>setWsLoading(false));
+    }).catch(e=>{
+      const errMsg = e instanceof Error ? e.message : 'Failed to load client workspace';
+      setError(errMsg);
+      if (errMsg.includes('Unauthorized') || errMsg.includes('401')) {
+        clearSession();
+        setAllowed(false);
+        router.push('/login?redirect=/app/platform');
+      }
+    }).finally(()=>setWsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientOrgId, activeSection]);
+  }, [clientOrgId, activeSection, router]);
  useEffect(()=>{if(!allowed)return;const t=setInterval(()=>{void fetchHealth().then(setHealth);void fetchPlatformMetrics().then(setMetrics);void fetchPlatformHealthSummary().then(setHealthSummary)},30000);return()=>clearInterval(t)},[allowed]);
 
  async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
@@ -166,7 +221,10 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
  const shown=useMemo(()=>{const q=query.toLowerCase().trim();return q?orgs.filter(o=>[o.name,o.slug,o.status].some(v=>v.toLowerCase().includes(q))):orgs},[orgs,query]);
  const active=orgs.filter(o=>o.status==='active').length,suspended=orgs.length-active,totalUsers=orgs.reduce((n,o)=>n+o.userCount,0);
  if(allowed===null)return <main className={styles.main}>Checking platform access…</main>;
- if(!allowed)return <main className={styles.main}><div className={styles.card}><h2>Platform access denied</h2><p className={styles.cardHint}>Ellines platform operator access is required.</p></div></main>;
+ if(!allowed){
+   const session = getSession();
+   return <main className={styles.main}><div className={styles.card}><h2>Platform access denied</h2><p className={styles.cardHint}>Ellines platform operator access is required.</p>{session && <div style={{marginTop:16,padding:12,background:'#f5f5f5',borderRadius:4,fontSize:11,fontFamily:'monospace'}}><strong>Current session:</strong><br/>Email: {session.user?.email || 'N/A'}<br/>Role: {session.user?.role || 'N/A'}<br/>Org: {session.organization?.name || 'N/A'}<br/>Platform Admin: {session.isPlatformAdmin ? 'Yes' : 'No'}<br/><br/><em>Only email "{process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS || 'ellines.tech@gmail.com'}" can access this control plane.</em></div>}{!session && <p style={{marginTop:16,color:'#666'}}>No active session found. <a href="/login?redirect=/app/platform" style={{color:'#2563EB'}}>Log in</a></p>}</div></main>;
+ }
 
  const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button+' '+styles.primary} onClick={()=>navigate('client',o.id)}>Open workspace</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No client organizations found.</td></tr>}</tbody></table></div>;
 

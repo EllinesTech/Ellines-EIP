@@ -24,6 +24,7 @@ import {
   type UserRole,
 } from '../../../../shared/auth';
 import { resolveMailConfig, sendOutboundEmail } from '../../../../shared/mail';
+import { getOrgEntitlement } from '../../../../shared/entitlements';
 
 const INVITE_TTL_MS = 72 * 60 * 60 * 1000; // 72 h
 
@@ -132,6 +133,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (!EIP_ROLES.includes(role)) return json({ statusCode: 400, message: 'Invalid role' }, 400);
   const assignErr = assertCanAssignRole(auth.role, role);
   if (assignErr) return json({ statusCode: 403, message: assignErr }, 403);
+
+  // Entitlement check: max_users enforced before creating a new member
+  {
+    const entitlement = await getOrgEntitlement(supabase, auth.organizationId);
+    if (entitlement.maxUsers !== null) {
+      const { count, error: countErr } = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', auth.organizationId)
+        .eq('is_active', true);
+      if (countErr) return json({ statusCode: 500, message: countErr.message }, 500);
+      const current = count ?? 0;
+      if (current >= entitlement.maxUsers) {
+        return json(
+          {
+            statusCode: 422,
+            message: `User limit reached. Your plan allows ${entitlement.maxUsers} active member(s) and you currently have ${current}. Contact Ellines to upgrade.`,
+            limit: entitlement.maxUsers,
+            current,
+          },
+          422,
+        );
+      }
+    }
+  }
 
   // Check if already a real active member
   const { data: existing } = await supabase

@@ -25,6 +25,7 @@ import {
 } from '../../../shared/auth';
 import { buildAuthHeaders, normalizeEnterprisePayload, toTimelineStorage } from '../../../shared/connectors';
 import type { InstallConfig } from '../../../shared/connectors';
+import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../shared/egress';
 
 type ProxyBody = {
   /** Resolve config from a saved installation instead of sending credentials inline. */
@@ -45,18 +46,6 @@ type ProxyBody = {
   /** When true: skip UEM normalisation, return raw response (for test-connection). */
   raw?: boolean;
 };
-
-const PRIVATE_IP_RE =
-  /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|localhost|::1|0\.0\.0\.0)/i;
-
-function isPrivateTarget(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    return PRIVATE_IP_RE.test(hostname);
-  } catch {
-    return false;
-  }
-}
 
 /** Hard limit: 512 KB response body to prevent edge memory abuse. */
 const MAX_RESPONSE_BYTES = 512 * 1024;
@@ -122,7 +111,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     };
   }
 
-  // ── Validate URL ────────────────────────────────────────────────────────────
+  // ── Validate URL — shared SSRF policy ────────────────────────────────────
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(targetUrl);
@@ -130,15 +119,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 400, message: `Invalid target URL: ${targetUrl}` }, 400);
   }
 
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+  const egressCheck = isSafeEgressTarget(targetUrl);
+  if (!egressCheck.safe) {
     return json(
-      { statusCode: 400, message: 'Only http:// and https:// targets are supported' },
+      {
+        statusCode: 400,
+        message: egressCheck.reason ?? 'Target URL is not allowed by egress policy',
+        target: parsedUrl.hostname,
+      },
       400,
     );
   }
 
-  // Log a note when proxying private IPs (common for on-prem systems on client VPN).
-  const isPrivate = isPrivateTarget(targetUrl);
+  // isPrivate is no longer meaningful after the policy check (private IPs are blocked),
+  // but we keep the field in responses as false for API backward compatibility.
+  const isPrivate = false;
 
   // ── Build request ────────────────────────────────────────────────────────────
   const authHeaders = buildAuthHeaders(config);
@@ -163,19 +158,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // ── Proxy ────────────────────────────────────────────────────────────────────
+  // ── Proxy — redirect-safe fetch ──────────────────────────────────────────
   let upstream: Response;
   try {
-    upstream = await fetch(targetUrl, fetchInit);
+    upstream = await safeFetch(targetUrl, fetchInit);
   } catch (err) {
+    if (err instanceof SsrfError) {
+      return json(
+        {
+          statusCode: 400,
+          message: `SSRF policy blocked redirect to: ${err.blockedUrl}`,
+          target: parsedUrl.hostname,
+        },
+        400,
+      );
+    }
     const msg = err instanceof Error ? err.message : 'Network error';
-    const hint = isPrivate
-      ? ' This is a private IP — ensure the Cloudflare network can reach it (VPN / site-to-site tunnel or expose via a DMZ).'
-      : '';
     return json(
       {
         statusCode: 502,
-        message: `Proxy could not reach ${parsedUrl.hostname}: ${msg}${hint}`,
+        message: `Proxy could not reach ${parsedUrl.hostname}: ${msg}`,
         isPrivateTarget: isPrivate,
         target: parsedUrl.hostname,
       },

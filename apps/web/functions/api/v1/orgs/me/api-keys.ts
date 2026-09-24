@@ -72,7 +72,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // ── GET: list keys ────────────────────────────────────────────────────────
   if (context.request.method === 'GET') {
     const permErr = await requirePermissionAsync(
-      context.env, auth.sub, auth.organizationId, auth.role, 'org:*',
+      context.env, auth.sub, auth.organizationId, auth.role, 'org:*', undefined, auth.email,
     );
     if (permErr) return permErr;
     const keys = await readKeys(supabase, auth.organizationId);
