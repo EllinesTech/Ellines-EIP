@@ -23,7 +23,7 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../shared/auth';
-import { buildAuthHeaders, normalizeEnterprisePayload, toTimelineStorage } from '../../../shared/connectors';
+import { buildAuthHeaders, normalizeEnterprisePayload, toTimelineStorage, decryptConnectorConfig } from '../../../shared/connectors';
 import type { InstallConfig } from '../../../shared/connectors';
 import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../shared/egress';
 
@@ -87,7 +87,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 404, message: 'Connector installation not found' }, 404);
     }
 
-    config = (install.config || {}) as InstallConfig;
+    // Decrypt credentials before use — never pass encrypted envelopes to buildAuthHeaders
+    config = await decryptConnectorConfig(
+      (install.config || {}) as InstallConfig,
+      install.organization_id as string,
+      context.env,
+    );
     targetUrl = (config.endpoint || '').trim();
     if (!targetUrl) {
       return json(
