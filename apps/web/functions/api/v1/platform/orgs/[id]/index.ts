@@ -9,7 +9,7 @@ import {
   platformAdminFromEnv,
   requireAuth,
   type Env,
-} from '../../../../shared/auth';
+} from '../../../../../shared/auth';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();

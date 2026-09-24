@@ -70,6 +70,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.organizationId,
       auth.role,
       'document:view',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
   } else if (context.request.method === 'POST') {
@@ -79,6 +81,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.organizationId,
       auth.role,
       'document:upload',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
   } else if (context.request.method === 'DELETE') {
@@ -89,6 +93,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.organizationId,
       auth.role,
       'document:delete',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
   }

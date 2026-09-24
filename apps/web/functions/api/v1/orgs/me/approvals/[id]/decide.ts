@@ -66,6 +66,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     auth.organizationId,
     auth.role,
     'approval:decide',
+    undefined,
+    auth.email,
   );
   if (permErr) return permErr;
 

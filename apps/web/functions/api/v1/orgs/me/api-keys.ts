@@ -83,7 +83,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // ── POST: create key ──────────────────────────────────────────────────────
   if (context.request.method === 'POST') {
     const permErr = await requirePermissionAsync(
-      context.env, auth.sub, auth.organizationId, auth.role, 'org:*',
+      context.env, auth.sub, auth.organizationId, auth.role, 'org:*', undefined, auth.email,
     );
     if (permErr) return permErr;
 
@@ -134,7 +134,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // ── DELETE: revoke key ────────────────────────────────────────────────────
   if (context.request.method === 'DELETE') {
     const permErr = await requirePermissionAsync(
-      context.env, auth.sub, auth.organizationId, auth.role, 'org:*',
+      context.env, auth.sub, auth.organizationId, auth.role, 'org:*', undefined, auth.email,
     );
     if (permErr) return permErr;
 

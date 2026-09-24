@@ -86,7 +86,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // ── GET: list pending invites ────────────────────────────────────────────
   if (context.request.method === 'GET') {
-    const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members');
+    const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members', undefined, auth.email);
     if (permErr) return permErr;
     const invites = await readInvites(supabase, auth.organizationId);
     // Redact token hashes from output
@@ -99,7 +99,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // ── DELETE: revoke invite ─────────────────────────────────────────────────
   if (isRevoke) {
-    const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members');
+    const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members', undefined, auth.email);
     if (permErr) return permErr;
     let body: { email?: string } = {};
     try { body = await context.request.json() as { email?: string }; } catch { /* ignore */ }
@@ -117,7 +117,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   }
 
-  const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members');
+  const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members', undefined, auth.email);
   if (permErr) return permErr;
 
   let body: { email?: string; fullName?: string; role?: string } = {};
