@@ -72,6 +72,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.organizationId,
       auth.role,
       'report:view',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
   } else if (context.request.method === 'POST') {
@@ -81,6 +83,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.organizationId,
       auth.role,
       'report:create',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
   } else {

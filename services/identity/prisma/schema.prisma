@@ -68,6 +68,7 @@ model Organization {
   approvalWorkflows      ApprovalWorkflowRequest[] // v2.0: Generated connector approvals
   sessions               Session[]           // Phase 2: session registry (spec 24.2.3)
   integrationRequests    IntegrationRequest[]     // TASK-09: integration request workflow
+  documents              Document[]               // Org-scoped document library
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -2239,4 +2240,27 @@ model IntegrationRequest {
   @@index([organizationId])
   @@index([status])
   @@map("integration_requests")
+}
+
+/** Org-scoped document library — uploaded files and text attachments. */
+model Document {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  mimeType       String   @default("text/plain") @map("mime_type")
+  sizeBytes      Int      @default(0) @map("size_bytes")
+  content        String?  @default("")
+  tags           String[] @default([])
+  branch         String?
+  department     String?
+  summary        String?
+  uploadedBy     String   @map("uploaded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("documents")
 }

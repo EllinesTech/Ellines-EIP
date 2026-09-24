@@ -57,7 +57,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members');
+  const permErr = await requirePermissionAsync(context.env, auth.sub, auth.organizationId, auth.role, 'org:manage_members', undefined, auth.email);
   if (permErr) return permErr;
 
   let body: { email?: string; fullName?: string; role?: string } = {};

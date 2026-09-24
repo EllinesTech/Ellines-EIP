@@ -32,6 +32,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .order('created_at', { ascending: false });
 
   if (error) {
+    if (error.code === '42P01' || error.message?.includes('schema cache')) return json([]);
     return json({ statusCode: 500, message: error.message }, 500);
   }
 

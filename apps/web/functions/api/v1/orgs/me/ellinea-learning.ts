@@ -82,6 +82,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       orgId,
       auth.role,
       'ellinea:manage',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
 
@@ -106,6 +108,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       orgId,
       auth.role,
       'ellinea:manage',
+      undefined,
+      auth.email,
     );
     if (permErr) return permErr;
     let body: unknown;

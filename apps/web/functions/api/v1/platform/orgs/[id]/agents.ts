@@ -24,7 +24,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   const { data, error } = await supabase
-    .from('agents')
+    .from('ellinea_agents')
     .select(
       'id, name, description, type, status, trigger_type, is_active, is_paused, execution_count, success_count, last_executed_at, created_at',
     )
