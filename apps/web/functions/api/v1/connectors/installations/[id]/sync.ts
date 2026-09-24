@@ -18,6 +18,8 @@ import {
   syncOpenApiRoutes,
   toTimelineStorage,
   withScheduleAfterSync,
+  appendDateWindowToUrl,
+  applyFieldMap,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
@@ -522,10 +524,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         normalizeEnterprisePayload(demoSeed),
       );
     } else if (catalogId === 'rest-api') {
-      const endpoint = resolveEndpoint(context.request.url, config.endpoint);
+      const rawEndpoint = resolveEndpoint(context.request.url, config.endpoint);
       const isSample =
-        endpoint.includes('/api/v1/connectors/rest-sample') ||
-        endpoint.endsWith('/connectors/rest-sample');
+        rawEndpoint.includes('/api/v1/connectors/rest-sample') ||
+        rawEndpoint.endsWith('/connectors/rest-sample');
+      // Append date-window query params when configured (?window=today|week|month&from=...&to=...)
+      const endpoint = isSample ? rawEndpoint : appendDateWindowToUrl(rawEndpoint, config);
       let raw: unknown = restSample;
       if (!isSample) {
         // Egress policy check before fetch
@@ -560,6 +564,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (isFirestoreResponse(raw)) {
           raw = normalizeFirestoreResponse(raw);
         }
+        // Apply field-name remapping (config.fieldMap) before normalization.
+        // Lets operators map upstream-specific field names to EIP field names
+        // without touching EIP code.
+        if (config.fieldMap && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+          raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
+        }
       }
       summary = await upsertSnapshot(
         context.env,
@@ -570,6 +580,92 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         displayName || 'REST API Systems',
         normalizeEnterprisePayload(raw),
       );
+    } else if (catalogId === 'graphql') {
+      // ── GraphQL connector ─────────────────────────────────────────────────
+      // Uses the query stored in config.graphqlQuery + the endpoint in config.endpoint.
+      // Auth headers are applied the same way as REST (apiKey, bearer, basic).
+      // The response is normalized generically — operators can use fieldMap to
+      // remap GraphQL-specific response fields to EIP names.
+      const gqlEndpoint = (config.endpoint || '').trim();
+      if (!gqlEndpoint) {
+        return json({ statusCode: 400, message: 'GraphQL endpoint is required' }, 400);
+      }
+      const gqlQuery = (config.graphqlQuery || '').trim();
+      if (!gqlQuery) {
+        return json({ statusCode: 400, message: 'GraphQL query is required' }, 400);
+      }
+      const egressCheck = isSafeEgressTarget(gqlEndpoint);
+      if (!egressCheck.safe) {
+        return json({ statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' }, 400);
+      }
+      const gqlRes = await safeFetch(gqlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...buildAuthHeaders(config),
+        },
+        body: JSON.stringify({ query: gqlQuery }),
+      });
+      if (!gqlRes.ok) {
+        return json({ statusCode: 502, message: `GraphQL endpoint returned ${gqlRes.status}` }, 502);
+      }
+      let gqlRaw: unknown;
+      try {
+        gqlRaw = await gqlRes.json();
+      } catch {
+        return json({ statusCode: 502, message: 'GraphQL endpoint returned non-JSON' }, 502);
+      }
+      // GraphQL responses are { data: {...}, errors: [...] }
+      // Extract data node before normalization
+      const gqlRoot = gqlRaw && typeof gqlRaw === 'object' ? gqlRaw as Record<string, unknown> : {};
+      let gqlData: unknown = gqlRoot.data ?? gqlRoot;
+      if (config.fieldMap && typeof gqlData === 'object' && gqlData !== null && !Array.isArray(gqlData)) {
+        gqlData = applyFieldMap(gqlData as Record<string, unknown>, config.fieldMap);
+      }
+      summary = await upsertSnapshot(
+        context.env,
+        auth.organizationId,
+        auth.sub,
+        id,
+        'graphql',
+        displayName || 'GraphQL API',
+        normalizeEnterprisePayload(gqlData),
+      );
+    } else if (catalogId === 'webhook-inbound') {
+      // ── Webhook inbound connector ─────────────────────────────────────────
+      // Push-based: the external system posts data to /api/v1/webhooks/enterprise.
+      // This sync call returns the current snapshot for the org — there is nothing
+      // to fetch because the data arrives when Haven/the external system fires.
+      const { data: snap } = await supabase
+        .from('enterprise_snapshots')
+        .select('*')
+        .eq('organization_id', auth.organizationId)
+        .maybeSingle();
+      if (!snap) {
+        return json({
+          statusCode: 200,
+          connectorId: 'webhook-inbound',
+          connectorName: displayName || 'Webhook Receiver',
+          healthScore: 0, connectedSystems: 0, openAlerts: 0, openDecisions: 0,
+          briefHighlight: 'Webhook receiver ready — no data pushed yet. Configure the external system to POST to /api/v1/webhooks/enterprise.',
+          timeline: [], model: null,
+          syncedAt: new Date().toISOString(), status: 'synced',
+        });
+      }
+      return json({
+        connectorId: snap.connector_id,
+        connectorName: displayName || snap.connector_name,
+        healthScore: snap.health_score,
+        connectedSystems: snap.connected_systems,
+        openAlerts: snap.open_alerts,
+        openDecisions: snap.open_decisions,
+        briefHighlight: snap.brief_highlight,
+        timeline: [],
+        model: null,
+        syncedAt: new Date(snap.synced_at as string).toISOString(),
+        status: 'synced',
+      });
     } else if (catalogId === 'openapi') {
       let baseUrl = (config.openApiBaseUrl || '').trim();
       let systemName = displayName || config.systemName || 'OpenAPI System';

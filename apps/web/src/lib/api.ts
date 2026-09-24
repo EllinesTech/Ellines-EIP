@@ -778,6 +778,7 @@ export interface ConnectorInstallConfigDto {
   headers?: Record<string, string>;
   authType?: 'none' | 'apiKey' | 'bearer' | 'basic';
   apiKey?: string;
+  /** Custom header name for API key (default: X-API-Key) */
   apiKeyHeader?: string;
   bearerToken?: string;
   basicUser?: string;
@@ -790,6 +791,10 @@ export interface ConnectorInstallConfigDto {
   sql?: string;
   systemName?: string;
   fieldMap?: Record<string, string>;
+  /** Date/time window appended as query params to REST/GraphQL requests */
+  dateWindow?: 'today' | 'week' | 'month' | 'all';
+  /** GraphQL query string for graphql connector type */
+  graphqlQuery?: string;
   imapHost?: string;
   imapPort?: number;
   imapUser?: string;

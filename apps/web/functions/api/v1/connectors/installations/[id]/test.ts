@@ -72,6 +72,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         ok = res.ok;
         if (!ok) message = `HTTP ${res.status}`;
       }
+    } else if (catalogId === 'graphql') {
+      const endpoint = (config.endpoint || '').trim();
+      if (!endpoint) throw new Error('GraphQL endpoint is required');
+      const egressCheck = isSafeEgressTarget(endpoint);
+      if (!egressCheck.safe) throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
+      const query = config.graphqlQuery?.trim() || '{ __typename }';
+      const res = await safeFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...buildAuthHeaders(config) },
+        body: JSON.stringify({ query }),
+      });
+      // 400 = bad query but server is reachable; 401/403 = auth issue but server is up
+      ok = res.ok || [400, 401, 403].includes(res.status);
+      message = ok ? `GraphQL endpoint reachable (HTTP ${res.status})` : `HTTP ${res.status} — check endpoint`;
+    } else if (catalogId === 'webhook-inbound') {
+      message = 'Webhook receiver ready. Get your webhook URL + HMAC secret from the Webhook section, then configure your external system.';
+      ok = true;
     } else if (catalogId === 'openapi') {
       if (!config.openApiDocument) throw new Error('OpenAPI document required');
       parseOpenApiDocument(config.openApiDocument);

@@ -55,7 +55,19 @@ const TYPES = [
     id: 'rest-api',
     title: 'REST / HTTP API',
     tag: 'When API exists',
-    blurb: 'Point at any JSON HTTPS URL IT can reach.',
+    blurb: 'Point at any JSON HTTPS URL IT can reach. Supports date-range filtering.',
+  },
+  {
+    id: 'graphql',
+    title: 'GraphQL API',
+    tag: 'Modern APIs',
+    blurb: 'Query any GraphQL endpoint with a custom query. Auth headers, fieldMap support.',
+  },
+  {
+    id: 'webhook-inbound',
+    title: 'Webhook Receiver',
+    tag: 'Real-time push',
+    blurb: 'The external system pushes data to EIP — no polling. Secured with HMAC.',
   },
   {
     id: 'postgres',
@@ -142,6 +154,14 @@ export default function ConnectorsPage() {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [syncIntervalMinutes, setSyncIntervalMinutes] = useState(0);
+  /** GraphQL query for graphql connector type */
+  const [graphqlQuery, setGraphqlQuery] = useState('{ __typename }');
+  /** Date/time window for REST and GraphQL connectors */
+  const [dateWindow, setDateWindow] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  /** Custom auth header name for API key (overrides X-API-Key default) */
+  const [apiKeyHeader, setApiKeyHeader] = useState('');
+  /** JSON field map: upstream field → EIP field, e.g. {"total_sales":"connectedSystems"} */
+  const [fieldMapText, setFieldMapText] = useState('');
   const [byoJson, setByoJson] = useState(
     '{\n  "connectorName": "External System B",\n  "healthScore": 78,\n  "connectedSystems": 1,\n  "openAlerts": 2,\n  "openDecisions": 1,\n  "briefHighlight": "Pushed from an external UEM feed.",\n  "timeline": [{ "title": "External ingest", "detail": "BYO snapshot" }]\n}',
   );
@@ -211,6 +231,7 @@ export default function ConnectorsPage() {
     setEndpoint('/api/v1/connectors/rest-sample');
     setAuthType('none');
     setApiKey('');
+    setApiKeyHeader('');
     setBearerToken('');
     setBasicUser('');
     setBasicPass('');
@@ -223,6 +244,9 @@ export default function ConnectorsPage() {
     setSelectedPaths([]);
     setTestOk(null);
     setSyncIntervalMinutes(0);
+    setGraphqlQuery('{ __typename }');
+    setDateWindow('all');
+    setFieldMapText('');
   }
 
   function openWizard() {
@@ -250,6 +274,7 @@ export default function ConnectorsPage() {
       systemName: displayName || undefined,
     };
     if (authType === 'apiKey' && apiKey && apiKey !== '***') config.apiKey = apiKey;
+    if (authType === 'apiKey' && apiKeyHeader.trim()) config.apiKeyHeader = apiKeyHeader.trim();
     if (authType === 'bearer' && bearerToken && bearerToken !== '***') {
       config.bearerToken = bearerToken;
     }
@@ -257,7 +282,24 @@ export default function ConnectorsPage() {
       if (basicUser) config.basicUser = basicUser;
       if (basicPass && basicPass !== '***') config.basicPass = basicPass;
     }
-    if (catalogId === 'rest-api') config.endpoint = endpoint.trim();
+    if (catalogId === 'rest-api') {
+      config.endpoint = endpoint.trim();
+      if (dateWindow !== 'all') config.dateWindow = dateWindow;
+    }
+    if (catalogId === 'graphql') {
+      config.endpoint = endpoint.trim();
+      config.graphqlQuery = graphqlQuery.trim();
+      if (dateWindow !== 'all') config.dateWindow = dateWindow;
+    }
+    // Field map — parse JSON if provided
+    if (fieldMapText.trim()) {
+      try {
+        const fm = JSON.parse(fieldMapText) as Record<string, string>;
+        if (typeof fm === 'object' && !Array.isArray(fm)) config.fieldMap = fm;
+      } catch {
+        // Invalid JSON — ignore; user will see no effect
+      }
+    }
     if (catalogId === 'csv-file') config.csvText = csvText;
     if (catalogId === 'postgres' || catalogId === 'sqlserver' || catalogId === 'mysql') {
       if (connectionString && connectionString !== '***') {
@@ -673,7 +715,7 @@ export default function ConnectorsPage() {
           {step === 2 ? (
             <div>
               <div className={adminStyles.form}>
-                {(catalogId === 'rest-api' || catalogId === 'openapi') && (
+              {(catalogId === 'rest-api' || catalogId === 'openapi' || catalogId === 'graphql') && (
                   <>
                     <label>
                       Auth
@@ -690,14 +732,24 @@ export default function ConnectorsPage() {
                       </select>
                     </label>
                     {authType === 'apiKey' ? (
-                      <label>
-                        API key
-                        <input
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="Paste key"
-                        />
-                      </label>
+                      <>
+                        <label>
+                          API key
+                          <input
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="Paste key"
+                          />
+                        </label>
+                        <label>
+                          Auth header name
+                          <input
+                            value={apiKeyHeader}
+                            onChange={(e) => setApiKeyHeader(e.target.value)}
+                            placeholder="X-API-Key (default)"
+                          />
+                        </label>
+                      </>
                     ) : null}
                     {authType === 'bearer' ? (
                       <label>
@@ -728,14 +780,91 @@ export default function ConnectorsPage() {
                 )}
 
                 {catalogId === 'rest-api' ? (
-                  <label style={{ gridColumn: '1 / -1' }}>
-                    Endpoint URL
-                    <input
-                      value={endpoint}
-                      onChange={(e) => setEndpoint(e.target.value)}
-                      placeholder="https://vendor.example/api/enterprise"
-                    />
-                  </label>
+                  <>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Endpoint URL
+                      <input
+                        value={endpoint}
+                        onChange={(e) => setEndpoint(e.target.value)}
+                        placeholder="https://vendor.example/api/enterprise"
+                      />
+                    </label>
+                    <label>
+                      Date window
+                      <select value={dateWindow} onChange={(e) => setDateWindow(e.target.value as typeof dateWindow)}>
+                        <option value="all">All (no date filter)</option>
+                        <option value="today">Today</option>
+                        <option value="week">Last 7 days</option>
+                        <option value="month">Last 30 days</option>
+                      </select>
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Field map (optional JSON)
+                      <input
+                        value={fieldMapText}
+                        onChange={(e) => setFieldMapText(e.target.value)}
+                        placeholder='{"upstream_field": "eipField"} — e.g. {"total_sales":"connectedSystems"}'
+                      />
+                    </label>
+                  </>
+                ) : null}
+
+                {catalogId === 'graphql' ? (
+                  <>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      GraphQL endpoint URL
+                      <input
+                        value={endpoint}
+                        onChange={(e) => setEndpoint(e.target.value)}
+                        placeholder="https://vendor.example/graphql"
+                      />
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      GraphQL query
+                      <textarea
+                        value={graphqlQuery}
+                        onChange={(e) => setGraphqlQuery(e.target.value)}
+                        rows={6}
+                        placeholder={'query {\n  salesSummary {\n    total\n    currency\n  }\n}'}
+                      />
+                    </label>
+                    <label>
+                      Date window
+                      <select value={dateWindow} onChange={(e) => setDateWindow(e.target.value as typeof dateWindow)}>
+                        <option value="all">All (no date filter)</option>
+                        <option value="today">Today</option>
+                        <option value="week">Last 7 days</option>
+                        <option value="month">Last 30 days</option>
+                      </select>
+                    </label>
+                    <label style={{ gridColumn: '1 / -1' }}>
+                      Field map (optional JSON)
+                      <input
+                        value={fieldMapText}
+                        onChange={(e) => setFieldMapText(e.target.value)}
+                        placeholder='{"salesSummary.total":"connectedSystems"}'
+                      />
+                    </label>
+                  </>
+                ) : null}
+
+                {catalogId === 'webhook-inbound' ? (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <p className={styles.lede}>
+                      <strong>Push-based connector.</strong> No credentials needed here — EIP gives you a
+                      webhook URL. Configure Ellines Haven (or any system) to POST its data to that URL.
+                    </p>
+                    <p className={styles.lede}>
+                      After saving, go to the Webhook section on this page to get your org&apos;s
+                      webhook URL and HMAC secret. Paste both into the external system&apos;s outbound
+                      webhook settings.
+                    </p>
+                    <p className={styles.lede}>
+                      <strong>Haven integration:</strong> In Haven&apos;s admin settings, enable
+                      &quot;Push reports to EIP&quot;, paste the webhook URL, and set the secret.
+                      Haven will then push sales and activity data to EIP automatically.
+                    </p>
+                  </div>
                 ) : null}
 
                 {catalogId === 'openapi' ? (

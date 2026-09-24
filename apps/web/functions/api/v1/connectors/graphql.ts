@@ -20,6 +20,7 @@ import {
   type Env,
 } from '../../../shared/auth';
 import { buildAuthHeaders, normalizeEnterprisePayload } from '../../../shared/connectors';
+import { isSafeEgressTarget, safeFetch } from '../../../shared/egress';
 
 type GraphQLRequest = {
   /** The GraphQL query/mutation/subscription */
@@ -81,7 +82,12 @@ async function executeGraphQLRequest(
   operationName: string | undefined,
   headers: Record<string, string>,
 ): Promise<{ data?: unknown; errors?: unknown[] }> {
-  const res = await fetch(endpoint, {
+  // Enforce SSRF egress policy before any outbound call
+  const egressCheck = isSafeEgressTarget(endpoint);
+  if (!egressCheck.safe) {
+    throw new Error(`SSRF policy blocked: ${egressCheck.reason ?? 'blocked URL'}`);
+  }
+  const res = await safeFetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

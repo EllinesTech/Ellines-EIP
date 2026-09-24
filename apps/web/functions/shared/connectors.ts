@@ -14,6 +14,7 @@ export type InstallConfig = {
   headers?: Record<string, string>;
   authType?: 'none' | 'apiKey' | 'bearer' | 'basic';
   apiKey?: string;
+  /** Custom header name for API key auth (default: X-API-Key). */
   apiKeyHeader?: string;
   bearerToken?: string;
   basicUser?: string;
@@ -24,14 +25,30 @@ export type InstallConfig = {
   selectedRoutes?: { method: string; path: string; capability?: string }[];
   connectionString?: string;
   sql?: string;
+  /**
+   * Optional field-name remapping applied before normalizeEnterprisePayload.
+   * Keys are upstream field names; values are EIP field names.
+   * Example: { "total_sales": "connectedSystems", "status_msg": "briefHighlight" }
+   */
   fieldMap?: Record<string, string>;
   systemName?: string;
+  /**
+   * Date/time window appended to REST/GraphQL requests as query parameters.
+   * When set, the connector appends ?window=<value>&from=<ISO>&to=<ISO> to the
+   * endpoint URL so the upstream system can filter its response by time range.
+   * 'all' = no date params (default behaviour, fetches everything).
+   */
+  dateWindow?: 'today' | 'week' | 'month' | 'all';
+  /** GraphQL query string (for graphql catalog type). */
+  graphqlQuery?: string;
+  /** IMAP */
   imapHost?: string;
   imapPort?: number;
   imapUser?: string;
   imapPassword?: string;
   imapMailbox?: string;
   imapSecure?: boolean;
+  /** SFTP */
   sftpHost?: string;
   sftpPort?: number;
   sftpUsername?: string;
@@ -142,6 +159,78 @@ export function buildAuthHeaders(config: InstallConfig): Record<string, string> 
     headers.Authorization = `Basic ${btoa(`${config.basicUser}:${config.basicPass || ''}`)}`;
   }
   return headers;
+}
+
+/**
+ * Return ISO date boundaries for a named time window, relative to `now`.
+ * Used by REST/GraphQL connectors to append ?window=&from=&to= to their
+ * endpoint URL so the upstream system can filter its response by time range.
+ */
+export function dateWindowBounds(
+  window: InstallConfig['dateWindow'],
+  now = new Date(),
+): { from: string; to: string } | null {
+  if (!window || window === 'all') return null;
+  const to = now.toISOString();
+  const from = new Date(now);
+  if (window === 'today') {
+    from.setHours(0, 0, 0, 0);
+  } else if (window === 'week') {
+    from.setDate(from.getDate() - 7);
+  } else if (window === 'month') {
+    from.setMonth(from.getMonth() - 1);
+  }
+  return { from: from.toISOString(), to };
+}
+
+/**
+ * Append date window query parameters to an endpoint URL when a dateWindow
+ * is configured. Adds ?window=<value>&from=<ISO>&to=<ISO> — many APIs accept
+ * these to filter their response to a time range (e.g. today's sales).
+ *
+ * If the upstream API uses different param names, the operator should include
+ * them directly in the endpoint URL; this provides a sensible default.
+ */
+export function appendDateWindowToUrl(
+  url: string,
+  config: InstallConfig,
+  now = new Date(),
+): string {
+  const bounds = dateWindowBounds(config.dateWindow, now);
+  if (!bounds) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set('window', config.dateWindow as string);
+    u.searchParams.set('from', bounds.from);
+    u.searchParams.set('to', bounds.to);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Apply a fieldMap to a plain object: renames upstream keys to EIP keys.
+ * Only top-level keys are remapped. Values are preserved as-is.
+ * If fieldMap is empty or absent, the original object is returned unchanged.
+ *
+ * Example config: { "total_books": "connectedSystems", "msg": "briefHighlight" }
+ * Input:  { "total_books": 15, "msg": "All good", "other": "x" }
+ * Output: { "connectedSystems": 15, "briefHighlight": "All good", "other": "x" }
+ */
+export function applyFieldMap(
+  data: Record<string, unknown>,
+  fieldMap?: Record<string, string>,
+): Record<string, unknown> {
+  if (!fieldMap || Object.keys(fieldMap).length === 0) return data;
+  const out: Record<string, unknown> = { ...data };
+  for (const [from, to] of Object.entries(fieldMap)) {
+    if (from in out && from !== to) {
+      out[to] = out[from];
+      delete out[from];
+    }
+  }
+  return out;
 }
 
 function asNumber(value: unknown, fallback = 0): number {
