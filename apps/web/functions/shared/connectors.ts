@@ -44,7 +44,7 @@ export type InstallConfig = {
   nextSyncAt?: string;
 };
 
-const SECRET_KEYS = [
+export const SECRET_KEYS = [
   'apiKey',
   'bearerToken',
   'basicPass',
