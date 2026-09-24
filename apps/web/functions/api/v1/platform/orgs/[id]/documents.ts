@@ -29,7 +29,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .limit(50);
 
     if (error) {
-      if (error.code === '42P01') return json([]);
+      if (error.code === '42P01' || error.message?.includes('schema cache')) return json([]);
       return json({ statusCode: 500, message: error.message }, 500);
     }
 

@@ -24,17 +24,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   const { data, error } = await supabase
-    .from('reports')
-    .select('id, name, description, type, status, created_at, updated_at')
+    .from('scheduled_reports')
+    .select('id, title, cadence, enabled, last_run_at, created_at, updated_at')
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
     .limit(50);
 
   if (error) {
-    // If table doesn't exist yet, return empty rather than 500
-    if (error.code === '42P01') return json([]);
+    // Table may not exist yet on this environment — return empty rather than 500
+    if (error.code === '42P01' || error.message?.includes('schema cache')) return json([]);
     return json({ statusCode: 500, message: error.message }, 500);
   }
 
-  return json(data || []);
+  return json(
+    (data || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      cadence: r.cadence,
+      enabled: r.enabled,
+      lastRunAt: r.last_run_at ?? null,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    })),
+  );
 };
