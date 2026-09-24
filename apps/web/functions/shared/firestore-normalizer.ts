@@ -14,19 +14,26 @@
  *
  * This module provides:
  *
- *  isFirestoreDocument(raw)         — detects a Firestore REST document or
+ *  isFirestoreResponse(raw)         — detects a Firestore REST document or
  *                                     collection response by its shape.
  *  unpackFirestoreValue(val)        — recursively unwraps a single typed value.
  *  unpackFirestoreFields(fields)    — unwraps a `fields` map into a plain object.
  *  normalizeFirestoreResponse(raw)  — top-level entry point: accepts a Firestore
  *                                     document OR a collection list-response and
- *                                     returns a plain object / array suitable for
- *                                     the EIP normalizeEnterprisePayload pipeline.
+ *                                     returns plain JS objects, free of typed-value
+ *                                     envelopes, ready for normalizeEnterprisePayload.
  *
- * No Haven-specific knowledge lives here. The Haven field mapping lives in
- * normalizeHavenBooksPayload (below), which is itself just a thin adapter over
- * normalizeEnterprisePayload — so any EIP connector pointing at a Firestore
- * REST endpoint benefits from the generic unpacking automatically.
+ * ── Design boundary ──────────────────────────────────────────────────────────
+ * This module knows about the Firestore REST wire format — nothing else.
+ * It contains NO knowledge of any specific business system (Haven, SAP, etc.).
+ * The result of normalizeFirestoreResponse is plain JSON. Any system-specific
+ * interpretation of that JSON (e.g. which field is a "health score") belongs at
+ * the business API boundary of the system being connected, not here.
+ *
+ * EIP's normalizeEnterprisePayload handles the plain result generically:
+ * it picks up whatever fields happen to match the enterprise schema
+ * (healthScore, timeline, briefHighlight, etc.) and infers what it cannot find.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 // ---------------------------------------------------------------------------
@@ -41,7 +48,11 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 /**
  * Returns true when the given value looks like a Firestore REST document
- * (`{ name, fields }`) or a collection list response (`{ documents: [...] }`).
+ * (`{ name: "projects/...", fields: {...} }`) or a collection list response
+ * (`{ documents: [...] }`).
+ *
+ * This is a structural check on the Firestore wire format only — it does not
+ * test for any specific project, collection, or document path.
  */
 export function isFirestoreResponse(raw: unknown): boolean {
   if (!isObject(raw)) return false;
@@ -127,9 +138,13 @@ export function unpackFirestoreFields(
  *
  * Returned shape:
  *   - Single document → plain object with the document's fields at the top level,
- *     plus `_firestoreName` (document path) and `_firestoreUpdatedAt`.
+ *     plus `_firestoreName` (document path) and `_firestoreUpdatedAt` (metadata).
  *   - Collection list → `{ documents: PlainObject[] }` where each entry is a
  *     plain-field object with `_firestoreName`.
+ *
+ * The caller passes this plain object to normalizeEnterprisePayload.
+ * normalizeEnterprisePayload handles it the same way it handles any other JSON
+ * from a REST connector — field mapping is inferred generically.
  *
  * @param raw  The JSON.parsed body of a Firestore REST GET call.
  */
@@ -169,101 +184,5 @@ export function normalizeFirestoreResponse(
     _firestoreName: name ?? '',
     _firestoreUpdatedAt: updateTime ?? createTime ?? '',
     ...(fields ? unpackFirestoreFields(fields) : {}),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Haven-specific EIP payload adapter
-// ---------------------------------------------------------------------------
-
-/**
- * Book record shape after Firestore unpacking (Haven books_catalogue document).
- * Only the fields relevant to EIP normalisation are typed here.
- */
-interface HavenBook {
-  id?: string;
-  title?: string;
-  author?: string;
-  status?: string;    // "published" | "draft" | "coming_soon"
-  genre?: string;
-  price?: number | string;
-  rating?: number | string;
-  wordCount?: number | string;
-  chapterCount?: number | string;
-  active?: boolean;
-  isNew?: boolean;
-  featured?: boolean;
-  description?: string;
-  subtitle?: string;
-}
-
-/**
- * Convert a Haven `books_catalogue` Firestore document (after
- * `normalizeFirestoreResponse`) into EIP enterprise payload fields suitable
- * for `normalizeEnterprisePayload`.
- *
- * Mapping rationale:
- *  - `connectedSystems` → number of active/published books (each book is a
- *    "system" connected to the Haven reading platform)
- *  - `healthScore`      → % of books with status "published" × 100, clamped to 100
- *  - `openAlerts`       → number of books with status "draft" or "coming_soon"
- *    (not yet live — platform attention may be needed)
- *  - `openDecisions`    → number of featured books (editorial decisions in flight)
- *  - `timeline`         → one entry per book: title + author + genre summary
- *  - `briefHighlight`   → human-readable summary for the EIP Command Center brief
- *  - `systemName`       → "Ellines Haven" (passed through to UEM model)
- *
- * This function does NOT call `normalizeEnterprisePayload` directly so that
- * the caller (sync.ts) can pass the result straight into `normalizeEnterprisePayload`
- * — maintaining the single normalisation path.
- */
-export function mapHavenBooksCatalogueToEipPayload(
-  plainDoc: Record<string, unknown>,
-): Record<string, unknown> {
-  const rawBooks = plainDoc.books;
-  const books: HavenBook[] = Array.isArray(rawBooks)
-    ? (rawBooks as unknown[]).filter((b): b is HavenBook => isObject(b))
-    : [];
-
-  const published = books.filter(
-    (b) => b.status === 'published' || b.active === true,
-  );
-  const pending = books.filter(
-    (b) =>
-      b.status === 'draft' ||
-      b.status === 'coming_soon' ||
-      (b.active !== true && b.status !== 'published'),
-  );
-  const featured = books.filter((b) => b.featured === true);
-
-  const healthScore =
-    books.length > 0 ? Math.round((published.length / books.length) * 100) : 0;
-
-  // Build timeline: up to 12 entries, most-recent first (original catalogue order)
-  const timeline = books.slice(0, 12).map((b) => ({
-    title: b.title || 'Untitled Book',
-    detail: [
-      b.author ? `by ${b.author}` : '',
-      b.genre ? b.genre : '',
-      b.status === 'published' ? 'Published' : b.status === 'coming_soon' ? 'Coming soon' : 'Draft',
-    ]
-      .filter(Boolean)
-      .join(' · '),
-  }));
-
-  const briefHighlight =
-    `Ellines Haven: ${published.length} of ${books.length} books published` +
-    (pending.length ? `, ${pending.length} pending` : '') +
-    (featured.length ? `, ${featured.length} featured` : '') +
-    '. African literature platform — Kenya.';
-
-  return {
-    healthScore,
-    connectedSystems: published.length,
-    openAlerts: pending.length,
-    openDecisions: featured.length,
-    briefHighlight,
-    timeline,
-    systemName: 'Ellines Haven',
   };
 }

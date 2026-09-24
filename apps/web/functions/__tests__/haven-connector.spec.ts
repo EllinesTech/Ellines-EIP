@@ -1,17 +1,24 @@
 /**
- * P1 — Ellines Haven Connector Experiment
+ * P1 — Ellines Haven Connector Experiment (corrected)
  *
- * Tests covering:
- *  1. SSRF policy accepts the Haven Firestore endpoint (static validation)
- *  2. Firestore REST response detection (isFirestoreResponse)
- *  3. Generic Firestore value unpacking (unpackFirestoreValue / unpackFirestoreFields)
- *  4. Top-level normalizeFirestoreResponse — single document and collection
- *  5. Haven books_catalogue → EIP enterprise payload mapping
- *  6. End-to-end: raw Haven API shape → normalizeEnterprisePayload output
+ * Demonstrates that EIP can connect to any business system that exposes data
+ * through the Firestore REST API, without EIP containing any knowledge of
+ * that business system's domain model.
  *
- * Live integration (actual HTTP to firestore.googleapis.com) is separated into
- * a describe block that is skipped by default (HAVEN_LIVE_TEST=1 to enable).
- * All other tests run in the standard Jest environment with no network access.
+ * The specific target used for the P1 experiment is Ellines Haven's
+ * books_catalogue document, accessed via the public Firestore REST endpoint.
+ * EIP treats it as "a REST endpoint that happens to return Firestore-format
+ * JSON" — the generic normalizer unpacks the typed values and
+ * normalizeEnterprisePayload infers enterprise fields from whatever is returned.
+ * No Haven-specific field mapping exists inside EIP.
+ *
+ * Tests:
+ *  1. SSRF policy accepts the Haven Firestore endpoint (static, no network)
+ *  2. isFirestoreResponse — structural detection of Firestore wire format
+ *  3. unpackFirestoreValue — every typed-value kind
+ *  4. normalizeFirestoreResponse — single doc and collection
+ *  5. End-to-end: raw Firestore JSON → normalizeEnterprisePayload (generic pipeline)
+ *  6. Live integration (HAVEN_LIVE_TEST=1) — real HTTP, no mock
  */
 
 import {
@@ -19,16 +26,20 @@ import {
   unpackFirestoreValue,
   unpackFirestoreFields,
   normalizeFirestoreResponse,
-  mapHavenBooksCatalogueToEipPayload,
 } from '../shared/firestore-normalizer';
 import { isSafeEgressTarget } from '../shared/egress';
 import { normalizeEnterprisePayload } from '../shared/connectors';
 
 // ── Real Haven endpoint under test ──────────────────────────────────────────
+// This is the Firestore REST API URL for Haven's books_catalogue document.
+// EIP stores this as a plain REST endpoint in the connector's config.endpoint
+// field — the same field used for any other REST connector. EIP does not know
+// it is Haven, nor does it know the data is in Firestore format until it
+// inspects the wire response.
 const HAVEN_BOOKS_ENDPOINT =
   'https://firestore.googleapis.com/v1/projects/ellines-haven-web/databases/(default)/documents/site_data/books_catalogue';
 
-// ── Fixture: minimal Firestore typed-value document ──────────────────────────
+// ── Fixture: minimal Firestore-format document (generic structure) ────────────
 const FIRESTORE_SINGLE_DOC = {
   name: 'projects/ellines-haven-web/databases/(default)/documents/site_data/books_catalogue',
   fields: {
@@ -67,20 +78,6 @@ const FIRESTORE_SINGLE_DOC = {
               },
             },
           },
-          {
-            mapValue: {
-              fields: {
-                id: { stringValue: 'book-003' },
-                title: { stringValue: 'Savanna Dreams' },
-                author: { stringValue: 'Kofi Asante' },
-                status: { stringValue: 'coming_soon' },
-                genre: { stringValue: 'Romance' },
-                active: { booleanValue: false },
-                featured: { booleanValue: false },
-                isNew: { booleanValue: true },
-              },
-            },
-          },
         ],
       },
     },
@@ -105,7 +102,7 @@ const FIRESTORE_COLLECTION = {
 };
 
 // ============================================================================
-// 1. SSRF policy — Haven endpoint must pass (static, no network)
+// 1. SSRF policy — Haven Firestore endpoint must pass (static, no network)
 // ============================================================================
 
 describe('SSRF policy: Haven Firestore endpoint', () => {
@@ -128,18 +125,16 @@ describe('SSRF policy: Haven Firestore endpoint', () => {
   });
 
   it('blocks localhost', () => {
-    const result = isSafeEgressTarget('https://localhost/api');
-    expect(result.safe).toBe(false);
+    expect(isSafeEgressTarget('https://localhost/api').safe).toBe(false);
   });
 
   it('blocks 169.254.169.254 (cloud metadata)', () => {
-    const result = isSafeEgressTarget('https://169.254.169.254/latest/meta-data/');
-    expect(result.safe).toBe(false);
+    expect(isSafeEgressTarget('https://169.254.169.254/latest/meta-data/').safe).toBe(false);
   });
 });
 
 // ============================================================================
-// 2. isFirestoreResponse detection
+// 2. isFirestoreResponse — structural detection (no system-specific knowledge)
 // ============================================================================
 
 describe('isFirestoreResponse', () => {
@@ -151,12 +146,12 @@ describe('isFirestoreResponse', () => {
     expect(isFirestoreResponse(FIRESTORE_COLLECTION)).toBe(true);
   });
 
-  it('returns false for a plain EIP-style JSON response', () => {
+  it('returns false for a plain REST JSON response', () => {
     expect(
       isFirestoreResponse({
         healthScore: 80,
         connectedSystems: 3,
-        briefHighlight: 'test',
+        briefHighlight: 'OK',
         timeline: [],
       }),
     ).toBe(false);
@@ -173,10 +168,15 @@ describe('isFirestoreResponse', () => {
   it('returns false for a string', () => {
     expect(isFirestoreResponse('hello')).toBe(false);
   });
+
+  it('requires name to start with "projects/" for single-doc detection', () => {
+    expect(isFirestoreResponse({ name: 'not-projects/x', fields: {} })).toBe(false);
+    expect(isFirestoreResponse({ name: 'projects/x', fields: {} })).toBe(true);
+  });
 });
 
 // ============================================================================
-// 3. unpackFirestoreValue — individual typed value unwrapping
+// 3. unpackFirestoreValue — every typed-value kind
 // ============================================================================
 
 describe('unpackFirestoreValue', () => {
@@ -184,7 +184,7 @@ describe('unpackFirestoreValue', () => {
     expect(unpackFirestoreValue({ stringValue: 'hello' })).toBe('hello');
   });
 
-  it('unpacks integerValue (arrives as string)', () => {
+  it('unpacks integerValue (arrives as string in Firestore wire format)', () => {
     expect(unpackFirestoreValue({ integerValue: '42' })).toBe(42);
   });
 
@@ -204,13 +204,13 @@ describe('unpackFirestoreValue', () => {
     expect(unpackFirestoreValue({ nullValue: null })).toBeNull();
   });
 
-  it('unpacks timestampValue', () => {
+  it('unpacks timestampValue as ISO string', () => {
     expect(unpackFirestoreValue({ timestampValue: '2026-09-01T10:00:00Z' })).toBe(
       '2026-09-01T10:00:00Z',
     );
   });
 
-  it('unpacks arrayValue', () => {
+  it('unpacks arrayValue recursively', () => {
     const result = unpackFirestoreValue({
       arrayValue: {
         values: [{ stringValue: 'a' }, { integerValue: '2' }],
@@ -223,7 +223,7 @@ describe('unpackFirestoreValue', () => {
     expect(unpackFirestoreValue({ arrayValue: {} })).toEqual([]);
   });
 
-  it('unpacks mapValue', () => {
+  it('unpacks mapValue recursively', () => {
     const result = unpackFirestoreValue({
       mapValue: {
         fields: {
@@ -235,7 +235,7 @@ describe('unpackFirestoreValue', () => {
     expect(result).toEqual({ name: 'test', count: 7 });
   });
 
-  it('handles plain (non-Firestore-typed) value without crashing', () => {
+  it('passes through plain (non-Firestore-typed) values unchanged', () => {
     expect(unpackFirestoreValue('plain string')).toBe('plain string');
     expect(unpackFirestoreValue(42)).toBe(42);
     expect(unpackFirestoreValue(null)).toBeNull();
@@ -243,38 +243,46 @@ describe('unpackFirestoreValue', () => {
 });
 
 // ============================================================================
-// 4. normalizeFirestoreResponse — document and collection
+// 4. normalizeFirestoreResponse — single doc and collection
 // ============================================================================
 
 describe('normalizeFirestoreResponse', () => {
-  it('unpacks a single document into plain fields', () => {
+  it('unpacks a single document: metadata fields present', () => {
     const result = normalizeFirestoreResponse(FIRESTORE_SINGLE_DOC) as Record<string, unknown>;
-
     expect(result._firestoreName).toBe(
       'projects/ellines-haven-web/databases/(default)/documents/site_data/books_catalogue',
     );
     expect(result._firestoreUpdatedAt).toBe('2026-09-01T10:00:00Z');
+  });
+
+  it('unpacks a single document: domain fields are plain JS values', () => {
+    const result = normalizeFirestoreResponse(FIRESTORE_SINGLE_DOC) as Record<string, unknown>;
     expect(result.updatedAt).toBe('2026-09-01T10:00:00Z');
     expect(Array.isArray(result.books)).toBe(true);
   });
 
-  it('fully unpacks the nested books array', () => {
+  it('fully unpacks nested arrays of maps (books)', () => {
     const result = normalizeFirestoreResponse(FIRESTORE_SINGLE_DOC) as Record<string, unknown>;
     const books = result.books as Record<string, unknown>[];
-    expect(books).toHaveLength(3);
+    expect(books).toHaveLength(2);
+    // All typed values unwrapped to plain JS
     expect(books[0]).toMatchObject({
       id: 'book-001',
       title: 'Marriage Is a Scam',
       author: 'Elijah Mwangi M',
       status: 'published',
-      price: 499,
-      rating: 4.7,
-      wordCount: 62000,
-      active: true,
+      price: 499,       // integerValue '499' → number 499
+      rating: 4.7,      // doubleValue 4.7 → number 4.7
+      wordCount: 62000, // integerValue '62000' → number 62000
+      active: true,     // booleanValue → boolean
       featured: true,
     });
-    expect(books[1]).toMatchObject({ title: 'The Nairobi Chronicles', status: 'draft' });
-    expect(books[2]).toMatchObject({ title: 'Savanna Dreams', status: 'coming_soon' });
+    expect(books[1]).toMatchObject({
+      id: 'book-002',
+      title: 'The Nairobi Chronicles',
+      status: 'draft',
+      active: false,
+    });
   });
 
   it('unpacks a collection list response', () => {
@@ -293,154 +301,87 @@ describe('normalizeFirestoreResponse', () => {
 });
 
 // ============================================================================
-// 5. mapHavenBooksCatalogueToEipPayload — Haven books → EIP fields
+// 5. End-to-end: raw Firestore JSON → normalizeEnterprisePayload (generic)
+//
+// This is the full pipeline EIP runs for any REST connector that returns
+// Firestore-format JSON. EIP applies no Haven-specific logic — it uses the
+// same normalizeEnterprisePayload it uses for every other connector.
 // ============================================================================
 
-describe('mapHavenBooksCatalogueToEipPayload', () => {
-  // Unpack the fixture into the plain-object form that sync.ts produces
-  const plain = normalizeFirestoreResponse(FIRESTORE_SINGLE_DOC) as Record<string, unknown>;
+describe('end-to-end: Firestore REST → generic normalizeEnterprisePayload', () => {
+  it('produces a valid (if sparse) EIP enterprise payload from the raw Firestore fixture', () => {
+    // Step 1: detect Firestore format
+    expect(isFirestoreResponse(FIRESTORE_SINGLE_DOC)).toBe(true);
 
-  it('returns a systemName of "Ellines Haven"', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    expect(payload.systemName).toBe('Ellines Haven');
-  });
+    // Step 2: unpack typed values to plain JS
+    const plain = normalizeFirestoreResponse(FIRESTORE_SINGLE_DOC) as Record<string, unknown>;
+    expect(typeof plain._firestoreName).toBe('string');
+    expect(Array.isArray(plain.books)).toBe(true);
 
-  it('counts only published/active books as connectedSystems', () => {
-    // Fixture: 1 published (book-001), 2 not (book-002 draft, book-003 coming_soon)
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    expect(payload.connectedSystems).toBe(1);
-  });
+    // Step 3: normalizeEnterprisePayload — generic field inference
+    // The Firestore document fields don't match EIP's expected field names
+    // (healthScore, connectedSystems, etc.) directly, so the payload will have
+    // zero values for numeric fields and inferred timeline from whatever is available.
+    // This is the correct behaviour — EIP does not pretend to understand Haven's
+    // domain; it just reports what it can infer generically.
+    const payload = normalizeEnterprisePayload(plain);
 
-  it('counts draft/coming_soon books as openAlerts', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    expect(payload.openAlerts).toBe(2);
-  });
-
-  it('counts featured books as openDecisions', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    expect(payload.openDecisions).toBe(1); // only book-001 is featured
-  });
-
-  it('derives a healthScore of 33% (1 of 3 published)', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    expect(payload.healthScore).toBe(33);
-  });
-
-  it('produces a timeline entry for each book', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
-    const timeline = payload.timeline as { title: string; detail: string }[];
-    expect(timeline).toHaveLength(3);
-    expect(timeline[0].title).toBe('Marriage Is a Scam');
-    expect(timeline[0].detail).toContain('Elijah Mwangi M');
-    expect(timeline[0].detail).toContain('Published');
-    expect(timeline[1].title).toBe('The Nairobi Chronicles');
-    expect(timeline[1].detail).toContain('Draft');
-    expect(timeline[2].detail).toContain('Coming soon');
-  });
-
-  it('generates a human-readable briefHighlight', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload(plain);
+    // Shape integrity
+    expect(typeof payload.healthScore).toBe('number');
+    expect(typeof payload.connectedSystems).toBe('number');
+    expect(typeof payload.openAlerts).toBe('number');
+    expect(typeof payload.openDecisions).toBe('number');
     expect(typeof payload.briefHighlight).toBe('string');
-    expect(payload.briefHighlight as string).toContain('Ellines Haven');
-    expect(payload.briefHighlight as string).toContain('1 of 3 books published');
+    expect(Array.isArray(payload.timeline)).toBe(true);
+
+    // Values are within valid range
+    expect(payload.healthScore).toBeGreaterThanOrEqual(0);
+    expect(payload.healthScore).toBeLessThanOrEqual(100);
+
+    // UEM model is inferred
+    expect(payload.model).not.toBeNull();
   });
 
-  it('handles an empty books array gracefully', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload({ books: [] });
-    expect(payload.healthScore).toBe(0);
-    expect(payload.connectedSystems).toBe(0);
-    expect(payload.openAlerts).toBe(0);
-    expect((payload.timeline as unknown[]).length).toBe(0);
+  it('handles a Firestore collection list as plainly as any other REST response', () => {
+    const plain = normalizeFirestoreResponse(FIRESTORE_COLLECTION) as Record<string, unknown>;
+    const payload = normalizeEnterprisePayload(plain);
+    expect(typeof payload.briefHighlight).toBe('string');
+    expect(Array.isArray(payload.timeline)).toBe(true);
   });
 
-  it('handles missing books field gracefully', () => {
-    const payload = mapHavenBooksCatalogueToEipPayload({});
-    expect(payload.healthScore).toBe(0);
-    expect(payload.connectedSystems).toBe(0);
-  });
-});
-
-// ============================================================================
-// 6. End-to-end: raw Haven API shape → normalizeEnterprisePayload
-// ============================================================================
-
-describe('end-to-end: Haven Firestore → normalizeEnterprisePayload', () => {
-  it('produces a valid EIP enterprise payload from the full raw fixture', () => {
-    // Simulate what proxyFetch does in sync.ts:
-    //   1. Parse JSON
-    //   2. isFirestoreResponse → true
-    //   3. normalizeFirestoreResponse → plain doc
-    //   4. _firestoreName ends with /books_catalogue → mapHavenBooksCatalogueToEipPayload
-    //   5. normalizeEnterprisePayload picks up the result
-    const raw = FIRESTORE_SINGLE_DOC;
-    expect(isFirestoreResponse(raw)).toBe(true);
-
-    const unpacked = normalizeFirestoreResponse(raw) as Record<string, unknown>;
-    expect(
-      (unpacked._firestoreName as string).endsWith('/books_catalogue'),
-    ).toBe(true);
-
-    const havenPayload = mapHavenBooksCatalogueToEipPayload(unpacked);
-    const eipPayload = normalizeEnterprisePayload(havenPayload);
-
-    expect(eipPayload.healthScore).toBe(33);
-    expect(eipPayload.connectedSystems).toBe(1);
-    expect(eipPayload.openAlerts).toBe(2);
-    expect(eipPayload.openDecisions).toBe(1);
-    expect(eipPayload.briefHighlight).toContain('Ellines Haven');
-    expect(eipPayload.timeline.length).toBeGreaterThan(0);
-    expect(eipPayload.timeline[0].title).toBe('Marriage Is a Scam');
-    // UEM model should be inferred
-    expect(eipPayload.model).not.toBeNull();
-  });
-
-  it('pipeline produces non-zero values even for all-draft fixture', () => {
-    const allDraft = {
-      ...FIRESTORE_SINGLE_DOC,
-      fields: {
-        ...FIRESTORE_SINGLE_DOC.fields,
-        books: {
-          arrayValue: {
-            values: [
-              {
-                mapValue: {
-                  fields: {
-                    id: { stringValue: 'b1' },
-                    title: { stringValue: 'Unpublished' },
-                    author: { stringValue: 'Author A' },
-                    status: { stringValue: 'draft' },
-                    active: { booleanValue: false },
-                    featured: { booleanValue: false },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      },
+  it('pipeline is idempotent for non-Firestore JSON (plain REST responses unchanged)', () => {
+    // A plain REST response that is NOT Firestore-format goes straight to
+    // normalizeEnterprisePayload without any unpacking.
+    const plain = {
+      healthScore: 72,
+      connectedSystems: 5,
+      openAlerts: 2,
+      briefHighlight: 'All systems nominal.',
+      timeline: [{ title: 'Deploy', detail: 'v1.4.2 deployed' }],
     };
-
-    const unpacked = normalizeFirestoreResponse(allDraft) as Record<string, unknown>;
-    const havenPayload = mapHavenBooksCatalogueToEipPayload(unpacked);
-    const eipPayload = normalizeEnterprisePayload(havenPayload);
-
-    expect(eipPayload.healthScore).toBe(0);
-    expect(eipPayload.openAlerts).toBe(1);
-    expect(eipPayload.briefHighlight).toContain('Ellines Haven');
+    expect(isFirestoreResponse(plain)).toBe(false);
+    const payload = normalizeEnterprisePayload(plain);
+    expect(payload.healthScore).toBe(72);
+    expect(payload.connectedSystems).toBe(5);
+    expect(payload.briefHighlight).toBe('All systems nominal.');
   });
 });
 
 // ============================================================================
-// 7. Live integration (network) — skipped unless HAVEN_LIVE_TEST=1
+// 6. Live integration (network) — skipped unless HAVEN_LIVE_TEST=1
+//
+// Connects to the real Haven Firestore REST endpoint, unpacks the Firestore
+// typed values generically, and feeds the result through normalizeEnterprisePayload.
+// No Haven-specific mapping is applied — EIP does not know it is Haven.
 // ============================================================================
 
 const RUN_LIVE = process.env.HAVEN_LIVE_TEST === '1';
 
 (RUN_LIVE ? describe : describe.skip)(
-  'LIVE: Haven Firestore endpoint (requires network)',
+  'LIVE: Haven Firestore endpoint — generic pipeline (requires network)',
   () => {
     it(
-      'fetches books_catalogue and produces a valid EIP payload',
+      'fetches books_catalogue, unpacks Firestore format, produces valid EIP payload',
       async () => {
         const res = await fetch(HAVEN_BOOKS_ENDPOINT, {
           method: 'GET',
@@ -449,25 +390,38 @@ const RUN_LIVE = process.env.HAVEN_LIVE_TEST === '1';
         expect(res.ok).toBe(true);
 
         const raw: unknown = await res.json();
+
+        // Step 1: confirm Firestore format detected
         expect(isFirestoreResponse(raw)).toBe(true);
 
-        const unpacked = normalizeFirestoreResponse(raw) as Record<string, unknown>;
-        expect(typeof unpacked._firestoreName).toBe('string');
+        // Step 2: unpack to plain JS — no Haven knowledge needed
+        const plain = normalizeFirestoreResponse(raw) as Record<string, unknown>;
+        expect(typeof plain._firestoreName).toBe('string');
+        expect((plain._firestoreName as string)).toContain('ellines-haven-web');
 
-        const havenPayload = mapHavenBooksCatalogueToEipPayload(unpacked);
-        const eipPayload = normalizeEnterprisePayload(havenPayload);
+        // Step 3: generic EIP normalisation
+        const payload = normalizeEnterprisePayload(plain);
 
-        // Basic integrity: must have at least 1 published book (Haven is live)
-        expect(eipPayload.connectedSystems).toBeGreaterThan(0);
-        expect(eipPayload.timeline.length).toBeGreaterThan(0);
-        expect(typeof eipPayload.briefHighlight).toBe('string');
-        expect(eipPayload.briefHighlight).toContain('Ellines Haven');
+        // Basic shape integrity
+        expect(typeof payload.healthScore).toBe('number');
+        expect(payload.healthScore).toBeGreaterThanOrEqual(0);
+        expect(payload.healthScore).toBeLessThanOrEqual(100);
+        expect(Array.isArray(payload.timeline)).toBe(true);
+        expect(typeof payload.briefHighlight).toBe('string');
 
-        // Log the actual shape for the P1 report
-        console.log('=== LIVE Haven EIP payload ===');
-        console.log(JSON.stringify(eipPayload, null, 2));
+        // Log for the P1 report
+        console.log('=== LIVE Haven → generic EIP payload ===');
+        console.log(JSON.stringify({
+          healthScore: payload.healthScore,
+          connectedSystems: payload.connectedSystems,
+          openAlerts: payload.openAlerts,
+          openDecisions: payload.openDecisions,
+          briefHighlight: payload.briefHighlight,
+          timelineEntries: payload.timeline.length,
+          _firestoreName: plain._firestoreName,
+        }, null, 2));
       },
-      15_000, // 15s timeout for live HTTP
+      15_000,
     );
   },
 );

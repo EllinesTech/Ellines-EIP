@@ -21,7 +21,6 @@ import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../shared/egr
 import {
   isFirestoreResponse,
   normalizeFirestoreResponse,
-  mapHavenBooksCatalogueToEipPayload,
 } from '../../../../shared/firestore-normalizer';
 
 const CSV_SAMPLE = `metric,value
@@ -144,8 +143,10 @@ async function upsertSnapshot(
  *
  * If the response is a Firestore REST API response (document or collection),
  * it is automatically unpacked via the generic Firestore normalizer before
- * returning. This handles typed Firestore value envelopes without any
- * source-system-specific logic in this function.
+ * returning. This strips the Firestore typed-value envelopes (stringValue,
+ * integerValue, arrayValue, mapValue, …) and returns plain JS so that
+ * normalizeEnterprisePayload receives ordinary JSON regardless of the upstream
+ * data store. No system-specific field mapping is applied here.
  */
 async function proxyFetch(
   url: string,
@@ -185,20 +186,13 @@ async function proxyFetch(
   // ({ stringValue, integerValue, arrayValue, mapValue, … }). Detect that
   // shape and normalize it into plain JS before handing off to
   // normalizeEnterprisePayload — which only understands plain objects.
+  //
+  // This is generic: it handles any Firestore REST document or collection
+  // regardless of which project, collection, or business system it came from.
+  // No system-specific field mapping happens here — normalizeEnterprisePayload
+  // applies its standard inference to whatever plain fields are returned.
   if (isFirestoreResponse(parsed)) {
-    const unpacked = normalizeFirestoreResponse(parsed);
-    // Single document that looks like a Haven books_catalogue payload
-    if (
-      !Array.isArray(unpacked) &&
-      typeof (unpacked as Record<string, unknown>)._firestoreName === 'string' &&
-      (unpacked as Record<string, unknown>)._firestoreName.endsWith('/books_catalogue')
-    ) {
-      // Apply the Haven books→EIP field mapping for a rich enterprise summary
-      return mapHavenBooksCatalogueToEipPayload(unpacked as Record<string, unknown>);
-    }
-    // Any other Firestore document or collection — return the plain unpacked form
-    // so normalizeEnterprisePayload can pick up whatever fields match its schema.
-    return unpacked;
+    return normalizeFirestoreResponse(parsed);
   }
 
   return parsed;
