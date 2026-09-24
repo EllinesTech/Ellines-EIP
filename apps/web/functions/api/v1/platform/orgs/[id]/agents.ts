@@ -25,7 +25,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const { data, error } = await supabase
     .from('agents')
-    .select('id, name, description, type, status, created_at')
+    .select(
+      'id, name, description, type, status, trigger_type, is_active, is_paused, execution_count, success_count, last_executed_at, created_at',
+    )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -36,5 +38,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 500, message: error.message }, 500);
   }
 
-  return json(data || []);
+  // Map DB snake_case rows to the PlatformOrgAgentDto camelCase contract
+  const rows = (data || []).map((row: Record<string, unknown>) => ({
+    id: row.id,
+    name: row.name ?? '',
+    description: row.description ?? '',
+    // trigger_type is the DB column; fall back to type for legacy rows
+    trigger: (row.trigger_type ?? row.type ?? 'manual') as string,
+    isActive: row.is_active !== undefined ? Boolean(row.is_active) : row.status === 'active',
+    isPaused: Boolean(row.is_paused),
+    executionCount: Number(row.execution_count ?? 0),
+    successCount: Number(row.success_count ?? 0),
+    lastExecutedAt: (row.last_executed_at as string | null) ?? null,
+    createdAt: new Date((row.created_at as string)).toISOString(),
+  }));
+
+  return json(rows);
 };

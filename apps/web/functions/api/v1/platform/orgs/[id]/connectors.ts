@@ -25,7 +25,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const { data, error } = await supabase
     .from('connector_installations')
-    .select('id, connector_id, config, status, last_sync, created_at')
+    .select(
+      'id, catalog_id, display_name, config, status, last_sync, last_synced_at, last_message, last_error, error_count, created_at, updated_at',
+    )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false });
 
@@ -33,5 +35,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return json({ statusCode: 500, message: error.message }, 500);
   }
 
-  return json(data || []);
+  // Map DB snake_case rows to the PlatformOrgConnectorDto camelCase contract
+  const rows = (data || []).map((row: Record<string, unknown>) => {
+    // last_synced_at takes priority; fall back to legacy last_sync column
+    const lastSyncedAt =
+      (row.last_synced_at as string | null) ??
+      (row.last_sync as string | null) ??
+      null;
+
+    return {
+      id: row.id,
+      catalogId: (row.catalog_id ?? 'unknown') as string,
+      displayName: (row.display_name ?? row.catalog_id ?? 'Connector') as string,
+      status: (row.status ?? 'idle') as string,
+      lastSyncedAt: lastSyncedAt ? new Date(lastSyncedAt).toISOString() : null,
+      lastMessage: (row.last_message as string | null) ?? null,
+      lastError: (row.last_error as string | null) ?? null,
+      errorCount: Number(row.error_count ?? 0),
+      createdAt: new Date((row.created_at as string)).toISOString(),
+      updatedAt: new Date((row.updated_at ?? row.created_at) as string).toISOString(),
+    };
+  });
+
+  return json(rows);
 };

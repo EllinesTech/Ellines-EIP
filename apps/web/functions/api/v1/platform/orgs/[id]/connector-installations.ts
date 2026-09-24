@@ -6,7 +6,7 @@ import {
   requireAuth,
   type Env,
 } from '../../../../../shared/auth';
-import { toInstallationDto, encryptConnectorConfig, type InstallConfig } from '../../../../shared/connectors';
+import { toInstallationDto, encryptConnectorConfig, type InstallConfig } from '../../../../../shared/connectors';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();

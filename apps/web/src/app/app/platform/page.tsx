@@ -454,7 +454,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   const clientAlertsPage = (
     <div>
       <div className={styles.grid4} style={{marginBottom:12}}>
-        <Kpi label="Clients with errors" value={orgs.filter(o=>o.status==='active').length} hint="active" cls={styles.ok}/>
+        <Kpi label="Suspended clients" value={orgs.filter(o=>o.status==='suspended').length} hint="access blocked" cls={orgs.filter(o=>o.status==='suspended').length?styles.warn:styles.ok}/>
         <Kpi label="Total clients" value={orgs.length} hint="onboarded"/>
         <Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations??'—'} hint="connector errors" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/>
         <Kpi label="Total integrations" value={metrics?.businessServices?.connectorInstallations??'—'} hint="installed"/>
@@ -968,10 +968,10 @@ function ClientWorkspace({
       {!loading && tab==='overview' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="Users" value={stats?.stats?.totalUsers??'—'} hint="total accounts"/>
+            <Kpi label="Users" value={tier?.rate_limit_tiers?.max_users!=null?`${stats?.stats?.totalUsers??'—'} / ${tier.rate_limit_tiers.max_users}`:(stats?.stats?.totalUsers??'—')} hint="used / allowed"/>
             <Kpi label="Active users" value={stats?.stats?.activeUsers??'—'} hint="currently active" cls={styles.ok}/>
-            <Kpi label="Connectors" value={connectors.length} hint="integrations configured"/>
-            <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="last sync ok" cls={styles.ok}/>
+            <Kpi label="Integrations" value={tier?.rate_limit_tiers?.max_connectors!=null?`${installations.length} / ${tier.rate_limit_tiers.max_connectors}`:(installations.length??'—')} hint="used / allowed"/>
+            <Kpi label="Connector errors" value={installations.filter(c=>c.status==='error').length} hint="need attention" cls={installations.filter(c=>c.status==='error').length?styles.warn:styles.ok}/>
           </div>
           <div className={styles.grid4} style={{marginBottom:12}}>
             <Kpi label="Pending approvals" value={approvals.filter(a=>a.status==='pending').length} hint="awaiting decision" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
@@ -979,22 +979,27 @@ function ClientWorkspace({
             <Kpi label="Active rules" value={rules.filter(r=>r.enabled).length} hint="business rules on"/>
             <Kpi label="Reports" value={reports.filter(r=>r.enabled).length} hint="scheduled active"/>
           </div>
+          {stats?.lastActivityAt && (
+            <div style={{marginBottom:8,fontSize:11,color:'#8795aa'}}>
+              Last activity: <span style={{color:'#c8d2e0'}}>{new Date(stats.lastActivityAt).toLocaleString()}</span>
+            </div>
+          )}
           <div className={styles.grid2} style={{marginBottom:12}}>
             <div className={styles.card}>
               <CardTitle title="Ellinea Glance" hint="Latest enterprise snapshot for this client."/>
               {snapshot ? (
                 <>
                   <div className={styles.grid2} style={{marginTop:8}}>
-                    <Kpi label="Health score" value={snapshot.healthScore+'/100'} hint="enterprise health" cls={snapshot.healthScore>=70?styles.ok:snapshot.healthScore>=40?styles.warn:styles.bad}/>
-                    <Kpi label="Connected systems" value={snapshot.connectedSystems} hint="active integrations"/>
-                    <Kpi label="Open alerts" value={snapshot.openAlerts} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
-                    <Kpi label="Open decisions" value={snapshot.openDecisions} hint="pending" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
+                    <Kpi label="Health score" value={(snapshot?.healthScore??0)+'/100'} hint="enterprise health" cls={(snapshot?.healthScore??0)>=70?styles.ok:(snapshot?.healthScore??0)>=40?styles.warn:styles.bad}/>
+                    <Kpi label="Connected systems" value={snapshot?.connectedSystems??0} hint="active integrations"/>
+                    <Kpi label="Open alerts" value={snapshot?.openAlerts??0} hint="need attention" cls={snapshot?.openAlerts?styles.warn:styles.ok}/>
+                    <Kpi label="Open decisions" value={snapshot?.openDecisions??0} hint="pending" cls={snapshot?.openDecisions?styles.warn:styles.ok}/>
                   </div>
                   <div className={styles.service} style={{marginTop:10}}>
                     <h4>Brief highlight</h4>
                     <p>{snapshot.briefHighlight||'No brief available.'}</p>
                   </div>
-                  <p style={{fontSize:10,color:'#64738a',marginTop:8}}>Synced {new Date(snapshot.syncedAt).toLocaleString()}</p>
+                  <p style={{fontSize:10,color:'#64738a',marginTop:8}}>Synced {snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : '—'}</p>
                 </>
               ) : <p className={styles.cardHint}>No snapshot yet. Client needs at least one synced connector.</p>}
             </div>
@@ -1024,13 +1029,13 @@ function ClientWorkspace({
           {snapshot ? (
             <>
               <div className={styles.grid4} style={{marginBottom:12}}>
-                <Kpi label="Health score" value={snapshot.healthScore+'/100'} hint="enterprise health" cls={snapshot.healthScore>=70?styles.ok:snapshot.healthScore>=40?styles.warn:styles.bad}/>
-                <Kpi label="Connected systems" value={snapshot.connectedSystems} hint="active integrations"/>
-                <Kpi label="Open alerts" value={snapshot.openAlerts} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
-                <Kpi label="Open decisions" value={snapshot.openDecisions} hint="pending decisions" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
+                <Kpi label="Health score" value={(snapshot.healthScore??0)+'/100'} hint="enterprise health" cls={(snapshot.healthScore??0)>=70?styles.ok:(snapshot.healthScore??0)>=40?styles.warn:styles.bad}/>
+                <Kpi label="Connected systems" value={snapshot.connectedSystems??0} hint="active integrations"/>
+                <Kpi label="Open alerts" value={snapshot.openAlerts??0} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
+                <Kpi label="Open decisions" value={snapshot.openDecisions??0} hint="pending decisions" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
               </div>
               <div className={styles.card} style={{marginBottom:12}}>
-                <CardTitle title="Brief highlight" hint={`Last synced ${new Date(snapshot.syncedAt).toLocaleString()}`}/>
+                <CardTitle title="Brief highlight" hint={`Last synced ${snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : '—'}`}/>
                 <p style={{fontSize:13,lineHeight:1.6,color:'#c8d2e0',marginTop:4}}>{snapshot.briefHighlight||'No brief available.'}</p>
               </div>
               <div className={styles.card}>
@@ -1122,7 +1127,7 @@ function ClientWorkspace({
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
             <Kpi label="Connected systems" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
-            <Kpi label="Health score" value={snapshot?(snapshot.healthScore+'/100'):'—'} hint="enterprise health" cls={snapshot?.healthScore&&snapshot.healthScore>=70?styles.ok:snapshot?.healthScore&&snapshot.healthScore>=40?styles.warn:styles.bad}/>
+            <Kpi label="Health score" value={snapshot?((snapshot.healthScore??0)+'/100'):'—'} hint="enterprise health" cls={snapshot?.healthScore!=null&&snapshot.healthScore>=70?styles.ok:snapshot?.healthScore!=null&&snapshot.healthScore>=40?styles.warn:styles.bad}/>
             <Kpi label="Connectors" value={connectors.length} hint="installed"/>
             <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="ok"/>
           </div>
@@ -1207,6 +1212,21 @@ function ClientWorkspace({
       {/* ── CONNECTORS ── */}
       {!loading && tab==='connectors' && (
         <div>
+          {/* Entitlement header: used / allowed from package tier */}
+          {tier?.rate_limit_tiers && (
+            <div style={{marginBottom:10,padding:'8px 14px',borderRadius:10,background:'rgba(124,58,237,.10)',border:'1px solid rgba(124,58,237,.2)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:12,color:'#c4b5fd',fontWeight:700}}>
+                {installations.filter(c=>c.status!=='deleted').length}
+                {' / '}
+                {tier.rate_limit_tiers.max_connectors ?? '∞'}
+                {' integrations purchased'}
+              </span>
+              {tier.rate_limit_tiers.max_connectors !== null &&
+               installations.filter(c=>c.status!=='deleted').length >= tier.rate_limit_tiers.max_connectors && (
+                <span style={{fontSize:11,color:'#fb7185',fontWeight:700}}>⚠ Limit reached — upgrade package to add more</span>
+              )}
+            </div>
+          )}
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
             <div className={styles.grid4} style={{gap:8}}>
               <Kpi label="Total" value={installations.length} hint="installed"/>

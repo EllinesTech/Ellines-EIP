@@ -75,7 +75,8 @@ export async function getOrgEntitlement(
     return { ...DEFAULT_ENTITLEMENT };
   }
 
-  const pkg = (data.rate_limit_tiers ?? {}) as Record<string, unknown>;
+  const tierRaw = data.rate_limit_tiers;
+  const pkg = (Array.isArray(tierRaw) ? (tierRaw[0] ?? {}) : (tierRaw ?? {})) as Record<string, unknown>;
   const custom = ((data.custom_limits ?? {}) as Record<string, unknown>);
 
   /** Pick from custom_limits first, then package, then fallback. */

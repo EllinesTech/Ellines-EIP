@@ -75,7 +75,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         organization_id: orgId,
         name,
         mime_type: body.mimeType || 'text/plain',
-        size_bytes: Buffer.byteLength(body.content || '', 'utf8'),
+        size_bytes: new TextEncoder().encode(body.content || '').length,
         content: body.content || '',
         tags: body.tags || [],
         branch: body.branch || null,

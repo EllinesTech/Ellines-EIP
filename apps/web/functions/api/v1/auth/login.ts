@@ -140,7 +140,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Audit log every platform admin login — this is a privileged event
     if (isPlatformAdmin) {
-      await supabase.from('audit_logs').insert({
+      void (supabase.from('audit_logs').insert({
         id: crypto.randomUUID(),
         organization_id: user.organization_id as string,
         user_id: user.id as string,
@@ -152,7 +152,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           country: context.request.headers.get('cf-ipcountry') ?? 'unknown',
           userAgent: context.request.headers.get('user-agent')?.slice(0, 200) ?? 'unknown',
         },
-      }).then(() => {/* fire-and-forget */}).catch(() => {/* non-fatal */});
+      }) as unknown as Promise<unknown>).catch(() => {/* non-fatal */});
     }
 
     return json({
