@@ -1,6 +1,7 @@
 import {
   getAdminClient, json, requireAuth, options, auditRow, getClientIp, type Env,
 } from '../../../../../shared/auth';
+import { getOrgEntitlement } from '../../../../../shared/entitlements';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 /** Permission entry stored in CustomRole.permissions JSON array */
@@ -52,6 +53,18 @@ async function handlePost(env: Env, request: Request) {
 
   if (!user || user.role !== 'owner') {
     return json({ statusCode: 403, message: 'Only Owner can create custom roles' }, 403);
+  }
+
+  // Entitlement check: enable_custom_roles must be true for this org's package
+  const entitlement = await getOrgEntitlement(supabase, user.organization_id as string);
+  if (!entitlement.enableCustomRoles) {
+    return json(
+      {
+        statusCode: 422,
+        message: 'Custom roles are not included in your plan. Contact Ellines to upgrade your package.',
+      },
+      422,
+    );
   }
 
   let body: { name: string; description?: string; color?: string; baseRole?: string; permissions?: PermissionEntry[] };

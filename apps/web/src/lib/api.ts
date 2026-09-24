@@ -3073,3 +3073,56 @@ export async function exportPlatformAuditLogs(params?: {
   if (!res.ok) throw new Error(`Audit export failed (${res.status})`);
   return res.blob();
 }
+
+// ─── Integration Requests (TASK-09) ──────────────────────────────────────────
+
+export interface IntegrationRequestDto {
+  id: string;
+  organizationId: string;
+  requestedById: string;
+  systemName: string;
+  purpose: string | null;
+  catalogId: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Client IT: list own org's integration requests */
+export function listIntegrationRequests() {
+  return request<IntegrationRequestDto[]>('/api/v1/orgs/me/integration-requests');
+}
+
+/** Client IT: submit a new integration request */
+export function createIntegrationRequest(payload: {
+  systemName: string;
+  purpose?: string;
+  catalogId?: string;
+}) {
+  return request<IntegrationRequestDto>('/api/v1/orgs/me/integration-requests', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Super Admin: list a client org's integration requests */
+export function listPlatformOrgIntegrationRequests(orgId: string) {
+  return request<IntegrationRequestDto[]>(
+    `/api/v1/platform/orgs/${encodeURIComponent(orgId)}/integration-requests`,
+  );
+}
+
+/** Super Admin: approve or reject an integration request */
+export function reviewPlatformOrgIntegrationRequest(
+  orgId: string,
+  reqId: string,
+  payload: { status: 'approved' | 'rejected'; reviewNote?: string },
+) {
+  return request<IntegrationRequestDto>(
+    `/api/v1/platform/orgs/${encodeURIComponent(orgId)}/integration-requests/${encodeURIComponent(reqId)}`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+  );
+}

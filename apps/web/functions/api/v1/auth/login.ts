@@ -136,6 +136,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       console.warn('[login] session registry write skipped:', err);
     }
 
+    const isPlatformAdmin = platformAdminFromEnv(context.env, user.email as string);
+
+    // Audit log every platform admin login — this is a privileged event
+    if (isPlatformAdmin) {
+      await supabase.from('audit_logs').insert({
+        id: crypto.randomUUID(),
+        organization_id: user.organization_id as string,
+        user_id: user.id as string,
+        action: 'auth.platform_admin.login',
+        resource: 'session',
+        metadata: {
+          email: user.email,
+          ip: context.request.headers.get('cf-connecting-ip') ?? 'unknown',
+          country: context.request.headers.get('cf-ipcountry') ?? 'unknown',
+          userAgent: context.request.headers.get('user-agent')?.slice(0, 200) ?? 'unknown',
+        },
+      }).then(() => {/* fire-and-forget */}).catch(() => {/* non-fatal */});
+    }
+
     return json({
       user: {
         id: user.id,
@@ -153,7 +172,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         slug: org.slug,
       },
       ...tokens,
-      isPlatformAdmin: platformAdminFromEnv(context.env, user.email as string),
+      isPlatformAdmin,
     });
   } catch (err) {
     // Handle payload size errors with 413 status

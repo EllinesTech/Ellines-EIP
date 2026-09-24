@@ -132,26 +132,32 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
       .catch(() => {
         /* keep local session if /me is briefly unavailable */
       });
-    fetchOrgDateTimeSettings()
-      .then((prefs) => {
-        setDateTimePrefs(prefs);
-        cacheOrgDateTimeSettings(s.organization.id, prefs);
-      })
-      .catch(() => {
-        /* keep defaults / cache if settings endpoint is briefly unavailable */
-      });
-    // Poll notification unread count every 30s
-    function pollNotifyCount() {
-      listApprovals()
-        .then((appr) => {
-          const pending = appr.filter((a) => a.status === 'pending').length;
-          setNotifyUnread(pending);
+    
+    // Skip org-scoped API calls when on platform page (Super Admin control plane)
+    const onPlatformPage = pathname === '/app/platform';
+    
+    if (!onPlatformPage) {
+      fetchOrgDateTimeSettings()
+        .then((prefs) => {
+          setDateTimePrefs(prefs);
+          cacheOrgDateTimeSettings(s.organization.id, prefs);
         })
-        .catch(() => {/* ignore */});
+        .catch(() => {
+          /* keep defaults / cache if settings endpoint is briefly unavailable */
+        });
+      // Poll notification unread count every 30s
+      function pollNotifyCount() {
+        listApprovals()
+          .then((appr) => {
+            const pending = appr.filter((a) => a.status === 'pending').length;
+            setNotifyUnread(pending);
+          })
+          .catch(() => {/* ignore */});
+      }
+      pollNotifyCount();
+      const pollId = window.setInterval(pollNotifyCount, 30_000);
+      return () => window.clearInterval(pollId);
     }
-    pollNotifyCount();
-    const pollId = window.setInterval(pollNotifyCount, 30_000);
-    return () => window.clearInterval(pollId);
   }, [router]);
 
   /**

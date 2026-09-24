@@ -1,0 +1,47 @@
+import {
+  getAdminClient,
+  json,
+  options,
+  platformAdminFromEnv,
+  requireAuth,
+  type Env,
+} from '../../../../../shared/auth';
+
+function asObj(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return {};
+}
+
+export const onRequest: PagesFunction<Env> = async (context) => {
+  if (context.request.method === 'OPTIONS') return options();
+  if (context.request.method !== 'GET') {
+    return json({ message: 'Method not allowed' }, 405);
+  }
+
+  const auth = await requireAuth(context.env, context.request);
+  if (auth instanceof Response) return auth;
+
+  if (!platformAdminFromEnv(context.env, auth.email)) {
+    return json({ statusCode: 403, message: 'Platform admin only' }, 403);
+  }
+
+  const orgId = context.params.id as string;
+  const supabase = getAdminClient(context.env);
+
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .maybeSingle();
+
+  if (error) {
+    return json({ statusCode: 500, message: error.message }, 500);
+  }
+
+  const settings = asObj(data?.settings);
+  const rules = Array.isArray(settings.workflowRules)
+    ? settings.workflowRules
+    : [];
+
+  return json(rules);
+};

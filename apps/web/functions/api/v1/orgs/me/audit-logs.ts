@@ -23,6 +23,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     auth.organizationId,
     auth.role,
     'audit:view',
+    undefined,
+    auth.email,
   );
   if (permErr) return permErr;
 

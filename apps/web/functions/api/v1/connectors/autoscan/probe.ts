@@ -5,6 +5,7 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../../shared/auth';
+import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../shared/egress';
 
 type ProbeBody = {
   targets?: string[];
@@ -30,27 +31,6 @@ const DEFAULT_TIMEOUT = 2500;
 const MAX_TIMEOUT = 5000;
 const MAX_BODY = 48_000;
 
-/** Block obvious SSRF / cloud-metadata targets from the edge probe. */
-function isBlockedHost(hostname: string): boolean {
-  const h = hostname.toLowerCase().replace(/\.$/, '');
-  if (h === 'localhost' || h === 'metadata.google.internal') return true;
-  if (h === '127.0.0.1' || h === '0.0.0.0' || h === '::1') return true;
-  if (h === '169.254.169.254' || h.endsWith('.local')) return true;
-  // Private / link-local IPv4 — edge cannot reach LAN usefully; refuse to pretend.
-  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-  }
-  return false;
-}
-
 function extractTitle(html: string): string | undefined {
   const m = html.match(/<title[^>]*>([^<]{1,120})<\/title>/i);
   return m?.[1]?.trim() || undefined;
@@ -63,15 +43,15 @@ async function probeOne(urlStr: string, timeoutMs: number): Promise<ProbeItem> {
   } catch {
     return { url: urlStr, reachable: false, error: 'Invalid URL' };
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    return { url: urlStr, reachable: false, error: 'Only http/https allowed' };
-  }
-  if (isBlockedHost(url.hostname)) {
+
+  // Shared SSRF policy — replaces the removed isBlockedHost()
+  const egressCheck = isSafeEgressTarget(urlStr);
+  if (!egressCheck.safe) {
     return {
       url: urlStr,
       reachable: false,
-      error:
-        'Edge probe skips localhost / private LAN. Use Local mode with the full SoR URL (any path — exact URL is probed first). Scan ≠ connect — after reachability, click Connect → credentials → Test & Sync.',
+      error: egressCheck.reason ??
+        'Edge probe skips localhost / private LAN. Use Local mode with the full SoR URL. Scan ≠ connect — after reachability, click Connect → credentials → Test & Sync.',
     };
   }
 
@@ -79,9 +59,9 @@ async function probeOne(urlStr: string, timeoutMs: number): Promise<ProbeItem> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url.toString(), {
+    // safeFetch re-validates on every redirect hop (DNS-rebinding protection)
+    const res = await safeFetch(url.toString(), {
       method: 'GET',
-      redirect: 'follow',
       signal: controller.signal,
       headers: {
         accept: 'application/json, text/html, application/yaml, text/plain, */*',
@@ -119,6 +99,14 @@ async function probeOne(urlStr: string, timeoutMs: number): Promise<ProbeItem> {
       latencyMs: Date.now() - started,
     };
   } catch (err) {
+    if (err instanceof SsrfError) {
+      return {
+        url: urlStr,
+        reachable: false,
+        error: `SSRF policy blocked redirect: ${err.blockedUrl}`,
+        latencyMs: Date.now() - started,
+      };
+    }
     return {
       url: urlStr,
       reachable: false,

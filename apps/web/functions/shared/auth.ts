@@ -310,6 +310,16 @@ export function parsePlatformAdminEmails(raw?: string | null): string[] {
 
 export function platformAdminFromEnv(env: Env, email: string): boolean {
   const allowlist = parsePlatformAdminEmails(env.PLATFORM_ADMIN_EMAILS);
+
+  // Safety guard: if the allowlist is unexpectedly large, something is wrong.
+  // 10 is a generous upper bound for Ellines operators.
+  if (allowlist.length > 10) {
+    console.error(
+      `[SECURITY] PLATFORM_ADMIN_EMAILS contains ${allowlist.length} entries — expected ≤10. Check env var for accidental bulk paste.`,
+    );
+    return false; // fail closed
+  }
+
   return allowlist.includes(email.trim().toLowerCase());
 }
 
@@ -420,7 +430,9 @@ export function isValidPermission(permission: string): boolean {
 /** Default permissions for each fixed role — mirrors PermissionService in NestJS identity. */
 const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
   owner:     ['*'],
-  admin:     ['org:*', 'connector:*', 'approval:*', 'rule:*', 'report:*', 'document:*', 'ellinea:*', 'audit:view', 'webhook:*', 'notification:*', 'sso:view'],
+  // connector:install and connector:delete are intentionally absent from admin.
+  // Connector installation is a platform admin operation — no org-level role may install connectors.
+  admin:     ['org:*', 'connector:read', 'connector:update', 'approval:*', 'rule:*', 'report:*', 'document:*', 'ellinea:*', 'audit:view', 'webhook:*', 'notification:*', 'sso:view'],
   executive: ['org:view', 'connector:read', 'approval:view', 'approval:decide', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'ellinea:view', 'audit:view', 'notification:view'],
   manager:   ['org:view', 'connector:read', 'approval:view', 'approval:request', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'notification:view'],
   member:    ['org:view', 'connector:read', 'approval:view', 'approval:request', 'report:view', 'document:view', 'ellinea:ask', 'notification:view'],
@@ -502,6 +514,10 @@ export function requirePermission(role: string, permission: string): Response | 
  * Full async permission check with custom role support.
  * Returns a 403 Response or null if allowed.
  * Use when the user might have a custom role assigned.
+ *
+ * @param email - Optional: when provided, platform admins (via PLATFORM_ADMIN_EMAILS)
+ *   are granted full access without a DB membership lookup. Pass `auth.email` from
+ *   requireAuth() to enable this bypass.
  */
 export async function requirePermissionAsync(
   env: Env,
@@ -510,7 +526,14 @@ export async function requirePermissionAsync(
   role: string,
   permission: string,
   resourceId?: string,
+  email?: string,
 ): Promise<Response | null> {
+  // Platform admins always pass: they own the platform and their own org is the operator org.
+  // The email bypass avoids an extra DB round-trip — use it whenever the caller has auth.email.
+  if (email && platformAdminFromEnv(env, email)) {
+    return null;
+  }
+
   const allowed = await checkPermission(env, userId, organizationId, role, permission, resourceId);
   if (allowed) return null;
   return json(

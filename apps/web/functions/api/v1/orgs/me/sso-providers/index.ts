@@ -1,4 +1,5 @@
 import { getAdminClient, json, requireAuth, options, auditRow, getClientIp, type Env } from '../../../../../shared/auth';
+import { getOrgEntitlement } from '../../../../../shared/entitlements';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 /**
@@ -50,6 +51,18 @@ async function handlePost(context: { env: Env; request: Request }) {
 
   if (!user || user.role !== 'owner') {
     return json({ statusCode: 403, message: 'Only Owner can create SSO providers' }, 403);
+  }
+
+  // Entitlement check: enable_sso must be true for this org's package
+  const entitlement = await getOrgEntitlement(supabase, user.organization_id as string);
+  if (!entitlement.enableSso) {
+    return json(
+      {
+        statusCode: 422,
+        message: 'SSO is not included in your plan. Contact Ellines to upgrade your package.',
+      },
+      422,
+    );
   }
 
   try {

@@ -231,8 +231,7 @@ const CLIENT_ORGANIZATION_ITEMS: NavItem[] = [
     icon: 'services',
     section: 'services',
     group: 'client-organizations',
-    available: false,
-    note: 'Reserved — the client service catalogue is in the build queue and has no live view yet.',
+    available: true,
   },
   {
     id: 'client-health',
@@ -250,8 +249,7 @@ const CLIENT_ORGANIZATION_ITEMS: NavItem[] = [
     icon: 'activity',
     section: 'activity',
     group: 'client-organizations',
-    available: false,
-    note: 'Reserved — client activity/usage reporting is in the build queue and has no live view yet.',
+    available: true,
   },
   {
     id: 'client-configuration',
@@ -269,8 +267,7 @@ const CLIENT_ORGANIZATION_ITEMS: NavItem[] = [
     icon: 'alerts',
     section: 'alerts',
     group: 'client-organizations',
-    available: false,
-    note: 'Reserved — client incident/alerts triage is in the build queue and has no live view yet.',
+    available: true,
   },
   {
     id: 'client-audit',
