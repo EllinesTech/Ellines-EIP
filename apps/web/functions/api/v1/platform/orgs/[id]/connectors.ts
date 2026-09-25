@@ -26,7 +26,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { data, error } = await supabase
     .from('connector_installations')
     .select(
-      'id, catalog_id, display_name, config, status, last_sync, last_synced_at, last_message, last_error, error_count, created_at, updated_at',
+      'id, catalog_id, display_name, config, status, last_synced_at, last_message, last_error, error_count, created_at, updated_at',
     )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false });
@@ -38,11 +38,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Map DB snake_case rows to the PlatformOrgConnectorDto camelCase contract
   const rows = (data || []).map((row: Record<string, unknown>) => {
-    // last_synced_at takes priority; fall back to legacy last_sync column
-    const lastSyncedAt =
-      (row.last_synced_at as string | null) ??
-      (row.last_sync as string | null) ??
-      null;
+    const lastSyncedAt = (row.last_synced_at as string | null) ?? null;
 
     return {
       id: row.id,
