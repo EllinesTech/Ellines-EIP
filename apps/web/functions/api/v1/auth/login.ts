@@ -138,21 +138,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const isPlatformAdmin = platformAdminFromEnv(context.env, user.email as string);
 
-    // Audit log every platform admin login — this is a privileged event
+    // Audit log every platform admin login — this is a privileged event.
+    // Use try/catch rather than .catch() — Supabase insert() returns a PromiseLike,
+    // not a full Promise, so .catch() is not available on it directly.
     if (isPlatformAdmin) {
-      void (supabase.from('audit_logs').insert({
-        id: crypto.randomUUID(),
-        organization_id: user.organization_id as string,
-        user_id: user.id as string,
-        action: 'auth.platform_admin.login',
-        resource: 'session',
-        metadata: {
-          email: user.email,
-          ip: context.request.headers.get('cf-connecting-ip') ?? 'unknown',
-          country: context.request.headers.get('cf-ipcountry') ?? 'unknown',
-          userAgent: context.request.headers.get('user-agent')?.slice(0, 200) ?? 'unknown',
-        },
-      }) as unknown as Promise<unknown>).catch(() => {/* non-fatal */});
+      try {
+        const { error: adminAuditError } = await supabase.from('audit_logs').insert({
+          id: crypto.randomUUID(),
+          organization_id: user.organization_id as string,
+          user_id: user.id as string,
+          action: 'auth.platform_admin.login',
+          resource: 'session',
+          metadata: {
+            email: user.email,
+            ip: context.request.headers.get('cf-connecting-ip') ?? 'unknown',
+            country: context.request.headers.get('cf-ipcountry') ?? 'unknown',
+            userAgent: context.request.headers.get('user-agent')?.slice(0, 200) ?? 'unknown',
+          },
+        });
+        if (adminAuditError) {
+          console.warn('[login] platform admin audit log skipped:', adminAuditError.message);
+        }
+      } catch (err) {
+        console.warn('[login] platform admin audit log skipped:', err);
+      }
     }
 
     return json({

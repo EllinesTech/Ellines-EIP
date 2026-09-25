@@ -16,11 +16,11 @@ async function probeDatabase(env: Env): Promise<{ status: 'up' | 'down'; latency
         timerId = setTimeout(() => reject(new Error('timeout')), PROBE_TIMEOUT_MS);
       }),
     ]);
-    clearTimeout(timerId);
-    return { status: result.error ? 'down' : 'up', latencyMs: Date.now() - started };
+    clearTimeout(timerId!);
+    return { status: result.error ? 'down' : 'up', latencyMs: Date.now() - started } as const;
   } catch {
-    clearTimeout(timerId);
-    return { status: 'down', latencyMs: null };
+    clearTimeout(timerId!);
+    return { status: 'down' as const, latencyMs: null };
   }
 }
 

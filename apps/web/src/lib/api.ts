@@ -2321,6 +2321,28 @@ export function deletePlatformOrgConnector(orgId: string, connId: string) {
   });
 }
 
+/**
+ * Super Admin only — activate a connector for the given org (draft|suspended → active).
+ * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
+ */
+export function activatePlatformOrgConnector(orgId: string, connId: string) {
+  return request<ConnectorInstallationDto>(
+    `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`,
+    { method: 'PATCH', body: JSON.stringify({ status: 'active' }) },
+  );
+}
+
+/**
+ * Super Admin only — deactivate (suspend) a connector for the given org.
+ * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
+ */
+export function deactivatePlatformOrgConnector(orgId: string, connId: string) {
+  return request<ConnectorInstallationDto>(
+    `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`,
+    { method: 'PATCH', body: JSON.stringify({ status: 'suspended' }) },
+  );
+}
+
 export function testPlatformOrgConnector(orgId: string, connId: string) {
   return request<{ ok: boolean; message?: string; installation: ConnectorInstallationDto }>(
     `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}/test`,
