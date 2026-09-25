@@ -231,7 +231,7 @@ export default function ConnectorsPage() {
     setDisplayName('');
     setPackId('');
     setEditingId(null);
-    setEndpoint('/api/v1/connectors/rest-sample');
+    setEndpoint('');
     setAuthType('none');
     setApiKey('');
     setApiKeyHeader('');
@@ -856,7 +856,7 @@ export default function ConnectorsPage() {
                   <div style={{ gridColumn: '1 / -1' }}>
                     <p className={styles.lede}>
                       <strong>Push-based connector.</strong> No credentials needed here — EIP gives you a
-                      webhook URL. Configure Ellines Haven (or any system) to POST its data to that URL.
+                      webhook URL. Configure your external system to POST its data to that URL.
                     </p>
                     <p className={styles.lede}>
                       After saving, go to the Webhook section on this page to get your org&apos;s
@@ -864,9 +864,9 @@ export default function ConnectorsPage() {
                       webhook settings.
                     </p>
                     <p className={styles.lede}>
-                      <strong>Haven integration:</strong> In Haven&apos;s admin settings, enable
-                      &quot;Push reports to EIP&quot;, paste the webhook URL, and set the secret.
-                      Haven will then push sales and activity data to EIP automatically.
+                      In your external system&apos;s admin settings, enable outbound webhooks, paste
+                      the EIP webhook URL, and set the HMAC secret. The system will then push
+                      events to EIP automatically.
                     </p>
                   </div>
                 ) : null}
