@@ -559,7 +559,7 @@ export class EnterpriseService {
     }
     if (catalogId === 'rest-api') {
       const endpoint = (config.endpoint || '').trim();
-      if (!endpoint || endpoint.includes('rest-sample') || endpoint === 'sample') return true;
+      if (!endpoint) return false;
       const connector = createRestApiConnector({
         endpoint,
         headers: buildAuthHeaders(config),
