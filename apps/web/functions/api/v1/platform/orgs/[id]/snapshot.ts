@@ -6,6 +6,7 @@ import {
   requireAuth,
   type Env,
 } from '../../../../../shared/auth';
+import { unpackTimelineStorage } from '../../../../../shared/uem';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -23,33 +24,46 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const orgId = context.params.id as string;
   const supabase = getAdminClient(context.env);
 
-  // Snapshot is a computed summary of the org's current state
-  // Return a stub for now — real implementation would aggregate:
-  // - Health score from connectors
-  // - Open alerts/decisions
-  // - Brief highlight from latest Ellinea digest
-  // - Timeline of recent significant events
-
-  const { data: org, error: orgErr } = await supabase
-    .from('organizations')
-    .select('id, name, slug')
-    .eq('id', orgId)
+  // Read the real enterprise snapshot for this client org
+  const { data: snap, error } = await supabase
+    .from('enterprise_snapshots')
+    .select('*')
+    .eq('organization_id', orgId)
     .maybeSingle();
 
-  if (orgErr) return json({ statusCode: 500, message: orgErr.message }, 500);
-  if (!org) return json({ statusCode: 404, message: 'Organization not found' }, 404);
+  if (error) return json({ statusCode: 500, message: error.message }, 500);
 
-  // Stub snapshot
+  if (!snap) {
+    return json({
+      organizationId: orgId,
+      connectorId: 'none',
+      connectorName: '',
+      healthScore: 0,
+      connectedSystems: 0,
+      openAlerts: 0,
+      openDecisions: 0,
+      briefHighlight: 'No connector sync yet for this organization.',
+      timeline: [],
+      model: null,
+      syncedAt: null,
+      status: 'idle',
+    });
+  }
+
+  const { events, model } = unpackTimelineStorage(snap.timeline);
+
   return json({
-    organizationId: org.id,
-    connectorId: 'snapshot',
-    connectorName: 'Platform Snapshot',
-    healthScore: 85,
-    connectedSystems: 0,
-    openAlerts: 0,
-    openDecisions: 0,
-    briefHighlight: `${org.name} snapshot (implementation pending)`,
-    timeline: [],
-    syncedAt: new Date().toISOString(),
+    organizationId: snap.organization_id,
+    connectorId: snap.connector_id,
+    connectorName: snap.connector_name,
+    healthScore: snap.health_score,
+    connectedSystems: snap.connected_systems,
+    openAlerts: snap.open_alerts,
+    openDecisions: snap.open_decisions,
+    briefHighlight: snap.brief_highlight,
+    timeline: events,
+    model,
+    syncedAt: new Date(snap.synced_at as string).toISOString(),
+    status: 'synced',
   });
 };

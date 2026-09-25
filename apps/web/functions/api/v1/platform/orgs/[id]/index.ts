@@ -79,5 +79,53 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
+  // ── DELETE: permanently remove an organization and all its data ─────────────
+  // This is a hard delete. Prisma cascades handle connector_installations,
+  // users, enterprise_snapshots, audit_logs, and all other org-owned rows.
+  // Requires explicit 'reason' in body — written to the operator audit log.
+  if (context.request.method === 'DELETE') {
+    let body: { reason?: string } = {};
+    try {
+      const text = await context.request.text();
+      if (text.trim()) body = JSON.parse(text) as typeof body;
+    } catch { /* no body is fine */ }
+
+    const reason = (body.reason || '').trim();
+    if (!reason) {
+      return json(
+        { statusCode: 400, message: 'A reason is required to delete an organization' },
+        400,
+      );
+    }
+
+    const { data: target, error: readErr } = await supabase
+      .from('organizations')
+      .select('id, name, slug')
+      .eq('id', orgId)
+      .maybeSingle();
+    if (readErr) return json({ statusCode: 500, message: readErr.message }, 500);
+    if (!target) return json({ statusCode: 404, message: 'Organization not found' }, 404);
+
+    // Write audit record BEFORE deleting (cascade would remove it otherwise)
+    await supabase.from('audit_logs').insert({
+      id: crypto.randomUUID(),
+      organization_id: orgId,
+      user_id: auth.sub,
+      action: 'platform.org.delete',
+      resource: 'organization',
+      metadata: { actorEmail: auth.email, orgName: target.name, slug: target.slug, reason },
+      created_at: new Date().toISOString(),
+    });
+
+    const { error: deleteErr } = await supabase
+      .from('organizations')
+      .delete()
+      .eq('id', orgId);
+
+    if (deleteErr) return json({ statusCode: 500, message: deleteErr.message }, 500);
+
+    return json({ ok: true, deleted: { id: orgId, name: target.name, slug: target.slug } });
+  }
+
   return json({ message: 'Method not allowed' }, 405);
 };

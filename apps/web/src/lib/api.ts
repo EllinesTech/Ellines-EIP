@@ -571,6 +571,17 @@ export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspe
   });
 }
 
+/**
+ * Super Admin only — permanently delete an organization and all its data.
+ * Requires a non-empty reason which is written to the audit log before deletion.
+ */
+export function deletePlatformOrg(orgId: string, reason: string) {
+  return request<{ ok: boolean; deleted: { id: string; name: string; slug: string } }>(
+    `/api/v1/platform/orgs/${orgId}`,
+    { method: 'DELETE', body: JSON.stringify({ reason }) },
+  );
+}
+
 export interface PlatformMetrics {
   generatedAt: string;
   window: { since: string; durationHours: number };

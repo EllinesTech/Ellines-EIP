@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10,6 +10,7 @@ import {
   listPlatformOrgs, listPlatformPackages, migratePlatformEncryption, refreshSessionFlags, updatePlatformFlag,
   updatePlatformOrgDateTimeSettings, updatePlatformOrgStatus, updatePlatformOrgUser,
   updatePlatformConnectorPack, publishPlatformConnectorPack, deprecatePlatformConnectorPack, deletePlatformConnectorPack,
+  deletePlatformOrg,
   fetchPlatformOrgConnectors, fetchPlatformOrgApprovals, fetchPlatformOrgRules,
   fetchPlatformOrgReports, fetchPlatformOrgAgents, fetchPlatformOrgSnapshot,
   fetchPlatformOrgConnectorInstallations, createPlatformOrgConnector, updatePlatformOrgConnector,
@@ -50,7 +51,7 @@ const roles = ['owner', 'admin', 'executive', 'manager', 'member', 'viewer'] as 
 function PlatformSuperAdminPage(){
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Read URL params synchronously — no useEffect round-trip, no 2-cycle delay.
+  // Read URL params synchronously â€” no useEffect round-trip, no 2-cycle delay.
   const sectionParam = searchParams?.get('section') ?? '';
   const clientOrgId = searchParams?.get('id') ?? '';
   const section = sectionParam as Section;
@@ -71,7 +72,7 @@ function PlatformSuperAdminPage(){
  const [metrics,setMetrics]=useState<PlatformMetrics|null>(null);
  const [users,setUsers]=useState<OrgMember[]>([]),[stats,setStats]=useState<any>(null),[tier,setTier]=useState<any>(null),[settings,setSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
  const [query,setQuery]=useState(''),[auditQuery,setAuditQuery]=useState(''),[auditOrg,setAuditOrg]=useState(''),[auditFrom,setAuditFrom]=useState(''),[auditTo,setAuditTo]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- // ── Client workspace state (loaded when entering ?section=client&id=ORG_ID) ──
+ // â”€â”€ Client workspace state (loaded when entering ?section=client&id=ORG_ID) â”€â”€
  const [wsOrg,setWsOrg]=useState<PlatformOrg|null>(null);
  const [wsUsers,setWsUsers]=useState<OrgMember[]>([]);
  const [wsStats,setWsStats]=useState<any>(null);
@@ -85,7 +86,7 @@ function PlatformSuperAdminPage(){
  const [wsReports,setWsReports]=useState<PlatformOrgReportDto[]>([]);
  const [wsAgents,setWsAgents]=useState<PlatformOrgAgentDto[]>([]);
  const [wsSnapshot,setWsSnapshot]=useState<PlatformOrgSnapshotDto>(null);
- // Full connector installations (writable — for wizard)
+ // Full connector installations (writable â€” for wizard)
  const [wsInstallations,setWsInstallations]=useState<ConnectorInstallationDto[]>([]);
  const [wsIntegrationRequests,setWsIntegrationRequests]=useState<IntegrationRequestDto[]>([]);
  const [wsDocuments,setWsDocuments]=useState<PlatformDocumentDto[]>([]);
@@ -128,7 +129,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     }
     
     const[o,p,f,h,cp,m,hs]=await Promise.all([listPlatformOrgs(),listPlatformPackages(),listPlatformFlags(),fetchHealth(),listPlatformConnectorPacks(),fetchPlatformMetrics(),fetchPlatformHealthSummary()]);
-    // Filter out the platform operator's own org — it is Ellines itself, not a client.
+    // Filter out the platform operator's own org â€” it is Ellines itself, not a client.
     const ownOrgId = getSession()?.user?.organizationId;
     setOrgs(ownOrgId ? o.filter(x => x.id !== ownOrgId) : o);
     setPackages(p);setFlags(f);setHealth(h);setPacks(cp);setMetrics(m);setHealthSummary(hs)}catch(e){
@@ -213,9 +214,10 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   }, [clientOrgId, activeSection, router]);
  useEffect(()=>{if(!allowed)return;const t=setInterval(()=>{void fetchHealth().then(setHealth);void fetchPlatformMetrics().then(setMetrics);void fetchPlatformHealthSummary().then(setHealthSummary)},30000);return()=>clearInterval(t)},[allowed]);
 
- async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
- async function register(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await createPlatformOrg({name:business.name,slug:business.slug||undefined,ownerEmail:business.ownerEmail||undefined,ownerFullName:business.ownerFullName||undefined,ownerPassword:business.ownerPassword||undefined});setNotice('Business “'+r.name+'” registered.');setBusiness({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});await load();navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Registration failed')}finally{setBusy(false)}}
-  async function createPackage(reason:string){setBusy(true);try{await createPlatformPackage({...pkg,reason});setNotice('Package “'+pkg.displayName+'” created.');setPkg({name:'',displayName:'',maxUsers:25,maxConnectors:5,requestsPerDay:10000,monthlyPrice:0,enableSso:false,enableCustomRoles:false,enableAgents:false,enableAdvancedBi:false,enableWebhooks:false});await load();setPkgDialog(false)}catch(e){setError(e instanceof Error?e.message:'Package creation failed');setPkgDialog(false)}finally{setBusy(false)}}
+ async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend â€œ'+o.name+'â€? This blocks tenant access.':'Reconnect â€œ'+o.name+'â€?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
+ async function deleteOrg(o:PlatformOrg){const reason=window.prompt('DELETE "'+o.name+'" permanently?\n\nThis cannot be undone u2014 all users, connectors, and data for this organization will be removed.\n\nEnter a reason to confirm deletion:');if(!reason||!reason.trim())return;if(!window.confirm('Final confirmation: permanently delete "'+o.name+'" ('+o.slug+')?'))return;setBusy(true);try{await deletePlatformOrg(o.id,reason.trim());setOrgs(x=>x.filter(v=>v.id!==o.id));if(selected?.id===o.id)setSelected(null);setNotice('"'+o.name+'" has been permanently deleted.');navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Delete failed')}finally{setBusy(false)}}
+ async function register(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await createPlatformOrg({name:business.name,slug:business.slug||undefined,ownerEmail:business.ownerEmail||undefined,ownerFullName:business.ownerFullName||undefined,ownerPassword:business.ownerPassword||undefined});setNotice('Business â€œ'+r.name+'â€ registered.');setBusiness({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});await load();navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Registration failed')}finally{setBusy(false)}}
+  async function createPackage(reason:string){setBusy(true);try{await createPlatformPackage({...pkg,reason});setNotice('Package â€œ'+pkg.displayName+'â€ created.');setPkg({name:'',displayName:'',maxUsers:25,maxConnectors:5,requestsPerDay:10000,monthlyPrice:0,enableSso:false,enableCustomRoles:false,enableAgents:false,enableAdvancedBi:false,enableWebhooks:false});await load();setPkgDialog(false)}catch(e){setError(e instanceof Error?e.message:'Package creation failed');setPkgDialog(false)}finally{setBusy(false)}}
  async function addUser(e:React.FormEvent){e.preventDefault();if(!selected)return;setBusy(true);try{const u=await createPlatformOrgUser(selected.id,user);setUsers(x=>[u,...x]);setUser({email:'',fullName:'',password:'',role:'member'});setNotice('User created.')}catch(e){setError(e instanceof Error?e.message:'User creation failed')}finally{setBusy(false)}}
  async function toggleUser(u:OrgMember){if(!selected)return;setBusy(true);try{const x=await updatePlatformOrgUser(selected.id,u.id,{isActive:!u.isActive});setUsers(v=>v.map(z=>z.id===x.id?x:z))}catch(e){setError(e instanceof Error?e.message:'User update failed')}finally{setBusy(false)}}
  async function saveDate(){if(!selected)return;setBusy(true);try{await updatePlatformOrgDateTimeSettings(selected.id,settings);setNotice('Tenant settings saved.')}catch(e){setError(e instanceof Error?e.message:'Settings update failed')}finally{setBusy(false)}}
@@ -225,39 +227,39 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const shown=useMemo(()=>{const q=query.toLowerCase().trim();return q?orgs.filter(o=>[o.name,o.slug,o.status].some(v=>v.toLowerCase().includes(q))):orgs},[orgs,query]);
  const active=orgs.filter(o=>o.status==='active').length,suspended=orgs.length-active,totalUsers=orgs.reduce((n,o)=>n+o.userCount,0);
- if(allowed===null)return <main className={styles.main}>Checking platform access…</main>;
+ if(allowed===null)return <main className={styles.main}>Checking platform accessâ€¦</main>;
  if(!allowed){
    const session = getSession();
    return <main className={styles.main}><div className={styles.card}><h2>Platform access denied</h2><p className={styles.cardHint}>Ellines platform operator access is required.</p>{session && <div style={{marginTop:16,padding:12,background:'#f5f5f5',borderRadius:4,fontSize:11,fontFamily:'monospace'}}><strong>Current session:</strong><br/>Email: {session.user?.email || 'N/A'}<br/>Role: {session.user?.role || 'N/A'}<br/>Org: {session.organization?.name || 'N/A'}<br/>Platform Admin: {session.isPlatformAdmin ? 'Yes' : 'No'}<br/><br/><em>Only email "{process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS || 'ellines.tech@gmail.com'}" can access this control plane.</em></div>}{!session && <p style={{marginTop:16,color:'#666'}}>No active session found. <a href="/login?redirect=/app/platform" style={{color:'#2563EB'}}>Log in</a></p>}</div></main>;
  }
 
- const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button+' '+styles.primary} onClick={()=>navigate('client',o.id)}>Open workspace</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No client organizations found.</td></tr>}</tbody></table></div>;
+ const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button+' '+styles.primary} onClick={()=>navigate('client',o.id)}>Open workspace</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button>{' '}<button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>void deleteOrg(o)} title='Permanently delete this organization and all its data'>Delete</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No client organizations found.</td></tr>}</tbody></table></div>;
 
- const overview=<><div className={styles.hero}><h2>Ellines EIP Control Plane</h2><p>This is the platform operating system — not a customer dashboard. Operate EIP itself, onboard businesses, assign services, troubleshoot tenants, control access, inspect security activity and configure the platform. Customer connectors are business services, not EIP infrastructure.</p><div className={styles.quick}><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register client</button><button className={styles.button} onClick={()=>navigate('businesses')}>Client portfolio</button><button className={styles.button} onClick={()=>navigate('packages')}>Service packages</button><button className={styles.button} onClick={()=>navigate('health')}>Diagnostics</button></div></div>
- <div className={styles.grid4}><Kpi label="Businesses onboarded" value={metrics?.platform?.businesses ?? orgs.length} hint="tenant accounts"/><Kpi label="Active tenant users" value={metrics?.platform?.activeUsers ?? totalUsers} hint="currently active" cls={styles.ok}/><Kpi label="Disconnected" value={suspended} hint="access blocked" cls={suspended?styles.warn:styles.ok}/><Kpi label="API requests / 24h" value={metrics?.platform?.apiRequests24h ?? '—'} hint="real platform usage"/></div>
- <div className={styles.grid4+' '+styles.section}><Kpi label="Audit events / 24h" value={metrics?.platform?.auditEvents24h ?? '—'} hint="operator/system activity"/><Kpi label="Rate-limit violations" value={metrics?.platform?.rateLimitViolations24h ?? '—'} hint="last 24 hours" cls={metrics?.platform?.rateLimitViolations24h?styles.warn:styles.ok}/><Kpi label="Customer integrations" value={metrics?.businessServices?.connectorInstallations ?? '—'} hint="business service layer"/><Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations ?? '—'} hint="customer troubleshooting" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/></div>
- <div className={styles.grid2+' '+styles.section}><div className={styles.card}><CardTitle title="Core EIP health" hint="System performance of EIP itself."/><div className={styles.grid2}><Service title="API" text={health?.status||'unknown'}/><Service title="Version" text={health?.version||'—'}/><Service title="Email" text={health?.email?.live?'Live · '+health.email.provider:'Not configured'}/><Service title="Feature controls" text={flags.filter(f=>f.enabled).length+'/'+flags.length+' enabled'}/></div></div><div className={styles.card}><CardTitle title="Operator attention" hint="Issues visible from current telemetry."/><Service title={suspended?suspended+' disconnected business'+(suspended===1?'':'es'):'No disconnected businesses'} text={suspended?'Review and reconnect where appropriate.':'Tenant lifecycle is clear.'}/><Service title={health?.status==='ok'?'Platform healthy':'Platform health requires attention'} text={health?.status==='ok'?'Health endpoint reports OK.':'Open diagnostics for investigation.'}/></div></div>
+ const overview=<><div className={styles.hero}><h2>Ellines EIP Control Plane</h2><p>This is the platform operating system â€” not a customer dashboard. Operate EIP itself, onboard businesses, assign services, troubleshoot tenants, control access, inspect security activity and configure the platform. Customer connectors are business services, not EIP infrastructure.</p><div className={styles.quick}><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register client</button><button className={styles.button} onClick={()=>navigate('businesses')}>Client portfolio</button><button className={styles.button} onClick={()=>navigate('packages')}>Service packages</button><button className={styles.button} onClick={()=>navigate('health')}>Diagnostics</button></div></div>
+ <div className={styles.grid4}><Kpi label="Businesses onboarded" value={metrics?.platform?.businesses ?? orgs.length} hint="tenant accounts"/><Kpi label="Active tenant users" value={metrics?.platform?.activeUsers ?? totalUsers} hint="currently active" cls={styles.ok}/><Kpi label="Disconnected" value={suspended} hint="access blocked" cls={suspended?styles.warn:styles.ok}/><Kpi label="API requests / 24h" value={metrics?.platform?.apiRequests24h ?? 'â€”'} hint="real platform usage"/></div>
+ <div className={styles.grid4+' '+styles.section}><Kpi label="Audit events / 24h" value={metrics?.platform?.auditEvents24h ?? 'â€”'} hint="operator/system activity"/><Kpi label="Rate-limit violations" value={metrics?.platform?.rateLimitViolations24h ?? 'â€”'} hint="last 24 hours" cls={metrics?.platform?.rateLimitViolations24h?styles.warn:styles.ok}/><Kpi label="Customer integrations" value={metrics?.businessServices?.connectorInstallations ?? 'â€”'} hint="business service layer"/><Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations ?? 'â€”'} hint="customer troubleshooting" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/></div>
+ <div className={styles.grid2+' '+styles.section}><div className={styles.card}><CardTitle title="Core EIP health" hint="System performance of EIP itself."/><div className={styles.grid2}><Service title="API" text={health?.status||'unknown'}/><Service title="Version" text={health?.version||'â€”'}/><Service title="Email" text={health?.email?.live?'Live Â· '+health.email.provider:'Not configured'}/><Service title="Feature controls" text={flags.filter(f=>f.enabled).length+'/'+flags.length+' enabled'}/></div></div><div className={styles.card}><CardTitle title="Operator attention" hint="Issues visible from current telemetry."/><Service title={suspended?suspended+' disconnected business'+(suspended===1?'':'es'):'No disconnected businesses'} text={suspended?'Review and reconnect where appropriate.':'Tenant lifecycle is clear.'}/><Service title={health?.status==='ok'?'Platform healthy':'Platform health requires attention'} text={health?.status==='ok'?'Health endpoint reports OK.':'Open diagnostics for investigation.'}/></div></div>
  <div className={styles.card+' '+styles.section}><CardTitle title="Recent businesses" hint="Fast tenant control."/><button className={styles.button} onClick={()=>navigate('businesses')}>Open all</button>{businessTable(orgs.slice(0,8))}</div></>;
 
- const businesses=<div className={styles.card}><CardTitle title="Business control" hint="Suspend/disconnect, inspect users, assign packages and troubleshoot every onboarded business."/><div style={{display:'flex',gap:8,marginBottom:12}}><input className={styles.input} placeholder="Search business, slug or status…" value={query} onChange={e=>setQuery(e.target.value)}/><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register</button></div>{businessTable(shown)}</div>;
+ const businesses=<div className={styles.card}><CardTitle title="Business control" hint="Suspend/disconnect, inspect users, assign packages and troubleshoot every onboarded business."/><div style={{display:'flex',gap:8,marginBottom:12}}><input className={styles.input} placeholder="Search business, slug or statusâ€¦" value={query} onChange={e=>setQuery(e.target.value)}/><button className={styles.button+' '+styles.primary} onClick={()=>navigate('onboarding')}>+ Register</button></div>{businessTable(shown)}</div>;
 
- const onboarding=<div className={styles.grid2}><form className={styles.card} onSubmit={register}><CardTitle title="Register business" hint="Create a tenant and optionally its first owner."/><div className={styles.form}><Field label="Business name" value={business.name} set={v=>setBusiness({...business,name:v})} placeholder="Acme Holdings Ltd"/><Field label="Slug" value={business.slug} set={v=>setBusiness({...business,slug:v})} placeholder="acme-holdings"/><Field label="Owner name" value={business.ownerFullName} set={v=>setBusiness({...business,ownerFullName:v})}/><Field label="Owner email" value={business.ownerEmail} set={v=>setBusiness({...business,ownerEmail:v})} type="email"/><Field label="Owner password" value={business.ownerPassword} set={v=>setBusiness({...business,ownerPassword:v})} type="password"/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!business.name}>Register business</button></div></div></form><div className={styles.card}><CardTitle title="Onboarding sequence" hint="Keep customer-specific integrations separate from the EIP platform."/><Service title="01 · Tenant" text="Business identity, owner and lifecycle state."/><Service title="02 · Package" text="Assign the commercial capability envelope."/><Service title="03 · Integrations" text="Configure business connectors only when the customer requires them."/><Service title="04 · Verify" text="Check users, health and audit history before handoff."/></div></div>;
+ const onboarding=<div className={styles.grid2}><form className={styles.card} onSubmit={register}><CardTitle title="Register business" hint="Create a tenant and optionally its first owner."/><div className={styles.form}><Field label="Business name" value={business.name} set={v=>setBusiness({...business,name:v})} placeholder="Acme Holdings Ltd"/><Field label="Slug" value={business.slug} set={v=>setBusiness({...business,slug:v})} placeholder="acme-holdings"/><Field label="Owner name" value={business.ownerFullName} set={v=>setBusiness({...business,ownerFullName:v})}/><Field label="Owner email" value={business.ownerEmail} set={v=>setBusiness({...business,ownerEmail:v})} type="email"/><Field label="Owner password" value={business.ownerPassword} set={v=>setBusiness({...business,ownerPassword:v})} type="password"/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!business.name}>Register business</button></div></div></form><div className={styles.card}><CardTitle title="Onboarding sequence" hint="Keep customer-specific integrations separate from the EIP platform."/><Service title="01 Â· Tenant" text="Business identity, owner and lifecycle state."/><Service title="02 Â· Package" text="Assign the commercial capability envelope."/><Service title="03 Â· Integrations" text="Configure business connectors only when the customer requires them."/><Service title="04 Â· Verify" text="Check users, health and audit history before handoff."/></div></div>;
 
- const packagesPage=<><div className={styles.grid2}><div className={styles.card}><CardTitle title="Service packages" hint="Commercial capability bundles. These are not connector infrastructure."/><div className={styles.grid2}>{packages.map(p=><Service key={p.id} title={p.display_name} text={p.name+' · '+(p.monthly_price?'KES '+(p.monthly_price/100).toLocaleString()+'/month':'Custom pricing')} tags={[p.max_users?p.max_users+' users':'∞ users',p.max_connectors?p.max_connectors+' integrations':'∞ integrations',p.enable_sso?'SSO':'',p.enable_agents?'Agents':'',p.enable_advanced_bi?'Advanced BI':''].filter(Boolean)}/>)}</div></div><div className={styles.card}><CardTitle title="Create package" hint="Build a service tier for onboarding."/><div className={styles.form}><Field label="Internal name" value={pkg.name} set={v=>setPkg({...pkg,name:v})}/><Field label="Display name" value={pkg.displayName} set={v=>setPkg({...pkg,displayName:v})}/><Field label="Max users" value={String(pkg.maxUsers)} set={v=>setPkg({...pkg,maxUsers:Number(v)})} type="number"/><Field label="Max integrations" value={String(pkg.maxConnectors)} set={v=>setPkg({...pkg,maxConnectors:Number(v)})} type="number"/><Field label="Requests/day" value={String(pkg.requestsPerDay)} set={v=>setPkg({...pkg,requestsPerDay:Number(v)})} type="number"/><Field label="Monthly price (cents)" value={String(pkg.monthlyPrice)} set={v=>setPkg({...pkg,monthlyPrice:Number(v)})} type="number"/><div className={styles.full}>{(['enableSso','enableCustomRoles','enableAgents','enableAdvancedBi','enableWebhooks'] as const).map(k=><label key={k} style={{display:'block',fontSize:11,margin:'6px 0'}}><input type="checkbox" checked={pkg[k]} onChange={e=>setPkg({...pkg,[k]:e.target.checked})}/> {k.replace('enable','')}</label>)}</div><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!pkg.name||!pkg.displayName} onClick={()=>setPkgDialog(true)}>Create package</button></div></div></div></div><div className={styles.card+' '+styles.section}><CardTitle title="Business integration catalog" hint="Connector packs live here because they are customer services, not platform health dependencies."/><div className={styles.grid3}>{packs.map(p=><Service key={p.id} title={p.name} text={p.description||'Integration template'} tags={[p.catalogId,p.published?'Published':'Draft']}/>)}</div></div><div className={styles.grid2}><div className={styles.card}><CardTitle title="Manage package" hint="Edit or delete a package. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPkg?.id||''} onChange={e=>pickPackage(e.target.value)}><option value="">Select package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select>{selectedPkg&&pkgEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Display name" value={pkgEdit.displayName} set={v=>setPkgEdit({...pkgEdit,displayName:v})}/><Field label="Max users" type="number" value={String(pkgEdit.maxUsers)} set={v=>setPkgEdit({...pkgEdit,maxUsers:Number(v)})}/><Field label="Max integrations" type="number" value={String(pkgEdit.maxConnectors)} set={v=>setPkgEdit({...pkgEdit,maxConnectors:Number(v)})}/><Field label="Requests/day" type="number" value={String(pkgEdit.requestsPerDay)} set={v=>setPkgEdit({...pkgEdit,requestsPerDay:Number(v)})}/><Field label="Monthly price (cents)" type="number" value={String(pkgEdit.monthlyPrice)} set={v=>setPkgEdit({...pkgEdit,monthlyPrice:Number(v)})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.package.update')}>Save changes</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.package.delete')}>Delete package</button></div></div>}</div><div className={styles.card}><CardTitle title="Manage connector pack" hint="Edit, publish, deprecate or delete a pack. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPack?.id||''} onChange={e=>pickPack(e.target.value)}><option value="">Select pack</option>{packs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>{selectedPack&&packEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Name" value={packEdit.name} set={v=>setPackEdit({...packEdit,name:v})}/><Field label="Description" value={packEdit.description} set={v=>setPackEdit({...packEdit,description:v})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.update')}>Save changes</button><button className={styles.button} disabled={busy} onClick={()=>setSafeguardOp(selectedPack.published?'platform.connector_pack.deprecate':'platform.connector_pack.publish')}>{selectedPack.published?'Deprecate':'Publish'}</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.delete')}>Delete pack</button></div></div>}</div></div></>;
+ const packagesPage=<><div className={styles.grid2}><div className={styles.card}><CardTitle title="Service packages" hint="Commercial capability bundles. These are not connector infrastructure."/><div className={styles.grid2}>{packages.map(p=><Service key={p.id} title={p.display_name} text={p.name+' Â· '+(p.monthly_price?'KES '+(p.monthly_price/100).toLocaleString()+'/month':'Custom pricing')} tags={[p.max_users?p.max_users+' users':'âˆž users',p.max_connectors?p.max_connectors+' integrations':'âˆž integrations',p.enable_sso?'SSO':'',p.enable_agents?'Agents':'',p.enable_advanced_bi?'Advanced BI':''].filter(Boolean)}/>)}</div></div><div className={styles.card}><CardTitle title="Create package" hint="Build a service tier for onboarding."/><div className={styles.form}><Field label="Internal name" value={pkg.name} set={v=>setPkg({...pkg,name:v})}/><Field label="Display name" value={pkg.displayName} set={v=>setPkg({...pkg,displayName:v})}/><Field label="Max users" value={String(pkg.maxUsers)} set={v=>setPkg({...pkg,maxUsers:Number(v)})} type="number"/><Field label="Max integrations" value={String(pkg.maxConnectors)} set={v=>setPkg({...pkg,maxConnectors:Number(v)})} type="number"/><Field label="Requests/day" value={String(pkg.requestsPerDay)} set={v=>setPkg({...pkg,requestsPerDay:Number(v)})} type="number"/><Field label="Monthly price (cents)" value={String(pkg.monthlyPrice)} set={v=>setPkg({...pkg,monthlyPrice:Number(v)})} type="number"/><div className={styles.full}>{(['enableSso','enableCustomRoles','enableAgents','enableAdvancedBi','enableWebhooks'] as const).map(k=><label key={k} style={{display:'block',fontSize:11,margin:'6px 0'}}><input type="checkbox" checked={pkg[k]} onChange={e=>setPkg({...pkg,[k]:e.target.checked})}/> {k.replace('enable','')}</label>)}</div><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!pkg.name||!pkg.displayName} onClick={()=>setPkgDialog(true)}>Create package</button></div></div></div></div><div className={styles.card+' '+styles.section}><CardTitle title="Business integration catalog" hint="Connector packs live here because they are customer services, not platform health dependencies."/><div className={styles.grid3}>{packs.map(p=><Service key={p.id} title={p.name} text={p.description||'Integration template'} tags={[p.catalogId,p.published?'Published':'Draft']}/>)}</div></div><div className={styles.grid2}><div className={styles.card}><CardTitle title="Manage package" hint="Edit or delete a package. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPkg?.id||''} onChange={e=>pickPackage(e.target.value)}><option value="">Select package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select>{selectedPkg&&pkgEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Display name" value={pkgEdit.displayName} set={v=>setPkgEdit({...pkgEdit,displayName:v})}/><Field label="Max users" type="number" value={String(pkgEdit.maxUsers)} set={v=>setPkgEdit({...pkgEdit,maxUsers:Number(v)})}/><Field label="Max integrations" type="number" value={String(pkgEdit.maxConnectors)} set={v=>setPkgEdit({...pkgEdit,maxConnectors:Number(v)})}/><Field label="Requests/day" type="number" value={String(pkgEdit.requestsPerDay)} set={v=>setPkgEdit({...pkgEdit,requestsPerDay:Number(v)})}/><Field label="Monthly price (cents)" type="number" value={String(pkgEdit.monthlyPrice)} set={v=>setPkgEdit({...pkgEdit,monthlyPrice:Number(v)})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.package.update')}>Save changes</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.package.delete')}>Delete package</button></div></div>}</div><div className={styles.card}><CardTitle title="Manage connector pack" hint="Edit, publish, deprecate or delete a pack. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPack?.id||''} onChange={e=>pickPack(e.target.value)}><option value="">Select pack</option>{packs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>{selectedPack&&packEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Name" value={packEdit.name} set={v=>setPackEdit({...packEdit,name:v})}/><Field label="Description" value={packEdit.description} set={v=>setPackEdit({...packEdit,description:v})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.update')}>Save changes</button><button className={styles.button} disabled={busy} onClick={()=>setSafeguardOp(selectedPack.published?'platform.connector_pack.deprecate':'platform.connector_pack.publish')}>{selectedPack.published?'Deprecate':'Publish'}</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.delete')}>Delete pack</button></div></div>}</div></div></>;
 
- const access=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Tenant access" hint="Select a business to manage its users."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<form className={styles.form} style={{marginTop:12}} onSubmit={addUser}><Field label="Full name" value={user.fullName} set={v=>setUser({...user,fullName:v})}/><Field label="Email" value={user.email} set={v=>setUser({...user,email:v})}/><Field label="Password" value={user.password} set={v=>setUser({...user,password:v})} type="password"/><label className={styles.field}><span>Role</span><select className={styles.select} value={user.role} onChange={e=>setUser({...user,role:e.target.value})}>{roles.map(r=><option key={r}>{r}</option>)}</select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy}>Add user</button></div></form>}</div><div className={styles.card}><CardTitle title={selected?selected.name:'Users'} hint={users.length+' loaded'}/>{users.map(u=><div className={styles.service} key={u.id} style={{marginBottom:8}}><strong>{u.fullName}</strong><p>{u.email} · {u.role}</p><button className={styles.button+' '+(u.isActive?styles.danger:styles.success)} onClick={()=>void toggleUser(u)}>{u.isActive?'Deactivate':'Activate'}</button></div>)}</div></div>;
+ const access=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Tenant access" hint="Select a business to manage its users."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<form className={styles.form} style={{marginTop:12}} onSubmit={addUser}><Field label="Full name" value={user.fullName} set={v=>setUser({...user,fullName:v})}/><Field label="Email" value={user.email} set={v=>setUser({...user,email:v})}/><Field label="Password" value={user.password} set={v=>setUser({...user,password:v})} type="password"/><label className={styles.field}><span>Role</span><select className={styles.select} value={user.role} onChange={e=>setUser({...user,role:e.target.value})}>{roles.map(r=><option key={r}>{r}</option>)}</select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy}>Add user</button></div></form>}</div><div className={styles.card}><CardTitle title={selected?selected.name:'Users'} hint={users.length+' loaded'}/>{users.map(u=><div className={styles.service} key={u.id} style={{marginBottom:8}}><strong>{u.fullName}</strong><p>{u.email} Â· {u.role}</p><button className={styles.button+' '+(u.isActive?styles.danger:styles.success)} onClick={()=>void toggleUser(u)}>{u.isActive?'Deactivate':'Activate'}</button></div>)}</div></div>;
 
- const healthPage=<><div className={styles.grid4}><Kpi label="Platform" value={healthSummary?.status||health?.status||'unknown'} hint="probed control plane" cls={healthSummary?.status==='ok'?styles.ok:styles.warn}/><Kpi label="Database" value={healthSummary?.dependencies.find(d=>d.name==='database')?.status||'unknown'} hint="live dependency probe"/><Kpi label="Email" value={healthSummary?.dependencies.find(d=>d.name==='email')?.status||'unknown'} hint={healthSummary?.dependencies.find(d=>d.name==='email')?.provider||'provider'}/><Kpi label="Checked" value={healthSummary?.checkedAt?new Date(healthSummary.checkedAt).toLocaleTimeString():'—'} hint="latest probe"/></div><div className={styles.card+' '+styles.section}><CardTitle title="Tenant diagnostics" hint="Business integration health is inspected here; it is not EIP core infrastructure."/>{businessTable(orgs)}</div></>;
+ const healthPage=<><div className={styles.grid4}><Kpi label="Platform" value={healthSummary?.status||health?.status||'unknown'} hint="probed control plane" cls={healthSummary?.status==='ok'?styles.ok:styles.warn}/><Kpi label="Database" value={healthSummary?.dependencies.find(d=>d.name==='database')?.status||'unknown'} hint="live dependency probe"/><Kpi label="Email" value={healthSummary?.dependencies.find(d=>d.name==='email')?.status||'unknown'} hint={healthSummary?.dependencies.find(d=>d.name==='email')?.provider||'provider'}/><Kpi label="Checked" value={healthSummary?.checkedAt?new Date(healthSummary.checkedAt).toLocaleTimeString():'â€”'} hint="latest probe"/></div><div className={styles.card+' '+styles.section}><CardTitle title="Tenant diagnostics" hint="Business integration health is inspected here; it is not EIP core infrastructure."/>{businessTable(orgs)}</div></>;
 
  const auditPage=<div className={styles.card}><CardTitle title="Security & audit center" hint="Cross-business operator activity for investigation and accountability."/><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginBottom:12}}><input className={styles.input} placeholder="Action prefix e.g. platform." value={auditQuery} onChange={e=>setAuditQuery(e.target.value)}/><select className={styles.select} value={auditOrg} onChange={e=>setAuditOrg(e.target.value)}><option value="">All businesses</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><input className={styles.input} type="date" value={auditFrom} onChange={e=>setAuditFrom(e.target.value)}/><input className={styles.input} type="date" value={auditTo} onChange={e=>setAuditTo(e.target.value)}/></div><div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}><button className={styles.button+' '+styles.primary} onClick={()=>void loadAudit(0)}>Search</button><button className={styles.button} onClick={()=>void exportAudit()}>Export CSV</button><span className={styles.muted}>{auditTotal} matching events</span><button className={styles.button} disabled={busy} onClick={()=>void migrateEncryption(true)}>Dry-run credential migration</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>{if(window.confirm('Migrate all legacy database credentials to the current master-key encryption format?'))void migrateEncryption(false)}}>Run encryption migration</button></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Time</th><th>Business</th><th>Actor</th><th>Action</th><th>Resource</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.createdAt).toLocaleString()}</td><td>{a.organizationName||a.organizationId}</td><td>{a.userEmail||'system'}</td><td>{a.action}</td><td>{a.resource}</td></tr>)}{!audit.length&&<tr><td colSpan={5}>No rows loaded.</td></tr>}</tbody></table></div><div style={{display:'flex',gap:8,marginTop:12}}><button className={styles.button} disabled={auditPageIndex===0} onClick={()=>void loadAudit(auditPageIndex-1)}>Previous</button><button className={styles.button} disabled={(auditPageIndex+1)*50>=auditTotal} onClick={()=>void loadAudit(auditPageIndex+1)}>Next</button></div></div>;
 
- const aiPage=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Ellinea AI — platform operator" hint="Evidence-backed investigation and summaries; authorization remains with the operator."/><form onSubmit={askAI}><textarea className={styles.input} style={{minHeight:130,resize:'vertical'}} placeholder="Ask about platform operations or a business…" value={aiQ} onChange={e=>setAiQ(e.target.value)}/><button className={styles.button+' '+styles.primary} disabled={aiBusy||!aiQ.trim()}>{aiBusy?'Thinking…':'Ask Ellinea'}</button></form></div><div className={styles.card}><CardTitle title="AI response" hint="No answer is treated as an authorization."/><p className={styles.cardHint}>{aiA||'No response yet.'}</p></div></div>;
+ const aiPage=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Ellinea AI â€” platform operator" hint="Evidence-backed investigation and summaries; authorization remains with the operator."/><form onSubmit={askAI}><textarea className={styles.input} style={{minHeight:130,resize:'vertical'}} placeholder="Ask about platform operations or a businessâ€¦" value={aiQ} onChange={e=>setAiQ(e.target.value)}/><button className={styles.button+' '+styles.primary} disabled={aiBusy||!aiQ.trim()}>{aiBusy?'Thinkingâ€¦':'Ask Ellinea'}</button></form></div><div className={styles.card}><CardTitle title="AI response" hint="No answer is treated as an authorization."/><p className={styles.cardHint}>{aiA||'No response yet.'}</p></div></div>;
 
  const config=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Global feature controls" hint="Platform-wide switches." />{flags.map(f=><div className={styles.service} key={f.key} style={{marginBottom:8}}><strong>{f.label}</strong><p>{f.note}</p><button className={styles.button+' '+(f.enabled?styles.success:'')} onClick={async()=>{try{const r=await updatePlatformFlag(f.key,!f.enabled);setFlags(r.data);setNotice(f.label+' updated.')}catch(e){setError(e instanceof Error?e.message:'Flag update failed')}}}>{f.enabled?'Enabled':'Disabled'}</button></div>)}</div><div className={styles.card}><CardTitle title="Tenant date & time" hint="Platform operator controls presentation for an onboarded business."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<div className={styles.form} style={{marginTop:12}}><label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>setSettings({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour</option><option value="24h">24-hour</option></select></label><label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>setSettings({...settings,dateStyle:e.target.value as OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short</option><option value="medium">Medium</option><option value="log">Log</option></select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} onClick={()=>void saveDate()}>Save</button></div></div>}</div></div>;
 
-  // ── section resolver ────────────────────────────────────────────────────────
+  // â”€â”€ section resolver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Every live section maps to a JSX variable. Reserved sections (available:false
-  // in app-navigation.ts) render an honest "Planned" state — no fake data.
+  // in app-navigation.ts) render an honest "Planned" state â€” no fake data.
   const meta = PLATFORM_SECTION_META[activeSection];
   const isReserved = meta ? !meta.available : false;
 
@@ -271,8 +273,8 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
         <CardTitle title="Platform health" hint="EIP control-plane status." />
         <div className={styles.grid2}>
           <Service title="API" text={health?.status || 'unknown'} />
-          <Service title="Version" text={health?.version || '—'} />
-          <Service title="Email" text={health?.email?.live ? `Live · ${health.email.provider}` : 'Not configured'} />
+          <Service title="Version" text={health?.version || 'â€”'} />
+          <Service title="Email" text={health?.email?.live ? `Live Â· ${health.email.provider}` : 'Not configured'} />
           <Service title="DB" text={healthSummary?.dependencies.find(d => d.name === 'database')?.status || 'unknown'} />
         </div>
       </div>
@@ -376,7 +378,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // ── TASK-13: Services & Entitlements ──────────────────────────────────────
+  // â”€â”€ TASK-13: Services & Entitlements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const clientServicesPage = (
     <div>
       <div className={styles.card} style={{marginBottom:12}}>
@@ -388,9 +390,9 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
               {orgs.map(o => (
                 <tr key={o.id}>
                   <td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td>
-                  <td><span className={styles.muted}>—</span></td>
+                  <td><span className={styles.muted}>â€”</span></td>
                   <td>{o.userCount}</td>
-                  <td>—</td>
+                  <td>â€”</td>
                   <td><span className={`${styles.status} ${o.status==='active'?styles.statusOk:styles.statusBad}`}>{o.status}</span></td>
                   <td><button className={`${styles.button} ${styles.primary}`} style={{fontSize:11}} onClick={()=>navigate('client',o.id)}>Open workspace</button></td>
                 </tr>
@@ -409,7 +411,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // ── TASK-14: Activity & Usage ──────────────────────────────────────────────
+  // â”€â”€ TASK-14: Activity & Usage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const clientActivityPage = (
     <div className={styles.card}>
       <CardTitle title="Activity & usage" hint="Cross-client audit activity. Filter by client, action or date range."/>
@@ -451,14 +453,14 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // ── TASK-15: Alerts & Issues ──────────────────────────────────────────────
+  // â”€â”€ TASK-15: Alerts & Issues â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const clientAlertsPage = (
     <div>
       <div className={styles.grid4} style={{marginBottom:12}}>
         <Kpi label="Suspended clients" value={orgs.filter(o=>o.status==='suspended').length} hint="access blocked" cls={orgs.filter(o=>o.status==='suspended').length?styles.warn:styles.ok}/>
         <Kpi label="Total clients" value={orgs.length} hint="onboarded"/>
-        <Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations??'—'} hint="connector errors" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/>
-        <Kpi label="Total integrations" value={metrics?.businessServices?.connectorInstallations??'—'} hint="installed"/>
+        <Kpi label="Failed integrations" value={metrics?.businessServices?.failedConnectorInstallations??'â€”'} hint="connector errors" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/>
+        <Kpi label="Total integrations" value={metrics?.businessServices?.connectorInstallations??'â€”'} hint="installed"/>
       </div>
       <div className={styles.card} style={{marginBottom:12}}>
         <CardTitle title="Connector errors across all clients" hint="Installations currently in error state. Click a client to open its workspace."/>
@@ -474,7 +476,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
                 </tr>
               ))}
               {!orgs.filter(o=>o.status!=='active').length&&(
-                <tr><td colSpan={3} style={{color:'#34d399',fontWeight:600}}>✓ No suspended or disconnected clients</td></tr>
+                <tr><td colSpan={3} style={{color:'#34d399',fontWeight:600}}>âœ“ No suspended or disconnected clients</td></tr>
               )}
             </tbody>
           </table>
@@ -482,7 +484,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       </div>
       <div className={styles.card}>
         <CardTitle title="How to triage an alert" hint="Step-by-step connector error resolution."/>
-        <Service title="1. Open client workspace" text="Click the client in the table above → Connectors tab."/>
+        <Service title="1. Open client workspace" text="Click the client in the table above â†’ Connectors tab."/>
         <Service title="2. Identify the failed connector" text="Status = error. Check the last message column for the error detail."/>
         <Service title="3. Edit credentials" text="Click Edit on the connector, update credentials, then Test connection."/>
         <Service title="4. Sync" text="Once the test passes, click Sync now to restore the live data feed."/>
@@ -538,6 +540,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
           notice={notice}
           onBack={() => navigate('businesses')}
           onToggle={(o) => void toggle(o)}
+          onDeleteOrg={(o) => void deleteOrg(o)}
           onAddUser={async (e) => {
             e.preventDefault();
             if (!clientOrgId) return;
@@ -609,13 +612,13 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
             if (!clientOrgId) return;
             const inst = await activatePlatformOrgConnector(clientOrgId, connId);
             setWsInstallations(v => v.map(x => x.id === inst.id ? inst : x));
-            setNotice(`"${inst.displayName}" activated — client org can now use this connector.`);
+            setNotice(`"${inst.displayName}" activated â€” client org can now use this connector.`);
           }}
           onDeactivateConnector={async (connId) => {
             if (!clientOrgId) return;
             const inst = await deactivatePlatformOrgConnector(clientOrgId, connId);
             setWsInstallations(v => v.map(x => x.id === inst.id ? inst : x));
-            setNotice(`"${inst.displayName}" deactivated — client org access suspended.`);
+            setNotice(`"${inst.displayName}" deactivated â€” client org access suspended.`);
           }}
           onTestConnector={async (connId) => {
             if (!clientOrgId) return { ok: false, message: 'No org' };
@@ -661,7 +664,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   const activeLabel = activeSection === 'client'
     ? (wsOrg?.name ?? 'Client Workspace')
     : (SECTION_LABEL[activeSection] ?? meta?.label ?? 'Platform');
-  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>{activeSection === 'client' ? (wsOrg ? `${wsOrg.slug} · ${wsOrg.status}` : 'Loading…') : 'Ellines EIP control-plane operations'}</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} clients</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
+  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>{activeSection === 'client' ? (wsOrg ? `${wsOrg.slug} Â· ${wsOrg.status}` : 'Loadingâ€¦') : 'Ellines EIP control-plane operations'}</p></div><div className={styles.topActions}><span className={styles.pill}>â— {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} clients</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
   <ConfirmDialog operationId="platform.package.create" open={pkgDialog} onConfirm={createPackage} onCancel={()=>setPkgDialog(false)} context={pkg.displayName||pkg.name}/>
   <ConfirmDialog operationId={safeguardOp||'platform.package.delete'} open={Boolean(safeguardOp)} onConfirm={reason=>runSafeguarded(reason,safeguardOp||'platform.package.delete')} onCancel={()=>setSafeguardOp(null)} context={safeguardOp&&safeguardOp.indexOf('package')>=0?(selectedPkg?.display_name||''):(selectedPack?.name||'')}/>
   </>;
@@ -672,7 +675,7 @@ function CardTitle({title,hint}:{title:string;hint:string}){return <div classNam
 function Service({title,text,tags=[]}:{title:string;text:string;tags?:string[]}){return <div className={styles.service}><h4>{title}</h4><p>{text}</p>{tags.map(t=><span className={styles.tag} key={t}>{t}</span>)}</div>}
 function Field({label,value,set,placeholder,type='text'}:{label:string;value:string;set:(v:string)=>void;placeholder?:string;type?:string}){return <label className={styles.field}><span>{label}</span><input className={styles.input} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} type={type}/></label>}
 
-// ── Full-page Client Workspace ───────────────────────────────────────────────
+// â”€â”€ Full-page Client Workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Opened when the operator clicks "Open workspace" on any client org.
 // Full Work Console view per client: every section the client's own users see,
 // but scoped to their org and read via platform cross-org APIs.
@@ -688,7 +691,7 @@ const CONNECTOR_TYPES = [
   { id:'csv-file',   title:'CSV / File export',   tag:'No API needed',              blurb:'Paste a nightly CSV/Excel dump the business already produces.' },
   { id:'email-imap', title:'Email (IMAP)',        tag:'Legacy reports',             blurb:'Ingest mailed reports and alerts from the prime system.' },
   { id:'sftp',       title:'SFTP / folder drop',  tag:'Healthcare / supply chain',  blurb:'Pull CSV dumps from an SFTP inbox the HIS or ERP already fills.' },
-  { id:'demo-json',  title:'Demo JSON seed',      tag:'Smoke test only',            blurb:'Built-in sample data — not for production.' },
+  { id:'demo-json',  title:'Demo JSON seed',      tag:'Smoke test only',            blurb:'Built-in sample data â€” not for production.' },
 ] as const;
 
 const DEFAULT_CSV = 'metric,value\nhealthScore,\nconnectedSystems,\nopenAlerts,\nopenDecisions,\nbriefHighlight,"Replace with your system\'s actual CSV export"';
@@ -710,12 +713,12 @@ function formatBytes(bytes: number): string {
 }
 
 function mimeIcon(mime: string): string {
-  if (mime.includes('pdf')) return '📄';
-  if (mime.includes('word')||mime.includes('document')) return '📝';
-  if (mime.includes('sheet')||mime.includes('excel')||mime.includes('csv')) return '📊';
-  if (mime.includes('image')) return '🖼️';
-  if (mime.includes('text')) return '📃';
-  return '📁';
+  if (mime.includes('pdf')) return 'ðŸ“„';
+  if (mime.includes('word')||mime.includes('document')) return 'ðŸ“';
+  if (mime.includes('sheet')||mime.includes('excel')||mime.includes('csv')) return 'ðŸ“Š';
+  if (mime.includes('image')) return 'ðŸ–¼ï¸';
+  if (mime.includes('text')) return 'ðŸ“ƒ';
+  return 'ðŸ“';
 }
 
 function ClientWorkspace({
@@ -724,7 +727,7 @@ function ClientWorkspace({
   installations, documents, orgProfile, availablePacks,
   packages, loading, busy, tab, setTab, wsUser, setWsUser,
   error: _e, notice: _n,
-  onBack, onToggle, onAddUser, onToggleUser, onAssignPackage,
+  onBack, onToggle, onDeleteOrg, onAddUser, onToggleUser, onAssignPackage,
   onSaveSettings, onSettingsChange, onSaveOrgName,
   onInstallConnector, onUpdateConnector, onDeleteConnector, onActivateConnector, onDeactivateConnector, onTestConnector, onSyncConnector,
   onUploadDocument, onDeleteDocument, onLoadAudit,
@@ -755,6 +758,7 @@ function ClientWorkspace({
   error: string; notice: string;
   onBack: () => void;
   onToggle: (o: import('@/lib/api').PlatformOrg) => void;
+  onDeleteOrg: (o: import('@/lib/api').PlatformOrg) => void;
   onAddUser: (e: React.FormEvent) => Promise<void>;
   onToggleUser: (u: import('@/lib/api').OrgMember) => Promise<void>;
   onAssignPackage: (tierId: string) => Promise<void>;
@@ -774,7 +778,7 @@ function ClientWorkspace({
   integrationRequests: import('@/lib/api').IntegrationRequestDto[];
   onReviewIntegrationRequest: (reqId:string, payload:{status:'approved'|'rejected';reviewNote?:string}) => Promise<void>;
 }) {
-  // ── Internal wizard state for Connectors tab ──
+  // â”€â”€ Internal wizard state for Connectors tab â”€â”€
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizStep, setWizStep] = useState<1|2|3|4>(1);
   const [wizCatalogId, setWizCatalogId] = useState('openapi');
@@ -909,7 +913,7 @@ function ClientWorkspace({
     {id:'agents',        label:'Automation'},
     {id:'documents',     label:'Documents'},
   ];
-  // ── Operator-only control tabs ──
+  // â”€â”€ Operator-only control tabs â”€â”€
   const OP_TABS: {id: WsTab; label: string}[] = [
     {id:'users',     label:'Users & Access'},
     {id:'audit',     label:'Audit Log'},
@@ -920,7 +924,7 @@ function ClientWorkspace({
   if (!orgId) return (
     <div className={styles.card}>
       <p className={styles.cardHint}>No client selected.</p>
-      <button className={styles.button} onClick={onBack}>← Back to portfolio</button>
+      <button className={styles.button} onClick={onBack}>â† Back to portfolio</button>
     </div>
   );
 
@@ -936,7 +940,7 @@ function ClientWorkspace({
 
   return (
     <div>
-      {/* ── Client identity banner — always visible ── */}
+      {/* â”€â”€ Client identity banner â€” always visible â”€â”€ */}
       <div style={{
         background:'linear-gradient(135deg,rgba(124,58,237,.18),rgba(37,99,235,.1))',
         border:'1px solid rgba(124,58,237,.25)',
@@ -948,13 +952,13 @@ function ClientWorkspace({
         gap:14,
         flexWrap:'wrap',
       }}>
-        <button className={styles.button} onClick={onBack} style={{fontSize:11,flexShrink:0}}>← Portfolio</button>
+        <button className={styles.button} onClick={onBack} style={{fontSize:11,flexShrink:0}}>â† Portfolio</button>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.12em',color:'#8b9bb0',fontWeight:800,marginBottom:2}}>
             Client Workspace
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <strong style={{fontSize:20,color:'#fff',letterSpacing:'-.02em'}}>{org?.name ?? '…'}</strong>
+            <strong style={{fontSize:20,color:'#fff',letterSpacing:'-.02em'}}>{org?.name ?? 'â€¦'}</strong>
             {org && <span className={`${styles.status} ${org.status==='active'?styles.statusOk:styles.statusBad}`}>{org.status}</span>}
             {org && <span style={{fontSize:11,color:'#8795aa'}}>{org.slug}</span>}
             {org && <span style={{fontSize:11,color:'#8795aa'}}>{org.userCount} users</span>}
@@ -962,7 +966,7 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {/* ── Work Console tabs (mirrors client's own nav) ── */}
+      {/* â”€â”€ Work Console tabs (mirrors client's own nav) â”€â”€ */}
       <div style={{marginBottom:4}}>
         <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2}}>Work Console</div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
@@ -970,7 +974,7 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {/* ── Operator control tabs ── */}
+      {/* â”€â”€ Operator control tabs â”€â”€ */}
       <div style={{marginBottom:18}}>
         <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2,marginTop:10}}>Operator Controls</div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:12,borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
@@ -978,15 +982,15 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {loading && <div style={{padding:'32px 0',color:'#8795aa',textAlign:'center'}}>Loading {org?.name ?? 'client'} workspace…</div>}
+      {loading && <div style={{padding:'32px 0',color:'#8795aa',textAlign:'center'}}>Loading {org?.name ?? 'client'} workspaceâ€¦</div>}
 
-      {/* ── OVERVIEW ── */}
+      {/* â”€â”€ OVERVIEW â”€â”€ */}
       {!loading && tab==='overview' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="Users" value={tier?.rate_limit_tiers?.max_users!=null?`${stats?.stats?.totalUsers??'—'} / ${tier.rate_limit_tiers.max_users}`:(stats?.stats?.totalUsers??'—')} hint="used / allowed"/>
-            <Kpi label="Active users" value={stats?.stats?.activeUsers??'—'} hint="currently active" cls={styles.ok}/>
-            <Kpi label="Integrations" value={tier?.rate_limit_tiers?.max_connectors!=null?`${installations.filter(c=>c.status==='active'||c.status==='synced').length} / ${tier.rate_limit_tiers.max_connectors}`:(installations.filter(c=>c.status==='active'||c.status==='synced').length??'—')} hint="active / allowed"/>
+            <Kpi label="Users" value={tier?.rate_limit_tiers?.max_users!=null?`${stats?.stats?.totalUsers??'â€”'} / ${tier.rate_limit_tiers.max_users}`:(stats?.stats?.totalUsers??'â€”')} hint="used / allowed"/>
+            <Kpi label="Active users" value={stats?.stats?.activeUsers??'â€”'} hint="currently active" cls={styles.ok}/>
+            <Kpi label="Integrations" value={tier?.rate_limit_tiers?.max_connectors!=null?`${installations.filter(c=>c.status==='active'||c.status==='synced').length} / ${tier.rate_limit_tiers.max_connectors}`:(installations.filter(c=>c.status==='active'||c.status==='synced').length??'â€”')} hint="active / allowed"/>
             <Kpi label="Connector errors" value={installations.filter(c=>c.status==='error').length} hint="need attention" cls={installations.filter(c=>c.status==='error').length?styles.warn:styles.ok}/>
           </div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1015,7 +1019,7 @@ function ClientWorkspace({
                     <h4>Brief highlight</h4>
                     <p>{snapshot.briefHighlight||'No brief available.'}</p>
                   </div>
-                  <p style={{fontSize:10,color:'#64738a',marginTop:8}}>Synced {snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : '—'}</p>
+                  <p style={{fontSize:10,color:'#64738a',marginTop:8}}>Synced {snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : 'â€”'}</p>
                 </>
               ) : <p className={styles.cardHint}>No snapshot yet. Client needs at least one synced connector.</p>}
             </div>
@@ -1039,7 +1043,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── GLANCE (Enterprise Snapshot) ── */}
+      {/* â”€â”€ GLANCE (Enterprise Snapshot) â”€â”€ */}
       {!loading && tab==='glance' && (
         <div>
           {snapshot ? (
@@ -1051,7 +1055,7 @@ function ClientWorkspace({
                 <Kpi label="Open decisions" value={snapshot.openDecisions??0} hint="pending decisions" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
               </div>
               <div className={styles.card} style={{marginBottom:12}}>
-                <CardTitle title="Brief highlight" hint={`Last synced ${snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : '—'}`}/>
+                <CardTitle title="Brief highlight" hint={`Last synced ${snapshot.syncedAt ? new Date(snapshot.syncedAt).toLocaleString() : 'â€”'}`}/>
                 <p style={{fontSize:13,lineHeight:1.6,color:'#c8d2e0',marginTop:4}}>{snapshot.briefHighlight||'No brief available.'}</p>
               </div>
               <div className={styles.card}>
@@ -1075,7 +1079,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── TIMELINE ── */}
+      {/* â”€â”€ TIMELINE â”€â”€ */}
       {!loading && tab==='timeline' && (
         <div>
           <div className={styles.card} style={{marginBottom:12}}>
@@ -1110,13 +1114,13 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── NOTIFICATIONS ── */}
+      {/* â”€â”€ NOTIFICATIONS â”€â”€ */}
       {!loading && tab==='notifications' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
             <Kpi label="Pending approvals" value={approvals.filter(a=>a.status==='pending').length} hint="require attention" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
-            <Kpi label="Open alerts" value={snapshot?.openAlerts??'—'} hint="from snapshot" cls={snapshot?.openAlerts?styles.warn:styles.ok}/>
-            <Kpi label="Open decisions" value={snapshot?.openDecisions??'—'} hint="pending" cls={snapshot?.openDecisions?styles.warn:styles.ok}/>
+            <Kpi label="Open alerts" value={snapshot?.openAlerts??'â€”'} hint="from snapshot" cls={snapshot?.openAlerts?styles.warn:styles.ok}/>
+            <Kpi label="Open decisions" value={snapshot?.openDecisions??'â€”'} hint="pending" cls={snapshot?.openDecisions?styles.warn:styles.ok}/>
             <Kpi label="Connector errors" value={connectors.filter(c=>c.errorCount>0).length} hint="need attention" cls={connectors.filter(c=>c.errorCount>0).length?styles.warn:styles.ok}/>
           </div>
           <div className={styles.card}>
@@ -1127,7 +1131,7 @@ function ClientWorkspace({
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                       <div>
                         <strong style={{fontSize:12}}>{a.title}</strong>
-                        <p style={{margin:'3px 0 0',fontSize:10}}>{a.requester} · {a.source}</p>
+                        <p style={{margin:'3px 0 0',fontSize:10}}>{a.requester} Â· {a.source}</p>
                       </div>
                       <span className={`${styles.status} ${styles.statusNeutral}`}>pending</span>
                     </div>
@@ -1138,19 +1142,19 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── FLEET ── */}
+      {/* â”€â”€ FLEET â”€â”€ */}
       {!loading && tab==='fleet' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="Connected systems" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
-            <Kpi label="Health score" value={snapshot?((snapshot.healthScore??0)+'/100'):'—'} hint="enterprise health" cls={snapshot?.healthScore!=null&&snapshot.healthScore>=70?styles.ok:snapshot?.healthScore!=null&&snapshot.healthScore>=40?styles.warn:styles.bad}/>
+            <Kpi label="Connected systems" value={snapshot?.connectedSystems??'â€”'} hint="from enterprise snapshot"/>
+            <Kpi label="Health score" value={snapshot?((snapshot.healthScore??0)+'/100'):'â€”'} hint="enterprise health" cls={snapshot?.healthScore!=null&&snapshot.healthScore>=70?styles.ok:snapshot?.healthScore!=null&&snapshot.healthScore>=40?styles.warn:styles.bad}/>
             <Kpi label="Connectors" value={connectors.length} hint="installed"/>
             <Kpi label="Synced" value={connectors.filter(c=>c.status==='synced').length} hint="ok"/>
           </div>
           {snapshot ? (
             <div className={styles.card}>
               <CardTitle title="Fleet overview" hint="Systems and assets visible from the enterprise snapshot."/>
-              <Service title="Enterprise health" text={`Score: ${snapshot.healthScore}/100 · ${snapshot.connectedSystems} connected systems`}/>
+              <Service title="Enterprise health" text={`Score: ${snapshot.healthScore}/100 Â· ${snapshot.connectedSystems} connected systems`}/>
               <Service title="Brief" text={snapshot.briefHighlight||'No brief available.'}/>
               <p style={{marginTop:12,fontSize:11,color:'#5f6d83'}}>
                 Full fleet detail (individual assets, vehicles, equipment) requires the client to have their fleet management system connected as a connector. The data shown here is aggregated from the enterprise snapshot.
@@ -1160,14 +1164,14 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── PEOPLE ── */}
+      {/* â”€â”€ PEOPLE â”€â”€ */}
       {!loading && tab==='people' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="EIP users" value={stats?.stats?.totalUsers??'—'} hint="registered accounts"/>
-            <Kpi label="Active" value={stats?.stats?.activeUsers??'—'} hint="currently active" cls={styles.ok}/>
+            <Kpi label="EIP users" value={stats?.stats?.totalUsers??'â€”'} hint="registered accounts"/>
+            <Kpi label="Active" value={stats?.stats?.activeUsers??'â€”'} hint="currently active" cls={styles.ok}/>
             <Kpi label="Roles" value={Object.keys(stats?.stats?.roleBreakdown??{}).length} hint="role types"/>
-            <Kpi label="Connected people" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
+            <Kpi label="Connected people" value={snapshot?.connectedSystems??'â€”'} hint="from enterprise snapshot"/>
           </div>
           <div className={styles.grid2}>
             <div className={styles.card}>
@@ -1181,7 +1185,7 @@ function ClientWorkspace({
                   <span style={{textTransform:'capitalize',color:'#a5b4fc'}}>{u.role}</span>
                 </div>
               ))}
-              {users.length > 15 && <p className={styles.cardHint} style={{marginTop:8}}>+{users.length-15} more — go to Users & Access for full management.</p>}
+              {users.length > 15 && <p className={styles.cardHint} style={{marginTop:8}}>+{users.length-15} more â€” go to Users & Access for full management.</p>}
               {!users.length && <p className={styles.cardHint}>No users loaded.</p>}
             </div>
             <div className={styles.card}>
@@ -1199,12 +1203,12 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── INBOX ── */}
+      {/* â”€â”€ INBOX â”€â”€ */}
       {!loading && tab==='inbox' && (
         <div className={styles.card}>
           <CardTitle title="Inbox" hint="Email and message activity for this client (requires email connector)."/>
           <div className={styles.planned}>
-            <h3>Inbox — operator view</h3>
+            <h3>Inbox â€” operator view</h3>
             <p>The client&apos;s inbox is populated by their own email connector syncs. As a platform operator you can see connector sync status in the Connectors tab. The client&apos;s users access their own inbox from their Work Console.</p>
           </div>
           <div style={{marginTop:14}}>
@@ -1214,18 +1218,18 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── DOCUMENTS ── */}
+      {/* â”€â”€ DOCUMENTS â”€â”€ */}
       {!loading && tab==='documents' && (
         <div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
             <div><strong style={{fontSize:14}}>{documents.length} document{documents.length!==1?'s':''}</strong><span className={styles.muted} style={{marginLeft:8,fontSize:11}}>{documents.reduce((n,d)=>n+d.sizeBytes,0)/1024<1024?`${(documents.reduce((n,d)=>n+d.sizeBytes,0)/1024).toFixed(1)} KB`:`${(documents.reduce((n,d)=>n+d.sizeBytes,0)/1048576).toFixed(1)} MB`} total</span></div>
             <button className={`${styles.button} ${styles.primary}`} onClick={()=>setDocUploadOpen(v=>!v)}>{docUploadOpen?'Cancel':'+ Upload document'}</button>
           </div>
-          {docUploadOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.25)'}}><CardTitle title="Upload document" hint="Max 500 KB. Ellinea can reference documents added with a summary."/>{docError&&<div className={styles.alert}>{docError}</div>}<div className={styles.form} style={{marginTop:8}}><label className={styles.field}><span>File (max 500 KB)</span><input type="file" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.json,.png,.jpg" onChange={e=>{const f=e.target.files?.[0]??null;setDocFile(f);if(f&&!docName)setDocName(f.name);}} required/></label><Field label="Display name" value={docName} set={setDocName}/><Field label="Tags (comma-separated)" value={docTags} set={setDocTags} placeholder="finance, Q3, Nairobi"/><Field label="Branch / site" value={docBranch} set={setDocBranch} placeholder="Nairobi HQ"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>Summary (for Ellinea)</span><textarea className={styles.input} value={docSummary} onChange={e=>setDocSummary(e.target.value)} rows={2} placeholder="Brief description for AI context…"/></label><div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={docBusy||!docFile} onClick={async()=>{if(!docFile)return;if(docFile.size>500*1024){setDocError('File exceeds 500 KB');return;}setDocBusy(true);setDocError('');try{const content=await fileToBase64(docFile);await onUploadDocument({name:docName||docFile.name,mimeType:docFile.type||'application/octet-stream',content,tags:docTags?docTags.split(',').map(t=>t.trim()).filter(Boolean):[],branch:docBranch||undefined,summary:docSummary||undefined});setDocUploadOpen(false);setDocFile(null);setDocName('');setDocTags('');setDocBranch('');setDocSummary('');}catch(e){setDocError(e instanceof Error?e.message:'Upload failed');}finally{setDocBusy(false);}}}>{docBusy?'Uploading…':'Upload'}</button>{docFile&&<span className={styles.muted} style={{marginLeft:8,fontSize:11}}>{docFile.name} ({formatBytes(docFile.size)}){docFile.size>500*1024?' — ⚠️ Too large':''}</span>}</div></div></div>)}
-          {documents.length>0?(<div style={{display:'flex',flexDirection:'column',gap:8}}>{documents.map(doc=>(<div key={doc.id} className={styles.card} style={{padding:'10px 14px'}}><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><span style={{fontSize:'1.3rem',lineHeight:1}}>{mimeIcon(doc.mimeType)}</span><div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{doc.name}</div><div style={{fontSize:10,color:'#8795aa'}}>{formatBytes(doc.sizeBytes)} · {doc.mimeType} · {doc.uploadedBy} · {new Date(doc.uploadedAt).toLocaleDateString()}{doc.branch?` · ${doc.branch}`:''}</div>{doc.summary&&<p style={{fontSize:10,color:'#8795aa',margin:'4px 0 0'}}>{doc.summary}</p>}{doc.tags.length>0&&<div style={{marginTop:4}}>{doc.tags.map(t=><span key={t} className={styles.tag}>{t}</span>)}</div>}</div><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px',flexShrink:0}} disabled={busy} onClick={async()=>{if(confirm(`Delete "${doc.name}"?`))await onDeleteDocument(doc.id);}}>Delete</button></div></div>))}</div>):(!docUploadOpen&&<div className={styles.planned}><h3>No documents</h3><p>Upload the first document for this client org using the button above.</p></div>)}
+          {docUploadOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.25)'}}><CardTitle title="Upload document" hint="Max 500 KB. Ellinea can reference documents added with a summary."/>{docError&&<div className={styles.alert}>{docError}</div>}<div className={styles.form} style={{marginTop:8}}><label className={styles.field}><span>File (max 500 KB)</span><input type="file" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.json,.png,.jpg" onChange={e=>{const f=e.target.files?.[0]??null;setDocFile(f);if(f&&!docName)setDocName(f.name);}} required/></label><Field label="Display name" value={docName} set={setDocName}/><Field label="Tags (comma-separated)" value={docTags} set={setDocTags} placeholder="finance, Q3, Nairobi"/><Field label="Branch / site" value={docBranch} set={setDocBranch} placeholder="Nairobi HQ"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>Summary (for Ellinea)</span><textarea className={styles.input} value={docSummary} onChange={e=>setDocSummary(e.target.value)} rows={2} placeholder="Brief description for AI contextâ€¦"/></label><div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={docBusy||!docFile} onClick={async()=>{if(!docFile)return;if(docFile.size>500*1024){setDocError('File exceeds 500 KB');return;}setDocBusy(true);setDocError('');try{const content=await fileToBase64(docFile);await onUploadDocument({name:docName||docFile.name,mimeType:docFile.type||'application/octet-stream',content,tags:docTags?docTags.split(',').map(t=>t.trim()).filter(Boolean):[],branch:docBranch||undefined,summary:docSummary||undefined});setDocUploadOpen(false);setDocFile(null);setDocName('');setDocTags('');setDocBranch('');setDocSummary('');}catch(e){setDocError(e instanceof Error?e.message:'Upload failed');}finally{setDocBusy(false);}}}>{docBusy?'Uploadingâ€¦':'Upload'}</button>{docFile&&<span className={styles.muted} style={{marginLeft:8,fontSize:11}}>{docFile.name} ({formatBytes(docFile.size)}){docFile.size>500*1024?' â€” âš ï¸ Too large':''}</span>}</div></div></div>)}
+          {documents.length>0?(<div style={{display:'flex',flexDirection:'column',gap:8}}>{documents.map(doc=>(<div key={doc.id} className={styles.card} style={{padding:'10px 14px'}}><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><span style={{fontSize:'1.3rem',lineHeight:1}}>{mimeIcon(doc.mimeType)}</span><div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{doc.name}</div><div style={{fontSize:10,color:'#8795aa'}}>{formatBytes(doc.sizeBytes)} Â· {doc.mimeType} Â· {doc.uploadedBy} Â· {new Date(doc.uploadedAt).toLocaleDateString()}{doc.branch?` Â· ${doc.branch}`:''}</div>{doc.summary&&<p style={{fontSize:10,color:'#8795aa',margin:'4px 0 0'}}>{doc.summary}</p>}{doc.tags.length>0&&<div style={{marginTop:4}}>{doc.tags.map(t=><span key={t} className={styles.tag}>{t}</span>)}</div>}</div><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px',flexShrink:0}} disabled={busy} onClick={async()=>{if(confirm(`Delete "${doc.name}"?`))await onDeleteDocument(doc.id);}}>Delete</button></div></div>))}</div>):(!docUploadOpen&&<div className={styles.planned}><h3>No documents</h3><p>Upload the first document for this client org using the button above.</p></div>)}
         </div>
       )}
-      {/* ── CONNECTORS ── */}
+      {/* â”€â”€ CONNECTORS â”€â”€ */}
       {!loading && tab==='connectors' && (
         <div>
           {/* Entitlement header: used / allowed from package tier */}
@@ -1234,12 +1238,12 @@ function ClientWorkspace({
               <span style={{fontSize:12,color:'#c4b5fd',fontWeight:700}}>
                 {installations.filter(c=>c.status!=='deleted').length}
                 {' / '}
-                {tier.rate_limit_tiers.max_connectors ?? '∞'}
+                {tier.rate_limit_tiers.max_connectors ?? 'âˆž'}
                 {' integrations purchased'}
               </span>
               {tier.rate_limit_tiers.max_connectors !== null &&
                installations.filter(c=>c.status!=='deleted').length >= tier.rate_limit_tiers.max_connectors && (
-                <span style={{fontSize:11,color:'#fb7185',fontWeight:700}}>⚠ Limit reached — upgrade package to add more</span>
+                <span style={{fontSize:11,color:'#fb7185',fontWeight:700}}>âš  Limit reached â€” upgrade package to add more</span>
               )}
             </div>
           )}
@@ -1252,17 +1256,17 @@ function ClientWorkspace({
             </div>
             <button className={`${styles.button} ${styles.primary}`} onClick={()=>{resetWizard();setWizardOpen(true);}}>+ Install connector</button>
           </div>
-          {availablePacks.length>0&&(<div className={styles.card} style={{marginBottom:12}}><CardTitle title="Platform packs" hint="Pre-configured connectors — enter credentials only."/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{availablePacks.map(p=>(<button key={p.id} className={styles.button} onClick={()=>{resetWizard();setWizCatalogId(p.catalogId);setWizDisplayName(p.name);setWizPackId(p.id);const c=p.templateConfig||{};if(c.endpoint)setWizEndpoint(String(c.endpoint));if(c.sql)setWizSql(String(c.sql));if(c.openApiBaseUrl)setWizOpenApiBaseUrl(String(c.openApiBaseUrl));setWizStep(2);setWizardOpen(true);setWizNotice(`Pack "${p.name}" — enter credentials, then Test & Sync.`);}}>📦 {p.name}</button>))}</div></div>)}
-          {wizardOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.35)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong style={{fontSize:13}}>Install wizard · Step {wizStep} of 4{wizEditingId?' · editing':''}</strong><button className={styles.button} onClick={()=>{setWizardOpen(false);resetWizard();}}>Close</button></div><div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>{['Type','Credentials','Capabilities','Test & sync'].map((l,i)=>(<span key={l} style={{fontSize:10,padding:'3px 8px',borderRadius:99,background:wizStep===i+1?'rgba(124,58,237,.35)':'rgba(255,255,255,.05)',color:wizStep===i+1?'#c4b5fd':'#8795aa',fontWeight:700}}>{i+1}. {l}</span>))}</div>{wizError&&<div className={styles.alert}>{wizError}</div>}{wizNotice&&<div className={styles.notice}>{wizNotice}</div>}{wizStep===1&&(<div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:12}}>{CONNECTOR_TYPES.map(t=>(<button key={t.id} className={styles.button} onClick={()=>{setWizCatalogId(t.id);if(!wizDisplayName)setWizDisplayName(t.title);}} style={{textAlign:'left',padding:10,background:wizCatalogId===t.id?'rgba(124,58,237,.25)':undefined,border:wizCatalogId===t.id?'1px solid rgba(124,58,237,.55)':undefined}}><span style={{fontSize:9,fontWeight:800,color:'#8b9bb0',textTransform:'uppercase',display:'block',marginBottom:3}}>{t.tag}</span><strong style={{fontSize:12,display:'block'}}>{t.title}</strong><span style={{fontSize:10,color:'#8795aa'}}>{t.blurb}</span></button>))}</div><div className={styles.form} style={{marginBottom:10}}><Field label="Display name" value={wizDisplayName} set={setWizDisplayName} placeholder="e.g. Clinical HIS production"/><Field label="System label" value={wizSystemLabel} set={setWizSystemLabel} placeholder="e.g. Haven Catalogue API, Nairobi Branch POS"/></div><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(2)}>Continue →</button></div>)}{wizStep===2&&(<div><div className={styles.form} style={{marginBottom:10}}>{(wizCatalogId==='rest-api'||wizCatalogId==='openapi')&&(<><label className={styles.field}><span>Auth</span><select className={styles.select} value={wizAuthType||'none'} onChange={e=>setWizAuthType(e.target.value as import('@/lib/api').ConnectorInstallConfigDto['authType'])}><option value="none">None</option><option value="apiKey">API key</option><option value="bearer">Bearer token</option><option value="basic">Basic</option></select></label>{wizAuthType==='apiKey'&&<Field label="API key" value={wizApiKey} set={setWizApiKey}/>}{wizAuthType==='bearer'&&<Field label="Bearer token" value={wizBearer} set={setWizBearer}/>}{wizAuthType==='basic'&&<><Field label="Username" value={wizBasicUser} set={setWizBasicUser}/><Field label="Password" value={wizBasicPass} set={setWizBasicPass} type="password"/></>}</>)}{wizCatalogId==='rest-api'&&<Field label="Endpoint URL" value={wizEndpoint} set={setWizEndpoint} placeholder="https://vendor.example/api"/>}{wizCatalogId==='openapi'&&(<><label className={styles.field} style={{gridColumn:'1/-1'}}><span>OpenAPI JSON</span><textarea className={styles.input} value={wizOpenApiText} onChange={e=>setWizOpenApiText(e.target.value)} rows={6} placeholder="Paste openapi.json here"/></label><Field label="Base URL" value={wizOpenApiBaseUrl} set={setWizOpenApiBaseUrl} placeholder="https://vendor.example/api"/><div className={styles.full}><button className={styles.button} disabled={wizBusy||!wizOpenApiText.trim()} onClick={async()=>{setWizBusy(true);setWizError('');try{const doc=JSON.parse(wizOpenApiText);const r=await parseOpenApi(doc);setWizParsed(r);if(!wizOpenApiBaseUrl&&r.baseUrl)setWizOpenApiBaseUrl(r.baseUrl);if(!wizDisplayName)setWizDisplayName(r.title);setWizSelectedPaths(r.endpoints.filter(e=>e.selectable).slice(0,5).map(e=>`${e.method} ${e.path}`));setWizNotice(`Parsed ${r.endpoints.length} operations.`);}catch(e){setWizError(e instanceof Error?e.message:'Parse failed');}finally{setWizBusy(false);}}}>Parse capabilities</button></div></>)}{wizCatalogId==='csv-file'&&<label className={styles.field} style={{gridColumn:'1/-1'}}><span>CSV content</span><textarea className={styles.input} value={wizCsv} onChange={e=>setWizCsv(e.target.value)} rows={6}/></label>}{['postgres','sqlserver','mysql'].includes(wizCatalogId)&&(<><Field label="Connection string (read-only)" value={wizConnStr} set={setWizConnStr} placeholder="postgresql://reader:…@host:5432/dbname"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>SELECT query</span><textarea className={styles.input} value={wizSql} onChange={e=>setWizSql(e.target.value)} rows={5}/></label></>)}{wizCatalogId==='email-imap'&&(<><Field label="IMAP host" value={wizImapHost} set={setWizImapHost}/><Field label="Port" value={wizImapPort} set={setWizImapPort}/><Field label="Username" value={wizImapUser} set={setWizImapUser}/><Field label="Password" value={wizImapPass} set={setWizImapPass} type="password"/><Field label="Mailbox" value={wizImapMailbox} set={setWizImapMailbox}/></>)}{wizCatalogId==='sftp'&&(<><Field label="SFTP host" value={wizSftpHost} set={setWizSftpHost}/><Field label="Port" value={wizSftpPort} set={setWizSftpPort}/><Field label="Username" value={wizSftpUser} set={setWizSftpUser}/><Field label="Password" value={wizSftpPass} set={setWizSftpPass} type="password"/><Field label="Remote path" value={wizSftpPath} set={setWizSftpPath}/></>)}{wizCatalogId==='demo-json'&&<p className={styles.cardHint} style={{gridColumn:'1/-1'}}>Demo seed — no credentials needed.</p>}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(1)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:4)}>Continue →</button></div></div>)}{wizStep===3&&wizParsed&&(<div><p className={styles.cardHint} style={{marginBottom:10}}>Select capabilities to expose.</p><div style={{maxHeight:260,overflowY:'auto',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:10,marginBottom:12}}>{wizParsed.endpoints.map(e=>{const key=`${e.method} ${e.path}`;return(<label key={key} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:11,cursor:e.selectable?'pointer':'default',opacity:e.selectable?1:.45}}><input type="checkbox" disabled={!e.selectable} checked={wizSelectedPaths.includes(key)} onChange={ev=>setWizSelectedPaths(prev=>ev.target.checked?[...prev,key]:prev.filter(p=>p!==key))} style={{marginTop:2}}/><span><code style={{color:'#a5b4fc'}}>{e.method}</code> <span style={{color:'#c8d2e0'}}>{e.path}</span><br/><span style={{color:'#8795aa'}}>{e.summary}</span></span></label>);})}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(2)}>← Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(4)}>Continue →</button></div></div>)}{wizStep===4&&(<div><div className={styles.form} style={{marginBottom:12}}><label className={styles.field}><span>Sync schedule</span><select className={styles.select} value={String(wizSyncMins)} onChange={e=>setWizSyncMins(Number(e.target.value))}><option value="0">Manual only</option><option value="15">Every 15 min</option><option value="60">Every hour</option><option value="360">Every 6 hrs</option><option value="1440">Daily</option></select></label>{wizTestOk!==null&&<div className={styles.full}><span style={{color:wizTestOk?'#34d399':'#fb7185',fontWeight:700}}>{wizTestOk?'✓ Test passed':'✗ Test failed'}</span></div>}</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className={styles.button} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:2)}>← Back</button><button className={styles.button} disabled={wizBusy} onClick={()=>void wizTest()}>Test connection</button><button className={`${styles.button} ${styles.primary}`} disabled={wizBusy} onClick={()=>void wizSync()}>Sync now</button></div></div>)}</div>)}
+          {availablePacks.length>0&&(<div className={styles.card} style={{marginBottom:12}}><CardTitle title="Platform packs" hint="Pre-configured connectors â€” enter credentials only."/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{availablePacks.map(p=>(<button key={p.id} className={styles.button} onClick={()=>{resetWizard();setWizCatalogId(p.catalogId);setWizDisplayName(p.name);setWizPackId(p.id);const c=p.templateConfig||{};if(c.endpoint)setWizEndpoint(String(c.endpoint));if(c.sql)setWizSql(String(c.sql));if(c.openApiBaseUrl)setWizOpenApiBaseUrl(String(c.openApiBaseUrl));setWizStep(2);setWizardOpen(true);setWizNotice(`Pack "${p.name}" â€” enter credentials, then Test & Sync.`);}}>ðŸ“¦ {p.name}</button>))}</div></div>)}
+          {wizardOpen&&(<div className={styles.card} style={{marginBottom:12,border:'1px solid rgba(124,58,237,.35)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong style={{fontSize:13}}>Install wizard Â· Step {wizStep} of 4{wizEditingId?' Â· editing':''}</strong><button className={styles.button} onClick={()=>{setWizardOpen(false);resetWizard();}}>Close</button></div><div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>{['Type','Credentials','Capabilities','Test & sync'].map((l,i)=>(<span key={l} style={{fontSize:10,padding:'3px 8px',borderRadius:99,background:wizStep===i+1?'rgba(124,58,237,.35)':'rgba(255,255,255,.05)',color:wizStep===i+1?'#c4b5fd':'#8795aa',fontWeight:700}}>{i+1}. {l}</span>))}</div>{wizError&&<div className={styles.alert}>{wizError}</div>}{wizNotice&&<div className={styles.notice}>{wizNotice}</div>}{wizStep===1&&(<div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:12}}>{CONNECTOR_TYPES.map(t=>(<button key={t.id} className={styles.button} onClick={()=>{setWizCatalogId(t.id);if(!wizDisplayName)setWizDisplayName(t.title);}} style={{textAlign:'left',padding:10,background:wizCatalogId===t.id?'rgba(124,58,237,.25)':undefined,border:wizCatalogId===t.id?'1px solid rgba(124,58,237,.55)':undefined}}><span style={{fontSize:9,fontWeight:800,color:'#8b9bb0',textTransform:'uppercase',display:'block',marginBottom:3}}>{t.tag}</span><strong style={{fontSize:12,display:'block'}}>{t.title}</strong><span style={{fontSize:10,color:'#8795aa'}}>{t.blurb}</span></button>))}</div><div className={styles.form} style={{marginBottom:10}}><Field label="Display name" value={wizDisplayName} set={setWizDisplayName} placeholder="e.g. Clinical HIS production"/><Field label="System label" value={wizSystemLabel} set={setWizSystemLabel} placeholder="e.g. Haven Catalogue API, Nairobi Branch POS"/></div><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(2)}>Continue â†’</button></div>)}{wizStep===2&&(<div><div className={styles.form} style={{marginBottom:10}}>{(wizCatalogId==='rest-api'||wizCatalogId==='openapi')&&(<><label className={styles.field}><span>Auth</span><select className={styles.select} value={wizAuthType||'none'} onChange={e=>setWizAuthType(e.target.value as import('@/lib/api').ConnectorInstallConfigDto['authType'])}><option value="none">None</option><option value="apiKey">API key</option><option value="bearer">Bearer token</option><option value="basic">Basic</option></select></label>{wizAuthType==='apiKey'&&<Field label="API key" value={wizApiKey} set={setWizApiKey}/>}{wizAuthType==='bearer'&&<Field label="Bearer token" value={wizBearer} set={setWizBearer}/>}{wizAuthType==='basic'&&<><Field label="Username" value={wizBasicUser} set={setWizBasicUser}/><Field label="Password" value={wizBasicPass} set={setWizBasicPass} type="password"/></>}</>)}{wizCatalogId==='rest-api'&&<Field label="Endpoint URL" value={wizEndpoint} set={setWizEndpoint} placeholder="https://vendor.example/api"/>}{wizCatalogId==='openapi'&&(<><label className={styles.field} style={{gridColumn:'1/-1'}}><span>OpenAPI JSON</span><textarea className={styles.input} value={wizOpenApiText} onChange={e=>setWizOpenApiText(e.target.value)} rows={6} placeholder="Paste openapi.json here"/></label><Field label="Base URL" value={wizOpenApiBaseUrl} set={setWizOpenApiBaseUrl} placeholder="https://vendor.example/api"/><div className={styles.full}><button className={styles.button} disabled={wizBusy||!wizOpenApiText.trim()} onClick={async()=>{setWizBusy(true);setWizError('');try{const doc=JSON.parse(wizOpenApiText);const r=await parseOpenApi(doc);setWizParsed(r);if(!wizOpenApiBaseUrl&&r.baseUrl)setWizOpenApiBaseUrl(r.baseUrl);if(!wizDisplayName)setWizDisplayName(r.title);setWizSelectedPaths(r.endpoints.filter(e=>e.selectable).slice(0,5).map(e=>`${e.method} ${e.path}`));setWizNotice(`Parsed ${r.endpoints.length} operations.`);}catch(e){setWizError(e instanceof Error?e.message:'Parse failed');}finally{setWizBusy(false);}}}>Parse capabilities</button></div></>)}{wizCatalogId==='csv-file'&&<label className={styles.field} style={{gridColumn:'1/-1'}}><span>CSV content</span><textarea className={styles.input} value={wizCsv} onChange={e=>setWizCsv(e.target.value)} rows={6}/></label>}{['postgres','sqlserver','mysql'].includes(wizCatalogId)&&(<><Field label="Connection string (read-only)" value={wizConnStr} set={setWizConnStr} placeholder="postgresql://reader:â€¦@host:5432/dbname"/><label className={styles.field} style={{gridColumn:'1/-1'}}><span>SELECT query</span><textarea className={styles.input} value={wizSql} onChange={e=>setWizSql(e.target.value)} rows={5}/></label></>)}{wizCatalogId==='email-imap'&&(<><Field label="IMAP host" value={wizImapHost} set={setWizImapHost}/><Field label="Port" value={wizImapPort} set={setWizImapPort}/><Field label="Username" value={wizImapUser} set={setWizImapUser}/><Field label="Password" value={wizImapPass} set={setWizImapPass} type="password"/><Field label="Mailbox" value={wizImapMailbox} set={setWizImapMailbox}/></>)}{wizCatalogId==='sftp'&&(<><Field label="SFTP host" value={wizSftpHost} set={setWizSftpHost}/><Field label="Port" value={wizSftpPort} set={setWizSftpPort}/><Field label="Username" value={wizSftpUser} set={setWizSftpUser}/><Field label="Password" value={wizSftpPass} set={setWizSftpPass} type="password"/><Field label="Remote path" value={wizSftpPath} set={setWizSftpPath}/></>)}{wizCatalogId==='demo-json'&&<p className={styles.cardHint} style={{gridColumn:'1/-1'}}>Demo seed â€” no credentials needed.</p>}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(1)}>â† Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:4)}>Continue â†’</button></div></div>)}{wizStep===3&&wizParsed&&(<div><p className={styles.cardHint} style={{marginBottom:10}}>Select capabilities to expose.</p><div style={{maxHeight:260,overflowY:'auto',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:10,marginBottom:12}}>{wizParsed.endpoints.map(e=>{const key=`${e.method} ${e.path}`;return(<label key={key} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:11,cursor:e.selectable?'pointer':'default',opacity:e.selectable?1:.45}}><input type="checkbox" disabled={!e.selectable} checked={wizSelectedPaths.includes(key)} onChange={ev=>setWizSelectedPaths(prev=>ev.target.checked?[...prev,key]:prev.filter(p=>p!==key))} style={{marginTop:2}}/><span><code style={{color:'#a5b4fc'}}>{e.method}</code> <span style={{color:'#c8d2e0'}}>{e.path}</span><br/><span style={{color:'#8795aa'}}>{e.summary}</span></span></label>);})}</div><div style={{display:'flex',gap:8}}><button className={styles.button} onClick={()=>setWizStep(2)}>â† Back</button><button className={`${styles.button} ${styles.primary}`} onClick={()=>setWizStep(4)}>Continue â†’</button></div></div>)}{wizStep===4&&(<div><div className={styles.form} style={{marginBottom:12}}><label className={styles.field}><span>Sync schedule</span><select className={styles.select} value={String(wizSyncMins)} onChange={e=>setWizSyncMins(Number(e.target.value))}><option value="0">Manual only</option><option value="15">Every 15 min</option><option value="60">Every hour</option><option value="360">Every 6 hrs</option><option value="1440">Daily</option></select></label>{wizTestOk!==null&&<div className={styles.full}><span style={{color:wizTestOk?'#34d399':'#fb7185',fontWeight:700}}>{wizTestOk?'âœ“ Test passed':'âœ— Test failed'}</span></div>}</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className={styles.button} onClick={()=>setWizStep(wizCatalogId==='openapi'&&wizParsed?3:2)}>â† Back</button><button className={styles.button} disabled={wizBusy} onClick={()=>void wizTest()}>Test connection</button><button className={`${styles.button} ${styles.primary}`} disabled={wizBusy} onClick={()=>void wizSync()}>Sync now</button></div></div>)}</div>)}
           {installations.length>0?(<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Last synced</th><th>Schedule</th><th>Actions</th></tr></thead><tbody>{installations.map(inst=>(<tr key={inst.id}><td><strong>{inst.displayName}</strong>{inst.lastMessage&&<><br/><span className={styles.muted} style={{fontSize:10}}>{inst.lastMessage}</span></>}</td><td><span className={styles.muted}>{inst.catalogId}</span></td><td><span className={`${styles.status} ${inst.status==='active'||inst.status==='synced'?styles.statusOk:inst.status==='error'||inst.status==='suspended'?styles.statusBad:styles.statusNeutral}`}>{inst.status}</span></td><td style={{fontSize:11}}>{inst.lastSyncedAt?new Date(inst.lastSyncedAt).toLocaleString():'Never'}</td><td style={{fontSize:11}}>{inst.config?.syncIntervalMinutes?`${inst.config.syncIntervalMinutes} min`:'Manual'}</td><td style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {/* Activate / Deactivate — Super Admin controls whether this org can use the connector */}
+            {/* Activate / Deactivate â€” Super Admin controls whether this org can use the connector */}
             {inst.status!=='active'&&inst.status!=='synced'
               ?<button className={`${styles.button} ${styles.success||styles.primary}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} title="Activate this connector for the client org" onClick={async()=>{try{await onActivateConnector(inst.id);}catch(e){console.error(e);}}}>Activate</button>
               :<button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} title="Suspend client org access to this connector" onClick={async()=>{if(confirm(`Deactivate "${inst.displayName}" for this client? They will lose access until you reactivate it.`))try{await onDeactivateConnector(inst.id);}catch(e){console.error(e);}}}>Deactivate</button>
             }
             <button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} onClick={()=>editInstallation(inst)}>Edit</button><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{try{await onSyncConnector(inst.id);}catch(e){console.error(e);}}}>Sync</button><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{if(confirm(`Remove "${inst.displayName}"?`))await onDeleteConnector(inst.id);}}>Remove</button></td></tr>))}</tbody></table></div>):(!wizardOpen&&<div className={styles.planned}><h3>No connectors yet</h3><p>Click &quot;+ Install connector&quot; above to connect this client&apos;s first system.</p></div>)}
 
-          {/* ── Integration Requests (TASK-09) ── */}
+          {/* â”€â”€ Integration Requests (TASK-09) â”€â”€ */}
           <div className={styles.card} style={{marginTop:20}}>
             <CardTitle title="Integration requests" hint="Requests submitted by client IT for new integrations. Approve to install, reject with a note."/>
             {integrationRequests.length===0
@@ -1271,7 +1275,7 @@ function ClientWorkspace({
                   {integrationRequests.map(req=>(
                     <tr key={req.id}>
                       <td><strong>{req.systemName}</strong>{req.catalogId&&<><br/><span className={styles.muted} style={{fontSize:10}}>{req.catalogId}</span></>}</td>
-                      <td style={{fontSize:11,maxWidth:200}}>{req.purpose||'—'}</td>
+                      <td style={{fontSize:11,maxWidth:200}}>{req.purpose||'â€”'}</td>
                       <td style={{fontSize:11}}>{new Date(req.createdAt).toLocaleDateString()}</td>
                       <td><span className={`${styles.status} ${req.status==='approved'?styles.statusOk:req.status==='rejected'?styles.statusBad:styles.statusNeutral}`}>{req.status}</span>{req.reviewNote&&<><br/><span className={styles.muted} style={{fontSize:10}}>{req.reviewNote}</span></>}</td>
                       <td>{req.status==='pending'&&<div style={{display:'flex',gap:4}}>
@@ -1285,7 +1289,7 @@ function ClientWorkspace({
           </div>
         </div>
       )}
-      {/* ── APPROVALS ── */}
+      {/* â”€â”€ APPROVALS â”€â”€ */}
       {!loading && tab==='approvals' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1306,7 +1310,7 @@ function ClientWorkspace({
                       <td><span className={`${styles.status} ${a.status==='approved'?styles.statusOk:a.status==='pending'?styles.statusNeutral:styles.statusBad}`}>{a.status}</span></td>
                       <td><span className={styles.muted}>{a.source}</span></td>
                       <td>{new Date(a.createdAt).toLocaleDateString()}</td>
-                      <td>{a.decidedAt?new Date(a.decidedAt).toLocaleDateString():'—'}</td>
+                      <td>{a.decidedAt?new Date(a.decidedAt).toLocaleDateString():'â€”'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1316,7 +1320,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── USERS & ACCESS ── */}
+      {/* â”€â”€ USERS & ACCESS â”€â”€ */}
       {!loading && tab==='users' && (
         <div className={styles.grid2}>
           <div className={styles.card}>
@@ -1346,7 +1350,7 @@ function ClientWorkspace({
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                     <div>
                       <strong style={{fontSize:12}}>{u.fullName}</strong>
-                      <p style={{margin:'3px 0 0',fontSize:10,color:'#8795aa'}}>{u.email} · <span style={{textTransform:'capitalize'}}>{u.role}</span></p>
+                      <p style={{margin:'3px 0 0',fontSize:10,color:'#8795aa'}}>{u.email} Â· <span style={{textTransform:'capitalize'}}>{u.role}</span></p>
                     </div>
                     <button className={`${styles.button} ${u.isActive?styles.danger:styles.success}`} style={{fontSize:10,padding:'5px 8px'}} disabled={busy} onClick={()=>void onToggleUser(u)}>
                       {u.isActive?'Deactivate':'Activate'}
@@ -1361,7 +1365,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── RULES ── */}
+      {/* â”€â”€ RULES â”€â”€ */}
       {!loading && tab==='rules' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1388,11 +1392,11 @@ function ClientWorkspace({
                 </tbody>
               </table>
             </div>
-          ) : <div className={styles.planned}><h3>No business rules</h3><p>This client has not created any business rules yet. Rules are configured from their Work Console → Rules page.</p></div>}
+          ) : <div className={styles.planned}><h3>No business rules</h3><p>This client has not created any business rules yet. Rules are configured from their Work Console â†’ Rules page.</p></div>}
         </div>
       )}
 
-      {/* ── REPORTS ── */}
+      {/* â”€â”€ REPORTS â”€â”€ */}
       {!loading && tab==='reports' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1418,11 +1422,11 @@ function ClientWorkspace({
                 </tbody>
               </table>
             </div>
-          ) : <div className={styles.planned}><h3>No scheduled reports</h3><p>This client has not set up any reports yet. Reports are configured from their Work Console → Reports page.</p></div>}
+          ) : <div className={styles.planned}><h3>No scheduled reports</h3><p>This client has not set up any reports yet. Reports are configured from their Work Console â†’ Reports page.</p></div>}
         </div>
       )}
 
-      {/* ── AUTOMATION / AGENTS ── */}
+      {/* â”€â”€ AUTOMATION / AGENTS â”€â”€ */}
       {!loading && tab==='agents' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1456,11 +1460,11 @@ function ClientWorkspace({
                 </tbody>
               </table>
             </div>
-          ) : <div className={styles.planned}><h3>No automation agents</h3><p>This client has not created any Ellinea Agents yet. Agents are configured from their Work Console → Automation page.</p></div>}
+          ) : <div className={styles.planned}><h3>No automation agents</h3><p>This client has not created any Ellinea Agents yet. Agents are configured from their Work Console â†’ Automation page.</p></div>}
         </div>
       )}
 
-      {/* ── AUDIT ── */}
+      {/* â”€â”€ AUDIT â”€â”€ */}
       {!loading && tab==='audit' && (
         <div className={styles.card}>
           <CardTitle title="Client audit log" hint={`Activity log for ${org?.name??'this client'}.`}/>
@@ -1487,7 +1491,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* ── SETTINGS ── */}
+      {/* â”€â”€ SETTINGS â”€â”€ */}
       {!loading && tab==='settings' && (
         <div>
           <div className={styles.grid2} style={{marginBottom:14}}>
@@ -1495,8 +1499,8 @@ function ClientWorkspace({
               <CardTitle title="Organization profile" hint="Edit this client organization's display name."/>
               <div className={styles.form} style={{marginTop:8}}>
                 <Field label="Organization name" value={editOrgName} set={setEditOrgName} placeholder="Acme Holdings Ltd"/>
-                <label className={styles.field}><span>Slug (read-only)</span><input className={styles.input} value={orgProfile?.slug??org?.slug??'—'} disabled/></label>
-                <div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={orgNameBusy||!editOrgName.trim()} onClick={async()=>{setOrgNameBusy(true);try{await onSaveOrgName(editOrgName);}catch(e){console.error(e);}finally{setOrgNameBusy(false);}}}>{orgNameBusy?'Saving…':'Save name'}</button></div>
+                <label className={styles.field}><span>Slug (read-only)</span><input className={styles.input} value={orgProfile?.slug??org?.slug??'â€”'} disabled/></label>
+                <div className={styles.full}><button className={`${styles.button} ${styles.primary}`} disabled={orgNameBusy||!editOrgName.trim()} onClick={async()=>{setOrgNameBusy(true);try{await onSaveOrgName(editOrgName);}catch(e){console.error(e);}finally{setOrgNameBusy(false);}}}>{orgNameBusy?'Savingâ€¦':'Save name'}</button></div>
               </div>
             </div>
             <div className={styles.card}>
@@ -1505,7 +1509,7 @@ function ClientWorkspace({
                 <option value="">No package</option>
                 {packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}
               </select>
-              {tier?.rate_limit_tiers&&<div style={{marginTop:10}}><Service title={packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.display_name??'Current package'} text={`${packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.requests_per_day?.toLocaleString()??'—'} req/day`}/></div>}
+              {tier?.rate_limit_tiers&&<div style={{marginTop:10}}><Service title={packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.display_name??'Current package'} text={`${packages.find(p=>p.id===tier.rate_limit_tiers?.id)?.requests_per_day?.toLocaleString()??'â€”'} req/day`}/></div>}
             </div>
           </div>
           <div className={styles.grid2}>
@@ -1519,7 +1523,7 @@ function ClientWorkspace({
             </div>
             <div className={styles.card}>
               <CardTitle title="Organization stats" hint="Current usage for this client org."/>
-              <Service title="Registered" text={org?new Date(org.createdAt).toLocaleDateString():'—'}/>
+              <Service title="Registered" text={org?new Date(org.createdAt).toLocaleDateString():'â€”'}/>
               <Service title="Users" text={`${stats?.stats?.totalUsers??0} total, ${stats?.stats?.activeUsers??0} active`}/>
               <Service title="Connectors" text={`${installations.length} installed, ${installations.filter(c=>c.status==='synced').length} synced`}/>
               <Service title="Documents" text={`${documents.length} uploaded`}/>
@@ -1541,14 +1545,17 @@ function ClientWorkspace({
               <button className={`${styles.button} ${org.status==='active'?styles.danger:styles.success}`} disabled={busy} onClick={()=>onToggle(org)}>
                 {org.status==='active'?'Disconnect / Suspend':'Reconnect'}
               </button>
+              <button className={`${styles.button} ${styles.danger}`} disabled={busy} onClick={()=>onDeleteOrg(org)} style={{opacity:0.85}} title="Permanently delete this organization and all its data">
+                Delete organization
+              </button>
             </div>
-            <p className={styles.cardHint} style={{marginTop:10}}>Disconnect is reversible. Data is preserved. Reconnect restores access immediately.</p>
+            <p className={styles.cardHint} style={{marginTop:10}}>Disconnect is reversible. Data is preserved. Reconnect restores access immediately. Delete is permanent and cannot be undone.</p>
           </div>
           <div className={styles.card}>
             <CardTitle title="Status notes" hint="What each state means for this client."/>
             <Service title="Active" text="Client has full access to their EIP Work Console and all configured connectors."/>
             <Service title="Disconnected" text="Client login is blocked. Data is preserved. No integrations run. Reconnect at any time."/>
-            <Service title="Hard delete" text="Not available from this interface. Contact a platform engineer for irreversible removal."/>
+            <Service title="Hard delete" text="Permanently removes the organization, all users, all connectors, all data. Use with extreme caution. Requires a written reason."/>
           </div>
         </div>
       )}
@@ -1559,7 +1566,7 @@ function ClientWorkspace({
 // useSearchParams() requires a Suspense boundary in the Next.js App Router.
 export default function PlatformPage() {
   return (
-    <Suspense fallback={<div style={{padding:24,color:'#8795aa'}}>Loading platform…</div>}>
+    <Suspense fallback={<div style={{padding:24,color:'#8795aa'}}>Loading platformâ€¦</div>}>
       <PlatformSuperAdminPage />
     </Suspense>
   );

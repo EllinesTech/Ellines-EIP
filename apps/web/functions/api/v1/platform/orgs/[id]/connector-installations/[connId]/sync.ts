@@ -289,7 +289,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       auth.sub,
       connId,
       displayName,
-      payload,
+      // Ensure connectedSystems ≥ 1: this installation itself IS a connected system.
+      // APIs like Haven return count=15 (books) which maps to recordCount, leaving
+      // connectedSystems=0. A successful sync always means at least 1 system connected.
+      { ...payload, connectedSystems: Math.max(payload.connectedSystems, 1) },
     );
 
     await supabase.from('audit_logs').insert(
