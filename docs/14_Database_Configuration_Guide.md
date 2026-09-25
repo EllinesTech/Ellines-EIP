@@ -1,8 +1,508 @@
 # Database Configuration Guide
 
-**Date:** 2026-08-06  
+**Date:** 2026-09-25 (updated)  
 **Product:** Ellines EIP v1.0+  
-**Feature:** Multi-Database Support (Sprint 13-14)
+**Feature:** Multi-Database Support + Local ↔ Supabase Data Sync
+
+---
+
+## Overview
+
+Ellines EIP supports organisations choosing their own database deployment model:
+
+| Model | Use Case | Setup Time | Cost | Control |
+|-------|----------|-----------|------|---------|
+| **Local PostgreSQL** | Development, on-premise, hybrid | 10 min | Free | Full |
+| **Supabase (Cloud)** | Live site, accessible from anywhere | 5 min | Free tier available | Shared infrastructure |
+| **Custom PostgreSQL** | Self-hosted on VPS | 20 min | VPS cost | Full |
+
+**Key benefit:** No code deployment needed to switch databases. Admin clicks one button, system automatically routes all queries to the new database.
+
+---
+
+## Data Sync: Local ↔ Supabase
+
+> **This is the most important section for day-to-day development and hybrid clients.**
+
+Both databases must always carry identical platform data (connector templates, rate-limit tiers, demo org). The sync system makes this automatic.
+
+### Quick Reference — All Sync Commands
+
+```bash
+# ── Daily dev workflow ─────────────────────────────────────
+npm run db:sync:to-cloud          # Push local data → Supabase (platform + demo)
+npm run db:sync:from-cloud        # Pull Supabase → local  (restore local)
+npm run db:sync:status            # Show row counts on both DBs
+npm run seed:both                 # Seed demo + rate tiers into BOTH DBs
+
+# ── Schema sync (run after any Prisma schema change) ───────
+npm run db:push                   # Sync schema to whichever DB .env points at
+npm run db:local && npm run db:push && npm run db:cloud && npm run db:push
+                                  # Sync schema to BOTH (manual two-step)
+
+# ── Seed one DB at a time ──────────────────────────────────
+npm run seed:demo                 # Seed demo org into current .env DB
+npm run seed:rate-limits          # Seed rate-limit tiers into current .env DB
+npm run seed:local                # Switch to local, seed demo + tiers, switch back
+npm run seed:cloud                # Switch to cloud, seed demo + tiers
+```
+
+### Table Classification — What Gets Synced
+
+The sync system uses a three-tier model so you can control exactly what moves between databases:
+
+| Tier | Tables | Synced by default? | Flag |
+|------|--------|--------------------|------|
+| **1 — Platform** | `connector_templates`, `rate_limit_tiers`, `platform_config` | ✓ Always | — |
+| **2 — Demo org** | `organizations` (demo only), `users`, `dashboards`, `workflow_rules`, `agent_templates` + associated rows | Optional | `--include-demo` |
+| **3 — User data** | `connector_installations`, `enterprise_snapshots`, all business/org data | Never automatic | `--include-user-data` + confirmation |
+
+**Why Tier 3 is never automatic:** `connector_installations` rows contain encrypted API credentials. Copying them between databases is a deliberate, audited action — not a background sync.
+
+### Standard Dev Workflow
+
+This is the normal loop when working on features locally before pushing to Supabase:
+
+```
+1. Work locally (npm run db:local, npm run dev:identity)
+       ↓
+2. Make schema changes → npm run db:push  (applies to local)
+       ↓
+3. Test locally with real data
+       ↓
+4. npm run db:cloud && npm run db:push    (apply same schema to Supabase)
+       ↓
+5. npm run db:sync:to-cloud               (push local data → Supabase)
+       ↓
+6. Live site at eip.ellines.co.ke picks up the changes
+```
+
+### Seeding Both Databases at Once
+
+After any schema migration or fresh clone, run this once to get both databases into a known state:
+
+```bash
+npm run seed:both
+```
+
+This runs `seed:demo` and `seed:rate-limits` against both local and Supabase sequentially, restoring `.env` to its original state afterwards. It is **idempotent** — safe to run any number of times.
+
+Options:
+```bash
+npm run seed:both                   # both local + Supabase
+node scripts/seed-both.mjs --local  # local only
+node scripts/seed-both.mjs --cloud  # Supabase only
+node scripts/seed-both.mjs --dry-run  # preview steps without executing
+```
+
+### Pushing Local Data to Supabase
+
+```bash
+npm run db:sync:to-cloud
+```
+
+What this does:
+1. Ensures Supabase schema is in sync (`npm run db:push` against Supabase)
+2. Truncates Tier 1 tables on Supabase and re-imports from local
+3. Deletes demo org rows on Supabase and re-imports from local (because `--include-demo` is the default for this script)
+
+To include only the platform tables (no demo org rows):
+```bash
+npm run db:sync:platform
+# equivalent to: node scripts/db-sync.mjs to-cloud
+```
+
+To do a full copy including user/connector data (requires confirmation):
+```bash
+npm run db:sync:full
+# equivalent to: node scripts/db-sync.mjs to-cloud --include-demo --include-user-data
+```
+
+### Pulling Supabase Data to Local
+
+Useful when you need to restore your local environment to match what's live:
+
+```bash
+npm run db:sync:from-cloud
+```
+
+Same tier rules apply — only platform + demo org rows are pulled by default.
+
+### Checking Sync Status
+
+```bash
+npm run db:sync:status
+```
+
+Shows row counts for platform tables on both local and Supabase, and whether the demo org is present on each. Use this to verify both DBs are in sync before a release.
+
+### Schema Changes — Always Sync Both
+
+Whenever you modify `services/identity/prisma/schema.prisma`, you must apply it to both databases:
+
+```bash
+# Option A: use db-switch helpers (recommended)
+npm run db:local
+npm run db:push
+npm run db:cloud
+npm run db:push
+
+# Option B: the sync script handles schema for you
+npm run db:sync:to-cloud   # includes db:push to Supabase automatically
+```
+
+The `db:sync:*` scripts always run `db:push` against the target before copying data, so the schema is guaranteed to be in sync before any `pg_dump` runs.
+
+### Hybrid Client Use Case
+
+Clients who run EIP on-premise **and** Supabase simultaneously (hybrid deployment) can use the same commands:
+
+```bash
+# On the client's on-premise server:
+npm run db:sync:to-cloud     # push their on-premise data to Supabase
+npm run db:sync:from-cloud   # pull Supabase updates back to on-premise
+
+# Seed platform data to both endpoints:
+npm run seed:both
+```
+
+The `--include-user-data` flag enables full bidirectional replication of all tables including `connector_installations`. This requires explicit confirmation because those rows contain encrypted credentials:
+
+```bash
+node scripts/db-sync.mjs to-cloud --include-demo --include-user-data
+# → prompts: Type YES to continue
+```
+
+---
+
+## For IT Administrators
+
+### Access Database Configuration
+
+1. Log in as **Owner** or **IT Admin**
+2. Go to **Settings** (top right menu)
+3. Scroll to **📦 Database Configuration** section
+4. You'll see:
+   - Currently active database (badge: `✅ Active Database`)
+   - List of configured databases
+   - Option to add new configurations
+
+### Local PostgreSQL Setup (Windows/Mac/Linux)
+
+**Prerequisites:** PostgreSQL 12+ installed
+
+**Step 1: Create a local database**
+
+```bash
+# On your machine (Windows, Mac, or Linux)
+createdb -U postgres ellines_eip_local
+# or specify different port:
+createdb -U postgres -p 5433 ellines_eip_local
+```
+
+**Step 2: Add to Ellines EIP**
+
+1. In **Database Configuration** section, click **+ Add Configuration**
+2. Fill in:
+   - **Configuration Name:** e.g., "Local Development DB" or "Ubuntu Server DB"
+   - **Database Type:** Choose `🖥️ Local PostgreSQL (on-premise)`
+   - Click **🔗 Test Connection** (should succeed)
+   - Click **✅ Create Configuration**
+
+**Step 3: Switch to this database** (optional)
+
+1. Click **Set as Primary** button on your new config
+2. Confirm in dialog
+3. All new queries use this database
+4. ✅ Status shows "Active Database"
+
+### Supabase Cloud Setup
+
+**Prerequisites:** Free account at https://supabase.com
+
+**Step 1: Create Supabase project**
+
+1. Go to https://supabase.com
+2. Sign up (free tier allows 2 projects)
+3. Click **+ New Project**
+4. Fill in:
+   - Project name
+   - Database password (save it!)
+   - Region (pick closest to you)
+5. Wait for provisioning (~2 mins)
+6. Navigate to **Settings → Database**
+7. Copy the **Connection String** (looks like `postgresql://...@...`)
+
+**Step 2: Add to Ellines EIP**
+
+1. In **Database Configuration**, click **+ Add Configuration**
+2. Fill in:
+   - **Configuration Name:** e.g., "Supabase Production"
+   - **Database Type:** `☁️ Supabase (cloud)`
+   - **Supabase Project URL:** Paste the connection string
+   - **Supabase API Key:** Copy from Supabase **Settings → API**
+   - Click **🔗 Test Connection**
+   - Click **✅ Create Configuration**
+
+**Step 3: Switch to Supabase** (optional)
+
+1. Click **Set as Primary** button
+2. All queries route to Supabase
+3. Data accessible from anywhere
+
+### Custom PostgreSQL on VPS
+
+**Prerequisites:** PostgreSQL running on a VPS or managed database service
+
+**Step 1: Get connection details**
+
+From your VPS/database provider, collect:
+- **Host:** e.g., `192.168.1.50` or `db.example.com`
+- **Port:** Usually `5432`
+- **Username:** e.g., `postgres` or your user
+- **Password:** Your database password
+- **Database Name:** e.g., `ellines_eip`
+
+**Step 2: Add to Ellines EIP**
+
+1. Click **+ Add Configuration**
+2. Fill in:
+   - **Configuration Name:** e.g., "Ubuntu Server on LAN"
+   - **Database Type:** `🔧 Custom PostgreSQL Server`
+   - **Host:** Your server IP or hostname
+   - **Port:** Usually 5432
+   - **Username:** Postgres user
+   - **Password:** Database password
+   - **Database Name:** Your database name
+   - Click **🔗 Test Connection**
+   - Click **✅ Create Configuration**
+
+**Step 3: Grant network access** (if needed)
+
+If test fails with "connection refused":
+
+- **On Ubuntu/Linux:**
+  ```bash
+  sudo nano /etc/postgresql/16/main/postgresql.conf
+  # Find: listen_addresses = 'localhost'
+  # Change to: listen_addresses = '*'
+  
+  sudo nano /etc/postgresql/16/main/pg_hba.conf
+  # Add: host    all    all    0.0.0.0/0    md5
+  
+  sudo systemctl restart postgresql
+  ```
+
+- **Firewall:**
+  ```bash
+  # Ubuntu UFW
+  sudo ufw allow 5432/tcp
+  ```
+
+### Switching Between Databases
+
+**Warning:** Switching databases affects all users immediately.
+
+1. Go to **Settings → Database Configuration**
+2. Find the config you want to activate
+3. Click **Set as Primary** button
+4. Read confirmation dialog carefully
+5. Click **Confirm**
+6. ✅ New database is now active
+7. All new queries use the new database
+8. Existing connections will switch on next request
+
+**What happens to old data?**
+- Old data stays in the old database (not moved automatically)
+- New queries use the new database
+- If you switch back, old data is still there
+- To migrate data, use `npm run db:sync:to-cloud` or `npm run db:sync:from-cloud`
+
+### Audit Log
+
+All database switches are logged for compliance:
+
+1. Click on a config card
+2. See **Last switched:** date and reason
+3. View full audit trail in **Audit Center** (Settings)
+
+---
+
+## For Developers
+
+### How It Works (Architecture)
+
+```
+Request with JWT
+    ↓
+DatabaseContextInterceptor (NestJS)
+    ↓
+Look up org from JWT → Load primary DB config
+    ↓
+Store in request.dbContext
+    ↓
+All queries use the configured database
+    ↓
+Response to client
+```
+
+### Implementation Details
+
+**Configuration stored in database:**
+
+```prisma
+model DatabaseConfiguration {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String    // e.g., "Local Dev", "Supabase Prod"
+  type           String    // local | supabase | custom_postgres
+  host           String?   // localhost or server IP
+  port           Int       // 5432
+  databaseName   String?
+  username       String?
+  password       String    // Encrypted at rest (TODO: full AES-GCM)
+  isPrimary      Boolean   @default(false)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+```
+
+### Adding Support to a New Endpoint
+
+1. **NestJS controller:** Use `@UseGuards(RolesGuard)` with `@Roles(OWNER, IT_ADMIN)`
+2. **Service:** Call `this.dbSwitcher.getActiveDatabase(orgId)` to get current DB
+3. **Prisma queries:** Use normally — they automatically use the switched database
+
+### Security Considerations
+
+**Passwords in database:**
+
+⚠️ **Current:** Passwords stored as BASE64 (not secure)  
+✅ **TODO:** Encrypt with org's encryption key (AES-GCM via `shared/encryption.ts`)
+
+**Database access control:**
+- Only Owner/IT Admin can configure databases
+- Switch reasons are audit logged
+- All changes tracked in `DatabaseSwitchLog`
+
+---
+
+## Troubleshooting
+
+### "Connection refused" Error
+
+```bash
+# Test connectivity from your machine
+telnet 192.168.1.50 5432
+# Check if PostgreSQL is running
+sudo systemctl status postgresql
+# Check listen address
+sudo grep "^listen_addresses" /etc/postgresql/*/main/postgresql.conf
+```
+
+### "Authentication failed" Error
+
+```bash
+# Test password locally on the server
+psql -U postgres -d ellines_eip
+# Reset password if needed
+sudo -u postgres psql
+postgres=# ALTER USER postgres WITH PASSWORD 'newpassword';
+```
+
+### "Database does not exist" Error
+
+```bash
+psql -l                                        # list databases
+createdb -U postgres ellines_eip_local         # create if missing
+```
+
+### Sync Script Fails with "pg_dump not found"
+
+The sync scripts expect PostgreSQL 18 at `C:\Program Files\PostgreSQL\18\`. If you installed a different version:
+
+```bash
+# Check what's installed
+Get-Item "C:\Program Files\PostgreSQL\*\bin\pg_dump.exe"
+```
+
+Edit the `PSQL` and `PG_DUMP` constants at the top of `scripts/db-sync.mjs` to match your installation path.
+
+### Sync Script Fails with "SSL required"
+
+Supabase requires SSL. The CLOUD_URL in `scripts/db-sync.mjs` already includes `?sslmode=require`. If you see an SSL error, verify `PGPASSWORD` is being set and that the Supabase password hasn't rotated.
+
+### Switching Database Didn't Take Effect
+
+1. Hard refresh browser (Ctrl+Shift+R)
+2. Log out and log back in
+3. Check that config is marked as Primary (blue badge)
+
+---
+
+## Security Best Practices
+
+### For Production Deployments
+
+1. **Use Supabase or a managed database service** — automated backups, encryption at rest, compliance certifications
+2. **Encrypt passwords** — pending upgrade from BASE64 to AES-GCM (`shared/encryption.ts`)
+3. **Network security** — use VPN or private network; never expose database ports to the public internet
+4. **Backup strategy** — automated backups to a separate location; test restoration; 30-day minimum retention
+5. **Sync audit** — `npm run db:sync:*` scripts log to console; pipe output to your audit trail for compliance
+
+### For Development
+
+- Use localhost or local network only
+- Non-production passwords are acceptable
+- Never put real client data in `ellines_eip_local`
+- Run `npm run seed:both` after a fresh clone to get a clean known state
+
+---
+
+## FAQ
+
+**Q: Can I migrate data between databases?**  
+A: Yes — use `npm run db:sync:to-cloud` (local → Supabase) or `npm run db:sync:from-cloud` (Supabase → local). For full migration including user data use the `--include-user-data` flag.
+
+**Q: What gets synced by default?**  
+A: Only Tier 1 (connector templates, rate-limit tiers, platform config) and Tier 2 (demo org rows). Real client data is never moved automatically.
+
+**Q: Is seed:both safe to run on production?**  
+A: Yes — all seed scripts use Prisma `upsert`. They only insert/update the demo org and platform config rows; they never delete existing client organisations.
+
+**Q: Can I use the same database for multiple organizations?**  
+A: Yes — configure the same database in Settings → Database Configuration for each org independently.
+
+**Q: What happens to my data when I switch databases?**  
+A: Data stays in both databases independently. New queries go to the new database. Old data remains in the old database. Use the sync commands to move data deliberately.
+
+**Q: Will switching databases cause downtime?**  
+A: No — the switch is instant and does not restart services.
+
+**Q: Can I automate database switching?**  
+A: Currently manual via Settings UI. For scripted environments use `npm run db:local` / `npm run db:cloud` (`.env` rewrite) or the `db:sync:*` commands.
+
+**Q: What's the maximum data size?**  
+A: Local: limited by disk space. Supabase free: 500 MB. Paid plans: up to terabytes.
+
+**Q: Is my data encrypted?**  
+A: In transit: SSL/TLS is enforced for Supabase. At rest: depends on database provider. Connector credential fields (`apiKey`, `bearerToken`, etc.) are AES-GCM encrypted in EIP before storage.
+
+---
+
+## Related Documentation
+
+- [README](../README.md) — Setup and architecture
+- [Dev Workflow](.kiro/steering/dev-workflow.md) — Day-to-day development loop
+- [Build Queue](./05_Build_Queue.md) — Current development status
+
+---
+
+**Last updated:** 2026-09-25  
+**Scripts:** `scripts/db-sync.mjs`, `scripts/db-sync-tables.mjs`, `scripts/seed-both.mjs`  
+**For questions:** See AGENTS.md or contact the development team
+
 
 ---
 
