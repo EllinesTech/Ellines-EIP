@@ -55,11 +55,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   let message = 'Connection test OK';
 
   try {
-    if (catalogId === 'demo-json') ok = true;
-    else if (catalogId === 'csv-file') ok = Boolean((config.csvText || 'x').trim());
+    if (catalogId === 'csv-file') ok = Boolean((config.csvText || 'x').trim());
     else if (catalogId === 'rest-api') {
       const endpoint = (config.endpoint || '').trim();
-      if (!endpoint || endpoint.includes('rest-sample')) ok = true;
+      if (!endpoint) throw new Error('REST endpoint URL is required');
       else {
         const egressCheck = isSafeEgressTarget(endpoint);
         if (!egressCheck.safe) {

@@ -16,7 +16,6 @@ import {
   assertReadOnlySql,
   buildAuthHeaders,
   createCsvFileConnector,
-  createDemoJsonConnector,
   createImapConnector,
   createMysqlConnector,
   createPostgresConnector,
@@ -38,7 +37,6 @@ import mysql from 'mysql2/promise';
 import { Client } from 'pg';
 import SftpClient from 'ssh2-sftp-client';
 import { PrismaService } from '../prisma/prisma.service';
-import demoSeed from './demo-enterprise.json';
 
 const SECRET_KEYS = [
   'apiKey',
@@ -57,7 +55,6 @@ const ALLOWED_CATALOG = [
   'postgres',
   'sqlserver',
   'mysql',
-  'demo-json',
   'email-imap',
   'sftp',
 ] as const;
@@ -480,15 +477,6 @@ export class EnterpriseService {
     options?: ConnectorInstallConfig,
   ) {
     await this.assertOrgNotSuspended(organizationId);
-    if (connectorId === 'demo-json') {
-      const connector = createDemoJsonConnector(normalizeEnterprisePayload(demoSeed));
-      const result = await connector.sync();
-      if (!result.ok) {
-        throw new ServiceUnavailableException(result.message || 'Sync failed');
-      }
-      return this.persistSync(organizationId, actorUserId, result.summary, connectorId);
-    }
-
     const config = options || {};
     const summary = await this.runSync(connectorId, config, undefined);
     return this.persistSync(organizationId, actorUserId, summary, connectorId);
@@ -566,7 +554,6 @@ export class EnterpriseService {
   }
 
   private async runTest(catalogId: string, config: ConnectorInstallConfig): Promise<boolean> {
-    if (catalogId === 'demo-json') return true;
     if (catalogId === 'csv-file') {
       return Boolean((config.csvText || '').trim());
     }
@@ -649,13 +636,6 @@ export class EnterpriseService {
     config: ConnectorInstallConfig,
     displayName?: string,
   ) {
-    if (catalogId === 'demo-json') {
-      const connector = createDemoJsonConnector(normalizeEnterprisePayload(demoSeed));
-      const result = await connector.sync();
-      if (!result.ok) throw new ServiceUnavailableException(result.message || 'Sync failed');
-      return result.summary;
-    }
-
     if (catalogId === 'rest-api') {
       const endpoint = (config.endpoint || '').trim();
       if (!endpoint) throw new BadRequestException('REST endpoint URL is required');
