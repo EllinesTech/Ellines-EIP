@@ -5,7 +5,6 @@ import {
   requireAuth,
   type Env,
 } from '../../../shared/auth';
-import seed from '../../../shared/demo-enterprise.json';
 import { unpackTimelineStorage } from '../../../shared/uem';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -31,18 +30,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (!snap) {
     return json({
       organizationId: auth.organizationId,
-      connectorId: 'demo-json',
-      connectorName: 'Demo JSON Systems',
+      connectorId: 'none',
+      connectorName: '',
       healthScore: 0,
       connectedSystems: 0,
       openAlerts: 0,
       openDecisions: 0,
-      briefHighlight: 'No connector sync yet. Open Connectors and run Sync now.',
+      briefHighlight: 'No connector sync yet. Open Connectors and sync your first system to unlock live KPIs.',
       timeline: [],
       model: null,
       syncedAt: null,
       status: 'idle',
-      seedAvailable: Boolean(seed),
     });
   }
 

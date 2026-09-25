@@ -248,13 +248,13 @@ function AdminOverview({
       .finally(() => setEmailPulling(false));
   }
 
-  const pulse = useMemo(() => pulseSeries(synced ? health : 42), [synced, health]);
+  const pulse = useMemo(() => synced ? pulseSeries(health) : [], [synced, health]);
   const sparks = useMemo(
     () => ({
-      health: sparkSeries(synced ? health : 40, 9),
-      systems: sparkSeries(synced ? systems * 18 + 30 : 28, 9),
-      decisions: sparkSeries(synced ? decisions * 10 + 35 : 32, 9),
-      ready: sparkSeries(70, 9),
+      health: sparkSeries(synced ? health : 0, 9),
+      systems: sparkSeries(synced ? systems * 18 + 30 : 0, 9),
+      decisions: sparkSeries(synced ? decisions * 10 + 35 : 0, 9),
+      ready: sparkSeries(synced ? health : 0, 9),
     }),
     [synced, health, systems, decisions],
   );
@@ -269,15 +269,17 @@ function AdminOverview({
           },
           {
             title: 'Next: sync a connector',
-            detail: 'Open Connectors and run Sync now on Demo JSON Systems.',
+            detail: 'Open Connectors and run Sync now to pull live data from your business systems.',
           },
         ];
 
-  const donut = [
-    { name: 'Decisions', value: Math.max(1, decisions), color: chartColors.GREEN },
-    { name: 'Alerts', value: Math.max(1, alerts), color: chartColors.BLUE },
-    { name: 'Standing by', value: Math.max(1, 8 - alerts), color: chartColors.AMBER },
-  ];
+  const donut = synced
+    ? [
+        { name: 'Decisions', value: Math.max(1, decisions), color: chartColors.GREEN },
+        { name: 'Alerts', value: Math.max(1, alerts), color: chartColors.BLUE },
+        { name: 'Standing by', value: Math.max(1, 8 - alerts), color: chartColors.AMBER },
+      ]
+    : [];
   const totalTasks = donut.reduce((a, b) => a + b.value, 0);
 
   const ops = [
@@ -307,7 +309,7 @@ function AdminOverview({
                 : 'Owner view — invite IT, then sync a connector to unlock live KPIs.'
               : synced
                 ? 'IT Admin view — connectors, access for work roles, and sync health.'
-                : 'IT Admin view — open Connectors and sync Demo JSON Systems to unlock live KPIs.'}
+                : 'IT Admin view — open Connectors and run Sync to connect your business systems and unlock live KPIs.'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -746,13 +748,13 @@ function ClientOverview({
   synced: boolean;
   variant: WorkHomeVariant;
 }) {
-  const health = synced ? summary!.healthScore : 62;
-  const alerts = synced ? summary!.openAlerts : 2;
-  const decisions = synced ? summary!.openDecisions : 3;
+  const health = synced ? summary!.healthScore : 0;
+  const alerts = synced ? summary!.openAlerts : 0;
+  const decisions = synced ? summary!.openDecisions : 0;
   const systems = synced ? summary!.connectedSystems : 0;
 
-  const bars = useMemo(() => weekSeries(health), [health]);
-  const cash = useMemo(() => pulseSeries(Math.max(40, health - 8)), [health]);
+  const bars = useMemo(() => synced ? weekSeries(health) : [], [synced, health]);
+  const cash = useMemo(() => synced ? pulseSeries(Math.max(0, health - 8)) : [], [synced, health]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -766,19 +768,21 @@ function ClientOverview({
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const depts = [
+  // Department breakdown is derived from real health score — only meaningful when synced
+  const depts = synced ? [
     { label: 'Finance', pct: Math.min(95, Math.round(health * 0.95)) },
     { label: 'Sales', pct: Math.min(92, Math.round(health * 0.88)) },
     { label: 'Operations', pct: Math.min(90, Math.round(health * 0.82)) },
     { label: 'HR', pct: Math.min(88, Math.round(health * 0.76)) },
     { label: 'IT', pct: Math.min(86, Math.round(health * 0.72)) },
-  ];
+  ] : [];
 
-  const opsSegments = [
+  // Ops donut — only shown when synced
+  const opsSegments = synced ? [
     { name: 'Critical', value: Math.max(1, Math.min(4, alerts)), color: chartColors.RED },
     { name: 'Warning', value: Math.max(2, Math.min(8, decisions)), color: chartColors.AMBER },
     { name: 'Normal', value: Math.max(8, 20 - alerts - decisions), color: chartColors.GREEN },
-  ];
+  ] : [];
 
   const title =
     variant === 'executive'

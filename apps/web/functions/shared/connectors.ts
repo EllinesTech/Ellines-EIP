@@ -14,6 +14,7 @@ export type InstallConfig = {
   headers?: Record<string, string>;
   authType?: 'none' | 'apiKey' | 'bearer' | 'basic';
   apiKey?: string;
+  /** Custom header name for API key auth (default: X-API-Key). */
   apiKeyHeader?: string;
   bearerToken?: string;
   basicUser?: string;
@@ -24,14 +25,65 @@ export type InstallConfig = {
   selectedRoutes?: { method: string; path: string; capability?: string }[];
   connectionString?: string;
   sql?: string;
+  /**
+   * Optional field-name remapping applied before normalizeEnterprisePayload.
+   * Keys are upstream field names; values are EIP field names.
+   * Example: { "total_sales": "connectedSystems", "status_msg": "briefHighlight" }
+   */
   fieldMap?: Record<string, string>;
   systemName?: string;
+  /**
+   * Human-readable label for the external system being connected.
+   * Used as the connector's source system name in the normalized payload and snapshot.
+   * Examples: "Haven Catalogue API", "Nairobi Branch POS", "Clinical HIS Production"
+   */
+  systemLabel?: string;
+  /**
+   * Optional free-form identifier for the business this connector belongs to.
+   * Supports future multi-business grouping and cross-business reporting.
+   * Example: "ellines-haven", "abc-energy-station-001"
+   */
+  businessId?: string;
+  /**
+   * Optional free-form identifier for the branch this connector belongs to.
+   * Supports future branch-level reporting and filtering.
+   * Example: "nairobi-cbd", "branch-027"
+   */
+  branchId?: string;
+  /**
+   * Date/time window appended to REST/GraphQL requests as query parameters.
+   * Only active when `dateWindowEnabled: true`.
+   * 'all' = no date params (default behaviour, fetches everything).
+   */
+  dateWindow?: 'today' | 'week' | 'month' | 'all';
+  /**
+   * When true, date range parameters are appended to the endpoint URL based on
+   * `dateWindow`. Must be explicitly enabled — defaults to false to avoid
+   * polluting external APIs with undocumented parameters.
+   */
+  dateWindowEnabled?: boolean;
+  /**
+   * Custom query-parameter name for the range start date sent to the upstream API.
+   * When set (together with dateParamTo), EIP sends `?<dateParamFrom>=<ISO>&<dateParamTo>=<ISO>`
+   * instead of the generic `?window=&from=&to=`.
+   * Example: "startDate", "since", "created_after"
+   */
+  dateParamFrom?: string;
+  /**
+   * Custom query-parameter name for the range end date sent to the upstream API.
+   * Example: "endDate", "until", "created_before"
+   */
+  dateParamTo?: string;
+  /** GraphQL query string (for graphql catalog type). */
+  graphqlQuery?: string;
+  /** IMAP */
   imapHost?: string;
   imapPort?: number;
   imapUser?: string;
   imapPassword?: string;
   imapMailbox?: string;
   imapSecure?: boolean;
+  /** SFTP */
   sftpHost?: string;
   sftpPort?: number;
   sftpUsername?: string;
@@ -144,6 +196,150 @@ export function buildAuthHeaders(config: InstallConfig): Record<string, string> 
   return headers;
 }
 
+/**
+ * Return ISO date boundaries for a named time window, relative to `now`.
+ * Used by REST/GraphQL connectors to append ?window=&from=&to= to their
+ * endpoint URL so the upstream system can filter its response by time range.
+ */
+export function dateWindowBounds(
+  window: InstallConfig['dateWindow'],
+  now = new Date(),
+): { from: string; to: string } | null {
+  if (!window || window === 'all') return null;
+  const to = now.toISOString();
+  const from = new Date(now);
+  if (window === 'today') {
+    from.setHours(0, 0, 0, 0);
+  } else if (window === 'week') {
+    from.setDate(from.getDate() - 7);
+  } else if (window === 'month') {
+    from.setMonth(from.getMonth() - 1);
+  }
+  return { from: from.toISOString(), to };
+}
+
+/**
+ * Append date window query parameters to an endpoint URL when date filtering
+ * is configured for this connector.
+ *
+ * Requires `config.dateWindowEnabled: true` to be explicitly set — date params
+ * are NOT appended by default, because many external APIs do not understand
+ * generic `window/from/to` parameters and this would pollute requests silently.
+ *
+ * Param name mapping (evaluated in order):
+ *   1. If `config.dateParamFrom` and `config.dateParamTo` are both set, uses
+ *      those names: `?<dateParamFrom>=<ISO>&<dateParamTo>=<ISO>`.
+ *   2. Otherwise falls back to the EIP generic form: `?window=<value>&from=<ISO>&to=<ISO>`.
+ *
+ * `config.dateWindow = 'all'` (or missing) → no params appended regardless of enabled flag.
+ */
+export function appendDateWindowToUrl(
+  url: string,
+  config: InstallConfig,
+  now = new Date(),
+): string {
+  // Must be explicitly enabled — default is off.
+  if (!config.dateWindowEnabled) return url;
+  const bounds = dateWindowBounds(config.dateWindow, now);
+  if (!bounds) return url;
+  try {
+    const u = new URL(url);
+    if (config.dateParamFrom && config.dateParamTo) {
+      // Custom param names: the upstream API defines its own date filter params.
+      u.searchParams.set(config.dateParamFrom, bounds.from);
+      u.searchParams.set(config.dateParamTo, bounds.to);
+    } else {
+      // EIP generic form — suitable for APIs that explicitly support ?window/from/to.
+      u.searchParams.set('window', config.dateWindow as string);
+      u.searchParams.set('from', bounds.from);
+      u.searchParams.set('to', bounds.to);
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Apply a fieldMap to a plain object: renames upstream keys to EIP keys.
+ * Only top-level keys are remapped. Values are preserved as-is.
+ * If fieldMap is empty or absent, the original object is returned unchanged.
+ *
+ * Example config: { "total_books": "recordCount", "msg": "briefHighlight" }
+ * Input:  { "total_books": 15, "msg": "All good", "other": "x" }
+ * Output: { "recordCount": 15, "briefHighlight": "All good", "other": "x" }
+ */
+export function applyFieldMap(
+  data: Record<string, unknown>,
+  fieldMap?: Record<string, string>,
+): Record<string, unknown> {
+  if (!fieldMap || Object.keys(fieldMap).length === 0) return data;
+  const out: Record<string, unknown> = { ...data };
+  for (const [from, to] of Object.entries(fieldMap)) {
+    if (from in out && from !== to) {
+      out[to] = out[from];
+      delete out[from];
+    }
+  }
+  return out;
+}
+
+/**
+ * Semantic protection set: EIP universal fields whose meaning is standardized.
+ * Mapping an arbitrary source field to one of these should be done deliberately.
+ */
+const PROTECTED_EIP_FIELDS = new Set([
+  'connectedSystems',
+  'healthScore',
+  'openAlerts',
+  'openDecisions',
+]);
+
+/**
+ * Validate a fieldMap for potential semantic risks.
+ * Returns an array of human-readable warning strings (empty = no concerns).
+ *
+ * Protected fields (connectedSystems, healthScore, openAlerts, openDecisions)
+ * have specific EIP semantics. Mapping an arbitrary source field to one of
+ * these is allowed but may produce misleading dashboards if the source field
+ * does not actually represent that concept.
+ *
+ * Warnings are advisory — the mapping is still applied. Surface them in the
+ * connector's last_message so the operator is informed.
+ */
+export function validateFieldMap(fieldMap?: Record<string, string>): string[] {
+  if (!fieldMap || Object.keys(fieldMap).length === 0) return [];
+  const warnings: string[] = [];
+  for (const [from, to] of Object.entries(fieldMap)) {
+    if (PROTECTED_EIP_FIELDS.has(to)) {
+      warnings.push(
+        `Mapping '${from}' → '${to}' targets a protected EIP semantic field. ` +
+        `Ensure '${from}' actually represents ${to} (not a generic record count or unrelated metric).`,
+      );
+    }
+  }
+  return warnings;
+}
+
+/**
+ * Inject connector config context into a raw API response object before normalization.
+ * This allows config-level metadata (systemLabel, businessId, branchId) to influence
+ * the normalized payload's sourceSystem without requiring the external API to return them.
+ *
+ * Only injects keys that are not already present in the raw data — the API's own
+ * fields always take priority.
+ */
+export function injectConfigContext(
+  raw: Record<string, unknown>,
+  config: InstallConfig,
+): Record<string, unknown> {
+  const out = { ...raw };
+  if (config.systemLabel && !out.systemName && !out.sourceSystem) {
+    out.systemName = config.systemLabel;
+  }
+  return out;
+}
+
 function asNumber(value: unknown, fallback = 0): number {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? Math.round(n) : fallback;
@@ -162,40 +358,119 @@ export function normalizeEnterprisePayload(raw: unknown) {
         ? (root.enterprise as Record<string, unknown>)
         : root;
 
+  // ── Timeline ────────────────────────────────────────────────────────────────
+  // Primary: look for a top-level array field named timeline / events / activity.
+  // Fallback: derive timeline entries from common top-level record arrays that
+  // many REST APIs return (books, products, records, items, orders, users, tickets).
+  // Each array element is treated as an event — title from name/title/id fields,
+  // detail from description/status/type/category or a concise field summary.
   const timelineRaw = data.timeline ?? data.events ?? data.activity ?? [];
-  const timeline = Array.isArray(timelineRaw)
-    ? timelineRaw
-        .map((item) => {
-          if (!item || typeof item !== 'object') return null;
-          const row = item as Record<string, unknown>;
-          const title = asString(row.title ?? row.name ?? row.event, '');
-          const detail = asString(row.detail ?? row.description ?? row.message, '');
-          if (!title) return null;
-          return { title, detail: detail || title };
-        })
-        .filter((x): x is { title: string; detail: string } => Boolean(x))
-        .slice(0, 12)
-    : [];
+  let timeline: { title: string; detail: string }[] = [];
 
+  if (Array.isArray(timelineRaw) && timelineRaw.length > 0) {
+    timeline = timelineRaw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const row = item as Record<string, unknown>;
+        const title = asString(row.title ?? row.name ?? row.event, '');
+        const detail = asString(row.detail ?? row.description ?? row.message, '');
+        if (!title) return null;
+        return { title, detail: detail || title };
+      })
+      .filter((x): x is { title: string; detail: string } => Boolean(x))
+      .slice(0, 12);
+  } else {
+    // No explicit timeline field — try common record-array field names.
+    // This handles APIs like {"books":[{title,author,status,...}],...} or
+    // {"products":[{name,sku,price,...}],...} where each record becomes a timeline entry.
+    const RECORD_ARRAY_KEYS = [
+      'books', 'products', 'records', 'items', 'orders',
+      'users', 'tickets', 'tasks', 'transactions', 'entries',
+    ] as const;
+    for (const key of RECORD_ARRAY_KEYS) {
+      const arr = data[key];
+      if (Array.isArray(arr) && arr.length > 0) {
+        timeline = arr
+          .slice(0, 12)
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const row = item as Record<string, unknown>;
+            const title = asString(
+              row.title ?? row.name ?? row.subject ?? String(row.id ?? ''),
+              '',
+            );
+            if (!title) return null;
+            const detail = asString(
+              row.detail ?? row.author ?? row.description ?? row.genre ??
+              row.type ?? row.category ?? row.status ?? '',
+              key,
+            );
+            return { title, detail };
+          })
+          .filter((x): x is { title: string; detail: string } => Boolean(x));
+        break;
+      }
+    }
+  }
+
+  // ── Numeric KPIs ─────────────────────────────────────────────────────────────
+  // Aliases in priority order — check schema-native names first.
+  //
+  // connectedSystems: only maps from fields that explicitly represent connected
+  // system/integration counts. Generic record counts (count, total, length) must
+  // NOT map here — those go to recordCount instead.
   const healthScore = Math.min(
     100,
     Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
   );
   const connectedSystems = Math.max(
     0,
-    asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
+    asNumber(
+      data.connectedSystems ?? data.connected_systems ?? data.systems ??
+      data.integrations ?? data.connections,
+      0,
+    ),
   );
-  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0));
+  // recordCount: the count of records returned by this connector.
+  // Maps from generic count aliases that many catalogue/inventory APIs return.
+  // This is distinct from connectedSystems — 15 books ≠ 15 connected systems.
+  const recordCount = Math.max(
+    0,
+    asNumber(
+      data.recordCount ?? data.record_count ??
+      data.count ?? data.total ?? data.length,
+      0,
+    ),
+  );
+  const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts ?? data.issues, 0));
   const openDecisions = Math.max(
     0,
-    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions, 0),
-  );
-  const briefHighlight = asString(
-    data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-    'REST sync completed with no brief text.',
+    asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions ?? data.pending, 0),
   );
 
-  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system, '');
+  // ── Brief highlight ───────────────────────────────────────────────────────────
+  // Fallback chain: schema-native → common prose fields → synthesised from
+  // business/api name + recordCount (or connectedSystems) so the Command Center
+  // shows something useful even when the upstream API returns no prose field.
+  const businessName = asString(
+    data.business ?? data.name ?? data.api ?? data.source ?? data.system ?? data.systemName,
+    '',
+  );
+  // Prefer recordCount for prose synthesis when the API returns records but
+  // not an explicit connected-systems count. Fall back to connectedSystems.
+  const proseSummaryCount = recordCount > 0 ? recordCount : connectedSystems;
+  const proseSummaryLabel = recordCount > 0 ? 'record' : 'system';
+  const briefHighlight = asString(
+    data.briefHighlight ?? data.brief ?? data.summary ?? data.message ??
+    (businessName && proseSummaryCount > 0
+      ? `${businessName}: ${proseSummaryCount} ${proseSummaryLabel}${proseSummaryCount !== 1 ? 's' : ''} synced.`
+      : businessName
+        ? `${businessName}: sync completed.`
+        : undefined),
+    'REST sync completed.',
+  );
+
+  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system ?? businessName, '');
   let model: UemModel | null = null;
   if (data.model || data.uem || data.objects || data.counts) {
     model = normalizeUemModel(data, {
@@ -215,6 +490,7 @@ export function normalizeEnterprisePayload(raw: unknown) {
   return {
     healthScore,
     connectedSystems,
+    recordCount,
     openAlerts,
     openDecisions,
     briefHighlight,

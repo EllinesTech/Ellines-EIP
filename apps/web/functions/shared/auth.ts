@@ -427,12 +427,17 @@ export function isValidPermission(permission: string): boolean {
   return canonicalIsValidPermission(permission);
 }
 
-/** Default permissions for each fixed role — mirrors PermissionService in NestJS identity. */
+/**
+ * Default permissions for each fixed role — mirrors PermissionService in NestJS identity
+ * (`services/identity/src/rbac/permission.service.ts`). These two tables MUST stay in sync.
+ *
+ * NOTE: `connector:install` is gated at the API layer by a separate `platformAdmin` check
+ * (Connector Governance Rule §5). The RBAC permission itself still exists for `admin` — the
+ * API-layer platformAdmin guard is what prevents non-platform-staff from exercising it.
+ */
 const FIXED_ROLE_PERMISSIONS: Record<string, string[]> = {
   owner:     ['*'],
-  // connector:install and connector:delete are intentionally absent from admin.
-  // Connector installation is a platform admin operation — no org-level role may install connectors.
-  admin:     ['org:*', 'connector:read', 'connector:update', 'approval:*', 'rule:*', 'report:*', 'document:*', 'ellinea:*', 'audit:view', 'webhook:*', 'notification:*', 'sso:view'],
+  admin:     ['org:*', 'connector:*', 'approval:*', 'rule:*', 'report:*', 'document:*', 'ellinea:*', 'audit:view', 'webhook:*', 'notification:*', 'sso:view'],
   executive: ['org:view', 'connector:read', 'approval:view', 'approval:decide', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'ellinea:view', 'audit:view', 'notification:view'],
   manager:   ['org:view', 'connector:read', 'approval:view', 'approval:request', 'rule:view', 'report:view', 'report:create', 'report:run', 'document:view', 'document:upload', 'ellinea:ask', 'notification:view'],
   member:    ['org:view', 'connector:read', 'approval:view', 'approval:request', 'report:view', 'document:view', 'ellinea:ask', 'notification:view'],

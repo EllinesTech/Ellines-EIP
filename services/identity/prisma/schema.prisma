@@ -18,15 +18,19 @@ enum UserRole {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  /** Optional parent org for multi-company groups (v1.1). Null = top-level org. */
-  parentOrgId String? @map("parent_org_id")
-  /** Display prefs e.g. { timeFormat, dateStyle } — org/platform admin editable. */
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  /**
+   * Optional parent org for multi-company groups (v1.1). Null = top-level org.
+   */
+  parentOrgId String?  @map("parent_org_id")
+  /**
+   * Display prefs e.g. { timeFormat, dateStyle } — org/platform admin editable.
+   */
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   users                  User[]
   branches               Branch[]
@@ -40,35 +44,35 @@ model Organization {
   scheduledReports       ScheduledReport[]
   enterpriseEvents       EnterpriseEvent[]
   memberships            OrganizationMembership[]
-  childOrgs              Organization[]           @relation("OrgParent")
-  parentOrg              Organization?            @relation("OrgParent", fields: [parentOrgId], references: [id], onDelete: SetNull)
+  childOrgs              Organization[]             @relation("OrgParent")
+  parentOrg              Organization?              @relation("OrgParent", fields: [parentOrgId], references: [id], onDelete: SetNull)
   ssoProviders           SsoProvider[]
   customRoles            CustomRole[]
   roleAuditLogs          RoleAuditLog[]
-  dashboards             Dashboard[]             // Track B: BI Dashboards
-  workflowRules          WorkflowRule[]          // Track C: Autonomous Workflows
-  ellineaAgents          EllineaAgent[]          // v2.0 A.1: Autonomous Agents
+  dashboards             Dashboard[] // Track B: BI Dashboards
+  workflowRules          WorkflowRule[] // Track C: Autonomous Workflows
+  ellineaAgents          EllineaAgent[] // v2.0 A.1: Autonomous Agents
   agentSubscriptions     AgentWebhookSubscription[] @relation("AgentSubscriptions")
-  databaseConfigs        DatabaseConfiguration[]   // Multi-database support
-  databaseSwitchLogs     DatabaseSwitchLog[]     // Database switch audit trail
-  apiUsage               ApiUsage[]              // B.3.2: API usage tracking
-  organizationTier       OrganizationTier?       // B.3.2: Rate limit tier
-  rateLimitViolations    RateLimitViolation[]    // B.3.2: Rate limit violations
-  userContextProfiles    UserContextProfile[]    @relation("UserContextProfiles")  // v2.0: Personalization user contexts
-  interactionLogs        InteractionLog[]        @relation("InteractionLogs")  // v2.0: Personalization interaction logs
-  notificationPrefs      NotificationPreference[] @relation("NotificationPreferences") // v2.0: Personalization notification preferences
-  shortcutSuggestions    ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
-  dataQualityScores      DataQualityScore[]      // v2.0: Data Quality Service
-  dataQualityIssues      DataQualityIssue[]      @relation("DataQualityIssues") // v2.0: Data Quality Issues
-  quarantinedData        QuarantinedData[]       @relation("QuarantinedData") // v2.0: Quarantined data
-  cleansingRules         CleansingRule[]         @relation("CleansingRules") // v2.0: Data cleansing rules
-  dataQualityHistory     DataQualityHistory[]    @relation("DataQualityHistory") // v2.0: Quality history
-  resilientConnections   ResilientConnection[]   // v2.0: Resilient Connection Manager
-  generatedConnectors    GeneratedConnector[]    // v2.0: Auto-generated connectors
+  databaseConfigs        DatabaseConfiguration[] // Multi-database support
+  databaseSwitchLogs     DatabaseSwitchLog[] // Database switch audit trail
+  apiUsage               ApiUsage[] // B.3.2: API usage tracking
+  organizationTier       OrganizationTier? // B.3.2: Rate limit tier
+  rateLimitViolations    RateLimitViolation[] // B.3.2: Rate limit violations
+  userContextProfiles    UserContextProfile[]       @relation("UserContextProfiles") // v2.0: Personalization user contexts
+  interactionLogs        InteractionLog[]           @relation("InteractionLogs") // v2.0: Personalization interaction logs
+  notificationPrefs      NotificationPreference[]   @relation("NotificationPreferences") // v2.0: Personalization notification preferences
+  shortcutSuggestions    ShortcutSuggestion[]       @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
+  dataQualityScores      DataQualityScore[] // v2.0: Data Quality Service
+  dataQualityIssues      DataQualityIssue[]         @relation("DataQualityIssues") // v2.0: Data Quality Issues
+  quarantinedData        QuarantinedData[]          @relation("QuarantinedData") // v2.0: Quarantined data
+  cleansingRules         CleansingRule[]            @relation("CleansingRules") // v2.0: Data cleansing rules
+  dataQualityHistory     DataQualityHistory[]       @relation("DataQualityHistory") // v2.0: Quality history
+  resilientConnections   ResilientConnection[] // v2.0: Resilient Connection Manager
+  generatedConnectors    GeneratedConnector[] // v2.0: Auto-generated connectors
   approvalWorkflows      ApprovalWorkflowRequest[] // v2.0: Generated connector approvals
-  sessions               Session[]           // Phase 2: session registry (spec 24.2.3)
-  integrationRequests    IntegrationRequest[]     // TASK-09: integration request workflow
-  documents              Document[]               // Org-scoped document library
+  sessions               Session[] // Phase 2: session registry (spec 24.2.3)
+  integrationRequests    IntegrationRequest[] // TASK-09: integration request workflow
+  documents              Document[] // Org-scoped document library
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -107,11 +111,17 @@ model User {
   email          String   @unique
   passwordHash   String   @map("password_hash")
   fullName       String   @map("full_name")
-  /** Optional job title shown on profile (e.g. Chief Executive). */
+  /**
+   * Optional job title shown on profile (e.g. Chief Executive).
+   */
   title          String?
-  /** Short personal bio / about. */
+  /**
+   * Short personal bio / about.
+   */
   bio            String?  @db.Text
-  /** Profile photo as compressed data URL (or external URL later). */
+  /**
+   * Profile photo as compressed data URL (or external URL later).
+   */
   avatarUrl      String?  @map("avatar_url") @db.Text
   organizationId String   @map("organization_id")
   role           UserRole @default(member)
@@ -119,17 +129,17 @@ model User {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
-  sessions             Session[]           // Phase 2: session registry (spec 24.2.3)
+  sessions            Session[] // Phase 2: session registry (spec 24.2.3)
   memberships         OrganizationMembership[]
   ssoProviderUsers    SsoProviderUser[]
-  apiUsage            ApiUsage[]              // B.3.2: API usage tracking
-  rateLimitViolations RateLimitViolation[]    // B.3.2: Rate limit violations
-  contextProfile      UserContextProfile?    // v2.0: Personalization context
-  shortcutSuggestions ShortcutSuggestion[]    @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
-  integrationRequests IntegrationRequest[]    @relation("IntegrationRequestedBy") // TASK-09
+  apiUsage            ApiUsage[] // B.3.2: API usage tracking
+  rateLimitViolations RateLimitViolation[] // B.3.2: Rate limit violations
+  contextProfile      UserContextProfile? // v2.0: Personalization context
+  shortcutSuggestions ShortcutSuggestion[]     @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
+  integrationRequests IntegrationRequest[]     @relation("IntegrationRequestedBy") // TASK-09
 
   @@index([organizationId])
   @@map("users")
@@ -143,40 +153,40 @@ model User {
  * Used by PersonalizationService for dashboard adaptation and AI response tailoring.
  */
 model UserContextProfile {
-  id                String   @id @default(cuid())
-  userId            String   @unique @map("user_id")
-  organizationId    String   @map("organization_id")
-  
-  // Demographic context
-  role              String                           // Matches User.role at profile creation
-  department        String?                          // Department name (from org structure)
-  jobTitle          String?  @map("job_title")
-  
-  // Behavioral patterns (learned from interactions)
-  frequentlyAccessedDataTypes String[]  @default([]) @map("frequently_accessed_data_types")  // e.g., ["orders", "customers", "products"]
-  frequentlyUsedFeatures      String[]  @default([]) @map("frequently_used_features")        // e.g., ["dashboard", "reports", "search"]
-  preferredDashboardWidgets   String[]  @default([]) @map("preferred_dashboard_widgets")     // e.g., ["kpi_card", "line_chart"]
-  
-  // Interaction metrics
-  totalLogins         Int      @default(0) @map("total_logins")
-  lastLoginAt         DateTime? @map("last_login_at")
-  averageSessionTime  Int      @default(0) @map("average_session_time")  // In seconds
-  
-  // Preferences metadata
-  preferredLanguage   String   @default("en") @map("preferred_language")
-  preferredTimezone   String   @default("UTC") @map("preferred_timezone")
-  
-  // AI response preferences
-  verbosityLevel      String   @default("medium") @map("verbosity_level")      // "concise" | "medium" | "detailed"
-  preferredTerminology String  @default("business") @map("preferred_terminology") // "technical" | "business" | "simple"
-  
-  // Metadata
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  lastProfiledAt      DateTime? @map("last_profiled_at")
+  id             String @id @default(cuid())
+  userId         String @unique @map("user_id")
+  organizationId String @map("organization_id")
 
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization        Organization @relation("UserContextProfiles", fields: [organizationId], references: [id], onDelete: Cascade)
+  // Demographic context
+  role       String // Matches User.role at profile creation
+  department String? // Department name (from org structure)
+  jobTitle   String? @map("job_title")
+
+  // Behavioral patterns (learned from interactions)
+  frequentlyAccessedDataTypes String[] @default([]) @map("frequently_accessed_data_types") // e.g., ["orders", "customers", "products"]
+  frequentlyUsedFeatures      String[] @default([]) @map("frequently_used_features") // e.g., ["dashboard", "reports", "search"]
+  preferredDashboardWidgets   String[] @default([]) @map("preferred_dashboard_widgets") // e.g., ["kpi_card", "line_chart"]
+
+  // Interaction metrics
+  totalLogins        Int       @default(0) @map("total_logins")
+  lastLoginAt        DateTime? @map("last_login_at")
+  averageSessionTime Int       @default(0) @map("average_session_time") // In seconds
+
+  // Preferences metadata
+  preferredLanguage String @default("en") @map("preferred_language")
+  preferredTimezone String @default("UTC") @map("preferred_timezone")
+
+  // AI response preferences
+  verbosityLevel       String @default("medium") @map("verbosity_level") // "concise" | "medium" | "detailed"
+  preferredTerminology String @default("business") @map("preferred_terminology") // "technical" | "business" | "simple"
+
+  // Metadata
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  lastProfiledAt DateTime? @map("last_profiled_at")
+
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization        Organization            @relation("UserContextProfiles", fields: [organizationId], references: [id], onDelete: Cascade)
   preferences         UserPreference[]
   interactionLogs     InteractionLog[]
   notificationPrefs   NotificationPreference?
@@ -193,18 +203,18 @@ model UserContextProfile {
  * Examples: favorite features, dismissed recommendations, feature toggles.
  */
 model UserPreference {
-  id                String   @id @default(cuid())
-  contextProfileId  String   @map("context_profile_id")
-  
-  // Preference key-value
-  preferenceKey     String                          // e.g., "dismiss_recommendation_onboarding", "favorite_report_id"
-  preferenceValue   Json     @default("{}")
-  
-  // Metadata
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String @id @default(cuid())
+  contextProfileId String @map("context_profile_id")
 
-  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  // Preference key-value
+  preferenceKey   String // e.g., "dismiss_recommendation_onboarding", "favorite_report_id"
+  preferenceValue Json   @default("{}")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contextProfile UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
 
   @@unique([contextProfileId, preferenceKey])
   @@index([contextProfileId])
@@ -216,27 +226,27 @@ model UserPreference {
  * Examples: clicked widget, dismissed recommendation, accessed data, used shortcut.
  */
 model InteractionLog {
-  id                String   @id @default(cuid())
-  contextProfileId  String   @map("context_profile_id")
-  organizationId    String   @map("organization_id")
-  
-  // Interaction details
-  interactionType   String                          // "widget_click" | "recommendation_dismiss" | "recommendation_accept" | "feature_use" | "data_access" | "shortcut_use"
-  resourceType      String?  @map("resource_type")  // e.g., "dashboard", "widget", "report", "feature"
-  resourceId        String?  @map("resource_id")
-  
-  // Context at time of interaction
-  contextData       Json     @default("{}")         // { "dashboard_id": "...", "widget_type": "kpi_card", ... }
-  
-  // Outcome
-  outcome           String?                         // "accepted" | "dismissed" | "completed" | "abandoned" for analyzing patterns
-  timeSpent         Int?     @map("time_spent")     // In seconds
-  
-  // Metadata
-  createdAt         DateTime @default(now()) @map("created_at")
+  id               String @id @default(cuid())
+  contextProfileId String @map("context_profile_id")
+  organizationId   String @map("organization_id")
 
-  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
-  organization      Organization @relation("InteractionLogs", fields: [organizationId], references: [id], onDelete: Cascade)
+  // Interaction details
+  interactionType String // "widget_click" | "recommendation_dismiss" | "recommendation_accept" | "feature_use" | "data_access" | "shortcut_use"
+  resourceType    String? @map("resource_type") // e.g., "dashboard", "widget", "report", "feature"
+  resourceId      String? @map("resource_id")
+
+  // Context at time of interaction
+  contextData Json @default("{}") // { "dashboard_id": "...", "widget_type": "kpi_card", ... }
+
+  // Outcome
+  outcome   String? // "accepted" | "dismissed" | "completed" | "abandoned" for analyzing patterns
+  timeSpent Int?    @map("time_spent") // In seconds
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contextProfile UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization   Organization       @relation("InteractionLogs", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([contextProfileId])
   @@index([organizationId])
@@ -250,35 +260,35 @@ model InteractionLog {
  * Adapts based on read, ignored, and acted-upon patterns.
  */
 model NotificationPreference {
-  id                String   @id @default(cuid())
-  contextProfileId  String   @unique @map("context_profile_id")
-  organizationId    String   @map("organization_id")
-  
+  id               String @id @default(cuid())
+  contextProfileId String @unique @map("context_profile_id")
+  organizationId   String @map("organization_id")
+
   // Channel preferences
   emailNotifications Boolean @default(true) @map("email_notifications")
   inAppNotifications Boolean @default(true) @map("in_app_notifications")
   pushNotifications  Boolean @default(true) @map("push_notifications")
-  
-  // Notification types preferences (learned from user behavior)
-  notificationTypes Json    @default("{}") // { "approval_pending": { "enabled": true, "frequency": "immediate" }, ... }
-  
-  // Quiet hours
-  quietHoursStart   String?  @map("quiet_hours_start")     // e.g., "18:00"
-  quietHoursEnd     String?  @map("quiet_hours_end")       // e.g., "08:00"
-  quietHoursEnabled Boolean  @default(false) @map("quiet_hours_enabled")
-  
-  // Learning metrics
-  readRate          Float    @default(0.5) @map("read_rate")           // % of notifications read (0-1)
-  ignoredRate       Float    @default(0.2) @map("ignored_rate")        // % ignored (0-1)
-  actedUponRate     Float    @default(0.3) @map("acted_upon_rate")     // % with action taken (0-1)
-  lastLearningAt    DateTime? @map("last_learning_at")
-  
-  // Metadata
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
 
-  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
-  organization      Organization @relation("NotificationPreferences", fields: [organizationId], references: [id], onDelete: Cascade)
+  // Notification types preferences (learned from user behavior)
+  notificationTypes Json @default("{}") // { "approval_pending": { "enabled": true, "frequency": "immediate" }, ... }
+
+  // Quiet hours
+  quietHoursStart   String? @map("quiet_hours_start") // e.g., "18:00"
+  quietHoursEnd     String? @map("quiet_hours_end") // e.g., "08:00"
+  quietHoursEnabled Boolean @default(false) @map("quiet_hours_enabled")
+
+  // Learning metrics
+  readRate       Float     @default(0.5) @map("read_rate") // % of notifications read (0-1)
+  ignoredRate    Float     @default(0.2) @map("ignored_rate") // % ignored (0-1)
+  actedUponRate  Float     @default(0.3) @map("acted_upon_rate") // % with action taken (0-1)
+  lastLearningAt DateTime? @map("last_learning_at")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contextProfile UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization   Organization       @relation("NotificationPreferences", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@map("notification_preferences")
@@ -289,35 +299,35 @@ model NotificationPreference {
  * Generated based on historical interaction patterns and current context.
  */
 model ShortcutSuggestion {
-  id                String   @id @default(cuid())
-  contextProfileId  String   @map("context_profile_id")
-  organizationId    String   @map("organization_id")
-  userId            String   @map("user_id")
-  
-  // Suggestion details
-  actionTitle       String                          // e.g., "View pending approvals"
-  actionDescription String   @default("")
-  actionUrl         String                          // e.g., "/app/approvals?status=pending"
-  actionType        String                          // "navigate" | "shortcut" | "workflow"
-  
-  // Scoring & ranking
-  confidence        Float    @default(0.5)          // 0.0-1.0: how likely user will find this useful
-  usageCount        Int      @default(0) @map("usage_count")
-  successCount      Int      @default(0) @map("success_count")  // How many times led to action completion
-  
-  // Context
-  context           Json     @default("{}")         // { "time_of_day": "morning", "day_type": "weekday", ... }
-  basedOnPattern    String?  @map("based_on_pattern")         // Which interaction pattern generated this
-  
-  // Lifecycle
-  isActive          Boolean  @default(true) @map("is_active")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  expiresAt         DateTime? @map("expires_at")   // Expire old suggestions
+  id               String @id @default(cuid())
+  contextProfileId String @map("context_profile_id")
+  organizationId   String @map("organization_id")
+  userId           String @map("user_id")
 
-  contextProfile    UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
-  organization      Organization @relation("ShortcutSuggestions", fields: [organizationId], references: [id], onDelete: Cascade)
-  user              User @relation("ShortcutSuggestions", fields: [userId], references: [id], onDelete: Cascade)
+  // Suggestion details
+  actionTitle       String // e.g., "View pending approvals"
+  actionDescription String @default("")
+  actionUrl         String // e.g., "/app/approvals?status=pending"
+  actionType        String // "navigate" | "shortcut" | "workflow"
+
+  // Scoring & ranking
+  confidence   Float @default(0.5) // 0.0-1.0: how likely user will find this useful
+  usageCount   Int   @default(0) @map("usage_count")
+  successCount Int   @default(0) @map("success_count") // How many times led to action completion
+
+  // Context
+  context        Json    @default("{}") // { "time_of_day": "morning", "day_type": "weekday", ... }
+  basedOnPattern String? @map("based_on_pattern") // Which interaction pattern generated this
+
+  // Lifecycle
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  expiresAt DateTime? @map("expires_at") // Expire old suggestions
+
+  contextProfile UserContextProfile @relation(fields: [contextProfileId], references: [id], onDelete: Cascade)
+  organization   Organization       @relation("ShortcutSuggestions", fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User               @relation("ShortcutSuggestions", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([contextProfileId])
   @@index([organizationId])
@@ -331,7 +341,6 @@ model ShortcutSuggestion {
  * v1.1 — Multi-company membership.
  * A User can belong to multiple Organizations with different roles.
  * The primary org remains User.organizationId (backward compat).
- * 
  * v1.1 Track D — Custom roles.
  * If customRoleId is set, it overrides the fixed `role` field.
  */
@@ -339,7 +348,7 @@ model OrganizationMembership {
   id             String   @id @default(cuid())
   userId         String   @map("user_id")
   organizationId String   @map("organization_id")
-  role           UserRole @default(member)       // Fallback if customRoleId not set
+  role           UserRole @default(member) // Fallback if customRoleId not set
   customRoleId   String?  @map("custom_role_id") // If set, use this custom role instead
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -399,6 +408,9 @@ model EnterpriseSnapshot {
   connectorName    String   @map("connector_name")
   healthScore      Int      @map("health_score")
   connectedSystems Int      @map("connected_systems")
+  /// Count of records returned by the last synced connector (e.g. 15 books, 100 students).
+  /// Distinct from connectedSystems — a catalogue with 15 records has 1 connected system.
+  recordCount      Int      @default(0) @map("record_count")
   openAlerts       Int      @map("open_alerts")
   openDecisions    Int      @map("open_decisions")
   briefHighlight   String   @map("brief_highlight")
@@ -412,31 +424,35 @@ model EnterpriseSnapshot {
   @@map("enterprise_snapshots")
 }
 
-/** Per-org connector wizard install — config persists server-side (not localStorage). */
+/**
+ * Per-org connector wizard install — config persists server-side (not localStorage).
+ */
 model ConnectorInstallation {
-  id                  String    @id @default(cuid())
-  organizationId      String    @map("organization_id")
-  catalogId           String    @map("catalog_id")
-  displayName         String    @map("display_name")
-  config              Json
-  status              String    @default("draft")
-  lastTestAt          DateTime? @map("last_test_at")
-  lastSyncedAt        DateTime? @map("last_synced_at")
-  lastMessage         String?   @map("last_message")
-  packId              String?   @map("pack_id")
-  templateId          String?   @map("template_id")      // Track A: reference to ConnectorTemplate
-  templateConfig      Json?     @map("template_config")  // Track A: user config merged with template defaults
-  oauthRefreshToken   String?   @map("oauth_refresh_token") // Track A: OAuth token storage
-  lastError           String?   @map("last_error")       // Track A: last sync error message
-  errorCount          Int       @default(0) @map("error_count") // Track A: consecutive error count
-  /** Last normalized sync payload (healthScore, counts, timeline, UEM model) for this one system. Used to aggregate across all of an org's connected systems instead of last-sync-wins. */
-  lastPayload         Json?     @map("last_payload")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  catalogId         String    @map("catalog_id")
+  displayName       String    @map("display_name")
+  config            Json
+  status            String    @default("draft")
+  lastTestAt        DateTime? @map("last_test_at")
+  lastSyncedAt      DateTime? @map("last_synced_at")
+  lastMessage       String?   @map("last_message")
+  packId            String?   @map("pack_id")
+  templateId        String?   @map("template_id") // Track A: reference to ConnectorTemplate
+  templateConfig    Json?     @map("template_config") // Track A: user config merged with template defaults
+  oauthRefreshToken String?   @map("oauth_refresh_token") // Track A: OAuth token storage
+  lastError         String?   @map("last_error") // Track A: last sync error message
+  errorCount        Int       @default(0) @map("error_count") // Track A: consecutive error count
+  /**
+   * Last normalized sync payload (healthScore, counts, timeline, UEM model) for this one system. Used to aggregate across all of an org's connected systems instead of last-sync-wins.
+   */
+  lastPayload       Json?     @map("last_payload")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  pack         ConnectorPack?        @relation(fields: [packId], references: [id], onDelete: SetNull)
-  template     ConnectorTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pack         ConnectorPack?     @relation(fields: [packId], references: [id], onDelete: SetNull)
+  template     ConnectorTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, packId])
   @@index([organizationId])
@@ -444,18 +460,20 @@ model ConnectorInstallation {
   @@map("connector_installations")
 }
 
-/** Platform Super Admin publishes packs; Org IT installs with credentials only. */
+/**
+ * Platform Super Admin publishes packs; Org IT installs with credentials only.
+ */
 model ConnectorPack {
-  id               String   @id @default(cuid())
-  slug             String   @unique
-  name             String
-  description      String   @default("")
-  catalogId        String   @map("catalog_id")
-  templateConfig   Json     @map("template_config")
-  published        Boolean  @default(true)
-  createdByEmail   String?  @map("created_by_email")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  description    String   @default("")
+  catalogId      String   @map("catalog_id")
+  templateConfig Json     @map("template_config")
+  published      Boolean  @default(true)
+  createdByEmail String?  @map("created_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   installations ConnectorInstallation[]
 
@@ -470,20 +488,20 @@ model ConnectorPack {
  * Templates define configuration schema, normalization rules, OAuth requirements, etc.
  */
 model ConnectorTemplate {
-  id                  String   @id @default(cuid())
-  slug                String   @unique
-  name                String
-  category            String                     // "ERP" | "CRM" | "HIS" | "HR" | "Database" | "REST" | "Email" | "File"
-  description         String   @default("")
-  configSchema        Json     @default("{}")    // JSON Schema for UI form generation
-  normalizationRules  Json     @default("[]")    // Array of UEM normalization rules
-  oauthRequired       Boolean  @default(false) @map("oauth_required")
-  oauthScopes         Json?    @map("oauth_scopes")     // Optional: required OAuth scopes
-  apiDocsUrl          String?  @map("api_docs_url")
-  examples            Json?    @default("[]")   // Array of example configs
-  published           Boolean  @default(true)
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  slug               String   @unique
+  name               String
+  category           String // "ERP" | "CRM" | "HIS" | "HR" | "Database" | "REST" | "Email" | "File"
+  description        String   @default("")
+  configSchema       Json     @default("{}") // JSON Schema for UI form generation
+  normalizationRules Json     @default("[]") // Array of UEM normalization rules
+  oauthRequired      Boolean  @default(false) @map("oauth_required")
+  oauthScopes        Json?    @map("oauth_scopes") // Optional: required OAuth scopes
+  apiDocsUrl         String?  @map("api_docs_url")
+  examples           Json?    @default("[]") // Array of example configs
+  published          Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   installations ConnectorInstallation[]
 
@@ -499,18 +517,18 @@ model ConnectorTemplate {
  * Org IT / Owner creates dashboards; supports layout, refresh rate, and permissions.
  */
 model Dashboard {
-  id              String   @id @default(cuid())
-  organizationId  String   @map("organization_id")
-  name            String
-  description     String   @default("")
-  layout          Json     @default("[]")    // Array of { id, x, y, w, h, ... }
-  refreshRate     Int      @default(300)    @map("refresh_rate")  // Seconds between refreshes
-  isPublic        Boolean  @default(false) @map("is_public")
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String   @default("")
+  layout         Json     @default("[]") // Array of { id, x, y, w, h, ... }
+  refreshRate    Int      @default(300) @map("refresh_rate") // Seconds between refreshes
+  isPublic       Boolean  @default(false) @map("is_public")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   widgets      Widget[]
   exports      DashboardExport[]
 
@@ -522,16 +540,16 @@ model Dashboard {
  * Widget — Individual widget (gauge, line, bar, table, KPI) on a dashboard.
  */
 model Widget {
-  id              String   @id @default(cuid())
-  dashboardId     String   @map("dashboard_id")
-  type            String                  // "gauge" | "line" | "bar" | "table" | "kpi"
-  title           String
-  config          Json     @default("{}")    // Widget-specific config
-  position        Int                    // Grid position / order
-  size            Json     @default("{\"w\":2,\"h\":2}") // Width and height in grid units
-  dataSourceId    String?  @map("data_source_id") // Optional reference to data source
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(cuid())
+  dashboardId  String   @map("dashboard_id")
+  type         String // "gauge" | "line" | "bar" | "table" | "kpi"
+  title        String
+  config       Json     @default("{}") // Widget-specific config
+  position     Int // Grid position / order
+  size         Json     @default("{\"w\":2,\"h\":2}") // Width and height in grid units
+  dataSourceId String?  @map("data_source_id") // Optional reference to data source
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   dashboard Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
   alerts    Alert[]
@@ -544,14 +562,14 @@ model Widget {
  * Alert — Alert threshold on a widget (e.g., if KPI > 100, trigger action).
  */
 model Alert {
-  id              String   @id @default(cuid())
-  widgetId        String   @map("widget_id")
-  condition       String                  // "gt" | "lt" | "eq" | "gte" | "lte"
-  threshold       Float
-  actions         Json     @default("[]")    // Array of { type: "email" | "webhook" | "notification", recipient: "..." }
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  widgetId  String   @map("widget_id")
+  condition String // "gt" | "lt" | "eq" | "gte" | "lte"
+  threshold Float
+  actions   Json     @default("[]") // Array of { type: "email" | "webhook" | "notification", recipient: "..." }
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   widget Widget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
 
@@ -563,14 +581,14 @@ model Alert {
  * DashboardExport — Scheduled dashboard exports (PDF, CSV).
  */
 model DashboardExport {
-  id              String    @id @default(cuid())
-  dashboardId     String    @map("dashboard_id")
-  format          String                 // "pdf" | "csv" | "excel"
-  schedule        String?              // Cron expression for email scheduling (null = manual only)
-  lastRun         DateTime? @map("last_run")
-  nextRun         DateTime? @map("next_run")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  dashboardId String    @map("dashboard_id")
+  format      String // "pdf" | "csv" | "excel"
+  schedule    String? // Cron expression for email scheduling (null = manual only)
+  lastRun     DateTime? @map("last_run")
+  nextRun     DateTime? @map("next_run")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   dashboard Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
@@ -585,20 +603,20 @@ model DashboardExport {
  * Autonomy levels: 1 = Deterministic, 2 = AI-assisted (requires approval), 3 = Scheduled (auto-execute).
  */
 model WorkflowRule {
-  id              String   @id @default(cuid())
-  organizationId  String   @map("organization_id")
-  name            String
-  description     String   @default("")
-  autonomyLevel   Int      @default(1) @map("autonomy_level") // 1 | 2 | 3
-  trigger         String                  // Event type: "approval_created" | "alert_threshold" | "schedule" | "manual"
-  condition       Json     @default("{}")    // Condition logic (e.g., { "field": "status", "op": "eq", "value": "pending" })
-  action          Json     @default("{}")    // Action to execute (e.g., { "type": "approve", "escalate": true })
-  isActive        Boolean  @default(true) @map("is_active")
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String   @default("")
+  autonomyLevel  Int      @default(1) @map("autonomy_level") // 1 | 2 | 3
+  trigger        String // Event type: "approval_created" | "alert_threshold" | "schedule" | "manual"
+  condition      Json     @default("{}") // Condition logic (e.g., { "field": "status", "op": "eq", "value": "pending" })
+  action         Json     @default("{}") // Action to execute (e.g., { "type": "approve", "escalate": true })
+  isActive       Boolean  @default(true) @map("is_active")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   executions   RuleExecution[]
   schedules    RuleSchedule[]
 
@@ -611,17 +629,17 @@ model WorkflowRule {
  * RuleExecution — Log of rule execution with status, recommendations, and approval state.
  */
 model RuleExecution {
-  id                  String    @id @default(cuid())
-  ruleId              String    @map("rule_id")
-  triggeredAt         DateTime  @map("triggered_at")
-  status              String                  // "pending" | "approved" | "rejected" | "executed" | "failed"
-  aiRecommendation    Json?     @map("ai_recommendation") // AI reasoning and confidence
-  humanApprovalBy     String?   @map("human_approval_by")
-  humanApprovalAt     DateTime? @map("human_approval_at")
-  executedAt          DateTime? @map("executed_at")
-  executionError      String?   @map("execution_error")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  ruleId           String    @map("rule_id")
+  triggeredAt      DateTime  @map("triggered_at")
+  status           String // "pending" | "approved" | "rejected" | "executed" | "failed"
+  aiRecommendation Json?     @map("ai_recommendation") // AI reasoning and confidence
+  humanApprovalBy  String?   @map("human_approval_by")
+  humanApprovalAt  DateTime? @map("human_approval_at")
+  executedAt       DateTime? @map("executed_at")
+  executionError   String?   @map("execution_error")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   rule WorkflowRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
@@ -635,14 +653,14 @@ model RuleExecution {
  * RuleSchedule — Cron schedule for Level 3 (autonomous) rules.
  */
 model RuleSchedule {
-  id              String   @id @default(cuid())
-  ruleId          String   @map("rule_id")
-  cronExpression  String   @map("cron_expression")
-  timezone        String   @default("UTC")
-  lastRun         DateTime? @map("last_run")
-  nextRun         DateTime? @map("next_run")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String    @id @default(cuid())
+  ruleId         String    @map("rule_id")
+  cronExpression String    @map("cron_expression")
+  timezone       String    @default("UTC")
+  lastRun        DateTime? @map("last_run")
+  nextRun        DateTime? @map("next_run")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   rule WorkflowRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
@@ -655,14 +673,14 @@ model RuleSchedule {
  * RuleTemplate — Pre-built rule template (e.g., "Escalate pending approvals after 3 days").
  */
 model RuleTemplate {
-  id              String   @id @default(cuid())
-  name            String
-  description     String   @default("")
-  rules           Json     @default("[]")    // Array of rule definitions
-  category        String   @default("general") // "approval" | "alert" | "sync" | "general"
-  published       Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  rules       Json     @default("[]") // Array of rule definitions
+  category    String   @default("general") // "approval" | "alert" | "sync" | "general"
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@index([category])
   @@map("rule_templates")
@@ -670,23 +688,25 @@ model RuleTemplate {
 
 // ─── Phase 5 — Workflow & Automation ────────────────────────────────────────
 
-/** Multi-step approval request (Phase 5.1). */
+/**
+ * Multi-step approval request (Phase 5.1).
+ */
 model ApprovalRequest {
-  id                String    @id @default(cuid())
-  organizationId    String    @map("organization_id")
-  title             String
-  detail            String    @default("")
-  requester         String
-  status            String    @default("pending")   // pending | approved | rejected
-  templateId        String    @default("simple") @map("template_id")
-  currentStepIndex  Int       @default(0) @map("current_step_index")
-  source            String    @default("manual")    // manual | template | decision-seed
-  decidedAt         DateTime? @map("decided_at")
-  decidedBy         String?   @map("decided_by")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  title            String
+  detail           String    @default("")
+  requester        String
+  status           String    @default("pending") // pending | approved | rejected
+  templateId       String    @default("simple") @map("template_id")
+  currentStepIndex Int       @default(0) @map("current_step_index")
+  source           String    @default("manual") // manual | template | decision-seed
+  decidedAt        DateTime? @map("decided_at")
+  decidedBy        String?   @map("decided_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   steps        ApprovalStep[]
 
   @@index([organizationId])
@@ -694,14 +714,16 @@ model ApprovalRequest {
   @@map("approval_requests")
 }
 
-/** Individual step within an ApprovalRequest (Phase 5.1). */
+/**
+ * Individual step within an ApprovalRequest (Phase 5.1).
+ */
 model ApprovalStep {
   id                String    @id @default(cuid())
   approvalRequestId String    @map("approval_request_id")
   stepOrder         Int       @map("step_order")
   key               String
   label             String
-  status            String    @default("pending")   // pending | approved | rejected
+  status            String    @default("pending") // pending | approved | rejected
   actorRole         String    @map("actor_role")
   decidedBy         String?   @map("decided_by")
   decidedAt         DateTime? @map("decided_at")
@@ -712,15 +734,17 @@ model ApprovalStep {
   @@map("approval_steps")
 }
 
-/** If/then business rule on enterprise snapshot metrics (Phase 5.2). */
+/**
+ * If/then business rule on enterprise snapshot metrics (Phase 5.2).
+ */
 model BusinessRule {
   id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
   name           String
   enabled        Boolean  @default(true)
-  when           String                           // open_alerts_gte | open_decisions_gte | health_lt
+  when           String // open_alerts_gte | open_decisions_gte | health_lt
   threshold      Int
-  then           String                           // seed_approval | flag_overview
+  then           String // seed_approval | flag_overview
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -730,12 +754,14 @@ model BusinessRule {
   @@map("business_rules")
 }
 
-/** Scheduled report definition (Phase 5.3). */
+/**
+ * Scheduled report definition (Phase 5.3).
+ */
 model ScheduledReport {
   id             String    @id @default(cuid())
   organizationId String    @map("organization_id")
   title          String
-  cadence        String    @default("daily")      // daily | weekly
+  cadence        String    @default("daily") // daily | weekly
   enabled        Boolean   @default(true)
   lastRunAt      DateTime? @map("last_run_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -747,7 +773,9 @@ model ScheduledReport {
   @@map("scheduled_reports")
 }
 
-/** Enterprise event bus log (Phase 5.4). */
+/**
+ * Enterprise event bus log (Phase 5.4).
+ */
 model EnterpriseEvent {
   id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
@@ -764,48 +792,48 @@ model EnterpriseEvent {
 
 // v1.1: OAuth2 / SAML SSO
 model SsoProvider {
-  id             String   @id @default(cuid())
-  organizationId String   @map("organization_id")
-  
-  // Provider Type
-  type           String   // 'oauth2' | 'saml2' | 'openid'
-  name           String   // Display name: "Azure AD", "Okta", "Google"
-  
-  // OAuth2 / OIDC Config
-  clientId       String?  @map("client_id")
-  clientSecret   String?  @map("client_secret")  // Encrypted in production
-  discoveryUrl   String?  @map("discovery_url")  // OIDC Discovery endpoint
-  authzUrl       String?  @map("authz_url")      // OAuth2 authorization endpoint
-  tokenUrl       String?  @map("token_url")      // Token endpoint
-  userinfoUrl    String?  @map("userinfo_url")   // UserInfo endpoint
-  
-  // SAML2 Config
-  entityId       String?  @map("entity_id")      // EIP's SAML entity ID
-  idpEntityId    String?  @map("idp_entity_id")  // IdP entity ID
-  idpSsoUrl      String?  @map("idp_sso_url")    // Single Sign-On Service URL
-  idpSloUrl      String?  @map("idp_slo_url")    // Single Logout Service URL
-  idpCertificate String?  @map("idp_certificate") @db.Text  // Base64-encoded cert
-  acsUrl         String?  @map("acs_url")        // Assertion Consumer Service URL
-  
-  // Attribute Mapping (JSON)
-  attributeMap   Json?    @map("attribute_map")  // { "email": "...", "name": "..." }
-  
-  // Auto-provisioning
-  autoProvision  Boolean  @default(true) @map("auto_provision")
-  defaultRole    String   @default("member") @map("default_role")
-  
-  // Group → Role Mapping
-  groupRoleMap   Json?    @map("group_role_map")  // { "admin-group": "admin" }
-  
-  // Settings
-  isActive       Boolean  @default(true) @map("is_active")
-  enforced       Boolean  @default(false)  // Disable email/password login?
-  createdBy      String   @map("created_by")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  users          SsoProviderUser[]
+  // Provider Type
+  type String // 'oauth2' | 'saml2' | 'openid'
+  name String // Display name: "Azure AD", "Okta", "Google"
+
+  // OAuth2 / OIDC Config
+  clientId     String? @map("client_id")
+  clientSecret String? @map("client_secret") // Encrypted in production
+  discoveryUrl String? @map("discovery_url") // OIDC Discovery endpoint
+  authzUrl     String? @map("authz_url") // OAuth2 authorization endpoint
+  tokenUrl     String? @map("token_url") // Token endpoint
+  userinfoUrl  String? @map("userinfo_url") // UserInfo endpoint
+
+  // SAML2 Config
+  entityId       String? @map("entity_id") // EIP's SAML entity ID
+  idpEntityId    String? @map("idp_entity_id") // IdP entity ID
+  idpSsoUrl      String? @map("idp_sso_url") // Single Sign-On Service URL
+  idpSloUrl      String? @map("idp_slo_url") // Single Logout Service URL
+  idpCertificate String? @map("idp_certificate") @db.Text // Base64-encoded cert
+  acsUrl         String? @map("acs_url") // Assertion Consumer Service URL
+
+  // Attribute Mapping (JSON)
+  attributeMap Json? @map("attribute_map") // { "email": "...", "name": "..." }
+
+  // Auto-provisioning
+  autoProvision Boolean @default(true) @map("auto_provision")
+  defaultRole   String  @default("member") @map("default_role")
+
+  // Group → Role Mapping
+  groupRoleMap Json? @map("group_role_map") // { "admin-group": "admin" }
+
+  // Settings
+  isActive  Boolean  @default(true) @map("is_active")
+  enforced  Boolean  @default(false) // Disable email/password login?
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        SsoProviderUser[]
 
   @@unique([organizationId, type])
   @@index([organizationId])
@@ -814,23 +842,23 @@ model SsoProvider {
 }
 
 model SsoProviderUser {
-  id             String   @id @default(cuid())
-  ssoProviderId  String   @map("sso_provider_id")
-  userId         String   @map("user_id")
-  
-  // External identifier (IdP user ID)
-  externalId     String   @map("external_id")  // SAML NameID or OIDC sub
-  externalEmail  String   @map("external_email")
-  
-  // Attributes from IdP
-  attributes     Json?    // Last sync of user attributes
-  
-  // Linking state
-  linkedAt       DateTime @default(now()) @map("linked_at")
-  lastLoginAt    DateTime? @map("last_login_at")
+  id            String @id @default(cuid())
+  ssoProviderId String @map("sso_provider_id")
+  userId        String @map("user_id")
 
-  ssoProvider    SsoProvider @relation(fields: [ssoProviderId], references: [id], onDelete: Cascade)
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // External identifier (IdP user ID)
+  externalId    String @map("external_id") // SAML NameID or OIDC sub
+  externalEmail String @map("external_email")
+
+  // Attributes from IdP
+  attributes Json? // Last sync of user attributes
+
+  // Linking state
+  linkedAt    DateTime  @default(now()) @map("linked_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  ssoProvider SsoProvider @relation(fields: [ssoProviderId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([ssoProviderId, externalId])
   @@index([ssoProviderId])
@@ -842,39 +870,38 @@ model SsoProviderUser {
 
 /**
  * Custom Role — allows Owner to create roles beyond the 6 fixed roles.
- * 
  * Permissions are stored as JSON array of resource permissions.
  * Example:
  * {
- *   "permissions": [
- *     { "permission": "connector:read" },
- *     { "permission": "connector:install", "attributes": { "department": "IT" } },
- *     { "permission": "approval:decide", "resources": ["approval-1", "approval-2"] }
- *   ]
+ * "permissions": [
+ * { "permission": "connector:read" },
+ * { "permission": "connector:install", "attributes": { "department": "IT" } },
+ * { "permission": "approval:decide", "resources": ["approval-1", "approval-2"] }
+ * ]
  * }
  */
 model CustomRole {
-  id             String   @id @default(cuid())
-  organizationId String   @map("organization_id")
-  name           String                           // "Finance Manager", "Analyst", etc.
-  description    String   @default("")
-  color          String   @default("#6F2D8D")     // UI badge color
-  
-  // Base role this is derived from (optional; helps with UI hints)
-  baseRole       String?  @map("base_role")       // null | 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
-  
-  // Permissions array: [ { permission: string, resources?: string[], attributes?: {}, conditions?: {} } ]
-  permissions    Json     @default("[]")
-  
-  // Metadata
-  isSystem       Boolean  @default(false) @map("is_system")  // System roles cannot be modified
-  isActive       Boolean  @default(true) @map("is_active")
-  createdBy      String   @map("created_by")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  name           String // "Finance Manager", "Analyst", etc.
+  description    String @default("")
+  color          String @default("#6F2D8D") // UI badge color
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships    OrganizationMembership[]
+  // Base role this is derived from (optional; helps with UI hints)
+  baseRole String? @map("base_role") // null | 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
+
+  // Permissions array: [ { permission: string, resources?: string[], attributes?: {}, conditions?: {} } ]
+  permissions Json @default("[]")
+
+  // Metadata
+  isSystem  Boolean  @default(false) @map("is_system") // System roles cannot be modified
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  OrganizationMembership[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -889,10 +916,10 @@ model CustomRole {
 model RoleAuditLog {
   id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
-  roleId         String?  @map("role_id")         // Role that was changed (null if deleted)
-  userId         String   @map("user_id")         // User who made the change
-  action         String                           // 'role.created' | 'role.updated' | 'role.assigned' | 'role.deleted'
-  details        Json?                            // Previous role data, permissions diff, etc.
+  roleId         String?  @map("role_id") // Role that was changed (null if deleted)
+  userId         String   @map("user_id") // User who made the change
+  action         String // 'role.created' | 'role.updated' | 'role.assigned' | 'role.deleted'
+  details        Json? // Previous role data, permissions diff, etc.
   ipAddress      String?  @map("ip_address")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -913,43 +940,43 @@ model RoleAuditLog {
  * Three confidence levels: low (queue for approval), medium (notify + act), high (auto-execute).
  */
 model EllineaAgent {
-  id              String   @id @default(cuid())
-  organizationId  String   @map("organization_id")
-  name            String
-  description     String   @default("")
-  templateId      String?  @map("template_id")    // Optional reference to AgentTemplate
-  
-  // Trigger configuration
-  trigger         String                          // Event type: "approval_pending" | "alert_threshold" | "sync_complete" | "manual"
-  triggerConfig   Json     @default("{}")         // Trigger-specific config (e.g., { "alertType": "critical", "thresholdValue": 5 })
-  
-  // Condition logic (when to act)
-  condition       Json     @default("{}")         // Condition rules (e.g., { "field": "amount", "op": "gt", "value": 1000 })
-  
-  // Action configuration
-  action          Json     @default("{}")         // Action to execute (e.g., { "type": "auto_approve", "escalate": true, "notifyOwner": true })
-  
-  // Confidence & autonomy
-  confidenceThreshold Float @default(0.7) @map("confidence_threshold") // 0.0-1.0: minimum confidence to auto-execute
-  requireApproval Boolean  @default(false) @map("require_approval")   // If true, always queue for human approval regardless of confidence
-  
-  // Status
-  isActive        Boolean  @default(true) @map("is_active")
-  isPaused        Boolean  @default(false) @map("is_paused")
-  
-  // Stats
-  executionCount  Int      @default(0) @map("execution_count")
-  successCount    Int      @default(0) @map("success_count")
-  lastExecutedAt  DateTime? @map("last_executed_at")
-  
-  // Metadata
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  name           String
+  description    String  @default("")
+  templateId     String? @map("template_id") // Optional reference to AgentTemplate
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  executions   AgentExecution[]
-  auditLogs    AgentAuditLog[]
+  // Trigger configuration
+  trigger       String // Event type: "approval_pending" | "alert_threshold" | "sync_complete" | "manual"
+  triggerConfig Json   @default("{}") // Trigger-specific config (e.g., { "alertType": "critical", "thresholdValue": 5 })
+
+  // Condition logic (when to act)
+  condition Json @default("{}") // Condition rules (e.g., { "field": "amount", "op": "gt", "value": 1000 })
+
+  // Action configuration
+  action Json @default("{}") // Action to execute (e.g., { "type": "auto_approve", "escalate": true, "notifyOwner": true })
+
+  // Confidence & autonomy
+  confidenceThreshold Float   @default(0.7) @map("confidence_threshold") // 0.0-1.0: minimum confidence to auto-execute
+  requireApproval     Boolean @default(false) @map("require_approval") // If true, always queue for human approval regardless of confidence
+
+  // Status
+  isActive Boolean @default(true) @map("is_active")
+  isPaused Boolean @default(false) @map("is_paused")
+
+  // Stats
+  executionCount Int       @default(0) @map("execution_count")
+  successCount   Int       @default(0) @map("success_count")
+  lastExecutedAt DateTime? @map("last_executed_at")
+
+  // Metadata
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization  Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions    AgentExecution[]
+  auditLogs     AgentAuditLog[]
   subscriptions AgentWebhookSubscription[] @relation("AgentSubscriptions")
 
   @@index([organizationId])
@@ -962,47 +989,47 @@ model EllineaAgent {
  * AgentExecution — Log of agent execution with AI reasoning, confidence, and approval state.
  */
 model AgentExecution {
-  id                  String    @id @default(cuid())
-  agentId             String    @map("agent_id")
-  organizationId      String    @map("organization_id")
-  
+  id             String @id @default(cuid())
+  agentId        String @map("agent_id")
+  organizationId String @map("organization_id")
+
   // Execution context
-  triggeredBy         String    @map("triggered_by")    // Event type or "manual"
-  triggerPayload      Json?     @map("trigger_payload") // Event payload snapshot
-  
+  triggeredBy    String @map("triggered_by") // Event type or "manual"
+  triggerPayload Json?  @map("trigger_payload") // Event payload snapshot
+
   // AI reasoning
-  confidence          Float                             // 0.0-1.0: AI confidence score
-  reasoning           Json?                             // AI explanation { "summary": "...", "evidence": [...], "risk": "low|medium|high" }
-  recommendedAction   String?   @map("recommended_action") // What the agent recommends
-  
+  confidence        Float // 0.0-1.0: AI confidence score
+  reasoning         Json? // AI explanation { "summary": "...", "evidence": [...], "risk": "low|medium|high" }
+  recommendedAction String? @map("recommended_action") // What the agent recommends
+
   // Execution status
-  status              String                            // "pending" | "approved" | "rejected" | "executed" | "failed" | "skipped"
-  requiresApproval    Boolean   @default(false) @map("requires_approval")
-  
+  status           String // "pending" | "approved" | "rejected" | "executed" | "failed" | "skipped"
+  requiresApproval Boolean @default(false) @map("requires_approval")
+
   // Human oversight
-  humanApprovalBy     String?   @map("human_approval_by")
-  humanApprovalAt     DateTime? @map("human_approval_at")
-  humanNote           String?   @map("human_note")
-  
+  humanApprovalBy String?   @map("human_approval_by")
+  humanApprovalAt DateTime? @map("human_approval_at")
+  humanNote       String?   @map("human_note")
+
   // Execution result
-  executedAt          DateTime? @map("executed_at")
-  executionResult     Json?     @map("execution_result") // Result data from action
-  executionError      String?   @map("execution_error")
-  
+  executedAt      DateTime? @map("executed_at")
+  executionResult Json?     @map("execution_result") // Result data from action
+  executionError  String?   @map("execution_error")
+
   // Rollback support
-  canRollback         Boolean   @default(false) @map("can_rollback")
-  rolledBackAt        DateTime? @map("rolled_back_at")
-  rolledBackBy        String?   @map("rolled_back_by")
-  
+  canRollback  Boolean   @default(false) @map("can_rollback")
+  rolledBackAt DateTime? @map("rolled_back_at")
+  rolledBackBy String?   @map("rolled_back_by")
+
   // User feedback (v2.0 A.2 — learning)
-  feedbackScore       Int?      @map("feedback_score")    // -1 (unhelpful), 0 (neutral), +1 (helpful)
-  feedbackComment     String?   @map("feedback_comment")
-  feedbackAt          DateTime? @map("feedback_at")
-  feedbackBy          String?   @map("feedback_by")
-  
+  feedbackScore   Int?      @map("feedback_score") // -1 (unhelpful), 0 (neutral), +1 (helpful)
+  feedbackComment String?   @map("feedback_comment")
+  feedbackAt      DateTime? @map("feedback_at")
+  feedbackBy      String?   @map("feedback_by")
+
   // Timestamps
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   agent EllineaAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
@@ -1022,9 +1049,9 @@ model AgentAuditLog {
   id             String   @id @default(cuid())
   agentId        String   @map("agent_id")
   organizationId String   @map("organization_id")
-  userId         String?  @map("user_id")         // User who triggered the action (null for system)
-  action         String                           // 'agent.created' | 'agent.updated' | 'agent.executed' | 'agent.approved' | 'agent.rolled_back'
-  details        Json?                            // Action-specific details
+  userId         String?  @map("user_id") // User who triggered the action (null for system)
+  action         String // 'agent.created' | 'agent.updated' | 'agent.executed' | 'agent.approved' | 'agent.rolled_back'
+  details        Json? // Action-specific details
   ipAddress      String?  @map("ip_address")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -1043,32 +1070,32 @@ model AgentAuditLog {
  * Platform admins publish templates; org admins install with 1-click.
  */
 model AgentTemplate {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  name            String
-  description     String   @default("")
-  category        String   @default("general")    // "approval" | "alert" | "sync" | "workflow" | "general"
-  
+  id          String @id @default(cuid())
+  slug        String @unique
+  name        String
+  description String @default("")
+  category    String @default("general") // "approval" | "alert" | "sync" | "workflow" | "general"
+
   // Template configuration
-  trigger         String
-  triggerConfig   Json     @default("{}")
-  condition       Json     @default("{}")
-  action          Json     @default("{}")
-  
+  trigger       String
+  triggerConfig Json   @default("{}")
+  condition     Json   @default("{}")
+  action        Json   @default("{}")
+
   // Default settings
-  confidenceThreshold Float @default(0.7) @map("confidence_threshold")
-  requireApproval Boolean  @default(false) @map("require_approval")
-  
+  confidenceThreshold Float   @default(0.7) @map("confidence_threshold")
+  requireApproval     Boolean @default(false) @map("require_approval")
+
   // Publishing
-  published       Boolean  @default(true)
-  featured        Boolean  @default(false)       // Featured templates shown first in gallery
-  
+  published Boolean @default(true)
+  featured  Boolean @default(false) // Featured templates shown first in gallery
+
   // Usage stats
-  installCount    Int      @default(0) @map("install_count")
-  
+  installCount Int @default(0) @map("install_count")
+
   // Metadata
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([published])
@@ -1081,26 +1108,26 @@ model AgentTemplate {
  * Allows agents to be triggered by connector sync events, external webhooks, or system events.
  */
 model AgentWebhookSubscription {
-  id              String   @id @default(cuid())
-  agentId         String   @map("agent_id")
-  organizationId  String   @map("organization_id")
-  
-  // Event source
-  eventSource     String   @map("event_source")   // "connector" | "webhook" | "system" | "manual"
-  eventSourceId   String?  @map("event_source_id") // Connector ID, webhook ID, or null for system
-  eventType       String   @map("event_type")     // Event type to subscribe to (e.g., "sync_complete", "sync_failed", "alert_raised")
-  
-  // Filter (optional)
-  filter          Json?    @default("{}")         // Additional filter rules (e.g., { "connectorType": "sql_server" })
-  
-  // Status
-  isActive        Boolean  @default(true) @map("is_active")
-  
-  // Metadata
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String @id @default(cuid())
+  agentId        String @map("agent_id")
+  organizationId String @map("organization_id")
 
-  agent EllineaAgent @relation("AgentSubscriptions", fields: [agentId], references: [id], onDelete: Cascade)
+  // Event source
+  eventSource   String  @map("event_source") // "connector" | "webhook" | "system" | "manual"
+  eventSourceId String? @map("event_source_id") // Connector ID, webhook ID, or null for system
+  eventType     String  @map("event_type") // Event type to subscribe to (e.g., "sync_complete", "sync_failed", "alert_raised")
+
+  // Filter (optional)
+  filter Json? @default("{}") // Additional filter rules (e.g., { "connectorType": "sql_server" })
+
+  // Status
+  isActive Boolean @default(true) @map("is_active")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  agent        EllineaAgent @relation("AgentSubscriptions", fields: [agentId], references: [id], onDelete: Cascade)
   organization Organization @relation("AgentSubscriptions", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, eventSource, eventSourceId, eventType])
@@ -1111,15 +1138,12 @@ model AgentWebhookSubscription {
   @@map("agent_webhook_subscriptions")
 }
 
-
-
 // ─── Database Configuration (Multi-database Support) ─────────────────────────
 
 /**
  * DatabaseConfiguration — Organizations can configure multiple databases (local + cloud).
  * Admin can switch primary database without code changes.
  * Supports: Local PostgreSQL, Supabase, Custom PostgreSQL servers.
- * 
  * Usage:
  * - Client chooses: local database (on-premise) OR supabase (cloud) OR custom server
  * - Admin can test connection before switching
@@ -1127,46 +1151,46 @@ model AgentWebhookSubscription {
  * - Optional backup sync (local ↔ cloud)
  */
 model DatabaseConfiguration {
-  id                String    @id @default(cuid())
-  organizationId    String    @map("organization_id")
-  
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+
   // Basic info
-  name              String                     // "Local Ubuntu", "Supabase Production", "Custom PG Server"
-  type              String                     // 'local' | 'supabase' | 'custom_postgres'
-  description       String    @default("")    @map("description")
-  
+  name        String // "Local Ubuntu", "Supabase Production", "Custom PG Server"
+  type        String // 'local' | 'supabase' | 'custom_postgres'
+  description String @default("") @map("description")
+
   // Connection details (encrypted in production)
-  host              String?                    // localhost | supabase-id.supabase.co | remote-server.com
-  port              Int       @default(5432)
-  username          String?                    @map("username")
-  passwordEncrypted String?   @map("password_encrypted")  // Encrypted with org encryption key
-  databaseName      String?   @map("database_name")
-  
+  host              String? // localhost | supabase-id.supabase.co | remote-server.com
+  port              Int     @default(5432)
+  username          String? @map("username")
+  passwordEncrypted String? @map("password_encrypted") // Encrypted with org encryption key
+  databaseName      String? @map("database_name")
+
   // Supabase specific
-  supabaseUrl       String?   @map("supabase_url")        // https://xxx.supabase.co
-  supabaseKeyEncrypted String? @map("supabase_key_encrypted")  // Encrypted API key
-  
+  supabaseUrl          String? @map("supabase_url") // https://xxx.supabase.co
+  supabaseKeyEncrypted String? @map("supabase_key_encrypted") // Encrypted API key
+
   // Custom PostgreSQL additional options
-  sslMode           String    @default("require") @map("ssl_mode")  // prefer | require | disable
-  connectionTimeout Int       @default(30) @map("connection_timeout")  // Seconds
-  
+  sslMode           String @default("require") @map("ssl_mode") // prefer | require | disable
+  connectionTimeout Int    @default(30) @map("connection_timeout") // Seconds
+
   // Status
-  isPrimary         Boolean   @default(false) @map("is_primary")       // Primary database for all operations
-  isActive          Boolean   @default(true) @map("is_active")
-  testStatus        String    @default("untested")  @map("test_status") // untested | success | failed
-  testMessage       String?   @map("test_message")  // Last test error/success message
-  lastTestedAt      DateTime? @map("last_tested_at")
-  
+  isPrimary    Boolean   @default(false) @map("is_primary") // Primary database for all operations
+  isActive     Boolean   @default(true) @map("is_active")
+  testStatus   String    @default("untested") @map("test_status") // untested | success | failed
+  testMessage  String?   @map("test_message") // Last test error/success message
+  lastTestedAt DateTime? @map("last_tested_at")
+
   // Sync configuration (for hybrid setups)
-  enableAutoSync     Boolean   @default(false) @map("enable_auto_sync")  // Auto-sync local ↔ cloud
-  syncDirection      String    @default("bidirectional") @map("sync_direction")  // local-to-cloud | cloud-to-local | bidirectional
-  lastSyncAt        DateTime? @map("last_sync_at")
-  syncStatus        String?   @map("sync_status")  // syncing | success | failed
-  
+  enableAutoSync Boolean   @default(false) @map("enable_auto_sync") // Auto-sync local ↔ cloud
+  syncDirection  String    @default("bidirectional") @map("sync_direction") // local-to-cloud | cloud-to-local | bidirectional
+  lastSyncAt     DateTime? @map("last_sync_at")
+  syncStatus     String?   @map("sync_status") // syncing | success | failed
+
   // Metadata
-  createdBy         String    @map("created_by")  // User who created this config
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdBy String   @map("created_by") // User who created this config
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1182,22 +1206,22 @@ model DatabaseConfiguration {
  * Tracks who switched databases, when, and why.
  */
 model DatabaseSwitchLog {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  configId          String   @map("config_id")  // Which config was switched TO
-  previousConfigId  String?  @map("previous_config_id")  // Which config was switched FROM
-  
-  switchedBy        String   @map("switched_by")  // User ID who made the switch
-  reason            String?  // Optional: why was the switch made
-  
+  id               String  @id @default(cuid())
+  organizationId   String  @map("organization_id")
+  configId         String  @map("config_id") // Which config was switched TO
+  previousConfigId String? @map("previous_config_id") // Which config was switched FROM
+
+  switchedBy String  @map("switched_by") // User ID who made the switch
+  reason     String? // Optional: why was the switch made
+
   // Sync details (if data was migrated)
-  syncPerformed     Boolean  @default(false) @map("sync_performed")
-  recordsMigrated   Int?     @map("records_migrated")
-  durationSeconds   Int?     @map("duration_seconds")
-  syncStatus        String?  @map("sync_status")  // success | partial | failed
-  syncError         String?  @map("sync_error")
-  
-  createdAt         DateTime @default(now()) @map("created_at")
+  syncPerformed   Boolean @default(false) @map("sync_performed")
+  recordsMigrated Int?    @map("records_migrated")
+  durationSeconds Int?    @map("duration_seconds")
+  syncStatus      String? @map("sync_status") // success | partial | failed
+  syncError       String? @map("sync_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1205,7 +1229,6 @@ model DatabaseSwitchLog {
   @@index([createdAt])
   @@map("database_switch_logs")
 }
-
 
 // ─── v2.0 Phase B.3.2 — API Gateway & Rate Limiting ────────────────────────────
 
@@ -1239,27 +1262,27 @@ model ApiUsage {
  * Tiers: free, starter, professional, enterprise
  */
 model RateLimitTier {
-  id                   String   @id @default(cuid())
-  name                 String   @unique // 'free', 'starter', 'professional', 'enterprise'
-  displayName          String   @map("display_name")
-  requestsPerDay       Int      @map("requests_per_day")
-  requestsPerHour      Int      @map("requests_per_hour")
-  requestsPerMinute    Int      @map("requests_per_minute")
-  burstLimit           Int      @default(10) @map("burst_limit") // Allow short bursts
-  allowedEndpoints     String[] @map("allowed_endpoints") // Empty = all endpoints
-  blockedEndpoints     String[] @map("blocked_endpoints")
-  maxConnectors        Int?     @map("max_connectors")
-  maxUsers             Int?     @map("max_users")
-  maxDataExportPerDay  Int?     @map("max_data_export_per_day")
-  enableWebhooks       Boolean  @default(false) @map("enable_webhooks")
-  enableSso            Boolean  @default(false) @map("enable_sso")
-  enableCustomRoles    Boolean  @default(false) @map("enable_custom_roles")
-  enableAgents         Boolean  @default(false) @map("enable_agents")
-  enableAdvancedBI     Boolean  @default(false) @map("enable_advanced_bi")
-  priority             Int      @default(0) // Higher priority = better support
-  monthlyPrice         Int      @default(0) @map("monthly_price") // In cents
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(cuid())
+  name                String   @unique // 'free', 'starter', 'professional', 'enterprise'
+  displayName         String   @map("display_name")
+  requestsPerDay      Int      @map("requests_per_day")
+  requestsPerHour     Int      @map("requests_per_hour")
+  requestsPerMinute   Int      @map("requests_per_minute")
+  burstLimit          Int      @default(10) @map("burst_limit") // Allow short bursts
+  allowedEndpoints    String[] @map("allowed_endpoints") // Empty = all endpoints
+  blockedEndpoints    String[] @map("blocked_endpoints")
+  maxConnectors       Int?     @map("max_connectors")
+  maxUsers            Int?     @map("max_users")
+  maxDataExportPerDay Int?     @map("max_data_export_per_day")
+  enableWebhooks      Boolean  @default(false) @map("enable_webhooks")
+  enableSso           Boolean  @default(false) @map("enable_sso")
+  enableCustomRoles   Boolean  @default(false) @map("enable_custom_roles")
+  enableAgents        Boolean  @default(false) @map("enable_agents")
+  enableAdvancedBI    Boolean  @default(false) @map("enable_advanced_bi")
+  priority            Int      @default(0) // Higher priority = better support
+  monthlyPrice        Int      @default(0) @map("monthly_price") // In cents
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   organizations OrganizationTier[]
 
@@ -1271,15 +1294,15 @@ model RateLimitTier {
  * Supports custom overrides and expiration for trial periods.
  */
 model OrganizationTier {
-  id             String   @id @default(cuid())
-  organizationId String   @unique @map("organization_id")
-  tierId         String   @map("tier_id")
-  startedAt      DateTime @default(now()) @map("started_at")
+  id             String    @id @default(cuid())
+  organizationId String    @unique @map("organization_id")
+  tierId         String    @map("tier_id")
+  startedAt      DateTime  @default(now()) @map("started_at")
   expiresAt      DateTime? @map("expires_at")
-  autoRenew      Boolean  @default(true) @map("auto_renew")
-  customLimits   Json?    @map("custom_limits") // Override tier defaults
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  autoRenew      Boolean   @default(true) @map("auto_renew")
+  customLimits   Json?     @map("custom_limits") // Override tier defaults
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tier         RateLimitTier @relation(fields: [tierId], references: [id])
@@ -1322,19 +1345,19 @@ model RateLimitViolation {
  * Actual graph data lives in Neo4j; this table tracks entity metadata and sync status.
  */
 model KnowledgeGraphEntity {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  entityType        String   @map("entity_type")  // 'person' | 'product' | 'location' | 'event' | 'document'
-  neo4jNodeId       String   @map("neo4j_node_id")  // Neo4j internal node ID
-  sourceSystem      String   @map("source_system")  // System that provided this entity
-  sourceEntityId    String   @map("source_entity_id")  // ID in source system
-  displayName       String   @map("display_name")
-  confidence        Float    @default(1.0)         // Confidence score 0.0-1.0
-  lastSyncedAt      DateTime @map("last_synced_at")
-  syncStatus        String   @default("active") @map("sync_status")  // 'active' | 'deleted' | 'merged'
-  mergedIntoId      String?  @map("merged_into_id")  // If merged, points to surviving entity
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  entityType     String   @map("entity_type") // 'person' | 'product' | 'location' | 'event' | 'document'
+  neo4jNodeId    String   @map("neo4j_node_id") // Neo4j internal node ID
+  sourceSystem   String   @map("source_system") // System that provided this entity
+  sourceEntityId String   @map("source_entity_id") // ID in source system
+  displayName    String   @map("display_name")
+  confidence     Float    @default(1.0) // Confidence score 0.0-1.0
+  lastSyncedAt   DateTime @map("last_synced_at")
+  syncStatus     String   @default("active") @map("sync_status") // 'active' | 'deleted' | 'merged'
+  mergedIntoId   String?  @map("merged_into_id") // If merged, points to surviving entity
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@unique([organizationId, sourceSystem, sourceEntityId])
   @@index([organizationId, entityType])
@@ -1347,19 +1370,19 @@ model KnowledgeGraphEntity {
  * Tracks relationship metadata, confidence, and evidence.
  */
 model KnowledgeGraphRelationship {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  neo4jRelId        String   @map("neo4j_rel_id")  // Neo4j internal relationship ID
-  fromEntityId      String   @map("from_entity_id")  // KnowledgeGraphEntity.id
-  toEntityId        String   @map("to_entity_id")    // KnowledgeGraphEntity.id
-  relationshipType  String   @map("relationship_type")  // 'works_at' | 'purchased' | 'located_in' | etc.
-  confidence        Float    @default(0.8)           // Confidence score 0.0-1.0
-  evidence          Json     @default("[]")          // Array of evidence sources
-  properties        Json     @default("{}")          // Additional relationship properties
-  isInferred        Boolean  @default(false) @map("is_inferred")  // True if relationship was inferred, not explicit
-  lastVerifiedAt    DateTime? @map("last_verified_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  neo4jRelId       String    @map("neo4j_rel_id") // Neo4j internal relationship ID
+  fromEntityId     String    @map("from_entity_id") // KnowledgeGraphEntity.id
+  toEntityId       String    @map("to_entity_id") // KnowledgeGraphEntity.id
+  relationshipType String    @map("relationship_type") // 'works_at' | 'purchased' | 'located_in' | etc.
+  confidence       Float     @default(0.8) // Confidence score 0.0-1.0
+  evidence         Json      @default("[]") // Array of evidence sources
+  properties       Json      @default("{}") // Additional relationship properties
+  isInferred       Boolean   @default(false) @map("is_inferred") // True if relationship was inferred, not explicit
+  lastVerifiedAt   DateTime? @map("last_verified_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@unique([neo4jRelId])
   @@index([organizationId])
@@ -1374,27 +1397,27 @@ model KnowledgeGraphRelationship {
  * Tracks model metadata, performance metrics, availability, and capabilities.
  */
 model AiModelRegistry {
-  id                String   @id @default(cuid())
-  modelId           String   @unique @map("model_id")  // Internal model identifier (e.g., 'gpt-4', 'claude-3-opus')
-  displayName       String   @map("display_name")
-  provider          String                              // 'openai' | 'anthropic' | 'azure' | 'local' | 'custom'
-  modelType         String   @map("model_type")        // 'language' | 'time_series' | 'anomaly' | 'vision' | 'reasoning'
-  capabilities      String[] @default([])              // Array of capabilities: 'text', 'code', 'reasoning', 'vision', etc.
-  contextWindow     Int?     @map("context_window")    // Max context tokens
-  costPerMToken     Float?   @map("cost_per_m_token")  // Cost per million tokens (in USD)
-  avgLatencyMs      Int?     @map("avg_latency_ms")    // Average response latency in milliseconds
-  accuracyScore     Float?   @map("accuracy_score")    // Accuracy metric (0.0-1.0)
-  throughputQps     Float?   @map("throughput_qps")    // Queries per second capacity
-  isAvailable       Boolean  @default(true) @map("is_available")
-  priority          Int      @default(50)              // Priority for model selection (0-100)
-  configuration     Json     @default("{}")            // Model-specific configuration
-  fallbackModelId   String?  @map("fallback_model_id") // Fallback model if this one fails
-  lastHealthCheck   DateTime? @map("last_health_check")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  modelId         String    @unique @map("model_id") // Internal model identifier (e.g., 'gpt-4', 'claude-3-opus')
+  displayName     String    @map("display_name")
+  provider        String // 'openai' | 'anthropic' | 'azure' | 'local' | 'custom'
+  modelType       String    @map("model_type") // 'language' | 'time_series' | 'anomaly' | 'vision' | 'reasoning'
+  capabilities    String[]  @default([]) // Array of capabilities: 'text', 'code', 'reasoning', 'vision', etc.
+  contextWindow   Int?      @map("context_window") // Max context tokens
+  costPerMToken   Float?    @map("cost_per_m_token") // Cost per million tokens (in USD)
+  avgLatencyMs    Int?      @map("avg_latency_ms") // Average response latency in milliseconds
+  accuracyScore   Float?    @map("accuracy_score") // Accuracy metric (0.0-1.0)
+  throughputQps   Float?    @map("throughput_qps") // Queries per second capacity
+  isAvailable     Boolean   @default(true) @map("is_available")
+  priority        Int       @default(50) // Priority for model selection (0-100)
+  configuration   Json      @default("{}") // Model-specific configuration
+  fallbackModelId String?   @map("fallback_model_id") // Fallback model if this one fails
+  lastHealthCheck DateTime? @map("last_health_check")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  modelDecisions    ModelDecisionLog[]
-  performanceLogs   ModelPerformanceLog[]
+  modelDecisions  ModelDecisionLog[]
+  performanceLogs ModelPerformanceLog[]
 
   @@index([modelType])
   @@index([isAvailable])
@@ -1407,19 +1430,19 @@ model AiModelRegistry {
  * Used for explainability, debugging, and continuous improvement.
  */
 model ModelDecisionLog {
-  id                String   @id @default(cuid())
-  organizationId    String?  @map("organization_id")
-  queryId           String   @map("query_id")
-  queryType         String   @map("query_type")        // 'text' | 'forecast' | 'anomaly' | 'vision' | 'reasoning'
-  selectedModelId   String   @map("selected_model_id")
-  secondaryModels   String[] @default([]) @map("secondary_models")  // Array of model IDs used in ensemble
-  routingReason     String   @map("routing_reason")    // Why this model was selected
-  ensembleStrategy  String?  @map("ensemble_strategy") // 'weighted_vote' | 'meta_learning' | 'cascade' | null
-  confidence        Float?                             // Overall confidence in result
-  latencyMs         Int?     @map("latency_ms")
-  success           Boolean  @default(true)
-  errorMessage      String?  @map("error_message")
-  createdAt         DateTime @default(now()) @map("created_at")
+  id               String   @id @default(cuid())
+  organizationId   String?  @map("organization_id")
+  queryId          String   @map("query_id")
+  queryType        String   @map("query_type") // 'text' | 'forecast' | 'anomaly' | 'vision' | 'reasoning'
+  selectedModelId  String   @map("selected_model_id")
+  secondaryModels  String[] @default([]) @map("secondary_models") // Array of model IDs used in ensemble
+  routingReason    String   @map("routing_reason") // Why this model was selected
+  ensembleStrategy String?  @map("ensemble_strategy") // 'weighted_vote' | 'meta_learning' | 'cascade' | null
+  confidence       Float? // Overall confidence in result
+  latencyMs        Int?     @map("latency_ms")
+  success          Boolean  @default(true)
+  errorMessage     String?  @map("error_message")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   model AiModelRegistry @relation(fields: [selectedModelId], references: [modelId], onDelete: Cascade)
 
@@ -1435,19 +1458,19 @@ model ModelDecisionLog {
  * Aggregated hourly for tracking model performance trends.
  */
 model ModelPerformanceLog {
-  id                String   @id @default(cuid())
-  modelId           String   @map("model_id")
-  windowStart       DateTime @map("window_start")
-  windowEnd         DateTime @map("window_end")
-  requestCount      Int      @default(0) @map("request_count")
-  successCount      Int      @default(0) @map("success_count")
-  failureCount      Int      @default(0) @map("failure_count")
-  avgLatencyMs      Float    @map("avg_latency_ms")
-  p95LatencyMs      Float?   @map("p95_latency_ms")
-  p99LatencyMs      Float?   @map("p99_latency_ms")
-  avgConfidence     Float?   @map("avg_confidence")
-  totalCost         Float    @default(0.0) @map("total_cost")  // Total cost in USD
-  createdAt         DateTime @default(now()) @map("created_at")
+  id            String   @id @default(cuid())
+  modelId       String   @map("model_id")
+  windowStart   DateTime @map("window_start")
+  windowEnd     DateTime @map("window_end")
+  requestCount  Int      @default(0) @map("request_count")
+  successCount  Int      @default(0) @map("success_count")
+  failureCount  Int      @default(0) @map("failure_count")
+  avgLatencyMs  Float    @map("avg_latency_ms")
+  p95LatencyMs  Float?   @map("p95_latency_ms")
+  p99LatencyMs  Float?   @map("p99_latency_ms")
+  avgConfidence Float?   @map("avg_confidence")
+  totalCost     Float    @default(0.0) @map("total_cost") // Total cost in USD
+  createdAt     DateTime @default(now()) @map("created_at")
 
   model AiModelRegistry @relation(fields: [modelId], references: [modelId], onDelete: Cascade)
 
@@ -1461,22 +1484,22 @@ model ModelPerformanceLog {
  * Used by the Self-Healing Remediator to automatically fix issues.
  */
 model RemediationPlaybook {
-  id                    String   @id @default(cuid())
-  errorPattern          String   @unique @map("error_pattern")  // Regex or exact error pattern
-  errorCategory         String   @map("error_category")         // 'database' | 'network' | 'memory' | 'authentication' | 'integration'
-  severity              String                                  // 'critical' | 'high' | 'medium' | 'low'
-  stages                Json     @default("[]")                 // Array of remediation stages with actions
-  confidenceThreshold   Float    @default(0.85) @map("confidence_threshold")  // Minimum confidence to auto-execute
-  maxAttempts           Int      @default(3) @map("max_attempts")
-  verificationPeriod    Int      @default(300) @map("verification_period")  // Seconds to monitor after remediation
-  isActive              Boolean  @default(true) @map("is_active")
-  createdBy             String?  @map("created_by")             // 'system' | 'manual' | 'learned'
-  learnedFrom           String?  @map("learned_from")           // If learned, reference to incident ID
-  successRate           Float    @default(0.0) @map("success_rate")  // Historical success rate (0.0-1.0)
-  executionCount        Int      @default(0) @map("execution_count")
-  lastExecutedAt        DateTime? @map("last_executed_at")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                  String    @id @default(cuid())
+  errorPattern        String    @unique @map("error_pattern") // Regex or exact error pattern
+  errorCategory       String    @map("error_category") // 'database' | 'network' | 'memory' | 'authentication' | 'integration'
+  severity            String // 'critical' | 'high' | 'medium' | 'low'
+  stages              Json      @default("[]") // Array of remediation stages with actions
+  confidenceThreshold Float     @default(0.85) @map("confidence_threshold") // Minimum confidence to auto-execute
+  maxAttempts         Int       @default(3) @map("max_attempts")
+  verificationPeriod  Int       @default(300) @map("verification_period") // Seconds to monitor after remediation
+  isActive            Boolean   @default(true) @map("is_active")
+  createdBy           String?   @map("created_by") // 'system' | 'manual' | 'learned'
+  learnedFrom         String?   @map("learned_from") // If learned, reference to incident ID
+  successRate         Float     @default(0.0) @map("success_rate") // Historical success rate (0.0-1.0)
+  executionCount      Int       @default(0) @map("execution_count")
+  lastExecutedAt      DateTime? @map("last_executed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   executions RemediationExecution[]
 
@@ -1491,22 +1514,22 @@ model RemediationPlaybook {
  * Used for learning, auditing, and improving self-healing capabilities.
  */
 model RemediationExecution {
-  id                String    @id @default(cuid())
-  playbookId        String    @map("playbook_id")
-  organizationId    String?   @map("organization_id")
-  incidentId        String    @map("incident_id")           // Reference to the incident being remediated
-  errorPattern      String    @map("error_pattern")
-  stagesExecuted    Int       @default(0) @map("stages_executed")
-  actionsPerformed  Json      @default("[]")               // Array of actions executed
-  confidence        Float                                  // Confidence score at execution time
-  outcome           String                                 // 'success' | 'partial_success' | 'failure' | 'escalated'
-  beforeSnapshot    Json?     @map("before_snapshot")      // System state before remediation
-  afterSnapshot     Json?     @map("after_snapshot")       // System state after remediation
-  timeTaken         Int       @map("time_taken")           // Milliseconds to execute
-  escalatedTo       String?   @map("escalated_to")         // User ID if escalated
-  escalationReason  String?   @map("escalation_reason")
-  verifiedAt        DateTime? @map("verified_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(cuid())
+  playbookId       String    @map("playbook_id")
+  organizationId   String?   @map("organization_id")
+  incidentId       String    @map("incident_id") // Reference to the incident being remediated
+  errorPattern     String    @map("error_pattern")
+  stagesExecuted   Int       @default(0) @map("stages_executed")
+  actionsPerformed Json      @default("[]") // Array of actions executed
+  confidence       Float // Confidence score at execution time
+  outcome          String // 'success' | 'partial_success' | 'failure' | 'escalated'
+  beforeSnapshot   Json?     @map("before_snapshot") // System state before remediation
+  afterSnapshot    Json?     @map("after_snapshot") // System state after remediation
+  timeTaken        Int       @map("time_taken") // Milliseconds to execute
+  escalatedTo      String?   @map("escalated_to") // User ID if escalated
+  escalationReason String?   @map("escalation_reason")
+  verifiedAt       DateTime? @map("verified_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   playbook RemediationPlaybook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 
@@ -1526,14 +1549,14 @@ model SystemHealthMetric {
   metricName        String   @unique @map("metric_name")
   displayName       String   @map("display_name")
   description       String   @default("")
-  metricType        String   @map("metric_type")        // 'gauge' | 'counter' | 'histogram'
-  category          String                              // 'performance' | 'health' | 'business' | 'security'
-  unit              String?                             // 'ms' | 'bytes' | 'count' | '%' | etc.
+  metricType        String   @map("metric_type") // 'gauge' | 'counter' | 'histogram'
+  category          String // 'performance' | 'health' | 'business' | 'security'
+  unit              String? // 'ms' | 'bytes' | 'count' | '%' | etc.
   influxBucket      String   @default("platform_metrics") @map("influx_bucket")
   influxMeasurement String   @map("influx_measurement")
   retentionDays     Int      @default(90) @map("retention_days")
-  aggregationLevel  String   @default("1m") @map("aggregation_level")  // '1s' | '1m' | '1h' | '1d'
-  alertThresholds   Json?    @map("alert_thresholds")   // Alert configuration
+  aggregationLevel  String   @default("1m") @map("aggregation_level") // '1s' | '1m' | '1h' | '1d'
+  alertThresholds   Json?    @map("alert_thresholds") // Alert configuration
   isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -1548,20 +1571,20 @@ model SystemHealthMetric {
  * Records participation, model updates, and privacy guarantees.
  */
 model FederatedLearningRound {
-  id                  String   @id @default(cuid())
-  roundNumber         Int      @unique @map("round_number")
-  modelType           String   @map("model_type")         // Which model is being trained
-  participantCount    Int      @default(0) @map("participant_count")
-  startedAt           DateTime @default(now()) @map("started_at")
+  id                  String    @id @default(cuid())
+  roundNumber         Int       @unique @map("round_number")
+  modelType           String    @map("model_type") // Which model is being trained
+  participantCount    Int       @default(0) @map("participant_count")
+  startedAt           DateTime  @default(now()) @map("started_at")
   completedAt         DateTime? @map("completed_at")
-  status              String   @default("in_progress")    // 'in_progress' | 'completed' | 'failed'
-  aggregationStrategy String   @map("aggregation_strategy") // 'fedavg' | 'fedprox' | 'scaffold'
-  privacyBudget       Float    @map("privacy_budget")     // Differential privacy budget used
-  globalModelVersion  String?  @map("global_model_version")  // Version identifier of resulting model
-  performanceMetrics  Json?    @map("performance_metrics")
-  patternsLearned     Json?    @map("patterns_learned")    // Summary of what was learned
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  status              String    @default("in_progress") // 'in_progress' | 'completed' | 'failed'
+  aggregationStrategy String    @map("aggregation_strategy") // 'fedavg' | 'fedprox' | 'scaffold'
+  privacyBudget       Float     @map("privacy_budget") // Differential privacy budget used
+  globalModelVersion  String?   @map("global_model_version") // Version identifier of resulting model
+  performanceMetrics  Json?     @map("performance_metrics")
+  patternsLearned     Json?     @map("patterns_learned") // Summary of what was learned
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   participants FederatedLearningParticipant[]
 
@@ -1576,16 +1599,16 @@ model FederatedLearningRound {
  * Records which organizations contributed to each round and their update quality.
  */
 model FederatedLearningParticipant {
-  id                String   @id @default(cuid())
-  roundId           String   @map("round_id")
-  organizationId    String   @map("organization_id")
-  updateSubmitted   Boolean  @default(false) @map("update_submitted")
-  updateAccepted    Boolean  @default(false) @map("update_accepted")
-  rejectionReason   String?  @map("rejection_reason")    // If update rejected (e.g., 'poisoning_detected')
-  datasetSize       Int?     @map("dataset_size")        // Number of examples used for local training
-  contributionScore Float?   @map("contribution_score")  // Quality score of contribution (0.0-1.0)
+  id                String    @id @default(cuid())
+  roundId           String    @map("round_id")
+  organizationId    String    @map("organization_id")
+  updateSubmitted   Boolean   @default(false) @map("update_submitted")
+  updateAccepted    Boolean   @default(false) @map("update_accepted")
+  rejectionReason   String?   @map("rejection_reason") // If update rejected (e.g., 'poisoning_detected')
+  datasetSize       Int?      @map("dataset_size") // Number of examples used for local training
+  contributionScore Float?    @map("contribution_score") // Quality score of contribution (0.0-1.0)
   submittedAt       DateTime? @map("submitted_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   round FederatedLearningRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
@@ -1602,21 +1625,21 @@ model FederatedLearningParticipant {
  * Req 6.8: Requires Platform_Super_Admin approval before production deployment.
  */
 model LearnerStrategyCandidate {
-  id                String    @id @default(cuid())
-  errorPattern      String    @map("error_pattern")
-  learnedActions    Json      @default("[]")             // Array of RemediationAction objects
-  confidence        Float     @default(0.5)              // Initial confidence (0.0-1.0)
-  source            String                               // 'pattern_analysis' | 'manual_fix' | 'federated'
-  sourceIncidentId  String?   @map("source_incident_id") // Incident that triggered learning
-  sourceAdminId     String?   @map("source_admin_id")    // Admin who performed manual fix
-  status            String    @default("pending")        // 'pending' | 'approved' | 'rejected' | 'deployed'
-  reviewedBy        String?   @map("reviewed_by")        // Platform_Super_Admin user id
-  reviewedAt        DateTime? @map("reviewed_at")
-  reviewNotes       String?   @map("review_notes")
-  organizationId    String?   @map("organization_id")    // Originating org (null = platform-wide)
-  patternSupport    Int       @default(1) @map("pattern_support") // Number of incidents supporting this pattern
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  errorPattern     String    @map("error_pattern")
+  learnedActions   Json      @default("[]") // Array of RemediationAction objects
+  confidence       Float     @default(0.5) // Initial confidence (0.0-1.0)
+  source           String // 'pattern_analysis' | 'manual_fix' | 'federated'
+  sourceIncidentId String?   @map("source_incident_id") // Incident that triggered learning
+  sourceAdminId    String?   @map("source_admin_id") // Admin who performed manual fix
+  status           String    @default("pending") // 'pending' | 'approved' | 'rejected' | 'deployed'
+  reviewedBy       String?   @map("reviewed_by") // Platform_Super_Admin user id
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewNotes      String?   @map("review_notes")
+  organizationId   String?   @map("organization_id") // Originating org (null = platform-wide)
+  patternSupport   Int       @default(1) @map("pattern_support") // Number of incidents supporting this pattern
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@index([errorPattern])
   @@index([status])
@@ -1630,19 +1653,19 @@ model LearnerStrategyCandidate {
  * Req 6.5: Identify recurring issues requiring permanent fixes vs temporary remediations.
  */
 model LearnerRecurringIssue {
-  id                  String    @id @default(cuid())
-  errorPattern        String    @unique @map("error_pattern")
-  organizationId      String?   @map("organization_id")
-  occurrenceCount     Int       @default(1) @map("occurrence_count")
-  firstSeenAt         DateTime  @default(now()) @map("first_seen_at")
-  lastSeenAt          DateTime  @default(now()) @map("last_seen_at")
-  remediationCount    Int       @default(0) @map("remediation_count")   // Times auto-remediated
-  permanentFixNeeded  Boolean   @default(false) @map("permanent_fix_needed")
-  permanentFixNotes   String?   @map("permanent_fix_notes")
-  resolvedAt          DateTime? @map("resolved_at")
-  status              String    @default("active")  // 'active' | 'resolved' | 'ignored'
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  id                 String    @id @default(cuid())
+  errorPattern       String    @unique @map("error_pattern")
+  organizationId     String?   @map("organization_id")
+  occurrenceCount    Int       @default(1) @map("occurrence_count")
+  firstSeenAt        DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt         DateTime  @default(now()) @map("last_seen_at")
+  remediationCount   Int       @default(0) @map("remediation_count") // Times auto-remediated
+  permanentFixNeeded Boolean   @default(false) @map("permanent_fix_needed")
+  permanentFixNotes  String?   @map("permanent_fix_notes")
+  resolvedAt         DateTime? @map("resolved_at")
+  status             String    @default("active") // 'active' | 'resolved' | 'ignored'
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@index([organizationId])
   @@index([status])
@@ -1656,13 +1679,13 @@ model LearnerRecurringIssue {
  */
 model LearnerArchitectureRecommendation {
   id                  String    @id @default(cuid())
-  type                String                             // 'architecture' | 'configuration' | 'monitoring'
+  type                String // 'architecture' | 'configuration' | 'monitoring'
   description         String
   rationale           String
-  preventedErrorTypes Json      @default("[]")          // Array of error type strings
+  preventedErrorTypes Json      @default("[]") // Array of error type strings
   estimatedImpact     Json?     @map("estimated_impact") // ImpactEstimate object
   organizationId      String?   @map("organization_id")
-  status              String    @default("open")         // 'open' | 'acknowledged' | 'implemented' | 'dismissed'
+  status              String    @default("open") // 'open' | 'acknowledged' | 'implemented' | 'dismissed'
   acknowledgedBy      String?   @map("acknowledged_by")
   acknowledgedAt      DateTime? @map("acknowledged_at")
   createdAt           DateTime  @default(now()) @map("created_at")
@@ -1682,39 +1705,39 @@ model LearnerArchitectureRecommendation {
  * Used by AI recommendation service to add quality caveats.
  */
 model DataQualityScore {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
-  entityType        String   @map("entity_type")         // e.g., "customer", "order", "product"
-  
-  // Five dimensions of data quality (0-100)
-  completenessScore Float    @map("completeness_score")   // % of required fields populated
-  accuracyScore     Float    @map("accuracy_score")       // % of values matching validation rules
-  consistencyScore  Float    @map("consistency_score")    // % data consistent across sources
-  timelinessScore   Float    @map("timeliness_score")     // % recent data (not stale)
-  validityScore     Float    @map("validity_score")       // % passing format/type checks
-  
-  // Overall score (average of five dimensions)
-  overallScore      Float    @map("overall_score")        // 0-100
-  qualityRating     String   @map("quality_rating")       // "excellent" | "good" | "fair" | "poor"
-  
-  // Metrics
-  recordsAssessed   Int      @default(0) @map("records_assessed")
-  recordsWithIssues Int      @default(0) @map("records_with_issues")
-  
-  // Trend data
-  scoreHistory      Json     @default("[]")              // Array of { date, overallScore }
-  trendDirection    String   @default("stable") @map("trend_direction")  // "improving" | "stable" | "degrading"
-  trendDays         Int      @default(7) @map("trend_days")              // Days included in trend analysis
-  
-  // Metadata
-  scoredAt          DateTime @map("scored_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  sourceSystemId String @map("source_system_id") // Connector installation ID
+  entityType     String @map("entity_type") // e.g., "customer", "order", "product"
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  issues        DataQualityIssue[]
-  quarantined   QuarantinedData[]
+  // Five dimensions of data quality (0-100)
+  completenessScore Float @map("completeness_score") // % of required fields populated
+  accuracyScore     Float @map("accuracy_score") // % of values matching validation rules
+  consistencyScore  Float @map("consistency_score") // % data consistent across sources
+  timelinessScore   Float @map("timeliness_score") // % recent data (not stale)
+  validityScore     Float @map("validity_score") // % passing format/type checks
+
+  // Overall score (average of five dimensions)
+  overallScore  Float  @map("overall_score") // 0-100
+  qualityRating String @map("quality_rating") // "excellent" | "good" | "fair" | "poor"
+
+  // Metrics
+  recordsAssessed   Int @default(0) @map("records_assessed")
+  recordsWithIssues Int @default(0) @map("records_with_issues")
+
+  // Trend data
+  scoreHistory   Json   @default("[]") // Array of { date, overallScore }
+  trendDirection String @default("stable") @map("trend_direction") // "improving" | "stable" | "degrading"
+  trendDays      Int    @default(7) @map("trend_days") // Days included in trend analysis
+
+  // Metadata
+  scoredAt  DateTime @map("scored_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  issues       DataQualityIssue[]
+  quarantined  QuarantinedData[]
 
   @@unique([organizationId, sourceSystemId, entityType])
   @@index([organizationId, sourceSystemId])
@@ -1728,41 +1751,41 @@ model DataQualityScore {
  * Examples: missing values, duplicates, format errors, referential integrity violations.
  */
 model DataQualityIssue {
-  id                String   @id @default(cuid())
-  scoreId           String   @map("score_id")
-  organizationId    String   @map("organization_id")
-  
-  // Issue classification
-  issueType         String   @map("issue_type")          // "missing_value" | "duplicate" | "format_error" | "referential_integrity" | "stale_data" | "outlier"
-  dimension         String                               // "completeness" | "accuracy" | "consistency" | "timeliness" | "validity"
-  severity          String                               // "critical" | "high" | "medium" | "low"
-  
-  // Data identification
-  recordId          String   @map("record_id")           // Record identifier in source system
-  fieldName         String?  @map("field_name")
-  currentValue      String?  @map("current_value")
-  expectedValue     String?  @map("expected_value")
-  
-  // Context
-  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
-  entityType        String   @map("entity_type")
-  
-  // Issue details
-  detectionRule     String   @map("detection_rule")      // Rule that triggered this issue
-  autoRemediable    Boolean  @default(false) @map("auto_remediable")
-  remediationAction String?  @map("remediation_action")
-  
-  // Resolution
-  status            String   @default("detected") @map("status")  // "detected" | "quarantined" | "remediated" | "ignored"
-  remediatedAt      DateTime? @map("remediated_at")
-  remediationResult String?  @map("remediation_result")   // "success" | "partial" | "failed"
-  
-  // Metadata
-  detectedAt        DateTime @default(now()) @map("detected_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  id             String @id @default(cuid())
+  scoreId        String @map("score_id")
+  organizationId String @map("organization_id")
 
-  score DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
-  organization Organization @relation("DataQualityIssues", fields: [organizationId], references: [id], onDelete: Cascade)
+  // Issue classification
+  issueType String @map("issue_type") // "missing_value" | "duplicate" | "format_error" | "referential_integrity" | "stale_data" | "outlier"
+  dimension String // "completeness" | "accuracy" | "consistency" | "timeliness" | "validity"
+  severity  String // "critical" | "high" | "medium" | "low"
+
+  // Data identification
+  recordId      String  @map("record_id") // Record identifier in source system
+  fieldName     String? @map("field_name")
+  currentValue  String? @map("current_value")
+  expectedValue String? @map("expected_value")
+
+  // Context
+  sourceSystemId String @map("source_system_id") // Connector installation ID
+  entityType     String @map("entity_type")
+
+  // Issue details
+  detectionRule     String  @map("detection_rule") // Rule that triggered this issue
+  autoRemediable    Boolean @default(false) @map("auto_remediable")
+  remediationAction String? @map("remediation_action")
+
+  // Resolution
+  status            String    @default("detected") @map("status") // "detected" | "quarantined" | "remediated" | "ignored"
+  remediatedAt      DateTime? @map("remediated_at")
+  remediationResult String?   @map("remediation_result") // "success" | "partial" | "failed"
+
+  // Metadata
+  detectedAt DateTime @default(now()) @map("detected_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  score        DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  organization Organization     @relation("DataQualityIssues", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([scoreId])
   @@index([organizationId])
@@ -1779,37 +1802,37 @@ model DataQualityIssue {
  * IT admins can review and decide: fix, delete, or release.
  */
 model QuarantinedData {
-  id                String   @id @default(cuid())
-  scoreId           String   @map("score_id")
-  organizationId    String   @map("organization_id")
-  
-  // Data identification
-  recordId          String   @map("record_id")           // Record identifier in source system
-  sourceSystemId    String   @map("source_system_id")    // Connector installation ID
-  entityType        String   @map("entity_type")
-  recordSnapshot    Json                                 // Full record data for review
-  
-  // Quarantine reason
-  quarantineReason  String   @map("quarantine_reason")   // "multiple_issues" | "critical_issue" | "anomaly_detected" | "manual_flag"
-  suspiciousFields  String[] @default([])  @map("suspicious_fields")
-  
-  // Resolution
-  status            String   @default("isolated")        // "isolated" | "approved" | "rejected" | "fixed"
-  reviewedBy        String?  @map("reviewed_by")         // IT admin user ID
-  reviewedAt        DateTime? @map("reviewed_at")
-  reviewNotes       String?  @map("review_notes")
-  
-  // Action taken
-  actionTaken       String?  @map("action_taken")        // "released" | "fixed" | "deleted" | null
-  fixedData         Json?    @map("fixed_data")
-  
-  // Metadata
-  quarantinedAt     DateTime @default(now()) @map("quarantined_at")
-  resolvedAt        DateTime? @map("resolved_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  id             String @id @default(cuid())
+  scoreId        String @map("score_id")
+  organizationId String @map("organization_id")
 
-  score DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
-  organization Organization @relation("QuarantinedData", fields: [organizationId], references: [id], onDelete: Cascade)
+  // Data identification
+  recordId       String @map("record_id") // Record identifier in source system
+  sourceSystemId String @map("source_system_id") // Connector installation ID
+  entityType     String @map("entity_type")
+  recordSnapshot Json // Full record data for review
+
+  // Quarantine reason
+  quarantineReason String   @map("quarantine_reason") // "multiple_issues" | "critical_issue" | "anomaly_detected" | "manual_flag"
+  suspiciousFields String[] @default([]) @map("suspicious_fields")
+
+  // Resolution
+  status      String    @default("isolated") // "isolated" | "approved" | "rejected" | "fixed"
+  reviewedBy  String?   @map("reviewed_by") // IT admin user ID
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewNotes String?   @map("review_notes")
+
+  // Action taken
+  actionTaken String? @map("action_taken") // "released" | "fixed" | "deleted" | null
+  fixedData   Json?   @map("fixed_data")
+
+  // Metadata
+  quarantinedAt DateTime  @default(now()) @map("quarantined_at")
+  resolvedAt    DateTime? @map("resolved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  score        DataQualityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  organization Organization     @relation("QuarantinedData", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([scoreId])
   @@index([organizationId])
@@ -1823,33 +1846,33 @@ model QuarantinedData {
  * Examples: trim whitespace, standardize phone format, fix date format.
  */
 model CleansingRule {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+
   // Rule identification
-  name              String
-  description       String   @default("")
-  ruleType          String   @map("rule_type")          // "trim" | "standardize" | "replace" | "normalize" | "validate"
-  
+  name        String
+  description String @default("")
+  ruleType    String @map("rule_type") // "trim" | "standardize" | "replace" | "normalize" | "validate"
+
   // Application
-  entityType        String   @map("entity_type")         // e.g., "customer", "order"
-  fieldName         String?  @map("field_name")
-  
+  entityType String  @map("entity_type") // e.g., "customer", "order"
+  fieldName  String? @map("field_name")
+
   // Rule definition
-  pattern           String?                              // Regex pattern for matching
-  transformation    Json                                 // { "type": "...", "config": {...} }
-  condition         Json?                                // Condition to apply rule
-  
+  pattern        String? // Regex pattern for matching
+  transformation Json // { "type": "...", "config": {...} }
+  condition      Json? // Condition to apply rule
+
   // Metrics
-  isActive          Boolean  @default(true) @map("is_active")
-  appliedCount      Int      @default(0) @map("applied_count")
-  successCount      Int      @default(0) @map("success_count")
-  successRate       Float    @default(0.0) @map("success_rate")    // 0-100%
-  
+  isActive     Boolean @default(true) @map("is_active")
+  appliedCount Int     @default(0) @map("applied_count")
+  successCount Int     @default(0) @map("success_count")
+  successRate  Float   @default(0.0) @map("success_rate") // 0-100%
+
   // Metadata
-  createdBy         String?  @map("created_by")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation("CleansingRules", fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1864,27 +1887,27 @@ model CleansingRule {
  * Used for trend analysis and reporting.
  */
 model DataQualityHistory {
-  id                String   @id @default(cuid())
-  scoreId           String   @map("score_id")
-  organizationId    String   @map("organization_id")
-  sourceSystemId    String   @map("source_system_id")
-  entityType        String   @map("entity_type")
-  
+  id             String @id @default(cuid())
+  scoreId        String @map("score_id")
+  organizationId String @map("organization_id")
+  sourceSystemId String @map("source_system_id")
+  entityType     String @map("entity_type")
+
   // Dimensional scores at time of snapshot
-  completenessScore Float    @map("completeness_score")
-  accuracyScore     Float    @map("accuracy_score")
-  consistencyScore  Float    @map("consistency_score")
-  timelinessScore   Float    @map("timeliness_score")
-  validityScore     Float    @map("validity_score")
-  overallScore      Float    @map("overall_score")
-  
+  completenessScore Float @map("completeness_score")
+  accuracyScore     Float @map("accuracy_score")
+  consistencyScore  Float @map("consistency_score")
+  timelinessScore   Float @map("timeliness_score")
+  validityScore     Float @map("validity_score")
+  overallScore      Float @map("overall_score")
+
   // Context
-  recordCount       Int      @default(0) @map("record_count")
-  issueCount        Int      @default(0) @map("issue_count")
-  
+  recordCount Int @default(0) @map("record_count")
+  issueCount  Int @default(0) @map("issue_count")
+
   // Snapshot time
-  snapshotAt        DateTime @map("snapshot_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  snapshotAt DateTime @map("snapshot_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   organization Organization @relation("DataQualityHistory", fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1893,7 +1916,6 @@ model DataQualityHistory {
   @@index([snapshotAt])
   @@map("data_quality_history")
 }
-
 
 // ─── v2.0 — Resilient Connection Manager (Task 6.3) ─────────────────────────
 
@@ -1904,34 +1926,34 @@ model DataQualityHistory {
  * Task 6.3 Requirement 28.3: Connection redundancy with priority-based routing
  */
 model ResilientConnection {
-  id                      String   @id @default(cuid())
-  organizationId          String   @map("organization_id")
-  systemId                String   @map("system_id")
-  systemName              String   @map("system_name")
-  
-  // Connection methods
-  primaryMethodId         String?  @map("primary_method_id")
-  currentMethodId         String?  @map("current_method_id")
-  
-  // Connection configuration
-  methods                 ConnectionMethod[] @relation("ConnectionMethods")
-  
-  // Health tracking
-  healthStatus            String   @default("healthy")  // "healthy" | "degraded" | "failing" | "disconnected"
-  lastHealthCheck         DateTime? @map("last_health_check")
-  lastSuccessfulConnection DateTime? @map("last_successful_connection")
-  
-  // Statistics
-  totalConnections        Int      @default(0) @map("total_connections")
-  successfulConnections   Int      @default(0) @map("successful_connections")
-  failedConnections       Int      @default(0) @map("failed_connections")
-  successRate             Float    @default(0.0) @map("success_rate")        // 0-100%
-  
-  // Metadata
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  systemId       String @map("system_id")
+  systemName     String @map("system_name")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Connection methods
+  primaryMethodId String? @map("primary_method_id")
+  currentMethodId String? @map("current_method_id")
+
+  // Connection configuration
+  methods ConnectionMethod[] @relation("ConnectionMethods")
+
+  // Health tracking
+  healthStatus             String    @default("healthy") // "healthy" | "degraded" | "failing" | "disconnected"
+  lastHealthCheck          DateTime? @map("last_health_check")
+  lastSuccessfulConnection DateTime? @map("last_successful_connection")
+
+  // Statistics
+  totalConnections      Int   @default(0) @map("total_connections")
+  successfulConnections Int   @default(0) @map("successful_connections")
+  failedConnections     Int   @default(0) @map("failed_connections")
+  successRate           Float @default(0.0) @map("success_rate") // 0-100%
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   healthHistory ConnectionHealth[]
 
   @@index([organizationId])
@@ -1945,31 +1967,31 @@ model ResilientConnection {
  * Task 6.3 Requirement 28.1: Support API, Database, File, Screen-scrape, Message Queue, Webhook
  */
 model ConnectionMethod {
-  id                String   @id @default(cuid())
-  connectionId      String   @map("connection_id")
-  
-  // Method type and priority
-  type              String                           // "api" | "database" | "file_sync" | "screen_scrape" | "message_queue" | "webhook"
-  priority          Int      @default(0)             // Higher = better
-  
-  // Connection config (encrypted in production)
-  config            Json     @default("{}")
-  
-  // Performance metrics
-  successRate       Float    @default(0.0) @map("success_rate")    // 0-1.0
-  avgLatency        Int      @default(0) @map("avg_latency")       // milliseconds
-  lastAttempt       DateTime? @map("last_attempt")
-  lastSuccess       DateTime? @map("last_success")
-  
-  // Failover tracking
-  failoverAttempts  Int      @default(0) @map("failover_attempts")
-  lastFailover      DateTime? @map("last_failover")
-  
-  // Metadata
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
 
-  connection ResilientConnection @relation("ConnectionMethods", fields: [connectionId], references: [id], onDelete: Cascade)
+  // Method type and priority
+  type     String // "api" | "database" | "file_sync" | "screen_scrape" | "message_queue" | "webhook"
+  priority Int    @default(0) // Higher = better
+
+  // Connection config (encrypted in production)
+  config Json @default("{}")
+
+  // Performance metrics
+  successRate Float     @default(0.0) @map("success_rate") // 0-1.0
+  avgLatency  Int       @default(0) @map("avg_latency") // milliseconds
+  lastAttempt DateTime? @map("last_attempt")
+  lastSuccess DateTime? @map("last_success")
+
+  // Failover tracking
+  failoverAttempts Int       @default(0) @map("failover_attempts")
+  lastFailover     DateTime? @map("last_failover")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  connection    ResilientConnection      @relation("ConnectionMethods", fields: [connectionId], references: [id], onDelete: Cascade)
   healthHistory ConnectionHealthDetail[]
 
   @@index([connectionId])
@@ -1983,24 +2005,24 @@ model ConnectionMethod {
  * Task 6.3 Requirement 28.4: Connection health monitor with automatic failover
  */
 model ConnectionHealth {
-  id                String   @id @default(cuid())
-  connectionId      String   @map("connection_id")
-  
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
+
   // Health status
-  status            String                           // "healthy" | "degraded" | "failing" | "disconnected"
-  latency           Int      @default(0)             // milliseconds
-  errorRate         Float    @default(0.0) @map("error_rate")    // 0-1.0
-  
+  status    String // "healthy" | "degraded" | "failing" | "disconnected"
+  latency   Int    @default(0) // milliseconds
+  errorRate Float  @default(0.0) @map("error_rate") // 0-1.0
+
   // Failover triggered
-  failoverTriggered Boolean  @default(false) @map("failover_triggered")
-  failoverReason    String?  @map("failover_reason")
-  
+  failoverTriggered Boolean @default(false) @map("failover_triggered")
+  failoverReason    String? @map("failover_reason")
+
   // Per-method details
-  methodDetails     ConnectionHealthDetail[]
-  
+  methodDetails ConnectionHealthDetail[]
+
   // Metadata
-  checkedAt         DateTime @default(now()) @map("checked_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  checkedAt DateTime @default(now()) @map("checked_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   connection ResilientConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
@@ -2015,22 +2037,22 @@ model ConnectionHealth {
  * Task 6.3 Requirement 28.4: Track health per method for intelligent routing
  */
 model ConnectionHealthDetail {
-  id            String   @id @default(cuid())
-  healthId      String   @map("health_id")
-  methodId      String   @map("method_id")
-  
+  id       String @id @default(cuid())
+  healthId String @map("health_id")
+  methodId String @map("method_id")
+
   // Method-specific health
-  status        String                          // "healthy" | "degraded" | "failing" | "disconnected"
-  latency       Int      @default(0)            // milliseconds
-  errorCount    Int      @default(0) @map("error_count")
-  successCount  Int      @default(0) @map("success_count")
-  
+  status       String // "healthy" | "degraded" | "failing" | "disconnected"
+  latency      Int    @default(0) // milliseconds
+  errorCount   Int    @default(0) @map("error_count")
+  successCount Int    @default(0) @map("success_count")
+
   // Last test result
-  lastTestAt    DateTime? @map("last_test_at")
-  testError     String?   @map("test_error")
-  
+  lastTestAt DateTime? @map("last_test_at")
+  testError  String?   @map("test_error")
+
   // Metadata
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   health ConnectionHealth @relation(fields: [healthId], references: [id], onDelete: Cascade)
   method ConnectionMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
@@ -2046,22 +2068,22 @@ model ConnectionHealthDetail {
  * Task 6.3 Requirement 28.6: Connection redundancy with priority-based routing
  */
 model AlternativeConnectionPath {
-  id               String   @id @default(cuid())
-  connectionId     String   @map("connection_id")
-  
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
+
   // Path definition
-  methodSequence   String[] @default([])  @map("method_sequence")  // Ordered list of method IDs to try
-  priority         Int      @default(0)
-  isActive         Boolean  @default(true) @map("is_active")
-  
+  methodSequence String[] @default([]) @map("method_sequence") // Ordered list of method IDs to try
+  priority       Int      @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+
   // Path metrics
-  successRate      Float    @default(0.0) @map("success_rate")
-  avgLatency       Int      @default(0) @map("avg_latency")
-  failureCount     Int      @default(0) @map("failure_count")
-  
+  successRate  Float @default(0.0) @map("success_rate")
+  avgLatency   Int   @default(0) @map("avg_latency")
+  failureCount Int   @default(0) @map("failure_count")
+
   // Metadata
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([connectionId])
   @@index([isActive])
@@ -2074,29 +2096,29 @@ model AlternativeConnectionPath {
  * Task 6.3 Requirement 28.7: Generated connector approval workflow for IT admins
  */
 model GeneratedConnector {
-  id                String   @id @default(cuid())
-  organizationId    String   @map("organization_id")
-  systemId          String   @map("system_id")
-  systemName        String   @map("system_name")
-  
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  systemId       String @map("system_id")
+  systemName     String @map("system_name")
+
   // Code details
-  sourceCode        String   @db.Text @map("source_code")
-  language          String   // "typescript" | "python" | "java"
-  dependencies      String[] @default([])
-  
+  sourceCode   String   @map("source_code") @db.Text
+  language     String // "typescript" | "python" | "java"
+  dependencies String[] @default([])
+
   // Test cases
-  testCases         String[] @default([]) @map("test_cases")
-  
+  testCases String[] @default([]) @map("test_cases")
+
   // Approval workflow
-  approvalStatus    String   @default("pending")  // "pending" | "approved" | "rejected" | "deployed"
-  approvalRequest   ApprovalWorkflowRequest? @relation("ApprovalRequests")
-  
+  approvalStatus  String                   @default("pending") // "pending" | "approved" | "rejected" | "deployed"
+  approvalRequest ApprovalWorkflowRequest? @relation("ApprovalRequests")
+
   // Metadata
-  generatedAt       DateTime @default(now()) @map("generated_at")
-  generatedBy       String?  @map("generated_by")
-  deployedAt        DateTime? @map("deployed_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  generatedBy String?   @map("generated_by")
+  deployedAt  DateTime? @map("deployed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -2111,27 +2133,27 @@ model GeneratedConnector {
  * Task 6.3 Requirement 28.8: IT admin approval interface
  */
 model ApprovalWorkflowRequest {
-  id                   String   @id @default(cuid())
-  organizationId       String   @map("organization_id")
-  generatedConnectorId String   @unique @map("generated_connector_id")
-  
-  // Request details
-  requestedBy          String   @map("requested_by")
-  requestedAt          DateTime @default(now()) @map("requested_at")
-  
-  // Approval status
-  status               String   @default("pending")  // "pending" | "approved" | "rejected"
-  approvedBy           String?  @map("approved_by")
-  approvedAt           DateTime? @map("approved_at")
-  rejectionReason      String?  @map("rejection_reason")
-  approvalNotes        String?  @db.Text @map("approval_notes")
-  
-  // Metadata
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                   String @id @default(cuid())
+  organizationId       String @map("organization_id")
+  generatedConnectorId String @unique @map("generated_connector_id")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  connector GeneratedConnector @relation("ApprovalRequests", fields: [generatedConnectorId], references: [id], onDelete: Cascade)
+  // Request details
+  requestedBy String   @map("requested_by")
+  requestedAt DateTime @default(now()) @map("requested_at")
+
+  // Approval status
+  status          String    @default("pending") // "pending" | "approved" | "rejected"
+  approvedBy      String?   @map("approved_by")
+  approvedAt      DateTime? @map("approved_at")
+  rejectionReason String?   @map("rejection_reason")
+  approvalNotes   String?   @map("approval_notes") @db.Text
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connector    GeneratedConnector @relation("ApprovalRequests", fields: [generatedConnectorId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([status])
@@ -2144,25 +2166,25 @@ model ApprovalWorkflowRequest {
  * Task 6.3 Requirement 28.6: Priority-based routing with load balancing
  */
 model ConnectionRoutingRule {
-  id             String   @id @default(cuid())
-  connectionId   String   @map("connection_id")
-  
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
+
   // Rule conditions
-  condition      Json                                // Matching condition
-  priority       Int      @default(0)
-  isActive       Boolean  @default(true) @map("is_active")
-  
+  condition Json // Matching condition
+  priority  Int     @default(0)
+  isActive  Boolean @default(true) @map("is_active")
+
   // Routing action
-  actionType     String                              // "prefer_method" | "load_balance" | "failover"
-  actionConfig   Json     @default("{}")
-  
+  actionType   String // "prefer_method" | "load_balance" | "failover"
+  actionConfig Json   @default("{}")
+
   // Metrics
-  matchCount     Int      @default(0) @map("match_count")
-  successCount   Int      @default(0) @map("success_count")
-  
+  matchCount   Int @default(0) @map("match_count")
+  successCount Int @default(0) @map("success_count")
+
   // Metadata
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([connectionId])
   @@index([isActive])
@@ -2174,22 +2196,22 @@ model ConnectionRoutingRule {
  * Task 6.3 Requirement 28.4: Track failover for audit and optimization
  */
 model ConnectionFailoverEvent {
-  id                   String   @id @default(cuid())
-  connectionId         String   @map("connection_id")
-  
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
+
   // Failover details
-  previousMethodId     String   @map("previous_method_id")
-  newMethodId          String   @map("new_method_id")
-  reason               String
-  
+  previousMethodId String @map("previous_method_id")
+  newMethodId      String @map("new_method_id")
+  reason           String
+
   // Outcome
-  success              Boolean  @default(false)
-  latency              Int      @default(0)  // milliseconds
-  errorMessage         String?  @map("error_message")
-  
+  success      Boolean @default(false)
+  latency      Int     @default(0) // milliseconds
+  errorMessage String? @map("error_message")
+
   // Metadata
-  occurredAt           DateTime @default(now()) @map("occurred_at")
-  createdAt            DateTime @default(now()) @map("created_at")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([connectionId])
   @@index([occurredAt])
@@ -2242,7 +2264,9 @@ model IntegrationRequest {
   @@map("integration_requests")
 }
 
-/** Org-scoped document library — uploaded files and text attachments. */
+/**
+ * Org-scoped document library — uploaded files and text attachments.
+ */
 model Document {
   id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
@@ -2263,4 +2287,25 @@ model Document {
   @@index([organizationId])
   @@index([createdAt])
   @@map("documents")
+}
+
+// ─── Platform Configuration ────────────────────────────────────────────────────
+
+/**
+ * PlatformConfig — Persisted platform-wide key/value settings.
+ * Replaces the previous in-memory feature flag list in platform.service.ts.
+ * Each row is one setting; the 'flags' key stores the feature flags JSON blob.
+ * Platform Super Admin PATCH calls upsert rows here.
+ *
+ * Single-row model: only one row per key exists at any time (@@unique on key).
+ */
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedBy String   @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("platform_config")
 }

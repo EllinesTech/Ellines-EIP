@@ -18,9 +18,17 @@ import {
   syncOpenApiRoutes,
   toTimelineStorage,
   withScheduleAfterSync,
+  appendDateWindowToUrl,
+  applyFieldMap,
+  validateFieldMap,
+  injectConfigContext,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
+import {
+  isFirestoreResponse,
+  normalizeFirestoreResponse,
+} from '../../../../../shared/firestore-normalizer';
 
 // ─── IMAP sync via Cloudflare TCP sockets ─────────────────────────────────────
 
@@ -279,17 +287,10 @@ function decodeImapText(text: string): string {
   });
 }
 
-const CSV_SAMPLE = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
-`;
-
 type StoredPayload = {
   healthScore?: number;
   connectedSystems?: number;
+  recordCount?: number;
   openAlerts?: number;
   openDecisions?: number;
   briefHighlight?: string;
@@ -311,6 +312,7 @@ async function upsertSnapshot(
   connectorId: string,
   connectorName: string,
   payload: ReturnType<typeof normalizeEnterprisePayload>,
+  fieldMapWarnings?: string[],
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
@@ -336,6 +338,7 @@ async function upsertSnapshot(
   let weightedHealth = 0;
   let totalWeight = 0;
   let connectedSystems = 0;
+  let totalRecordCount = 0;
   let openAlerts = 0;
   let openDecisions = 0;
   let bestHighlight = '';
@@ -350,6 +353,7 @@ async function upsertSnapshot(
     weightedHealth += (p.healthScore || 0) * weight;
     totalWeight += weight;
     connectedSystems += p.connectedSystems || 0;
+    totalRecordCount += p.recordCount || 0;
     openAlerts += p.openAlerts || 0;
     openDecisions += p.openDecisions || 0;
     names.push(inst.display_name || 'System');
@@ -360,6 +364,17 @@ async function upsertSnapshot(
       bestHighlight = p.briefHighlight || '';
     }
   }
+
+  // Use the count of active connector installations as the authoritative
+  // connected_systems value — not a sum of inferred payload fields.
+  // connectedSystems from payloads is still aggregated for completeness,
+  // but the active install count is the ground truth.
+  const { count: activeCount } = await supabase
+    .from('connector_installations')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .in('status', ['active', 'synced']);
+  const activeConnectorCount = activeCount ?? Math.max(merged.length, connectedSystems);
 
   const aggHealthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : payload.healthScore;
   const aggConnectorName =
@@ -385,7 +400,8 @@ async function upsertSnapshot(
     connector_id: aggConnectorId,
     connector_name: aggConnectorName,
     health_score: aggHealthScore,
-    connected_systems: connectedSystems,
+    connected_systems: activeConnectorCount,
+    record_count: totalRecordCount,
     open_alerts: openAlerts,
     open_decisions: openDecisions,
     brief_highlight: bestHighlight,
@@ -410,6 +426,7 @@ async function upsertSnapshot(
         connector_name: row.connector_name,
         health_score: row.health_score,
         connected_systems: row.connected_systems,
+        record_count: row.record_count,
         open_alerts: row.open_alerts,
         open_decisions: row.open_decisions,
         brief_highlight: row.brief_highlight,
@@ -439,7 +456,8 @@ async function upsertSnapshot(
     connectorId,
     connectorName,
     healthScore: payload.healthScore,
-    connectedSystems: payload.connectedSystems,
+    connectedSystems: activeConnectorCount,
+    recordCount: payload.recordCount,
     openAlerts: payload.openAlerts,
     openDecisions: payload.openDecisions,
     briefHighlight: payload.briefHighlight,
@@ -447,6 +465,7 @@ async function upsertSnapshot(
     model: payload.model || null,
     syncedAt,
     status: 'synced' as const,
+    fieldMapWarnings: fieldMapWarnings ?? [],
   };
 }
 
@@ -518,10 +537,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         normalizeEnterprisePayload(demoSeed),
       );
     } else if (catalogId === 'rest-api') {
-      const endpoint = resolveEndpoint(context.request.url, config.endpoint);
+      const rawEndpoint = resolveEndpoint(context.request.url, config.endpoint);
       const isSample =
-        endpoint.includes('/api/v1/connectors/rest-sample') ||
-        endpoint.endsWith('/connectors/rest-sample');
+        rawEndpoint.includes('/api/v1/connectors/rest-sample') ||
+        rawEndpoint.endsWith('/connectors/rest-sample');
+      // Append date-window query params when configured (?window=today|week|month&from=...&to=...)
+      const endpoint = isSample ? rawEndpoint : appendDateWindowToUrl(rawEndpoint, config);
       let raw: unknown = restSample;
       if (!isSample) {
         // Egress policy check before fetch
@@ -542,7 +563,32 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             502,
           );
         }
-        raw = await res.json();
+        const text = await res.text();
+        try {
+          raw = JSON.parse(text);
+        } catch {
+          raw = {
+            briefHighlight: text.slice(0, 400) || `Sync from ${new URL(endpoint).hostname}`,
+            timeline: [{ title: 'HTTP sync', detail: `200 from ${new URL(endpoint).hostname}` }],
+          };
+        }
+        // Unpack Firestore REST typed-value envelopes if present — applies to any
+        // endpoint backed by Firestore's REST API regardless of which system it is.
+        if (isFirestoreResponse(raw)) {
+          raw = normalizeFirestoreResponse(raw);
+        }
+        // Apply field-name remapping (config.fieldMap) before normalization.
+        // Lets operators map upstream-specific field names to EIP field names
+        // without touching EIP code.
+        if (config.fieldMap && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+          raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
+        }
+      }
+      // Validate fieldMap for semantic risks and capture any warnings.
+      const fieldMapWarnings = validateFieldMap(config.fieldMap);
+      // Inject config context (systemLabel) into raw before normalization.
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        raw = injectConfigContext(raw as Record<string, unknown>, config);
       }
       summary = await upsertSnapshot(
         context.env,
@@ -550,9 +596,96 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         auth.sub,
         id,
         'rest-api',
-        displayName || 'REST API Systems',
+        config.systemLabel || displayName || 'REST API Systems',
         normalizeEnterprisePayload(raw),
+        fieldMapWarnings,
       );
+    } else if (catalogId === 'graphql') {
+      // ── GraphQL connector ─────────────────────────────────────────────────
+      // Uses the query stored in config.graphqlQuery + the endpoint in config.endpoint.
+      // Auth headers are applied the same way as REST (apiKey, bearer, basic).
+      // The response is normalized generically — operators can use fieldMap to
+      // remap GraphQL-specific response fields to EIP names.
+      const gqlEndpoint = (config.endpoint || '').trim();
+      if (!gqlEndpoint) {
+        return json({ statusCode: 400, message: 'GraphQL endpoint is required' }, 400);
+      }
+      const gqlQuery = (config.graphqlQuery || '').trim();
+      if (!gqlQuery) {
+        return json({ statusCode: 400, message: 'GraphQL query is required' }, 400);
+      }
+      const egressCheck = isSafeEgressTarget(gqlEndpoint);
+      if (!egressCheck.safe) {
+        return json({ statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' }, 400);
+      }
+      const gqlRes = await safeFetch(gqlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...buildAuthHeaders(config),
+        },
+        body: JSON.stringify({ query: gqlQuery }),
+      });
+      if (!gqlRes.ok) {
+        return json({ statusCode: 502, message: `GraphQL endpoint returned ${gqlRes.status}` }, 502);
+      }
+      let gqlRaw: unknown;
+      try {
+        gqlRaw = await gqlRes.json();
+      } catch {
+        return json({ statusCode: 502, message: 'GraphQL endpoint returned non-JSON' }, 502);
+      }
+      // GraphQL responses are { data: {...}, errors: [...] }
+      // Extract data node before normalization
+      const gqlRoot = gqlRaw && typeof gqlRaw === 'object' ? gqlRaw as Record<string, unknown> : {};
+      let gqlData: unknown = gqlRoot.data ?? gqlRoot;
+      if (config.fieldMap && typeof gqlData === 'object' && gqlData !== null && !Array.isArray(gqlData)) {
+        gqlData = applyFieldMap(gqlData as Record<string, unknown>, config.fieldMap);
+      }
+      summary = await upsertSnapshot(
+        context.env,
+        auth.organizationId,
+        auth.sub,
+        id,
+        'graphql',
+        displayName || 'GraphQL API',
+        normalizeEnterprisePayload(gqlData),
+      );
+    } else if (catalogId === 'webhook-inbound') {
+      // ── Webhook inbound connector ─────────────────────────────────────────
+      // Push-based: the external system posts data to /api/v1/webhooks/enterprise.
+      // This sync call returns the current snapshot for the org — there is nothing
+      // to fetch because the data arrives when Haven/the external system fires.
+      const { data: snap } = await supabase
+        .from('enterprise_snapshots')
+        .select('*')
+        .eq('organization_id', auth.organizationId)
+        .maybeSingle();
+      if (!snap) {
+        return json({
+          statusCode: 200,
+          connectorId: 'webhook-inbound',
+          connectorName: displayName || 'Webhook Receiver',
+          healthScore: 0, connectedSystems: 0, openAlerts: 0, openDecisions: 0,
+          briefHighlight: 'Webhook receiver ready — no data pushed yet. Configure the external system to POST to /api/v1/webhooks/enterprise.',
+          timeline: [], model: null,
+          syncedAt: new Date().toISOString(), status: 'synced',
+        });
+      }
+      return json({
+        connectorId: snap.connector_id,
+        connectorName: displayName || snap.connector_name,
+        healthScore: snap.health_score,
+        connectedSystems: snap.connected_systems,
+        openAlerts: snap.open_alerts,
+        openDecisions: snap.open_decisions,
+        briefHighlight: snap.brief_highlight,
+        timeline: [],
+        model: null,
+        syncedAt: new Date(snap.synced_at as string).toISOString(),
+        status: 'synced',
+      });
     } else if (catalogId === 'openapi') {
       let baseUrl = (config.openApiBaseUrl || '').trim();
       let systemName = displayName || config.systemName || 'OpenAPI System';
@@ -589,7 +722,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         payload,
       );
     } else if (catalogId === 'csv-file') {
-      const csvText = (config.csvText && config.csvText.trim()) || CSV_SAMPLE;
+      const csvText = (config.csvText && config.csvText.trim());
+      if (!csvText) {
+        return json(
+          { statusCode: 400, message: 'CSV text is required. Edit this connector and paste your system\'s export into the CSV content field.' },
+          400,
+        );
+      }
       summary = await upsertSnapshot(
         context.env,
         auth.organizationId,
@@ -684,12 +823,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const now = new Date().toISOString();
     const nextConfig = withScheduleAfterSync(config, new Date(now));
+    // Collect any fieldMap semantic warnings to surface in the admin UI.
+    const fieldMapWarnSuffix =
+      Array.isArray((summary as Record<string,unknown>).fieldMapWarnings) &&
+      ((summary as Record<string,unknown>).fieldMapWarnings as string[]).length > 0
+        ? ' ⚠ ' + ((summary as Record<string,unknown>).fieldMapWarnings as string[])[0].slice(0, 150)
+        : '';
     await supabase
       .from('connector_installations')
       .update({
         status: 'synced',
         last_synced_at: now,
-        last_message: `Synced — health ${summary.healthScore}`,
+        last_message: `Synced — health ${summary.healthScore}${fieldMapWarnSuffix}`,
         config: nextConfig,
         updated_at: now,
       })

@@ -18,14 +18,10 @@ import {
 } from '../../../../shared/connectors';
 import { sendOutboundEmail } from '../../../../shared/mail';
 import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../shared/egress';
-
-const CSV_SAMPLE = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
-`;
+import {
+  isFirestoreResponse,
+  normalizeFirestoreResponse,
+} from '../../../../shared/firestore-normalizer';
 
 type SyncBody = {
   endpoint?: string;
@@ -67,6 +63,7 @@ async function upsertSnapshot(
     connector_name: connectorName,
     health_score: payload.healthScore,
     connected_systems: payload.connectedSystems,
+    record_count: payload.recordCount,
     open_alerts: payload.openAlerts,
     open_decisions: payload.openDecisions,
     brief_highlight: payload.briefHighlight,
@@ -91,6 +88,7 @@ async function upsertSnapshot(
         connector_name: row.connector_name,
         health_score: row.health_score,
         connected_systems: row.connected_systems,
+        record_count: row.record_count,
         open_alerts: row.open_alerts,
         open_decisions: row.open_decisions,
         brief_highlight: row.brief_highlight,
@@ -136,6 +134,13 @@ async function upsertSnapshot(
  * Fetch any HTTPS endpoint from the Cloudflare edge through the shared SSRF-safe
  * egress policy. Private / localhost / cloud-metadata targets are blocked.
  * Redirects are validated hop-by-hop.
+ *
+ * If the response is a Firestore REST API response (document or collection),
+ * it is automatically unpacked via the generic Firestore normalizer before
+ * returning. This strips the Firestore typed-value envelopes (stringValue,
+ * integerValue, arrayValue, mapValue, …) and returns plain JS so that
+ * normalizeEnterprisePayload receives ordinary JSON regardless of the upstream
+ * data store. No system-specific field mapping is applied here.
  */
 async function proxyFetch(
   url: string,
@@ -159,8 +164,9 @@ async function proxyFetch(
     throw new Error(`Upstream ${url} returned ${res.status} ${res.statusText}`);
   }
   const text = await res.text();
+  let parsed: unknown;
   try {
-    return JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch {
     // Non-JSON: wrap in a minimal enterprise-compatible envelope
     return {
@@ -168,6 +174,22 @@ async function proxyFetch(
       timeline: [{ title: 'HTTP sync', detail: `${res.status} from ${new URL(url).hostname}` }],
     };
   }
+
+  // ── Firestore REST response detection and unpacking ──────────────────────
+  // The Firestore REST API wraps field values in typed envelopes
+  // ({ stringValue, integerValue, arrayValue, mapValue, … }). Detect that
+  // shape and normalize it into plain JS before handing off to
+  // normalizeEnterprisePayload — which only understands plain objects.
+  //
+  // This is generic: it handles any Firestore REST document or collection
+  // regardless of which project, collection, or business system it came from.
+  // No system-specific field mapping happens here — normalizeEnterprisePayload
+  // applies its standard inference to whatever plain fields are returned.
+  if (isFirestoreResponse(parsed)) {
+    return normalizeFirestoreResponse(parsed);
+  }
+
+  return parsed;
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -231,7 +253,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (connectorId === 'csv-file') {
-      const csvText = (body.csvText && body.csvText.trim()) || CSV_SAMPLE;
+      const csvText = (body.csvText && body.csvText.trim());
+      if (!csvText) {
+        return json({ statusCode: 400, message: 'CSV text is required. Provide csvText in the request body.' }, 400);
+      }
       const summary = await upsertSnapshot(
         context.env,
         auth.organizationId,
