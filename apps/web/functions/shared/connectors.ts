@@ -33,12 +33,47 @@ export type InstallConfig = {
   fieldMap?: Record<string, string>;
   systemName?: string;
   /**
+   * Human-readable label for the external system being connected.
+   * Used as the connector's source system name in the normalized payload and snapshot.
+   * Examples: "Haven Catalogue API", "Nairobi Branch POS", "Clinical HIS Production"
+   */
+  systemLabel?: string;
+  /**
+   * Optional free-form identifier for the business this connector belongs to.
+   * Supports future multi-business grouping and cross-business reporting.
+   * Example: "ellines-haven", "abc-energy-station-001"
+   */
+  businessId?: string;
+  /**
+   * Optional free-form identifier for the branch this connector belongs to.
+   * Supports future branch-level reporting and filtering.
+   * Example: "nairobi-cbd", "branch-027"
+   */
+  branchId?: string;
+  /**
    * Date/time window appended to REST/GraphQL requests as query parameters.
-   * When set, the connector appends ?window=<value>&from=<ISO>&to=<ISO> to the
-   * endpoint URL so the upstream system can filter its response by time range.
+   * Only active when `dateWindowEnabled: true`.
    * 'all' = no date params (default behaviour, fetches everything).
    */
   dateWindow?: 'today' | 'week' | 'month' | 'all';
+  /**
+   * When true, date range parameters are appended to the endpoint URL based on
+   * `dateWindow`. Must be explicitly enabled — defaults to false to avoid
+   * polluting external APIs with undocumented parameters.
+   */
+  dateWindowEnabled?: boolean;
+  /**
+   * Custom query-parameter name for the range start date sent to the upstream API.
+   * When set (together with dateParamTo), EIP sends `?<dateParamFrom>=<ISO>&<dateParamTo>=<ISO>`
+   * instead of the generic `?window=&from=&to=`.
+   * Example: "startDate", "since", "created_after"
+   */
+  dateParamFrom?: string;
+  /**
+   * Custom query-parameter name for the range end date sent to the upstream API.
+   * Example: "endDate", "until", "created_before"
+   */
+  dateParamTo?: string;
   /** GraphQL query string (for graphql catalog type). */
   graphqlQuery?: string;
   /** IMAP */
@@ -184,25 +219,41 @@ export function dateWindowBounds(
 }
 
 /**
- * Append date window query parameters to an endpoint URL when a dateWindow
- * is configured. Adds ?window=<value>&from=<ISO>&to=<ISO> — many APIs accept
- * these to filter their response to a time range (e.g. today's sales).
+ * Append date window query parameters to an endpoint URL when date filtering
+ * is configured for this connector.
  *
- * If the upstream API uses different param names, the operator should include
- * them directly in the endpoint URL; this provides a sensible default.
+ * Requires `config.dateWindowEnabled: true` to be explicitly set — date params
+ * are NOT appended by default, because many external APIs do not understand
+ * generic `window/from/to` parameters and this would pollute requests silently.
+ *
+ * Param name mapping (evaluated in order):
+ *   1. If `config.dateParamFrom` and `config.dateParamTo` are both set, uses
+ *      those names: `?<dateParamFrom>=<ISO>&<dateParamTo>=<ISO>`.
+ *   2. Otherwise falls back to the EIP generic form: `?window=<value>&from=<ISO>&to=<ISO>`.
+ *
+ * `config.dateWindow = 'all'` (or missing) → no params appended regardless of enabled flag.
  */
 export function appendDateWindowToUrl(
   url: string,
   config: InstallConfig,
   now = new Date(),
 ): string {
+  // Must be explicitly enabled — default is off.
+  if (!config.dateWindowEnabled) return url;
   const bounds = dateWindowBounds(config.dateWindow, now);
   if (!bounds) return url;
   try {
     const u = new URL(url);
-    u.searchParams.set('window', config.dateWindow as string);
-    u.searchParams.set('from', bounds.from);
-    u.searchParams.set('to', bounds.to);
+    if (config.dateParamFrom && config.dateParamTo) {
+      // Custom param names: the upstream API defines its own date filter params.
+      u.searchParams.set(config.dateParamFrom, bounds.from);
+      u.searchParams.set(config.dateParamTo, bounds.to);
+    } else {
+      // EIP generic form — suitable for APIs that explicitly support ?window/from/to.
+      u.searchParams.set('window', config.dateWindow as string);
+      u.searchParams.set('from', bounds.from);
+      u.searchParams.set('to', bounds.to);
+    }
     return u.toString();
   } catch {
     return url;
@@ -214,9 +265,9 @@ export function appendDateWindowToUrl(
  * Only top-level keys are remapped. Values are preserved as-is.
  * If fieldMap is empty or absent, the original object is returned unchanged.
  *
- * Example config: { "total_books": "connectedSystems", "msg": "briefHighlight" }
+ * Example config: { "total_books": "recordCount", "msg": "briefHighlight" }
  * Input:  { "total_books": 15, "msg": "All good", "other": "x" }
- * Output: { "connectedSystems": 15, "briefHighlight": "All good", "other": "x" }
+ * Output: { "recordCount": 15, "briefHighlight": "All good", "other": "x" }
  */
 export function applyFieldMap(
   data: Record<string, unknown>,
@@ -229,6 +280,62 @@ export function applyFieldMap(
       out[to] = out[from];
       delete out[from];
     }
+  }
+  return out;
+}
+
+/**
+ * Semantic protection set: EIP universal fields whose meaning is standardized.
+ * Mapping an arbitrary source field to one of these should be done deliberately.
+ */
+const PROTECTED_EIP_FIELDS = new Set([
+  'connectedSystems',
+  'healthScore',
+  'openAlerts',
+  'openDecisions',
+]);
+
+/**
+ * Validate a fieldMap for potential semantic risks.
+ * Returns an array of human-readable warning strings (empty = no concerns).
+ *
+ * Protected fields (connectedSystems, healthScore, openAlerts, openDecisions)
+ * have specific EIP semantics. Mapping an arbitrary source field to one of
+ * these is allowed but may produce misleading dashboards if the source field
+ * does not actually represent that concept.
+ *
+ * Warnings are advisory — the mapping is still applied. Surface them in the
+ * connector's last_message so the operator is informed.
+ */
+export function validateFieldMap(fieldMap?: Record<string, string>): string[] {
+  if (!fieldMap || Object.keys(fieldMap).length === 0) return [];
+  const warnings: string[] = [];
+  for (const [from, to] of Object.entries(fieldMap)) {
+    if (PROTECTED_EIP_FIELDS.has(to)) {
+      warnings.push(
+        `Mapping '${from}' → '${to}' targets a protected EIP semantic field. ` +
+        `Ensure '${from}' actually represents ${to} (not a generic record count or unrelated metric).`,
+      );
+    }
+  }
+  return warnings;
+}
+
+/**
+ * Inject connector config context into a raw API response object before normalization.
+ * This allows config-level metadata (systemLabel, businessId, branchId) to influence
+ * the normalized payload's sourceSystem without requiring the external API to return them.
+ *
+ * Only injects keys that are not already present in the raw data — the API's own
+ * fields always take priority.
+ */
+export function injectConfigContext(
+  raw: Record<string, unknown>,
+  config: InstallConfig,
+): Record<string, unknown> {
+  const out = { ...raw };
+  if (config.systemLabel && !out.systemName && !out.sourceSystem) {
+    out.systemName = config.systemLabel;
   }
   return out;
 }
@@ -307,8 +414,11 @@ export function normalizeEnterprisePayload(raw: unknown) {
   }
 
   // ── Numeric KPIs ─────────────────────────────────────────────────────────────
-  // Aliases in priority order — check schema-native names first, then common
-  // field names used by real-world REST APIs (count, total, length, size, num_*).
+  // Aliases in priority order — check schema-native names first.
+  //
+  // connectedSystems: only maps from fields that explicitly represent connected
+  // system/integration counts. Generic record counts (count, total, length) must
+  // NOT map here — those go to recordCount instead.
   const healthScore = Math.min(
     100,
     Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
@@ -317,17 +427,18 @@ export function normalizeEnterprisePayload(raw: unknown) {
     0,
     asNumber(
       data.connectedSystems ?? data.connected_systems ?? data.systems ??
-      // Many catalogue / inventory APIs return a top-level count of their records.
-      // Use it as connectedSystems when no native field exists and a record array is present.
-      (
-        data.count !== undefined
-          ? data.count
-          : data.total !== undefined
-            ? data.total
-            : data.length !== undefined
-              ? data.length
-              : undefined
-      ),
+      data.integrations ?? data.connections,
+      0,
+    ),
+  );
+  // recordCount: the count of records returned by this connector.
+  // Maps from generic count aliases that many catalogue/inventory APIs return.
+  // This is distinct from connectedSystems — 15 books ≠ 15 connected systems.
+  const recordCount = Math.max(
+    0,
+    asNumber(
+      data.recordCount ?? data.record_count ??
+      data.count ?? data.total ?? data.length,
       0,
     ),
   );
@@ -339,16 +450,20 @@ export function normalizeEnterprisePayload(raw: unknown) {
 
   // ── Brief highlight ───────────────────────────────────────────────────────────
   // Fallback chain: schema-native → common prose fields → synthesised from
-  // business/api name + count so the Command Center shows something useful
-  // even when the upstream API returns no prose field.
+  // business/api name + recordCount (or connectedSystems) so the Command Center
+  // shows something useful even when the upstream API returns no prose field.
   const businessName = asString(
     data.business ?? data.name ?? data.api ?? data.source ?? data.system ?? data.systemName,
     '',
   );
+  // Prefer recordCount for prose synthesis when the API returns records but
+  // not an explicit connected-systems count. Fall back to connectedSystems.
+  const proseSummaryCount = recordCount > 0 ? recordCount : connectedSystems;
+  const proseSummaryLabel = recordCount > 0 ? 'record' : 'system';
   const briefHighlight = asString(
     data.briefHighlight ?? data.brief ?? data.summary ?? data.message ??
-    (businessName && connectedSystems > 0
-      ? `${businessName}: ${connectedSystems} record${connectedSystems !== 1 ? 's' : ''} synced.`
+    (businessName && proseSummaryCount > 0
+      ? `${businessName}: ${proseSummaryCount} ${proseSummaryLabel}${proseSummaryCount !== 1 ? 's' : ''} synced.`
       : businessName
         ? `${businessName}: sync completed.`
         : undefined),
@@ -375,6 +490,7 @@ export function normalizeEnterprisePayload(raw: unknown) {
   return {
     healthScore,
     connectedSystems,
+    recordCount,
     openAlerts,
     openDecisions,
     briefHighlight,

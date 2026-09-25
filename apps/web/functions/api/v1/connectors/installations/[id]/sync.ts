@@ -20,6 +20,8 @@ import {
   withScheduleAfterSync,
   appendDateWindowToUrl,
   applyFieldMap,
+  validateFieldMap,
+  injectConfigContext,
   type InstallConfig,
 } from '../../../../../shared/connectors';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
@@ -296,6 +298,7 @@ briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightl
 type StoredPayload = {
   healthScore?: number;
   connectedSystems?: number;
+  recordCount?: number;
   openAlerts?: number;
   openDecisions?: number;
   briefHighlight?: string;
@@ -317,6 +320,7 @@ async function upsertSnapshot(
   connectorId: string,
   connectorName: string,
   payload: ReturnType<typeof normalizeEnterprisePayload>,
+  fieldMapWarnings?: string[],
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
@@ -342,6 +346,7 @@ async function upsertSnapshot(
   let weightedHealth = 0;
   let totalWeight = 0;
   let connectedSystems = 0;
+  let totalRecordCount = 0;
   let openAlerts = 0;
   let openDecisions = 0;
   let bestHighlight = '';
@@ -356,6 +361,7 @@ async function upsertSnapshot(
     weightedHealth += (p.healthScore || 0) * weight;
     totalWeight += weight;
     connectedSystems += p.connectedSystems || 0;
+    totalRecordCount += p.recordCount || 0;
     openAlerts += p.openAlerts || 0;
     openDecisions += p.openDecisions || 0;
     names.push(inst.display_name || 'System');
@@ -366,6 +372,17 @@ async function upsertSnapshot(
       bestHighlight = p.briefHighlight || '';
     }
   }
+
+  // Use the count of active connector installations as the authoritative
+  // connected_systems value — not a sum of inferred payload fields.
+  // connectedSystems from payloads is still aggregated for completeness,
+  // but the active install count is the ground truth.
+  const { count: activeCount } = await supabase
+    .from('connector_installations')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .in('status', ['active', 'synced']);
+  const activeConnectorCount = activeCount ?? Math.max(merged.length, connectedSystems);
 
   const aggHealthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : payload.healthScore;
   const aggConnectorName =
@@ -391,7 +408,8 @@ async function upsertSnapshot(
     connector_id: aggConnectorId,
     connector_name: aggConnectorName,
     health_score: aggHealthScore,
-    connected_systems: connectedSystems,
+    connected_systems: activeConnectorCount,
+    record_count: totalRecordCount,
     open_alerts: openAlerts,
     open_decisions: openDecisions,
     brief_highlight: bestHighlight,
@@ -416,6 +434,7 @@ async function upsertSnapshot(
         connector_name: row.connector_name,
         health_score: row.health_score,
         connected_systems: row.connected_systems,
+        record_count: row.record_count,
         open_alerts: row.open_alerts,
         open_decisions: row.open_decisions,
         brief_highlight: row.brief_highlight,
@@ -445,7 +464,8 @@ async function upsertSnapshot(
     connectorId,
     connectorName,
     healthScore: payload.healthScore,
-    connectedSystems: payload.connectedSystems,
+    connectedSystems: activeConnectorCount,
+    recordCount: payload.recordCount,
     openAlerts: payload.openAlerts,
     openDecisions: payload.openDecisions,
     briefHighlight: payload.briefHighlight,
@@ -453,6 +473,7 @@ async function upsertSnapshot(
     model: payload.model || null,
     syncedAt,
     status: 'synced' as const,
+    fieldMapWarnings: fieldMapWarnings ?? [],
   };
 }
 
@@ -571,14 +592,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
         }
       }
+      // Validate fieldMap for semantic risks and capture any warnings.
+      const fieldMapWarnings = validateFieldMap(config.fieldMap);
+      // Inject config context (systemLabel) into raw before normalization.
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        raw = injectConfigContext(raw as Record<string, unknown>, config);
+      }
       summary = await upsertSnapshot(
         context.env,
         auth.organizationId,
         auth.sub,
         id,
         'rest-api',
-        displayName || 'REST API Systems',
+        config.systemLabel || displayName || 'REST API Systems',
         normalizeEnterprisePayload(raw),
+        fieldMapWarnings,
       );
     } else if (catalogId === 'graphql') {
       // ── GraphQL connector ─────────────────────────────────────────────────
@@ -797,12 +825,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const now = new Date().toISOString();
     const nextConfig = withScheduleAfterSync(config, new Date(now));
+    // Collect any fieldMap semantic warnings to surface in the admin UI.
+    const fieldMapWarnSuffix =
+      Array.isArray((summary as Record<string,unknown>).fieldMapWarnings) &&
+      ((summary as Record<string,unknown>).fieldMapWarnings as string[]).length > 0
+        ? ' ⚠ ' + ((summary as Record<string,unknown>).fieldMapWarnings as string[])[0].slice(0, 150)
+        : '';
     await supabase
       .from('connector_installations')
       .update({
         status: 'synced',
         last_synced_at: now,
-        last_message: `Synced — health ${summary.healthScore}`,
+        last_message: `Synced — health ${summary.healthScore}${fieldMapWarnSuffix}`,
         config: nextConfig,
         updated_at: now,
       })

@@ -43,7 +43,11 @@ import {
   normalizeFirestoreResponse,
 } from '../shared/firestore-normalizer';
 import { isSafeEgressTarget } from '../shared/egress';
-import { normalizeEnterprisePayload } from '../shared/connectors';
+import {
+  normalizeEnterprisePayload,
+  validateFieldMap,
+  appendDateWindowToUrl,
+} from '../shared/connectors';
 
 // ── Target endpoints ──────────────────────────────────────────────────────────
 // Primary: Haven's own Cloud Function API (the business API boundary)
@@ -280,8 +284,9 @@ describe('normalizeFirestoreResponse', () => {
 // havenCatalogueApi returns {"success":true,"business":"Ellines Haven","count":15,
 // "books":[{title,author,genre,status,...},...]}
 // The generic normalizer should:
-//   count  → connectedSystems = 15
-//   business + count → briefHighlight contains "Ellines Haven" and "15"
+//   count  → recordCount = 15   (NOT connectedSystems — 15 books ≠ 15 systems)
+//   connectedSystems = 0        (no explicit systems/integrations field in response)
+//   business + count → briefHighlight contains "Ellines Haven" and "15 records"
 //   books[].title + books[].author/genre → timeline entries (up to 12)
 // ============================================================================
 
@@ -292,14 +297,17 @@ describe('normalizeEnterprisePayload — Haven Cloud Function JSON shape', () =>
     payload = normalizeEnterprisePayload(HAVEN_API_RESPONSE);
   });
 
-  it('maps count to connectedSystems', () => {
-    // HAVEN_API_RESPONSE has count: 15 at the top level — that maps to connectedSystems
-    expect(payload.connectedSystems).toBe(15);
+  it('maps count to recordCount (NOT connectedSystems — 15 books ≠ 15 connected systems)', () => {
+    // count:15 is a record/catalogue count, not a count of connected systems.
+    expect(payload.recordCount).toBe(15);
+    expect(payload.connectedSystems).toBe(0);
   });
 
-  it('synthesises briefHighlight from business + count', () => {
+  it('synthesises briefHighlight from business + recordCount', () => {
     expect(payload.briefHighlight).toContain('Ellines Haven');
+    // recordCount is used in prose since connectedSystems=0
     expect(payload.briefHighlight).toContain('15');
+    expect(payload.briefHighlight).toContain('record');
   });
 
   it('builds timeline from books array (books[] used since no timeline/events field)', () => {
@@ -321,6 +329,7 @@ describe('normalizeEnterprisePayload — Haven Cloud Function JSON shape', () =>
   it('all required shape fields are present', () => {
     expect(typeof payload.healthScore).toBe('number');
     expect(typeof payload.connectedSystems).toBe('number');
+    expect(typeof payload.recordCount).toBe('number');
     expect(typeof payload.openAlerts).toBe('number');
     expect(typeof payload.openDecisions).toBe('number');
     expect(typeof payload.briefHighlight).toBe('string');
@@ -378,7 +387,8 @@ const RUN_LIVE = process.env.HAVEN_LIVE_TEST === '1';
 
         // Basic integrity checks
         expect(typeof payload.healthScore).toBe('number');
-        expect(payload.connectedSystems).toBeGreaterThan(0); // count=15 maps to connectedSystems
+        // count=15 maps to recordCount (not connectedSystems) — semantic correction
+        expect(payload.recordCount).toBeGreaterThan(0);
         expect(Array.isArray(payload.timeline)).toBe(true);
         expect(payload.timeline.length).toBeGreaterThan(0); // books → timeline
         expect(typeof payload.briefHighlight).toBe('string');
@@ -399,3 +409,110 @@ const RUN_LIVE = process.env.HAVEN_LIVE_TEST === '1';
     );
   },
 );
+
+// ============================================================================
+// 8. validateFieldMap — semantic protection warnings
+// ============================================================================
+
+describe('validateFieldMap', () => {
+  it('warns when mapping an arbitrary field to connectedSystems', () => {
+    const warnings = validateFieldMap({ count: 'connectedSystems' });
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain('connectedSystems');
+    expect(warnings[0]).toContain("'count'");
+  });
+
+  it('warns when mapping an arbitrary field to healthScore', () => {
+    const warnings = validateFieldMap({ total_revenue: 'healthScore' });
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain('healthScore');
+  });
+
+  it('warns when mapping to openAlerts or openDecisions', () => {
+    const alertWarnings = validateFieldMap({ issues: 'openAlerts' });
+    const decisionWarnings = validateFieldMap({ pending_approvals: 'openDecisions' });
+    expect(alertWarnings.length).toBeGreaterThan(0);
+    expect(decisionWarnings.length).toBeGreaterThan(0);
+  });
+
+  it('returns no warnings for safe remappings (non-protected fields)', () => {
+    const warnings = validateFieldMap({
+      systemName: 'briefHighlight',
+      status_text: 'briefHighlight',
+    });
+    // briefHighlight is not a protected semantic field
+    expect(warnings).toEqual([]);
+  });
+
+  it('returns empty array for empty fieldMap', () => {
+    expect(validateFieldMap({})).toEqual([]);
+    expect(validateFieldMap(undefined)).toEqual([]);
+  });
+});
+
+// ============================================================================
+// 9. appendDateWindowToUrl — dateWindowEnabled flag and custom param names
+// ============================================================================
+
+describe('appendDateWindowToUrl — dateWindowEnabled controls', () => {
+  const BASE_URL = 'https://vendor.example/api/data';
+  const NOW = new Date('2026-09-24T10:00:00.000Z');
+
+  it('does NOT append params when dateWindowEnabled is false (default-safe)', () => {
+    const result = appendDateWindowToUrl(
+      BASE_URL,
+      { dateWindow: 'today', dateWindowEnabled: false },
+      NOW,
+    );
+    expect(result).toBe(BASE_URL);
+  });
+
+  it('does NOT append params when dateWindowEnabled is omitted', () => {
+    const result = appendDateWindowToUrl(
+      BASE_URL,
+      { dateWindow: 'today' },
+      NOW,
+    );
+    expect(result).toBe(BASE_URL);
+  });
+
+  it('appends generic ?window=&from=&to= when dateWindowEnabled=true and no custom params', () => {
+    const result = appendDateWindowToUrl(
+      BASE_URL,
+      { dateWindow: 'today', dateWindowEnabled: true },
+      NOW,
+    );
+    const u = new URL(result);
+    expect(u.searchParams.get('window')).toBe('today');
+    expect(u.searchParams.get('from')).not.toBeNull();
+    expect(u.searchParams.get('to')).not.toBeNull();
+  });
+
+  it('uses custom param names when dateParamFrom and dateParamTo are set', () => {
+    const result = appendDateWindowToUrl(
+      BASE_URL,
+      {
+        dateWindow: 'today',
+        dateWindowEnabled: true,
+        dateParamFrom: 'startDate',
+        dateParamTo: 'endDate',
+      },
+      NOW,
+    );
+    const u = new URL(result);
+    // Custom names used — no generic 'window' param
+    expect(u.searchParams.get('startDate')).not.toBeNull();
+    expect(u.searchParams.get('endDate')).not.toBeNull();
+    expect(u.searchParams.get('window')).toBeNull();
+    expect(u.searchParams.get('from')).toBeNull();
+  });
+
+  it('does not append params when dateWindow is all (regardless of enabled flag)', () => {
+    const result = appendDateWindowToUrl(
+      BASE_URL,
+      { dateWindow: 'all', dateWindowEnabled: true },
+      NOW,
+    );
+    expect(result).toBe(BASE_URL);
+  });
+});

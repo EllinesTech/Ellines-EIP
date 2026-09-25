@@ -790,9 +790,21 @@ export interface ConnectorInstallConfigDto {
   connectionString?: string;
   sql?: string;
   systemName?: string;
+  /** Human-readable label for the external system. Used as sourceSystem in normalized payload. */
+  systemLabel?: string;
+  /** Free-form business identifier for multi-business grouping (e.g. "ellines-haven") */
+  businessId?: string;
+  /** Free-form branch identifier for branch-level filtering (e.g. "nairobi-cbd") */
+  branchId?: string;
   fieldMap?: Record<string, string>;
   /** Date/time window appended as query params to REST/GraphQL requests */
   dateWindow?: 'today' | 'week' | 'month' | 'all';
+  /** When true, date range params are appended to the endpoint URL */
+  dateWindowEnabled?: boolean;
+  /** Custom query-param name for range start (e.g. "startDate", "since") */
+  dateParamFrom?: string;
+  /** Custom query-param name for range end (e.g. "endDate", "until") */
+  dateParamTo?: string;
   /** GraphQL query string for graphql connector type */
   graphqlQuery?: string;
   imapHost?: string;

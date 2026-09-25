@@ -268,6 +268,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Normalize into UEM
   const payload = normalizeEnterprisePayload(parsedBody);
 
+  // Determine the active connector count for this org — this is the authoritative
+  // connected_systems value. Math.max(payload.connectedSystems, 1) is semantically
+  // wrong: if the org has 3 active connectors, connected_systems should be 3,
+  // not whatever value the webhook payload happened to carry.
+  const { count: activeConnectorCount } = await supabase
+    .from('connector_installations')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .in('status', ['active', 'synced']);
+  const connectedSystemsCount = activeConnectorCount ?? Math.max(payload.connectedSystems, 1);
+
   // Update enterprise snapshot
   const syncedAt = new Date().toISOString();
   const packedTimeline = toTimelineStorage(payload);
@@ -278,7 +289,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     connector_id: `webhook-${sourceSystem.toLowerCase().replace(/\s+/g, '-')}`,
     connector_name: `Webhook: ${sourceSystem}`,
     health_score: payload.healthScore,
-    connected_systems: Math.max(payload.connectedSystems, 1),
+    connected_systems: connectedSystemsCount,
+    record_count: payload.recordCount,
     open_alerts: payload.openAlerts,
     open_decisions: payload.openDecisions,
     brief_highlight: payload.briefHighlight || `Webhook update from ${sourceSystem}`,
@@ -302,6 +314,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         connector_name: snapshotRow.connector_name,
         health_score: snapshotRow.health_score,
         connected_systems: snapshotRow.connected_systems,
+        record_count: snapshotRow.record_count,
         open_alerts: snapshotRow.open_alerts,
         open_decisions: snapshotRow.open_decisions,
         brief_highlight: snapshotRow.brief_highlight,
