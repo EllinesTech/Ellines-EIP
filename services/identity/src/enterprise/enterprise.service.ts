@@ -41,14 +41,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import demoSeed from './demo-enterprise.json';
 import restSample from './rest-enterprise-sample.json';
 
-const CSV_SAMPLE = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
-`;
-
 const SECRET_KEYS = [
   'apiKey',
   'bearerToken',
@@ -588,7 +580,7 @@ export class EnterpriseService {
   private async runTest(catalogId: string, config: ConnectorInstallConfig): Promise<boolean> {
     if (catalogId === 'demo-json') return true;
     if (catalogId === 'csv-file') {
-      return Boolean((config.csvText || CSV_SAMPLE).trim());
+      return Boolean((config.csvText || '').trim());
     }
     if (catalogId === 'rest-api') {
       const endpoint = (config.endpoint || '').trim();
@@ -746,8 +738,10 @@ export class EnterpriseService {
     }
 
     if (catalogId === 'csv-file') {
+      const csvText = (config.csvText && config.csvText.trim());
+      if (!csvText) throw new BadRequestException('CSV text is required. Edit the connector and paste your system\'s export data.');
       const connector = createCsvFileConnector({
-        csvText: (config.csvText && config.csvText.trim()) || CSV_SAMPLE,
+        csvText,
         connectorName: displayName || 'CSV / File Import',
       });
       const result = await connector.sync();

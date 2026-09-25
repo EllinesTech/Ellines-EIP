@@ -43,23 +43,19 @@ export class ErrorBudgetService {
 
     switch (service) {
       case 'api_availability':
-        current_sli = await this.sliCalculator.calculateAPIAvailability(
-          window,
-        );
+        current_sli = (await this.sliCalculator.calculateAPIAvailability(window)) ?? slo;
         break;
       case 'permission_check':
-        current_sli = await this.sliCalculator.calculatePermissionSLI(window);
+        current_sli = (await this.sliCalculator.calculatePermissionSLI(window)) ?? slo;
         break;
       case 'connector_sync':
-        current_sli = await this.sliCalculator.calculateConnectorSyncSLI(window);
+        current_sli = (await this.sliCalculator.calculateConnectorSyncSLI(window)) ?? slo;
         break;
       case 'rule_execution':
-        current_sli = await this.sliCalculator.calculateRuleExecutionSLI(window);
+        current_sli = (await this.sliCalculator.calculateRuleExecutionSLI(window)) ?? slo;
         break;
       case 'dashboard_performance':
-        current_sli = await this.sliCalculator.calculateDashboardPerformanceSLI(
-          window,
-        );
+        current_sli = (await this.sliCalculator.calculateDashboardPerformanceSLI(window)) ?? slo;
         break;
     }
 

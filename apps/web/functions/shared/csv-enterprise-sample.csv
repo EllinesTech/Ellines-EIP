@@ -1,6 +1,0 @@
-metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."

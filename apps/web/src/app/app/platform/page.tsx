@@ -678,8 +678,8 @@ const CONNECTOR_TYPES = [
   { id:'demo-json',  title:'Demo JSON seed',      tag:'Smoke test only',            blurb:'Built-in sample data — not for production.' },
 ] as const;
 
-const DEFAULT_CSV = 'metric,value\nhealthScore,81\nconnectedSystems,4\nopenAlerts,1\nopenDecisions,3\nbriefHighlight,"CSV export from nightly ERP dump."';
-const DEFAULT_SQL = 'SELECT 72 AS "healthScore", 1 AS "connectedSystems", 2 AS "openAlerts", 1 AS "openDecisions", \'Read-only SQL.\' AS "briefHighlight"';
+const DEFAULT_CSV = 'metric,value\nhealthScore,\nconnectedSystems,\nopenAlerts,\nopenDecisions,\nbriefHighlight,"Replace with your system\'s actual CSV export"';
+const DEFAULT_SQL = '-- Replace with your actual read-only reporting query\nSELECT NULL AS "healthScore", NULL AS "connectedSystems", NULL AS "openAlerts", NULL AS "openDecisions", \'Replace with real data\' AS "briefHighlight"';
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

@@ -2288,3 +2288,24 @@ model Document {
   @@index([createdAt])
   @@map("documents")
 }
+
+// ─── Platform Configuration ────────────────────────────────────────────────────
+
+/**
+ * PlatformConfig — Persisted platform-wide key/value settings.
+ * Replaces the previous in-memory feature flag list in platform.service.ts.
+ * Each row is one setting; the 'flags' key stores the feature flags JSON blob.
+ * Platform Super Admin PATCH calls upsert rows here.
+ *
+ * Single-row model: only one row per key exists at any time (@@unique on key).
+ */
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedBy String   @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("platform_config")
+}

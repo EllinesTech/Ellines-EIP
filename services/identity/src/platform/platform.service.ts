@@ -76,28 +76,41 @@ export class PlatformService {
     };
   }
 
-  /** Placeholder flags until a dedicated config store exists. */
-  listFeatureFlags() {
-    return [
-      {
-        key: 'ellinea_chat',
-        label: 'Ellinea chat',
-        enabled: false,
-        note: 'Unlocks Ask Ellinea production chat',
-      },
-      {
-        key: 'live_connectors',
-        label: 'Live connectors',
-        enabled: false,
-        note: 'Integration Hub sync to Command Center',
-      },
-      {
-        key: 'ceo_daily_brief',
-        label: 'CEO Daily Brief',
-        enabled: false,
-        note: 'Automated morning summary delivery',
-      },
-    ];
+  /** Default flags seeded when no DB record exists yet. */
+  private readonly DEFAULT_FLAGS = [
+    { key: 'ellinea_chat', label: 'Ellinea chat', enabled: false, note: 'Unlocks Ask Ellinea production chat' },
+    { key: 'live_connectors', label: 'Live connectors', enabled: false, note: 'Integration Hub sync to Command Center' },
+    { key: 'ceo_daily_brief', label: 'CEO Daily Brief', enabled: false, note: 'Automated morning summary delivery' },
+  ];
+
+  /** Feature flags — persisted in platform_config table under key 'feature_flags'. */
+  async listFeatureFlags() {
+    const row = await this.prisma.platformConfig.findUnique({ where: { key: 'feature_flags' } });
+    if (!row) return this.DEFAULT_FLAGS;
+    const stored = row.value as typeof this.DEFAULT_FLAGS;
+    if (!Array.isArray(stored)) return this.DEFAULT_FLAGS;
+    // Merge: ensure any new default keys are present even if not yet in the stored list
+    const storedKeys = new Set(stored.map((f) => f.key));
+    const merged = [...stored];
+    for (const d of this.DEFAULT_FLAGS) {
+      if (!storedKeys.has(d.key)) merged.push(d);
+    }
+    return merged;
+  }
+
+  /** Update a single feature flag by key. Persists to platform_config. */
+  async updateFeatureFlag(key: string, enabled: boolean) {
+    const current = await this.listFeatureFlags();
+    const idx = current.findIndex((f) => f.key === key);
+    if (idx === -1) throw new Error(`Unknown flag: ${key}`);
+    const updated = current.map((f) => f.key === key ? { ...f, enabled } : f);
+    const jsonValue = updated as unknown as Parameters<typeof this.prisma.platformConfig.upsert>[0]['create']['value'];
+    await this.prisma.platformConfig.upsert({
+      where: { key: 'feature_flags' },
+      create: { key: 'feature_flags', value: jsonValue, updatedBy: 'system' },
+      update: { value: jsonValue, updatedBy: 'system' },
+    });
+    return { statusCode: 200, data: updated };
   }
 
   // ── God-mode org creation ───────────────────────────────────────────────
@@ -562,16 +575,7 @@ export class PlatformService {
     return { ...result, rate_limit_tiers: result.tier };
   }
 
-  // ── Feature flag update ──────────────────────────────────────────────────
-
-  updateFeatureFlag(key: string, enabled: boolean) {
-    // Flags are in-memory until a DB config store is built.
-    // Return the updated list so the UI can reflect the change.
-    const flags = this.listFeatureFlags().map((f) =>
-      f.key === key ? { ...f, enabled } : f,
-    );
-    return { statusCode: 200, data: flags };
-  }
+  // ── Feature flag update — now handled by the async updateFeatureFlag above ──
 
   // ── Org profile management ───────────────────────────────────────────────
 

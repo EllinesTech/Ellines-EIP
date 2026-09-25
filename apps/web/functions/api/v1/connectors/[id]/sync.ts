@@ -23,14 +23,6 @@ import {
   normalizeFirestoreResponse,
 } from '../../../../shared/firestore-normalizer';
 
-const CSV_SAMPLE = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
-`;
-
 type SyncBody = {
   endpoint?: string;
   headers?: Record<string, string>;
@@ -261,7 +253,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (connectorId === 'csv-file') {
-      const csvText = (body.csvText && body.csvText.trim()) || CSV_SAMPLE;
+      const csvText = (body.csvText && body.csvText.trim());
+      if (!csvText) {
+        return json({ statusCode: 400, message: 'CSV text is required. Provide csvText in the request body.' }, 400);
+      }
       const summary = await upsertSnapshot(
         context.env,
         auth.organizationId,

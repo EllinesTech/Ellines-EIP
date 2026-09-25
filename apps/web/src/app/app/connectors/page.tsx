@@ -27,20 +27,24 @@ import adminStyles from '../admin/admin.module.css';
 import SystemAutoscanPanel from './SystemAutoscanPanel';
 import type { WizardPrefill } from '@/lib/system-autoscan';
 
-const DEFAULT_CSV = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
+/** Placeholder shown in the CSV textarea — operators replace with their actual export */
+const CSV_PLACEHOLDER = `metric,value
+healthScore,
+connectedSystems,
+openAlerts,
+openDecisions,
+briefHighlight,"Replace this with your system's actual CSV export"
 `;
 
-const DEFAULT_SQL = `SELECT
-  72 AS "healthScore",
-  1 AS "connectedSystems",
-  2 AS "openAlerts",
-  1 AS "openDecisions",
-  'Read-only SQL from reporting replica — no vendor API.' AS "briefHighlight"`;
+/** Placeholder SQL — operators replace with their actual reporting query */
+const SQL_PLACEHOLDER = `-- Replace with your actual read-only reporting query
+SELECT
+  NULL AS "healthScore",
+  NULL AS "connectedSystems",
+  NULL AS "openAlerts",
+  NULL AS "openDecisions",
+  'Replace with real data' AS "briefHighlight"
+`;
 
 type WizardStep = 1 | 2 | 3 | 4;
 
@@ -129,15 +133,15 @@ export default function ConnectorsPage() {
   const [packId, setPackId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [endpoint, setEndpoint] = useState('/api/v1/connectors/rest-sample');
+  const [endpoint, setEndpoint] = useState('');
   const [authType, setAuthType] = useState<ConnectorInstallConfigDto['authType']>('none');
   const [apiKey, setApiKey] = useState('');
   const [bearerToken, setBearerToken] = useState('');
   const [basicUser, setBasicUser] = useState('');
   const [basicPass, setBasicPass] = useState('');
-  const [csvText, setCsvText] = useState(DEFAULT_CSV);
+  const [csvText, setCsvText] = useState(CSV_PLACEHOLDER);
   const [connectionString, setConnectionString] = useState('');
-  const [sql, setSql] = useState(DEFAULT_SQL);
+  const [sql, setSql] = useState(SQL_PLACEHOLDER);
   const [imapHost, setImapHost] = useState('');
   const [imapPort, setImapPort] = useState('993');
   const [imapUser, setImapUser] = useState('');
@@ -162,9 +166,8 @@ export default function ConnectorsPage() {
   const [apiKeyHeader, setApiKeyHeader] = useState('');
   /** JSON field map: upstream field → EIP field, e.g. {"total_sales":"connectedSystems"} */
   const [fieldMapText, setFieldMapText] = useState('');
-  const [byoJson, setByoJson] = useState(
-    '{\n  "connectorName": "External System B",\n  "healthScore": 78,\n  "connectedSystems": 1,\n  "openAlerts": 2,\n  "openDecisions": 1,\n  "briefHighlight": "Pushed from an external UEM feed.",\n  "timeline": [{ "title": "External ingest", "detail": "BYO snapshot" }]\n}',
-  );
+  /** BYO JSON ingest — empty by default, schema shown as placeholder */
+  const [byoJson, setByoJson] = useState('');
   const [webhookConfigured, setWebhookConfigured] = useState(false);
   const [webhookPreview, setWebhookPreview] = useState<string | null>(null);
   const [webhookOrgId, setWebhookOrgId] = useState('');
@@ -235,9 +238,9 @@ export default function ConnectorsPage() {
     setBearerToken('');
     setBasicUser('');
     setBasicPass('');
-    setCsvText(DEFAULT_CSV);
+    setCsvText(CSV_PLACEHOLDER);
     setConnectionString('');
-    setSql(DEFAULT_SQL);
+    setSql(SQL_PLACEHOLDER);
     setOpenApiText('');
     setOpenApiBaseUrl('');
     setParsed(null);
@@ -549,6 +552,7 @@ export default function ConnectorsPage() {
             onChange={(e) => setByoJson(e.target.value)}
             rows={8}
             style={{ width: '100%', fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem' }}
+            placeholder={'{\n  "healthScore": 80,\n  "connectedSystems": 5,\n  "openAlerts": 1,\n  "openDecisions": 2,\n  "briefHighlight": "Your system summary here",\n  "timeline": [{ "title": "Event", "detail": "Detail" }]\n}'}
           />
         </label>
         <button

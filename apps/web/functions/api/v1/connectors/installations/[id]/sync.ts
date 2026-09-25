@@ -287,14 +287,6 @@ function decodeImapText(text: string): string {
   });
 }
 
-const CSV_SAMPLE = `metric,value
-healthScore,81
-connectedSystems,4
-openAlerts,1
-openDecisions,3
-briefHighlight,"Branch ops CSV export — no vendor API; file landed from nightly ERP dump."
-`;
-
 type StoredPayload = {
   healthScore?: number;
   connectedSystems?: number;
@@ -730,7 +722,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         payload,
       );
     } else if (catalogId === 'csv-file') {
-      const csvText = (config.csvText && config.csvText.trim()) || CSV_SAMPLE;
+      const csvText = (config.csvText && config.csvText.trim());
+      if (!csvText) {
+        return json(
+          { statusCode: 400, message: 'CSV text is required. Edit this connector and paste your system\'s export into the CSV content field.' },
+          400,
+        );
+      }
       summary = await upsertSnapshot(
         context.env,
         auth.organizationId,
