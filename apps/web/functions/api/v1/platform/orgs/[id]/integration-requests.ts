@@ -40,14 +40,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // ── GET: list requests for the org ──────────────────────────────────────
   if (context.request.method === 'GET') {
+    // Note: IntegrationRequest Prisma model has no @map on fields, so Supabase
+    // columns are camelCase: organizationId, requestedById, systemName, etc.
     const { data, error } = await supabase
       .from('integration_requests')
       .select('*')
-      .eq('organization_id', orgId)
-      .order('created_at', { ascending: false });
+      .eq('organizationId', orgId)
+      .order('createdAt', { ascending: false });
 
     if (error) {
-      if (error.code === '42P01' || error.message?.includes('schema cache')) return json([]);
+      // Table or column doesn't exist yet — return empty rather than 500
+      if (
+        error.code === '42P01' ||
+        error.code === '42703' ||
+        error.message?.includes('schema cache') ||
+        error.message?.includes('does not exist')
+      ) return json([]);
       return json({ statusCode: 500, message: error.message }, 500);
     }
     return json((data || []).map(toDto));
@@ -76,9 +84,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const { data: existing } = await supabase
       .from('integration_requests')
-      .select('id, organization_id, system_name')
+      .select('id, organizationId, systemName')
       .eq('id', reqId)
-      .eq('organization_id', orgId)
+      .eq('organizationId', orgId)
       .maybeSingle();
 
     if (!existing) {
@@ -90,10 +98,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .from('integration_requests')
       .update({
         status,
-        reviewed_by_id: auth.sub,
-        reviewed_at: now,
-        review_note: (body.reviewNote || '').trim() || null,
-        updated_at: now,
+        reviewedById: auth.sub,
+        reviewedAt: now,
+        reviewNote: (body.reviewNote || '').trim() || null,
+        updatedAt: now,
       })
       .eq('id', reqId)
       .select('*')
@@ -109,7 +117,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         resource: 'integration_request',
         metadata: {
           requestId: reqId,
-          systemName: existing.system_name,
+          systemName: existing.systemName as string,
           status,
           reviewNote: body.reviewNote || null,
           reviewedBy: auth.email,
@@ -125,18 +133,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 };
 
 function toDto(row: Record<string, unknown>) {
+  // Columns are camelCase in DB (IntegrationRequest model has no @map on fields)
+  const orgId = (row.organizationId ?? row.organization_id) as string;
+  const reqById = (row.requestedById ?? row.requested_by_id) as string;
+  const sysName = (row.systemName ?? row.system_name) as string;
+  const revById = (row.reviewedById ?? row.reviewed_by_id) as string | null | undefined;
+  const revAt = (row.reviewedAt ?? row.reviewed_at) as string | null | undefined;
+  const revNote = (row.reviewNote ?? row.review_note) as string | null | undefined;
+  const createdAt = (row.createdAt ?? row.created_at) as string;
+  const updatedAt = (row.updatedAt ?? row.updated_at) as string;
   return {
     id: row.id as string,
-    organizationId: row.organization_id as string,
-    requestedById: row.requested_by_id as string,
-    systemName: row.system_name as string,
+    organizationId: orgId,
+    requestedById: reqById,
+    systemName: sysName,
     purpose: (row.purpose as string) || null,
-    catalogId: (row.catalog_id as string) || null,
+    catalogId: (row.catalogId ?? row.catalog_id) as string | null || null,
     status: row.status as string,
-    reviewedById: (row.reviewed_by_id as string) || null,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at as string).toISOString() : null,
-    reviewNote: (row.review_note as string) || null,
-    createdAt: new Date(row.created_at as string).toISOString(),
-    updatedAt: new Date(row.updated_at as string).toISOString(),
+    reviewedById: revById || null,
+    reviewedAt: revAt ? new Date(revAt).toISOString() : null,
+    reviewNote: revNote || null,
+    createdAt: new Date(createdAt).toISOString(),
+    updatedAt: new Date(updatedAt).toISOString(),
   };
 }

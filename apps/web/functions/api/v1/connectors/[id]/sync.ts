@@ -6,8 +6,6 @@ import {
   requireOrgAdmin,
   type Env,
 } from '../../../../shared/auth';
-import demoSeed from '../../../../shared/demo-enterprise.json';
-import restSample from '../../../../shared/rest-enterprise-sample.json';
 import {
   buildAuthHeaders,
   normalizeEnterprisePayload,
@@ -29,10 +27,9 @@ type SyncBody = {
   csvText?: string;
 };
 
-function resolveEndpoint(requestUrl: string, endpoint?: string): string {
-  const origin = new URL(requestUrl).origin;
-  const raw = (endpoint || '/api/v1/connectors/rest-sample').trim();
-  if (raw.startsWith('/')) return `${origin}${raw}`;
+function resolveEndpoint(endpoint?: string): string {
+  const raw = (endpoint || '').trim();
+  if (!raw) throw new Error('REST endpoint URL is required');
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -216,58 +213,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   try {
-    // ── Built-in demo / sample connectors ───────────────────────────────────────
-    if (connectorId === 'demo-json') {
-      const summary = await upsertSnapshot(
-        context.env,
-        auth.organizationId,
-        auth.sub,
-        'demo-json',
-        'Demo JSON Systems',
-        normalizeEnterprisePayload(demoSeed),
-      );
-      return json(summary);
-    }
-
-    if (connectorId === 'rest-api') {
-      const endpoint = resolveEndpoint(context.request.url, body.endpoint);
-      const isSample =
-        endpoint.includes('/api/v1/connectors/rest-sample') ||
-        endpoint.endsWith('/connectors/rest-sample') ||
-        endpoint.endsWith('/connectors/rest-sample/');
-
-      let raw: unknown = restSample;
-      if (!isSample) {
-        raw = await proxyFetch(endpoint, { headers: body.headers });
-      }
-
-      const summary = await upsertSnapshot(
-        context.env,
-        auth.organizationId,
-        auth.sub,
-        'rest-api',
-        'REST API Systems',
-        normalizeEnterprisePayload(raw),
-      );
-      return json(summary);
-    }
-
-    if (connectorId === 'csv-file') {
-      const csvText = (body.csvText && body.csvText.trim());
-      if (!csvText) {
-        return json({ statusCode: 400, message: 'CSV text is required. Provide csvText in the request body.' }, 400);
-      }
-      const summary = await upsertSnapshot(
-        context.env,
-        auth.organizationId,
-        auth.sub,
-        'csv-file',
-        'CSV / File Import',
-        parseCsvToEnterprisePayload(csvText),
-      );
-      return json(summary);
-    }
-
     // ── Installed connector sync (any system) ───────────────────────────────────
     // connectorId here is the installation UUID (UUIDv4 format) or catalog ID.
     // Try UUID-format lookup first, then fall back to catalog ID lookup.
@@ -295,8 +240,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       switch (catalogId) {
         case 'rest-api': {
-          const endpoint = (config.endpoint || '').trim();
-          if (!endpoint) throw new Error('Connector has no endpoint configured');
+          const endpoint = resolveEndpoint(config.endpoint);
           const raw = await proxyFetch(endpoint, config);
           payload = normalizeEnterprisePayload(raw);
           break;
@@ -355,11 +299,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
               ],
             });
           }
-          break;
-        }
-
-        case 'demo-json': {
-          payload = normalizeEnterprisePayload(demoSeed);
           break;
         }
 

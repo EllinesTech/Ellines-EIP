@@ -35,7 +35,6 @@ import {
   isFirestoreResponse,
   normalizeFirestoreResponse,
 } from '../../../../../../../shared/firestore-normalizer';
-import demoSeed from '../../../../../../../shared/demo-enterprise.json';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -188,11 +187,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   try {
     switch (catalogId) {
-      case 'demo-json': {
-        payload = normalizeEnterprisePayload(demoSeed);
-        break;
-      }
-
       case 'rest-api': {
         const endpoint = (config.endpoint || '').trim();
         if (!endpoint) throw new Error('Connector has no endpoint configured');

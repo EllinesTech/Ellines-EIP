@@ -15,7 +15,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { EnterpriseService } from './enterprise.service';
-import restSample from './rest-enterprise-sample.json';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,11 +29,6 @@ export class EnterpriseController {
   @Get('connectors')
   listConnectors(@Request() req: { user: { organizationId: string } }) {
     return this.enterprise.listConnectors(req.user.organizationId);
-  }
-
-  @Get('connectors/rest-sample')
-  restSample() {
-    return restSample;
   }
 
   @Get('connectors/installations')

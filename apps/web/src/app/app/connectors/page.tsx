@@ -109,12 +109,6 @@ const TYPES = [
     tag: 'Healthcare / supply chain',
     blurb: 'Pull CSV dumps from an SFTP inbox the HIS or ERP already fills.',
   },
-  {
-    id: 'demo-json',
-    title: 'Demo JSON seed',
-    tag: 'Smoke test only',
-    blurb: 'Built-in sample — not for production. Prefer a real system path above.',
-  },
 ] as const;
 
 export default function ConnectorsPage() {
@@ -1018,12 +1012,6 @@ export default function ConnectorsPage() {
                   </>
                 ) : null}
 
-                {catalogId === 'demo-json' ? (
-                  <p className={styles.lede}>
-                    Smoke test only — prefer OpenAPI, Postgres, CSV, Email, or SFTP for real System B
-                    data.
-                  </p>
-                ) : null}
               </div>
               <div className={adminStyles.wizardActions}>
                 <button type="button" className={adminStyles.ghost} onClick={() => setStep(1)}>

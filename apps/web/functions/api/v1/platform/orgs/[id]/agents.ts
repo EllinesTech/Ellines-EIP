@@ -23,10 +23,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const orgId = context.params.id as string;
   const supabase = getAdminClient(context.env);
 
+  // Schema column is "trigger" (no @map), plus mapped snake_case fields.
   const { data, error } = await supabase
     .from('ellinea_agents')
     .select(
-      'id, name, description, type, status, trigger_type, is_active, is_paused, execution_count, success_count, last_executed_at, created_at',
+      'id, name, description, trigger, is_active, is_paused, execution_count, success_count, last_executed_at, created_at',
     )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
@@ -35,17 +36,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (error) {
     // If table doesn't exist yet, return empty rather than 500
     if (error.code === '42P01') return json([]);
+    // Unknown column — schema drift; return empty so the UI doesn't crash
+    if (error.code === '42703') return json([]);
     return json({ statusCode: 500, message: error.message }, 500);
   }
 
-  // Map DB snake_case rows to the PlatformOrgAgentDto camelCase contract
+  // Map DB rows to the PlatformOrgAgentDto camelCase contract
   const rows = (data || []).map((row: Record<string, unknown>) => ({
     id: row.id,
     name: row.name ?? '',
     description: row.description ?? '',
-    // trigger_type is the DB column; fall back to type for legacy rows
-    trigger: (row.trigger_type ?? row.type ?? 'manual') as string,
-    isActive: row.is_active !== undefined ? Boolean(row.is_active) : row.status === 'active',
+    trigger: (row.trigger ?? 'manual') as string,
+    isActive: Boolean(row.is_active),
     isPaused: Boolean(row.is_paused),
     executionCount: Number(row.execution_count ?? 0),
     successCount: Number(row.success_count ?? 0),

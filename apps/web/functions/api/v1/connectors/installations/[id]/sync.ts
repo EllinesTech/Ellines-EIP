@@ -7,8 +7,6 @@ import {
   type Env,
 } from '../../../../../shared/auth';
 import { isSafeEgressTarget, safeFetch, SsrfError, isSafeTcpHost, isSafeTcpPort } from '../../../../../shared/egress';
-import demoSeed from '../../../../../shared/demo-enterprise.json';
-import restSample from '../../../../../shared/rest-enterprise-sample.json';
 import {
   buildAuthHeaders,
   decryptConnectorConfig,
@@ -470,10 +468,9 @@ async function upsertSnapshot(
 }
 
 
-function resolveEndpoint(requestUrl: string, endpoint?: string): string {
-  const origin = new URL(requestUrl).origin;
-  const raw = (endpoint || '/api/v1/connectors/rest-sample').trim();
-  if (raw.startsWith('/')) return `${origin}${raw}`;
+function resolveEndpoint(endpoint?: string): string {
+  const raw = (endpoint || '').trim();
+  if (!raw) throw new Error('REST endpoint URL is required');
   return raw;
 }
 
@@ -526,63 +523,47 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   try {
     let summary;
-    if (catalogId === 'demo-json') {
-      summary = await upsertSnapshot(
-        context.env,
-        auth.organizationId,
-        auth.sub,
-        id,
-        'demo-json',
-        displayName || 'Demo JSON Systems',
-        normalizeEnterprisePayload(demoSeed),
-      );
-    } else if (catalogId === 'rest-api') {
-      const rawEndpoint = resolveEndpoint(context.request.url, config.endpoint);
-      const isSample =
-        rawEndpoint.includes('/api/v1/connectors/rest-sample') ||
-        rawEndpoint.endsWith('/connectors/rest-sample');
-      // Append date-window query params when configured (?window=today|week|month&from=...&to=...)
-      const endpoint = isSample ? rawEndpoint : appendDateWindowToUrl(rawEndpoint, config);
-      let raw: unknown = restSample;
-      if (!isSample) {
-        // Egress policy check before fetch
-        const egressCheck = isSafeEgressTarget(endpoint);
-        if (!egressCheck.safe) {
-          return json(
-            { statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' },
-            400,
-          );
-        }
-        const res = await safeFetch(endpoint, {
-          method: 'GET',
-          headers: { Accept: 'application/json', ...buildAuthHeaders(config) },
-        });
-        if (!res.ok) {
-          return json(
-            { statusCode: 502, message: `REST endpoint returned ${res.status}` },
-            502,
-          );
-        }
-        const text = await res.text();
-        try {
-          raw = JSON.parse(text);
-        } catch {
-          raw = {
-            briefHighlight: text.slice(0, 400) || `Sync from ${new URL(endpoint).hostname}`,
-            timeline: [{ title: 'HTTP sync', detail: `200 from ${new URL(endpoint).hostname}` }],
-          };
-        }
-        // Unpack Firestore REST typed-value envelopes if present — applies to any
-        // endpoint backed by Firestore's REST API regardless of which system it is.
-        if (isFirestoreResponse(raw)) {
-          raw = normalizeFirestoreResponse(raw);
-        }
-        // Apply field-name remapping (config.fieldMap) before normalization.
-        // Lets operators map upstream-specific field names to EIP field names
-        // without touching EIP code.
-        if (config.fieldMap && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-          raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
-        }
+    if (catalogId === 'rest-api') {
+      const rawEndpoint = resolveEndpoint(config.endpoint);
+      const endpoint = appendDateWindowToUrl(rawEndpoint, config);
+      // Egress policy check before fetch
+      const egressCheck = isSafeEgressTarget(endpoint);
+      if (!egressCheck.safe) {
+        return json(
+          { statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' },
+          400,
+        );
+      }
+      const res = await safeFetch(endpoint, {
+        method: 'GET',
+        headers: { Accept: 'application/json', ...buildAuthHeaders(config) },
+      });
+      if (!res.ok) {
+        return json(
+          { statusCode: 502, message: `REST endpoint returned ${res.status}` },
+          502,
+        );
+      }
+      const text = await res.text();
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        raw = {
+          briefHighlight: text.slice(0, 400) || `Sync from ${new URL(endpoint).hostname}`,
+          timeline: [{ title: 'HTTP sync', detail: `200 from ${new URL(endpoint).hostname}` }],
+        };
+      }
+      // Unpack Firestore REST typed-value envelopes if present — applies to any
+      // endpoint backed by Firestore's REST API regardless of which system it is.
+      if (isFirestoreResponse(raw)) {
+        raw = normalizeFirestoreResponse(raw);
+      }
+      // Apply field-name remapping (config.fieldMap) before normalization.
+      // Lets operators map upstream-specific field names to EIP field names
+      // without touching EIP code.
+      if (config.fieldMap && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
       }
       // Validate fieldMap for semantic risks and capture any warnings.
       const fieldMapWarnings = validateFieldMap(config.fieldMap);

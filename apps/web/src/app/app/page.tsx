@@ -406,8 +406,8 @@ function AdminOverview({
             <strong>{isOwner ? 'Connect your first system' : 'Sync a connector'}</strong>
             <p>
               {isOwner
-                ? 'Ask IT (or open Connectors yourself) to sync Demo JSON Systems — then Ellinea and KPIs light up.'
-                : 'Open Connectors → install or pick Demo JSON Systems → Sync now.'}
+                ? 'Open Connectors to install your first system — then Ellinea and live KPIs will activate.'
+                : 'Open Connectors and sync your first system to unlock live insights.'}
             </p>
           </div>
           <Link href="/app/connectors" className={styles.aiBtn}>
@@ -627,7 +627,7 @@ function AdminOverview({
             {synced
               ? summary!.briefHighlight
               : variant === 'admin'
-                ? 'Invite users from IT Admin, then sync Demo JSON Systems to unlock live insights.'
+                ? 'Invite users from IT Admin, then sync your first connector to unlock live insights.'
                 : 'Ask your IT admin to sync the first connector so Ellinea can brief you.'}
           </p>
           <Link href="/app/ellinea" className={styles.aiBtn}>

@@ -35,14 +35,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   // ── GET: list requests for caller's org ─────────────────────────────────
+  // Note: IntegrationRequest Prisma model has no @map on fields, so Supabase
+  // columns are camelCase: organizationId, requestedById, systemName, etc.
   if (context.request.method === 'GET') {
     const { data, error } = await supabase
       .from('integration_requests')
       .select('*')
-      .eq('organization_id', auth.organizationId)
-      .order('created_at', { ascending: false });
+      .eq('organizationId', auth.organizationId)
+      .order('createdAt', { ascending: false });
 
-    if (error) return json({ statusCode: 500, message: error.message }, 500);
+    if (error) {
+      if (
+        error.code === '42P01' ||
+        error.code === '42703' ||
+        error.message?.includes('does not exist')
+      ) return json([]);
+      return json({ statusCode: 500, message: error.message }, 500);
+    }
     return json((data || []).map(toDto));
   }
 
@@ -65,14 +74,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .from('integration_requests')
       .insert({
         id: crypto.randomUUID(),
-        organization_id: auth.organizationId,
-        requested_by_id: auth.sub,
-        system_name: systemName,
+        organizationId: auth.organizationId,
+        requestedById: auth.sub,
+        systemName: systemName,
         purpose: (body.purpose || '').trim() || null,
-        catalog_id: (body.catalogId || '').trim() || null,
+        catalogId: (body.catalogId || '').trim() || null,
         status: 'pending',
-        created_at: now,
-        updated_at: now,
+        createdAt: now,
+        updatedAt: now,
       })
       .select('*')
       .single();
@@ -96,18 +105,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 };
 
 function toDto(row: Record<string, unknown>) {
+  // Columns are camelCase in DB (no @map on IntegrationRequest model fields)
+  const orgId = (row.organizationId ?? row.organization_id) as string;
+  const reqById = (row.requestedById ?? row.requested_by_id) as string;
+  const sysName = (row.systemName ?? row.system_name) as string;
+  const revById = (row.reviewedById ?? row.reviewed_by_id) as string | null | undefined;
+  const revAt = (row.reviewedAt ?? row.reviewed_at) as string | null | undefined;
+  const revNote = (row.reviewNote ?? row.review_note) as string | null | undefined;
+  const createdAt = (row.createdAt ?? row.created_at) as string;
+  const updatedAt = (row.updatedAt ?? row.updated_at) as string;
   return {
     id: row.id as string,
-    organizationId: row.organization_id as string,
-    requestedById: row.requested_by_id as string,
-    systemName: row.system_name as string,
+    organizationId: orgId,
+    requestedById: reqById,
+    systemName: sysName,
     purpose: (row.purpose as string) || null,
-    catalogId: (row.catalog_id as string) || null,
+    catalogId: ((row.catalogId ?? row.catalog_id) as string) || null,
     status: row.status as string,
-    reviewedById: (row.reviewed_by_id as string) || null,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at as string).toISOString() : null,
-    reviewNote: (row.review_note as string) || null,
-    createdAt: new Date(row.created_at as string).toISOString(),
-    updatedAt: new Date(row.updated_at as string).toISOString(),
+    reviewedById: revById || null,
+    reviewedAt: revAt ? new Date(revAt).toISOString() : null,
+    reviewNote: revNote || null,
+    createdAt: new Date(createdAt).toISOString(),
+    updatedAt: new Date(updatedAt).toISOString(),
   };
 }

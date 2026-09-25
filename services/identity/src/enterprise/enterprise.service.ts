@@ -39,7 +39,6 @@ import { Client } from 'pg';
 import SftpClient from 'ssh2-sftp-client';
 import { PrismaService } from '../prisma/prisma.service';
 import demoSeed from './demo-enterprise.json';
-import restSample from './rest-enterprise-sample.json';
 
 const SECRET_KEYS = [
   'apiKey',
@@ -108,13 +107,13 @@ export class EnterpriseService {
     if (!snap) {
       return {
         organizationId,
-        connectorId: 'demo-json',
-        connectorName: 'Demo JSON Systems',
+        connectorId: 'none',
+        connectorName: '',
         healthScore: 0,
         connectedSystems: 0,
         openAlerts: 0,
         openDecisions: 0,
-        briefHighlight: 'No connector sync yet. Open Connectors and run Sync now.',
+        briefHighlight: 'No connector sync yet. Open Connectors and sync your first system.',
         timeline: [],
         model: null,
         syncedAt: null,
@@ -145,17 +144,6 @@ export class EnterpriseService {
     const lastAt = snap?.syncedAt.toISOString() ?? null;
     const activeId = snap?.connectorId ?? null;
     return [
-      {
-        id: 'demo-json',
-        name: 'Demo JSON Systems',
-        type: 'file',
-        status: activeId === 'demo-json' ? 'synced' : 'idle',
-        lastSyncedAt: activeId === 'demo-json' ? lastAt : null,
-        message:
-          activeId === 'demo-json'
-            ? 'Last sync OK'
-            : 'Built-in seed — Sync now for live KPIs',
-      },
       {
         id: 'rest-api',
         name: 'REST API Systems',
@@ -670,19 +658,7 @@ export class EnterpriseService {
 
     if (catalogId === 'rest-api') {
       const endpoint = (config.endpoint || '').trim();
-      const useSample =
-        !endpoint ||
-        endpoint.includes('/api/v1/connectors/rest-sample') ||
-        endpoint === 'sample';
-      if (useSample) {
-        const payload = normalizeEnterprisePayload(restSample);
-        return {
-          connectorId: 'rest-api',
-          connectorName: displayName || 'REST API Systems',
-          ...payload,
-          syncedAt: new Date().toISOString(),
-        };
-      }
+      if (!endpoint) throw new BadRequestException('REST endpoint URL is required');
       let parsed: URL;
       try {
         parsed = new URL(endpoint);
