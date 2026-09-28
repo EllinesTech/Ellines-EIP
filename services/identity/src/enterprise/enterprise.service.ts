@@ -129,7 +129,7 @@ export class EnterpriseService {
       briefHighlight: snap.briefHighlight,
       timeline: events,
       model,
-      syncedAt: snap.syncedAt.toISOString(),
+      syncedAt: snap.syncedAt ? snap.syncedAt.toISOString() : null,
       status: 'synced',
     };
   }
@@ -138,7 +138,7 @@ export class EnterpriseService {
     const snap = await this.prisma.enterpriseSnapshot.findUnique({
       where: { organizationId },
     });
-    const lastAt = snap?.syncedAt.toISOString() ?? null;
+    const lastAt = snap?.syncedAt ? snap.syncedAt.toISOString() : null;
     const activeId = snap?.connectorId ?? null;
     return [
       {
@@ -1071,7 +1071,7 @@ export class EnterpriseService {
       briefHighlight: snap.briefHighlight,
       timeline: events,
       model,
-      syncedAt: snap.syncedAt.toISOString(),
+      syncedAt: snap.syncedAt ? snap.syncedAt.toISOString() : null,
       status: 'synced' as const,
     };
   }

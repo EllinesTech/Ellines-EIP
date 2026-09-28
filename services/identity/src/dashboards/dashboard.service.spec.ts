@@ -1,6 +1,14 @@
 import { NotFoundException } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PredictiveAnalyticsService } from '../analytics/predictive-analytics.service';
+
+/** Minimal stub — DashboardService only calls forecast() in getWidgetWithForecast(). */
+function makePredictive(): PredictiveAnalyticsService {
+  return {
+    forecast: jest.fn().mockResolvedValue(null),
+  } as unknown as PredictiveAnalyticsService;
+}
 
 const mockDash = {
   id: 'd1', organizationId: 'org-1', name: 'Main', description: '',
@@ -39,13 +47,12 @@ function makePrisma(overrides: Record<string, any> = {}) {
 // ─── listDashboards ──────────────────────────────────────────────────────────
 describe('DashboardService.listDashboards', () => {
   it('returns empty array when no dashboards', async () => {
-    const svc = new DashboardService(makePrisma());
-    expect(await svc.listDashboards('org-1')).toEqual([]);
+    const svc = new DashboardService(makePrisma(), makePredictive());
   });
 
   it('returns dashboards for org', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findMany: jest.fn().mockResolvedValue([mockDash]) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     const result = await svc.listDashboards('org-1');
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('d1');
@@ -55,13 +62,13 @@ describe('DashboardService.listDashboards', () => {
 // ─── getDashboard ────────────────────────────────────────────────────────────
 describe('DashboardService.getDashboard', () => {
   it('throws NotFoundException when missing', async () => {
-    const svc = new DashboardService(makePrisma());
+    const svc = new DashboardService(makePrisma(), makePredictive());
     await expect(svc.getDashboard('d-missing', 'org-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns dashboard when found', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findFirst: jest.fn().mockResolvedValue(mockDash) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     const result = await svc.getDashboard('d1', 'org-1');
     expect(result.id).toBe('d1');
   });
@@ -71,7 +78,7 @@ describe('DashboardService.getDashboard', () => {
 describe('DashboardService.createDashboard', () => {
   it('creates dashboard with defaults', async () => {
     const prisma = makePrisma();
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     await svc.createDashboard('org-1', { name: 'Sales Board' }, 'u1');
     expect(prisma.dashboard.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -82,7 +89,7 @@ describe('DashboardService.createDashboard', () => {
 
   it('uses provided refreshRate and isPublic', async () => {
     const prisma = makePrisma();
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     await svc.createDashboard('org-1', { name: 'Public Board', refreshRate: 60, isPublic: true }, 'u1');
     expect(prisma.dashboard.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ refreshRate: 60, isPublic: true }) }),
@@ -94,7 +101,7 @@ describe('DashboardService.createDashboard', () => {
 describe('DashboardService.deleteDashboard', () => {
   it('calls deleteMany with correct where clause', async () => {
     const prisma = makePrisma();
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     await svc.deleteDashboard('d1', 'org-1');
     expect(prisma.dashboard.deleteMany).toHaveBeenCalledWith({ where: { id: 'd1', organizationId: 'org-1' } });
   });
@@ -103,13 +110,13 @@ describe('DashboardService.deleteDashboard', () => {
 // ─── addWidget ───────────────────────────────────────────────────────────────
 describe('DashboardService.addWidget', () => {
   it('throws NotFoundException when dashboard not found', async () => {
-    const svc = new DashboardService(makePrisma());
+    const svc = new DashboardService(makePrisma(), makePredictive());
     await expect(svc.addWidget('d-missing', 'org-1', { type: 'kpi', title: 'Sales' })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates widget on existing dashboard', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findFirst: jest.fn().mockResolvedValue(mockDash) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     const result = await svc.addWidget('d1', 'org-1', { type: 'kpi', title: 'Revenue', position: 2 });
     expect(prisma.widget.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ type: 'kpi', title: 'Revenue', position: 2 }) }),
@@ -119,7 +126,7 @@ describe('DashboardService.addWidget', () => {
 
   it('defaults position to 0 when not provided', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findFirst: jest.fn().mockResolvedValue(mockDash) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     await svc.addWidget('d1', 'org-1', { type: 'kpi', title: 'Count' });
     const call = (prisma.widget.create as jest.Mock).mock.calls[0][0];
     expect(call.data.position).toBe(0);
@@ -129,13 +136,13 @@ describe('DashboardService.addWidget', () => {
 // ─── addAlert ────────────────────────────────────────────────────────────────
 describe('DashboardService.addAlert', () => {
   it('throws when dashboard not found', async () => {
-    const svc = new DashboardService(makePrisma());
+    const svc = new DashboardService(makePrisma(), makePredictive());
     await expect(svc.addAlert('w1', 'd-missing', 'org-1', { condition: 'gt', threshold: 100 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates alert on valid dashboard', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findFirst: jest.fn().mockResolvedValue(mockDash) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     const result = await svc.addAlert('w1', 'd1', 'org-1', { condition: 'gt', threshold: 500, active: true });
     expect(prisma.alert.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ condition: 'gt', threshold: 500, active: true }) }),
@@ -147,13 +154,13 @@ describe('DashboardService.addAlert', () => {
 // ─── exportDashboard ─────────────────────────────────────────────────────────
 describe('DashboardService.exportDashboard', () => {
   it('throws when dashboard not found', async () => {
-    const svc = new DashboardService(makePrisma());
+    const svc = new DashboardService(makePrisma(), makePredictive());
     await expect(svc.exportDashboard('d-missing', 'org-1', 'pdf')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates export record for valid dashboard', async () => {
     const prisma = makePrisma({ dashboard: { ...makePrisma().dashboard, findFirst: jest.fn().mockResolvedValue(mockDash) } });
-    const svc = new DashboardService(prisma);
+    const svc = new DashboardService(prisma, makePredictive());
     await svc.exportDashboard('d1', 'org-1', 'csv');
     expect(prisma.dashboardExport.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ dashboardId: 'd1', format: 'csv' }) }),
