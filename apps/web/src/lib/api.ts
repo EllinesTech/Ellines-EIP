@@ -1,4 +1,4 @@
-const API_URL = (() => {
+﻿const API_URL = (() => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
@@ -52,7 +52,7 @@ export interface AuthSession {
   user: AuthUser;
   organization: AuthOrganization;
   isPlatformAdmin?: boolean;
-  /** v1.1 — all orgs this user belongs to; populated after listMyOrgs() */
+  /** v1.1 â€” all orgs this user belongs to; populated after listMyOrgs() */
   orgs?: OrgMembership[];
 }
 
@@ -547,32 +547,32 @@ export function deletePushSubscription() {
 }
 
 export function fetchPlatformOrgDateTimeSettings(orgId: string) {
-  return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
+  return pagesRequest<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`);
 }
 
 export function updatePlatformOrgDateTimeSettings(
   orgId: string,
   payload: Partial<OrgDateTimeSettingsDto>,
 ) {
-  return request<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`, {
+  return pagesRequest<OrgDateTimeSettingsDto>(`/api/v1/platform/orgs/${orgId}/settings`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
 export function listPlatformOrgs() {
-  return request<PlatformOrg[]>('/api/v1/platform/orgs');
+  return pagesRequest<PlatformOrg[]>('/api/v1/platform/orgs');
 }
 
 export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspended') {
-  return request<PlatformOrg>(`/api/v1/platform/orgs/${orgId}`, {
+  return pagesRequest<PlatformOrg>(`/api/v1/platform/orgs/${orgId}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
 }
 
 /**
- * Super Admin only — permanently delete an organization and all its data.
+ * Super Admin only â€” permanently delete an organization and all its data.
  * Requires a non-empty reason which is written to the audit log before deletion.
  */
 export function deletePlatformOrg(orgId: string, reason: string) {
@@ -599,7 +599,7 @@ export interface PlatformMetrics {
 }
 
 export function fetchPlatformMetrics() {
-  return request<PlatformMetrics>('/api/v1/platform/metrics');
+  return pagesRequest<PlatformMetrics>('/api/v1/platform/metrics');
 }
 
 export interface PlatformPackage {
@@ -623,7 +623,7 @@ export interface PlatformPackage {
 }
 
 export function listPlatformPackages() {
-  return request<PlatformPackage[]>('/api/v1/platform/packages');
+  return pagesRequest<PlatformPackage[]>('/api/v1/platform/packages');
 }
 
 export function createPlatformPackage(payload: {
@@ -640,13 +640,13 @@ export function createPlatformPackage(payload: {
   enableWebhooks?: boolean;
   reason?: string;
 }) {
-  return request<PlatformPackage>('/api/v1/platform/packages', {
+  return pagesRequest<PlatformPackage>('/api/v1/platform/packages', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
-/** PATCH /platform/packages/:id payload — camelCase keys mapped server-side to snake_case columns. */
+/** PATCH /platform/packages/:id payload â€” camelCase keys mapped server-side to snake_case columns. */
 export interface PlatformPackageUpdatePayload {
   displayName?: string;
   requestsPerDay?: number;
@@ -670,14 +670,14 @@ export interface PlatformPackageUpdatePayload {
 }
 
 export function updatePlatformPackage(id: string, payload: PlatformPackageUpdatePayload) {
-  return request<PlatformPackage>(`/api/v1/platform/packages/${id}`, {
+  return pagesRequest<PlatformPackage>(`/api/v1/platform/packages/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
 export function deletePlatformPackage(id: string, reason: string) {
-  return request<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/platform/packages/${id}`, {
     method: 'DELETE',
     body: JSON.stringify({ reason }),
   });
@@ -709,34 +709,34 @@ export interface PlatformAuditRow {
 }
 
 export function listPlatformOrgUsers(orgId: string) {
-  return request<OrgMember[]>(`/api/v1/platform/orgs/${orgId}/users`);
+  return pagesRequest<OrgMember[]>(`/api/v1/platform/orgs/${orgId}/users`);
 }
 
 export function createPlatformOrgUser(orgId: string, payload: { email: string; fullName: string; password: string; role: string }) {
-  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users`, {
+  return pagesRequest<OrgMember>(`/api/v1/platform/orgs/${orgId}/users`, {
     method: 'POST', body: JSON.stringify(payload),
   });
 }
 
 export function updatePlatformOrgUser(orgId: string, userId: string, payload: { fullName?: string; role?: string; isActive?: boolean; password?: string }) {
-  return request<OrgMember>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, {
+  return pagesRequest<OrgMember>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, {
     method: 'PATCH', body: JSON.stringify(payload),
   });
 }
 
 export function deactivatePlatformOrgUser(orgId: string, userId: string) {
-  return request<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  return pagesRequest<{ ok: boolean; message: string }>(`/api/v1/platform/orgs/${orgId}/users?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
 export function updatePlatformFlag(key: string, enabled: boolean, reason = 'platform feature flag change') {
-  return request<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
+  return pagesRequest<{ statusCode: number; data: FeatureFlag[] }>('/api/v1/platform/flags', {
     method: 'PATCH',
     body: JSON.stringify({ key, enabled, reason }),
   });
 }
 
 export function listPlatformFlags() {
-  return request<FeatureFlag[]>('/api/v1/platform/flags');
+  return pagesRequest<FeatureFlag[]>('/api/v1/platform/flags');
 }
 
 export interface EnterpriseSummaryDto {
@@ -876,13 +876,15 @@ export interface OpenApiParseResult {
   }[];
 }
 
+// enterprise/summary and enterprise/ingest are Cloudflare Pages Functions that
+// read/write enterprise_snapshots on Supabase â€” must use pagesRequest.
 export function fetchEnterpriseSummary() {
-  return request<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
+  return pagesRequest<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
 }
 
 /** Owner/IT: push any System B JSON (UEM / metrics) into the org snapshot. */
 export function ingestEnterpriseSnapshot(payload: Record<string, unknown>) {
-  return request<EnterpriseSummaryDto & { message?: string }>('/api/v1/enterprise/ingest', {
+  return pagesRequest<EnterpriseSummaryDto & { message?: string }>('/api/v1/enterprise/ingest', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -911,7 +913,7 @@ export function rotateWebhookSecret() {
   });
 }
 
-// ─── Webhook Delivery (B.3.4) ─────────────────────────────────────────────
+// â”€â”€â”€ Webhook Delivery (B.3.4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type WebhookDeliveryStatus = 'success' | 'failure' | 'pending' | 'permanently_failed';
 
@@ -996,7 +998,7 @@ export function retryWebhookDelivery(deliveryId: string) {
   });
 }
 
-// ─── Database Configuration (Multi-database Support) ──────────────────────
+// â”€â”€â”€ Database Configuration (Multi-database Support) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DatabaseConfigurationDto = {
   id: string;
@@ -1109,13 +1111,13 @@ export function syncConnector(
   connectorId: string,
   options?: ConnectorInstallConfigDto,
 ) {
-  return request<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
+  return pagesRequest<EnterpriseSummaryDto>(`/api/v1/connectors/${connectorId}/sync`, {
     method: 'POST',
     body: options ? JSON.stringify(options) : undefined,
   });
 }
 
-// ── Connector installations — all routed via pagesRequest so they hit the
+// â”€â”€ Connector installations â€” all routed via pagesRequest so they hit the
 // Cloudflare Pages Function (Supabase-backed) both in dev and production.
 // Using request() would proxy to NestJS (localhost:3001 in dev) which reads
 // from the local PostgreSQL DB and would miss Super Admin-installed connectors
@@ -1218,7 +1220,7 @@ export function listPublishedPacks() {
 }
 
 export function listPlatformConnectorPacks() {
-  return request<ConnectorPackDto[]>('/api/v1/platform/connector-packs');
+  return pagesRequest<ConnectorPackDto[]>('/api/v1/platform/connector-packs');
 }
 
 export function createPlatformConnectorPack(body: {
@@ -1231,7 +1233,7 @@ export function createPlatformConnectorPack(body: {
   published?: boolean;
   reason?: string;
 }) {
-  return request<ConnectorPackDto>('/api/v1/platform/connector-packs', {
+  return pagesRequest<ConnectorPackDto>('/api/v1/platform/connector-packs', {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -1244,34 +1246,34 @@ export function updatePlatformConnectorPack(id: string, body: {
   published?: boolean;
   reason?: string;
 }) {
-  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+  return pagesRequest<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
 }
 
 export function publishPlatformConnectorPack(id: string, reason: string) {
-  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+  return pagesRequest<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'publish', reason }),
   });
 }
 
 export function deprecatePlatformConnectorPack(id: string, reason: string) {
-  return request<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
+  return pagesRequest<ConnectorPackDto>(`/api/v1/platform/connector-packs/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'deprecate', reason }),
   });
 }
 
 export function deletePlatformConnectorPack(id: string, reason: string) {
-  return request<{ ok: boolean }>(`/api/v1/platform/connector-packs/${id}`, {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/platform/connector-packs/${id}`, {
     method: 'DELETE',
     body: JSON.stringify({ reason }),
   });
 }
 
-// ─── Platform — God-mode extensions ─────────────────────────────────────────
+// â”€â”€â”€ Platform â€” God-mode extensions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface PlatformUserDto {
   id: string;
@@ -1321,7 +1323,7 @@ export function createPlatformOrg(payload: {
   ownerFullName?: string;
   ownerPassword?: string;
 }) {
-  return request<CreateOrgResult>('/api/v1/platform/orgs/create', {
+  return pagesRequest<CreateOrgResult>('/api/v1/platform/orgs/create', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -1338,7 +1340,7 @@ export interface EncryptionMigrationResult {
 }
 
 export function migratePlatformEncryption(dryRun = false, organizationId?: string) {
-  return request<EncryptionMigrationResult>('/api/v1/platform/security/migrate-encryption', {
+  return pagesRequest<EncryptionMigrationResult>('/api/v1/platform/security/migrate-encryption', {
     method: 'POST',
     body: JSON.stringify({ dryRun, organizationId }),
   });
@@ -1360,10 +1362,10 @@ export function listPlatformAuditLogs(params?: {
   if (params?.limit !== undefined) q.set('limit', String(params.limit));
   if (params?.offset !== undefined) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return request<PlatformAuditPage>(`/api/v1/platform/audit-logs${qs ? `?${qs}` : ''}`);
+  return pagesRequest<PlatformAuditPage>(`/api/v1/platform/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
-// ─── Phase 5 — Workflow & Automation API ─────────────────────────────────────
+// â”€â”€â”€ Phase 5 â€” Workflow & Automation API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ApprovalStepDto = {
   key: string;
@@ -1415,7 +1417,7 @@ export function decideApprovalApi(
   });
 }
 
-// ─── Email Intelligence ────────────────────────────────────────────────────────
+// â”€â”€â”€ Email Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type EmailSyncResultDto = {
   emails: {
@@ -1446,7 +1448,7 @@ export function pullEmailSync() {
   });
 }
 
-// ─── Report Intelligence ──────────────────────────────────────────────────────
+// â”€â”€â”€ Report Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ReportInterpretResultDto = {
   interpretation: string;
@@ -1566,7 +1568,7 @@ export function deleteReportApi(id: string) {
   });
 }
 
-// ─── Data Export (B.3.1) ──────────────────────────────────────────────────────
+// â”€â”€â”€ Data Export (B.3.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ExportType = 'uem' | 'timeline' | 'approvals' | 'all';
 export type ExportFormat = 'csv' | 'json';
@@ -1599,7 +1601,7 @@ export async function exportOrgData(type: ExportType, format: ExportFormat): Pro
   return res.blob();
 }
 
-// ─── Compliance Export (D.2.1) ───────────────────────────────────────────────
+// â”€â”€â”€ Compliance Export (D.2.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ComplianceTemplate = 'soc2' | 'hipaa' | 'gdpr' | 'pci' | 'all';
 
@@ -1633,7 +1635,7 @@ export async function exportComplianceReport(opts: {
   return res.blob();
 }
 
-// ─── Data Access Log (D.2.2) ─────────────────────────────────────────────────
+// â”€â”€â”€ Data Access Log (D.2.2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DataAccessResourceCategory =
   | 'connector' | 'report' | 'document' | 'export' | 'api_key'
@@ -1704,7 +1706,7 @@ export async function downloadDataAccessLog(opts?: {
   return res.blob();
 }
 
-// ─── Compliance Report Templates (D.2.3) ─────────────────────────────────────
+// â”€â”€â”€ Compliance Report Templates (D.2.3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ComplianceControlStatus = 'pass' | 'partial' | 'missing';
 
@@ -1756,7 +1758,7 @@ export async function downloadComplianceReport(
   return res.blob();
 }
 
-// ─── Evidence Pack (D.2.4) ───────────────────────────────────────────────────
+// â”€â”€â”€ Evidence Pack (D.2.4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Owner/IT: generate and download a full compliance evidence pack as HTML. */
 export async function downloadEvidencePack(opts: {
@@ -1815,20 +1817,20 @@ export type EnterpriseEventDto = {
 };
 
 export function listEnterpriseEvents(limit = 100) {
-  return request<EnterpriseEventDto[]>(`/api/v1/orgs/me/events?limit=${limit}`);
+  return pagesRequest<EnterpriseEventDto[]>(`/api/v1/orgs/me/events?limit=${limit}`);
 }
 
 export function publishEnterpriseEventApi(payload: {
   type: string;
   payload?: Record<string, unknown>;
 }) {
-  return request<EnterpriseEventDto>('/api/v1/orgs/me/events', {
+  return pagesRequest<EnterpriseEventDto>('/api/v1/orgs/me/events', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
-// ─── v1.1 — Multi-company / Multi-org ────────────────────────────────────────
+// â”€â”€â”€ v1.1 â€” Multi-company / Multi-org â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** List all organizations the current user belongs to. */
 export function listMyOrgs() {
@@ -1887,13 +1889,13 @@ export type OrgGroupSummaryEntry = {
 
 /**
  * Owner: combined health summary of the current org's own window plus every
- * linked child org — see the whole business group at a glance, not just one at a time.
+ * linked child org â€” see the whole business group at a glance, not just one at a time.
  */
 export function fetchGroupSummary() {
   return request<OrgGroupSummaryEntry[]>('/api/v1/orgs/me/group-summary');
 }
 
-// ─── Document Hub API ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Document Hub API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type DocumentRecordDto = {
   id: string;
@@ -1939,14 +1941,14 @@ export function deleteDocument(id: string) {
   });
 }
 
-// ─── Notification unread count ───────────────────────────────────────────────
+// â”€â”€â”€ Notification unread count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type NotifyUnreadDto = {
   unread: number;
   total: number;
 };
 
-/** Lightweight unread count — polls outbox for unread in-app items. */
+/** Lightweight unread count â€” polls outbox for unread in-app items. */
 export function fetchNotifyUnreadCount() {
   return request<NotifyUnreadDto>('/api/v1/notifications/deliver').then((items) => {
     // items is OutboxItem[] from the GET endpoint
@@ -1959,7 +1961,7 @@ export function fetchNotifyUnreadCount() {
   });
 }
 
-// ─── Reports with email status ────────────────────────────────────────────────
+// â”€â”€â”€ Reports with email status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ScheduledReportRunDto = {
   id: string;
@@ -1989,7 +1991,7 @@ export function runReportFullApi(id: string) {
   });
 }
 
-// ─── Platform per-org stats ──────────────────────────────────────────────────
+// â”€â”€â”€ Platform per-org stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PlatformOrgStatsDto = {
   id: string;
@@ -2204,10 +2206,10 @@ export function deleteExportApi(dashboardId: string, exportId: string, organizat
 }
 
 export function fetchPlatformOrgStats(orgId: string) {
-  return request<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
+  return pagesRequest<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
 }
 
-// ─── Platform cross-org Work Console reads ────────────────────────────────────
+// â”€â”€â”€ Platform cross-org Work Console reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PlatformOrgConnectorDto = {
   id: string;
@@ -2281,33 +2283,33 @@ export type PlatformOrgSnapshotDto = {
 } | null;
 
 export function fetchPlatformOrgConnectors(orgId: string) {
-  return request<PlatformOrgConnectorDto[]>(`/api/v1/platform/orgs/${orgId}/connectors`);
+  return pagesRequest<PlatformOrgConnectorDto[]>(`/api/v1/platform/orgs/${orgId}/connectors`);
 }
 
 export function fetchPlatformOrgApprovals(orgId: string) {
-  return request<PlatformOrgApprovalDto[]>(`/api/v1/platform/orgs/${orgId}/approvals`);
+  return pagesRequest<PlatformOrgApprovalDto[]>(`/api/v1/platform/orgs/${orgId}/approvals`);
 }
 
 export function fetchPlatformOrgRules(orgId: string) {
-  return request<PlatformOrgRuleDto[]>(`/api/v1/platform/orgs/${orgId}/rules`);
+  return pagesRequest<PlatformOrgRuleDto[]>(`/api/v1/platform/orgs/${orgId}/rules`);
 }
 
 export function fetchPlatformOrgReports(orgId: string) {
-  return request<PlatformOrgReportDto[]>(`/api/v1/platform/orgs/${orgId}/reports`);
+  return pagesRequest<PlatformOrgReportDto[]>(`/api/v1/platform/orgs/${orgId}/reports`);
 }
 
 export function fetchPlatformOrgAgents(orgId: string) {
-  return request<PlatformOrgAgentDto[]>(`/api/v1/platform/orgs/${orgId}/agents`);
+  return pagesRequest<PlatformOrgAgentDto[]>(`/api/v1/platform/orgs/${orgId}/agents`);
 }
 
 export function fetchPlatformOrgSnapshot(orgId: string) {
-  return request<PlatformOrgSnapshotDto>(`/api/v1/platform/orgs/${orgId}/snapshot`);
+  return pagesRequest<PlatformOrgSnapshotDto>(`/api/v1/platform/orgs/${orgId}/snapshot`);
 }
 
-// ─── Platform cross-org connector management ──────────────────────────────────
+// â”€â”€â”€ Platform cross-org connector management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function fetchPlatformOrgConnectorInstallations(orgId: string) {
-  return request<ConnectorInstallationDto[]>(`/api/v1/platform/orgs/${orgId}/connector-installations`);
+  return pagesRequest<ConnectorInstallationDto[]>(`/api/v1/platform/orgs/${orgId}/connector-installations`);
 }
 
 export function createPlatformOrgConnector(orgId: string, body: {
@@ -2316,7 +2318,7 @@ export function createPlatformOrgConnector(orgId: string, body: {
   config?: ConnectorInstallConfigDto;
   packId?: string;
 }) {
-  return request<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations`, {
+  return pagesRequest<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -2326,20 +2328,20 @@ export function updatePlatformOrgConnector(orgId: string, connId: string, body: 
   displayName?: string;
   config?: ConnectorInstallConfigDto;
 }) {
-  return request<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
+  return pagesRequest<ConnectorInstallationDto>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
 }
 
 export function deletePlatformOrgConnector(orgId: string, connId: string) {
-  return request<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/connector-installations/${connId}`, {
     method: 'DELETE',
   });
 }
 
 /**
- * Super Admin only — activate a connector for the given org (draft|suspended → active).
+ * Super Admin only â€” activate a connector for the given org (draft|suspended â†’ active).
  * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
  */
 export function activatePlatformOrgConnector(orgId: string, connId: string) {
@@ -2350,7 +2352,7 @@ export function activatePlatformOrgConnector(orgId: string, connId: string) {
 }
 
 /**
- * Super Admin only — deactivate (suspend) a connector for the given org.
+ * Super Admin only â€” deactivate (suspend) a connector for the given org.
  * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
  */
 export function deactivatePlatformOrgConnector(orgId: string, connId: string) {
@@ -2368,13 +2370,13 @@ export function testPlatformOrgConnector(orgId: string, connId: string) {
 }
 
 export function syncPlatformOrgConnector(orgId: string, connId: string) {
-  return request<EnterpriseSummaryDto>(
+  return pagesRequest<EnterpriseSummaryDto>(
     `/api/v1/platform/orgs/${orgId}/connector-installations/${connId}/sync`,
     { method: 'POST' },
   );
 }
 
-// ─── Platform cross-org document management ───────────────────────────────────
+// â”€â”€â”€ Platform cross-org document management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PlatformDocumentDto = {
   id: string;
@@ -2390,7 +2392,7 @@ export type PlatformDocumentDto = {
 };
 
 export function listPlatformOrgDocuments(orgId: string) {
-  return request<PlatformDocumentDto[]>(`/api/v1/platform/orgs/${orgId}/documents`);
+  return pagesRequest<PlatformDocumentDto[]>(`/api/v1/platform/orgs/${orgId}/documents`);
 }
 
 export function uploadPlatformOrgDocument(orgId: string, body: {
@@ -2401,19 +2403,19 @@ export function uploadPlatformOrgDocument(orgId: string, body: {
   branch?: string;
   summary?: string;
 }) {
-  return request<PlatformDocumentDto>(`/api/v1/platform/orgs/${orgId}/documents`, {
+  return pagesRequest<PlatformDocumentDto>(`/api/v1/platform/orgs/${orgId}/documents`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
 }
 
 export function deletePlatformOrgDocument(orgId: string, docId: string) {
-  return request<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/documents/${docId}`, {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/platform/orgs/${orgId}/documents/${docId}`, {
     method: 'DELETE',
   });
 }
 
-// ─── Platform cross-org org profile ──────────────────────────────────────────
+// â”€â”€â”€ Platform cross-org org profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PlatformOrgProfileDto = {
   id: string;
@@ -2423,17 +2425,17 @@ export type PlatformOrgProfileDto = {
 };
 
 export function fetchPlatformOrgProfile(orgId: string) {
-  return request<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`);
+  return pagesRequest<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`);
 }
 
 export function updatePlatformOrgProfile(orgId: string, name: string) {
-  return request<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`, {
+  return pagesRequest<PlatformOrgProfileDto>(`/api/v1/platform/orgs/${orgId}/profile`, {
     method: 'PATCH',
     body: JSON.stringify({ name }),
   });
 }
 
-// ─── v2.0 Phase A — Ellinea Agents (Autonomous AI) ──────────────────────────
+// â”€â”€â”€ v2.0 Phase A â€” Ellinea Agents (Autonomous AI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type EllineaAgentDto = {
   id: string;
@@ -2702,7 +2704,7 @@ export function fetchAgentCohortSignals() {
   }>('/api/v1/orgs/me/agent-cohort-signals');
 }
 
-// ─── v2.0 Phase A — Alert Correlation (A.3.1) ────────────────────────────────
+// â”€â”€â”€ v2.0 Phase A â€” Alert Correlation (A.3.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type AlertCorrelationGroupDto = {
   id: string;
@@ -2743,7 +2745,7 @@ export function fetchAlertRootCause(
 }
 
 
-// ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
+// â”€â”€â”€ v2.0 Phase A â€” Ellinea Autonomous Agents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type AgentDto = {
   id: string;
@@ -2795,7 +2797,7 @@ export type AgentExecutionDto = {
   createdAt: string;
   updatedAt?: string;
   agent?: { name: string };
-  /** Feedback (v2.0 A.2 — learning) */
+  /** Feedback (v2.0 A.2 â€” learning) */
   feedbackScore?: number | null; // -1, 0, or 1
   feedbackComment?: string | null;
   feedbackAt?: string | null;
@@ -2862,7 +2864,7 @@ export function decideExecutionApi(
   );
 }
 
-// ─── S6.2 — Invite magic link ─────────────────────────────────────────────────
+// â”€â”€â”€ S6.2 â€” Invite magic link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PendingInviteDto = {
   email: string;
@@ -2914,7 +2916,7 @@ export function revokeInvite(email: string) {
   });
 }
 
-// ─── S6.6 — API Keys ──────────────────────────────────────────────────────────
+// â”€â”€â”€ S6.6 â€” API Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ApiKeyDto = {
   id: string;
@@ -2947,7 +2949,7 @@ export function revokeApiKey(id: string) {
   });
 }
 
-// ─── Organization Data Window ─────────────────────────────────────────────────
+// â”€â”€â”€ Organization Data Window â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type OrgDataEmailDto = {
   id: string;
@@ -2984,7 +2986,7 @@ export function fetchOrgDataWindow() {
   return pagesRequest<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
 }
 
-// ─── Sprint 7 — Health + Org Status ──────────────────────────────────────────
+// â”€â”€â”€ Sprint 7 â€” Health + Org Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface HealthDto {
   status: string;
@@ -2999,7 +3001,7 @@ export interface HealthDto {
   };
 }
 
-/** Unauthenticated — safe to call without a token. */
+/** Unauthenticated â€” safe to call without a token. */
 export function fetchHealth() {
   return fetch(`${API_URL}/api/v1/health`)
     .then((r) => r.json() as Promise<HealthDto>)
@@ -3020,7 +3022,7 @@ export function fetchOrgStatus() {
   return request<OrgStatusDto>('/api/v1/orgs/me/status');
 }
 
-// ─── Sprint 9 — Report upload + Ellinea digest ────────────────────────────────
+// â”€â”€â”€ Sprint 9 â€” Report upload + Ellinea digest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ReportUploadResultDto = {
   id: string;
@@ -3065,7 +3067,7 @@ export function sendEllineaDigest(force = false) {
   });
 }
 
-// ─── Report Comparison (S10.1) ───────────────────────────────────────────────
+// â”€â”€â”€ Report Comparison (S10.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ReportCompareResultDto = {
   reportAId: string;
@@ -3110,7 +3112,7 @@ export interface PlatformHealthSummaryDto {
 }
 
 export function fetchPlatformHealthSummary() {
-  return request<PlatformHealthSummaryDto>('/api/v1/platform/health/summary');
+  return pagesRequest<PlatformHealthSummaryDto>('/api/v1/platform/health/summary');
 }
 
 export async function exportPlatformAuditLogs(params?: {
@@ -3130,7 +3132,7 @@ export async function exportPlatformAuditLogs(params?: {
   return res.blob();
 }
 
-// ─── Integration Requests (TASK-09) ──────────────────────────────────────────
+// â”€â”€â”€ Integration Requests (TASK-09) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface IntegrationRequestDto {
   id: string;

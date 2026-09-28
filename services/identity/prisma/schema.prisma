@@ -1500,6 +1500,7 @@ model RemediationPlaybook {
   successRate         Float     @default(0.0) @map("success_rate") // Historical success rate (0.0-1.0)
   executionCount      Int       @default(0) @map("execution_count")
   lastExecutedAt      DateTime? @map("last_executed_at")
+  requiresApproval    Boolean   @default(false) @map("requires_approval") // v2.0 Learner: learned strategies need Super Admin approval before production deployment
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
