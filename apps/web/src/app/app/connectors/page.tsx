@@ -1141,104 +1141,104 @@ export default function ConnectorsPage() {
         <div className={styles.panelLabel}>Installed connections</div>
         {installations.length === 0 ? (
           <p className={styles.lede}>
-            No saved installations yet. Use Install connector — nothing is kept in the browser.
+            No integrations connected yet. Contact your platform administrator to set up a connector
+            for your organization.
           </p>
         ) : (
-          <table className={adminStyles.table}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Schedule</th>
-                <th>Last sync</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {installations.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <div>{c.displayName}</div>
-                    {c.lastMessage ? (
-                      <div style={{ fontSize: '0.78rem', color: '#8b95a8', marginTop: 2 }}>
-                        {c.lastMessage}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{c.catalogId}</td>
-                  <td>{c.status}</td>
-                  <td>
-                    <select
-                      value={String(c.config?.syncIntervalMinutes || 0)}
-                      disabled={busy}
-                      aria-label={`Schedule for ${c.displayName}`}
-                      onChange={(e) => {
-                        const mins = Number(e.target.value) || 0;
-                        void (async () => {
-                          setBusy(true);
-                          setError('');
-                          try {
-                            await updateInstallation(c.id, {
-                              config: { syncIntervalMinutes: mins },
-                            });
-                            setNotice(
-                              mins
-                                ? `Schedule set to every ${mins} minutes for ${c.displayName}.`
-                                : `Manual sync only for ${c.displayName}.`,
-                            );
-                            await load();
-                          } catch (err) {
-                            setError(err instanceof Error ? err.message : 'Schedule update failed');
-                          } finally {
-                            setBusy(false);
-                          }
-                        })();
-                      }}
-                    >
-                      <option value="0">Manual</option>
-                      <option value="15">15 min</option>
-                      <option value="60">1 hour</option>
-                      <option value="360">6 hours</option>
-                      <option value="1440">Daily</option>
-                    </select>
-                    {c.config?.nextSyncAt ? (
-                      <div style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 4 }}>
-                        Next {new Date(String(c.config.nextSyncAt)).toLocaleString()}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString() : '—'}</td>
-                  <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className={adminStyles.ghost}
-                      disabled={busy}
-                      onClick={() => editInstallation(c)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={adminStyles.primary}
-                      disabled={busy}
-                      onClick={() => void onSyncInstall(c.id)}
-                    >
-                      Sync
-                    </button>
-                    <button
-                      type="button"
-                      className={adminStyles.ghost}
-                      disabled={busy}
-                      onClick={() => void onDelete(c.id)}
-                    >
-                      Remove
-                    </button>
-                  </td>
+          <>
+            <p className={styles.lede} style={{ marginBottom: '0.75rem' }}>
+              Connectors are installed and managed by the platform administrator. You can trigger
+              a sync or view status below.
+            </p>
+            <table className={adminStyles.table}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Last sync</th>
+                  <th>Next sync</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {installations.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{c.displayName}</div>
+                      {c.lastMessage ? (
+                        <div style={{ fontSize: '0.78rem', color: '#8b95a8', marginTop: 2 }}>
+                          {c.lastMessage}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <span style={{ textTransform: 'capitalize', fontSize: '0.82rem' }}>
+                        {c.catalogId.replace(/-/g, ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          fontSize: '0.82rem',
+                          fontWeight: 500,
+                          color:
+                            c.status === 'active' || c.status === 'synced'
+                              ? '#22c55e'
+                              : c.status === 'error'
+                              ? '#ef4444'
+                              : c.status === 'suspended'
+                              ? '#f59e0b'
+                              : '#8b95a8',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: 'currentColor',
+                            flexShrink: 0,
+                          }}
+                        />
+                        {c.status}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.82rem' }}>
+                      {c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString() : '—'}
+                    </td>
+                    <td style={{ fontSize: '0.82rem' }}>
+                      {c.config?.nextSyncAt
+                        ? new Date(String(c.config.nextSyncAt)).toLocaleString()
+                        : c.config?.syncIntervalMinutes && Number(c.config.syncIntervalMinutes) > 0
+                        ? `Every ${c.config.syncIntervalMinutes} min`
+                        : 'Manual'}
+                    </td>
+                    <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {/* Only Sync is available to the business owner — credentials and
+                          lifecycle are managed exclusively by the platform administrator. */}
+                      <button
+                        type="button"
+                        className={adminStyles.primary}
+                        disabled={busy || c.status === 'suspended'}
+                        title={
+                          c.status === 'suspended'
+                            ? 'Connector is suspended by the platform administrator'
+                            : 'Pull latest data from this integration'
+                        }
+                        onClick={() => void onSyncInstall(c.id)}
+                      >
+                        {busy ? 'Syncing…' : 'Sync now'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </section>
     </div>

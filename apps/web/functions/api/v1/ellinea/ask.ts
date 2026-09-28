@@ -9,6 +9,73 @@ import {
 import { sendOutboundEmail } from '../../../shared/mail';
 import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
 
+// ─── Model orchestrator response shape ────────────────────────────────────────
+// Mirrors OrchestrateResponse from ellinea.controller.ts (services/identity).
+
+type ModelDecision = {
+  modelId: string;
+  confidence: number;
+  weight: number;
+};
+
+type OrchestrateResponse = {
+  answer: string;
+  confidence: number;
+  explanation: string;
+  sources: string[];
+  modelDecisions: ModelDecision[];
+  conflictDetected: boolean;
+  ensembleStrategy: 'weighted_vote' | 'meta_learning';
+  queryType: string;
+  routingReason: string;
+  degradationNotice?: string;
+};
+
+/**
+ * Call the internal POST /api/v1/ellinea/orchestrate endpoint on the identity
+ * service (Cloudflare Pages Functions co-deployed on the same origin).
+ *
+ * Returns null if the endpoint is unreachable or returns a non-OK status —
+ * the caller falls back to the direct LLM path in that case.
+ *
+ * Requirement 1.2: Route query to the most appropriate model.
+ * Requirement 1.8: Include modelDecisions in the response for audit.
+ */
+async function callOrchestrate(
+  request: Request,
+  jwtToken: string,
+  query: string,
+  orgId: string,
+): Promise<OrchestrateResponse | null> {
+  // Derive the internal API base from the incoming request origin so this
+  // works in both local dev and on Cloudflare Pages without any hard-coded URL.
+  const url = new URL(request.url);
+  const internalBase = `${url.protocol}//${url.host}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${internalBase}/api/v1/ellinea/orchestrate`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${jwtToken}`,
+      },
+      body: JSON.stringify({ query, orgId }),
+    });
+  } catch {
+    // Network failure — fall through to direct LLM path.
+    return null;
+  }
+
+  if (!res.ok) return null;
+
+  try {
+    return (await res.json()) as OrchestrateResponse;
+  } catch {
+    return null;
+  }
+}
+
 type MemoryNote = { id: string; title: string; body: string; updatedAt: string };
 type DnaTrait = { id?: string; label?: string; detail?: string; source?: string };
 type DnaSnapshot = { summary?: string; traits?: DnaTrait[] };

@@ -13,6 +13,8 @@ import { ObservabilityModule } from './observability/observability.module';
 import { AgentsModule } from './agents/agents.module';
 import { DatabaseModule } from './database/database.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { EllineaModule } from './ellinea/ellinea.module';
+import { KnowledgeGraphModule } from './knowledge-graph/knowledge-graph.module';
 import { HealthController } from './health.controller';
 import { CorrelationMiddleware } from './logging/correlation.middleware';
 import { LoggingMiddleware } from './middleware/logging.middleware';
@@ -39,6 +41,8 @@ import { LoggingMiddleware } from './middleware/logging.middleware';
     AgentsModule,
     DatabaseModule,
     RateLimitModule,
+    EllineaModule,
+    KnowledgeGraphModule,
   ],
   controllers: [HealthController],
 })

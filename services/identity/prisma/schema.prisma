@@ -415,6 +415,8 @@ model EnterpriseSnapshot {
   openDecisions    Int      @map("open_decisions")
   briefHighlight   String   @map("brief_highlight")
   timeline         Json
+  /// JSON array of DetectedPattern objects persisted by ReasoningEngineService.detectPatterns().
+  insights         Json     @default("[]")
   syncedAt         DateTime @map("synced_at")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")

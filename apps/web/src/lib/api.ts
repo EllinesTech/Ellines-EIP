@@ -900,12 +900,12 @@ export type WebhookSecretDto = {
 
 /** Owner/IT: masked webhook secret + endpoint for System B pushes. */
 export function fetchWebhookSecret() {
-  return request<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret');
+  return pagesRequest<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret');
 }
 
 /** Owner/IT: rotate webhook secret (full value returned once). */
 export function rotateWebhookSecret() {
-  return request<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret', {
+  return pagesRequest<WebhookSecretDto>('/api/v1/orgs/me/webhook-secret', {
     method: 'POST',
     body: '{}',
   });
@@ -1115,8 +1115,14 @@ export function syncConnector(
   });
 }
 
+// ── Connector installations — all routed via pagesRequest so they hit the
+// Cloudflare Pages Function (Supabase-backed) both in dev and production.
+// Using request() would proxy to NestJS (localhost:3001 in dev) which reads
+// from the local PostgreSQL DB and would miss Super Admin-installed connectors
+// that were written to Supabase by the platform admin Pages Functions.
+
 export function listInstallations() {
-  return request<ConnectorInstallationDto[]>('/api/v1/connectors/installations');
+  return pagesRequest<ConnectorInstallationDto[]>('/api/v1/connectors/installations');
 }
 
 export function createInstallation(body: {
@@ -1125,7 +1131,7 @@ export function createInstallation(body: {
   config?: ConnectorInstallConfigDto;
   packId?: string;
 }) {
-  return request<ConnectorInstallationDto>('/api/v1/connectors/installations', {
+  return pagesRequest<ConnectorInstallationDto>('/api/v1/connectors/installations', {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -1135,33 +1141,33 @@ export function updateInstallation(
   id: string,
   body: { displayName?: string; config?: ConnectorInstallConfigDto },
 ) {
-  return request<ConnectorInstallationDto>(`/api/v1/connectors/installations/${id}`, {
+  return pagesRequest<ConnectorInstallationDto>(`/api/v1/connectors/installations/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
 }
 
 export function deleteInstallation(id: string) {
-  return request<{ ok: boolean }>(`/api/v1/connectors/installations/${id}`, {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/connectors/installations/${id}`, {
     method: 'DELETE',
   });
 }
 
 export function testInstallation(id: string) {
-  return request<{ ok: boolean; message?: string; installation: ConnectorInstallationDto }>(
+  return pagesRequest<{ ok: boolean; message?: string; installation: ConnectorInstallationDto }>(
     `/api/v1/connectors/installations/${id}/test`,
     { method: 'POST' },
   );
 }
 
 export function syncInstallation(id: string) {
-  return request<EnterpriseSummaryDto>(`/api/v1/connectors/installations/${id}/sync`, {
+  return pagesRequest<EnterpriseSummaryDto>(`/api/v1/connectors/installations/${id}/sync`, {
     method: 'POST',
   });
 }
 
 export function runDueConnectorSyncs() {
-  return request<{
+  return pagesRequest<{
     checked: number;
     due: number;
     ran: number;
@@ -1172,7 +1178,7 @@ export function runDueConnectorSyncs() {
 }
 
 export function parseOpenApi(document: unknown) {
-  return request<OpenApiParseResult>('/api/v1/connectors/openapi/parse', {
+  return pagesRequest<OpenApiParseResult>('/api/v1/connectors/openapi/parse', {
     method: 'POST',
     body: JSON.stringify({ document }),
   });
@@ -1196,7 +1202,7 @@ export function probeAutoscanTargets(body: {
   catalogId?: string;
   timeoutMs?: number;
 }) {
-  return request<{
+  return pagesRequest<{
     mode: string;
     catalogId: string | null;
     limits: { maxTargets: number; timeoutMs: number; note: string };
@@ -1208,7 +1214,7 @@ export function probeAutoscanTargets(body: {
 }
 
 export function listPublishedPacks() {
-  return request<ConnectorPackDto[]>('/api/v1/connectors/packs');
+  return pagesRequest<ConnectorPackDto[]>('/api/v1/connectors/packs');
 }
 
 export function listPlatformConnectorPacks() {

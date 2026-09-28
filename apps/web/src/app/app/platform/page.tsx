@@ -72,7 +72,7 @@ function PlatformSuperAdminPage(){
  const [metrics,setMetrics]=useState<PlatformMetrics|null>(null);
  const [users,setUsers]=useState<OrgMember[]>([]),[stats,setStats]=useState<any>(null),[tier,setTier]=useState<any>(null),[settings,setSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
  const [query,setQuery]=useState(''),[auditQuery,setAuditQuery]=useState(''),[auditOrg,setAuditOrg]=useState(''),[auditFrom,setAuditFrom]=useState(''),[auditTo,setAuditTo]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- // â”€â”€ Client workspace state (loaded when entering ?section=client&id=ORG_ID) â”€â”€
+ // ── Client workspace state (loaded when entering ?section=client&id=ORG_ID) ──
  const [wsOrg,setWsOrg]=useState<PlatformOrg|null>(null);
  const [wsUsers,setWsUsers]=useState<OrgMember[]>([]);
  const [wsStats,setWsStats]=useState<any>(null);
@@ -258,7 +258,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const onboarding=<div className={styles.grid2}><form className={styles.card} onSubmit={register}><CardTitle title="Register business" hint="Create a tenant and optionally its first owner."/><div className={styles.form}><Field label="Business name" value={business.name} set={v=>setBusiness({...business,name:v})} placeholder="Acme Holdings Ltd"/><Field label="Slug" value={business.slug} set={v=>setBusiness({...business,slug:v})} placeholder="acme-holdings"/><Field label="Owner name" value={business.ownerFullName} set={v=>setBusiness({...business,ownerFullName:v})}/><Field label="Owner email" value={business.ownerEmail} set={v=>setBusiness({...business,ownerEmail:v})} type="email"/><Field label="Owner password" value={business.ownerPassword} set={v=>setBusiness({...business,ownerPassword:v})} type="password"/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!business.name}>Register business</button></div></div></form><div className={styles.card}><CardTitle title="Onboarding sequence" hint="Keep customer-specific integrations separate from the EIP platform."/><Service title="01 · Tenant" text="Business identity, owner and lifecycle state."/><Service title="02 · Package" text="Assign the commercial capability envelope."/><Service title="03 · Integrations" text="Configure business connectors only when the customer requires them."/><Service title="04 · Verify" text="Check users, health and audit history before handoff."/></div></div>;
 
- const packagesPage=<><div className={styles.grid2}><div className={styles.card}><CardTitle title="Service packages" hint="Commercial capability bundles. These are not connector infrastructure."/><div className={styles.grid2}>{packages.map(p=><Service key={p.id} title={p.display_name} text={p.name+' · '+(p.monthly_price?'KES '+(p.monthly_price/100).toLocaleString()+'/month':'Custom pricing')} tags={[p.max_users?p.max_users+' users':'âˆž users',p.max_connectors?p.max_connectors+' integrations':'âˆž integrations',p.enable_sso?'SSO':'',p.enable_agents?'Agents':'',p.enable_advanced_bi?'Advanced BI':''].filter(Boolean)}/>)}</div></div><div className={styles.card}><CardTitle title="Create package" hint="Build a service tier for onboarding."/><div className={styles.form}><Field label="Internal name" value={pkg.name} set={v=>setPkg({...pkg,name:v})}/><Field label="Display name" value={pkg.displayName} set={v=>setPkg({...pkg,displayName:v})}/><Field label="Max users" value={String(pkg.maxUsers)} set={v=>setPkg({...pkg,maxUsers:Number(v)})} type="number"/><Field label="Max integrations" value={String(pkg.maxConnectors)} set={v=>setPkg({...pkg,maxConnectors:Number(v)})} type="number"/><Field label="Requests/day" value={String(pkg.requestsPerDay)} set={v=>setPkg({...pkg,requestsPerDay:Number(v)})} type="number"/><Field label="Monthly price (cents)" value={String(pkg.monthlyPrice)} set={v=>setPkg({...pkg,monthlyPrice:Number(v)})} type="number"/><div className={styles.full}>{(['enableSso','enableCustomRoles','enableAgents','enableAdvancedBi','enableWebhooks'] as const).map(k=><label key={k} style={{display:'block',fontSize:11,margin:'6px 0'}}><input type="checkbox" checked={pkg[k]} onChange={e=>setPkg({...pkg,[k]:e.target.checked})}/> {k.replace('enable','')}</label>)}</div><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!pkg.name||!pkg.displayName} onClick={()=>setPkgDialog(true)}>Create package</button></div></div></div></div><div className={styles.card+' '+styles.section}><CardTitle title="Business integration catalog" hint="Connector packs live here because they are customer services, not platform health dependencies."/><div className={styles.grid3}>{packs.map(p=><Service key={p.id} title={p.name} text={p.description||'Integration template'} tags={[p.catalogId,p.published?'Published':'Draft']}/>)}</div></div><div className={styles.grid2}><div className={styles.card}><CardTitle title="Manage package" hint="Edit or delete a package. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPkg?.id||''} onChange={e=>pickPackage(e.target.value)}><option value="">Select package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select>{selectedPkg&&pkgEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Display name" value={pkgEdit.displayName} set={v=>setPkgEdit({...pkgEdit,displayName:v})}/><Field label="Max users" type="number" value={String(pkgEdit.maxUsers)} set={v=>setPkgEdit({...pkgEdit,maxUsers:Number(v)})}/><Field label="Max integrations" type="number" value={String(pkgEdit.maxConnectors)} set={v=>setPkgEdit({...pkgEdit,maxConnectors:Number(v)})}/><Field label="Requests/day" type="number" value={String(pkgEdit.requestsPerDay)} set={v=>setPkgEdit({...pkgEdit,requestsPerDay:Number(v)})}/><Field label="Monthly price (cents)" type="number" value={String(pkgEdit.monthlyPrice)} set={v=>setPkgEdit({...pkgEdit,monthlyPrice:Number(v)})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.package.update')}>Save changes</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.package.delete')}>Delete package</button></div></div>}</div><div className={styles.card}><CardTitle title="Manage connector pack" hint="Edit, publish, deprecate or delete a pack. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPack?.id||''} onChange={e=>pickPack(e.target.value)}><option value="">Select pack</option>{packs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>{selectedPack&&packEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Name" value={packEdit.name} set={v=>setPackEdit({...packEdit,name:v})}/><Field label="Description" value={packEdit.description} set={v=>setPackEdit({...packEdit,description:v})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.update')}>Save changes</button><button className={styles.button} disabled={busy} onClick={()=>setSafeguardOp(selectedPack.published?'platform.connector_pack.deprecate':'platform.connector_pack.publish')}>{selectedPack.published?'Deprecate':'Publish'}</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.delete')}>Delete pack</button></div></div>}</div></div></>;
+ const packagesPage=<><div className={styles.grid2}><div className={styles.card}><CardTitle title="Service packages" hint="Commercial capability bundles. These are not connector infrastructure."/><div className={styles.grid2}>{packages.map(p=><Service key={p.id} title={p.display_name} text={p.name+' · '+(p.monthly_price?'KES '+(p.monthly_price/100).toLocaleString()+'/month':'Custom pricing')} tags={[p.max_users?p.max_users+' users':'∞ users',p.max_connectors?p.max_connectors+' integrations':'∞ integrations',p.enable_sso?'SSO':'',p.enable_agents?'Agents':'',p.enable_advanced_bi?'Advanced BI':''].filter(Boolean)}/>)}</div></div><div className={styles.card}><CardTitle title="Create package" hint="Build a service tier for onboarding."/><div className={styles.form}><Field label="Internal name" value={pkg.name} set={v=>setPkg({...pkg,name:v})}/><Field label="Display name" value={pkg.displayName} set={v=>setPkg({...pkg,displayName:v})}/><Field label="Max users" value={String(pkg.maxUsers)} set={v=>setPkg({...pkg,maxUsers:Number(v)})} type="number"/><Field label="Max integrations" value={String(pkg.maxConnectors)} set={v=>setPkg({...pkg,maxConnectors:Number(v)})} type="number"/><Field label="Requests/day" value={String(pkg.requestsPerDay)} set={v=>setPkg({...pkg,requestsPerDay:Number(v)})} type="number"/><Field label="Monthly price (cents)" value={String(pkg.monthlyPrice)} set={v=>setPkg({...pkg,monthlyPrice:Number(v)})} type="number"/><div className={styles.full}>{(['enableSso','enableCustomRoles','enableAgents','enableAdvancedBi','enableWebhooks'] as const).map(k=><label key={k} style={{display:'block',fontSize:11,margin:'6px 0'}}><input type="checkbox" checked={pkg[k]} onChange={e=>setPkg({...pkg,[k]:e.target.checked})}/> {k.replace('enable','')}</label>)}</div><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy||!pkg.name||!pkg.displayName} onClick={()=>setPkgDialog(true)}>Create package</button></div></div></div></div><div className={styles.card+' '+styles.section}><CardTitle title="Business integration catalog" hint="Connector packs live here because they are customer services, not platform health dependencies."/><div className={styles.grid3}>{packs.map(p=><Service key={p.id} title={p.name} text={p.description||'Integration template'} tags={[p.catalogId,p.published?'Published':'Draft']}/>)}</div></div><div className={styles.grid2}><div className={styles.card}><CardTitle title="Manage package" hint="Edit or delete a package. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPkg?.id||''} onChange={e=>pickPackage(e.target.value)}><option value="">Select package</option>{packages.map(p=><option key={p.id} value={p.id}>{p.display_name}</option>)}</select>{selectedPkg&&pkgEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Display name" value={pkgEdit.displayName} set={v=>setPkgEdit({...pkgEdit,displayName:v})}/><Field label="Max users" type="number" value={String(pkgEdit.maxUsers)} set={v=>setPkgEdit({...pkgEdit,maxUsers:Number(v)})}/><Field label="Max integrations" type="number" value={String(pkgEdit.maxConnectors)} set={v=>setPkgEdit({...pkgEdit,maxConnectors:Number(v)})}/><Field label="Requests/day" type="number" value={String(pkgEdit.requestsPerDay)} set={v=>setPkgEdit({...pkgEdit,requestsPerDay:Number(v)})}/><Field label="Monthly price (cents)" type="number" value={String(pkgEdit.monthlyPrice)} set={v=>setPkgEdit({...pkgEdit,monthlyPrice:Number(v)})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.package.update')}>Save changes</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.package.delete')}>Delete package</button></div></div>}</div><div className={styles.card}><CardTitle title="Manage connector pack" hint="Edit, publish, deprecate or delete a pack. Every privileged change requires a recorded reason."/><select className={styles.select} value={selectedPack?.id||''} onChange={e=>pickPack(e.target.value)}><option value="">Select pack</option>{packs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>{selectedPack&&packEdit&&<div className={styles.form} style={{marginTop:12}}><Field label="Name" value={packEdit.name} set={v=>setPackEdit({...packEdit,name:v})}/><Field label="Description" value={packEdit.description} set={v=>setPackEdit({...packEdit,description:v})}/><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.update')}>Save changes</button><button className={styles.button} disabled={busy} onClick={()=>setSafeguardOp(selectedPack.published?'platform.connector_pack.deprecate':'platform.connector_pack.publish')}>{selectedPack.published?'Deprecate':'Publish'}</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>setSafeguardOp('platform.connector_pack.delete')}>Delete pack</button></div></div>}</div></div></>;
 
  const access=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Tenant access" hint="Select a business to manage its users."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<form className={styles.form} style={{marginTop:12}} onSubmit={addUser}><Field label="Full name" value={user.fullName} set={v=>setUser({...user,fullName:v})}/><Field label="Email" value={user.email} set={v=>setUser({...user,email:v})}/><Field label="Password" value={user.password} set={v=>setUser({...user,password:v})} type="password"/><label className={styles.field}><span>Role</span><select className={styles.select} value={user.role} onChange={e=>setUser({...user,role:e.target.value})}>{roles.map(r=><option key={r}>{r}</option>)}</select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} disabled={busy}>Add user</button></div></form>}</div><div className={styles.card}><CardTitle title={selected?selected.name:'Users'} hint={users.length+' loaded'}/>{users.map(u=><div className={styles.service} key={u.id} style={{marginBottom:8}}><strong>{u.fullName}</strong><p>{u.email} · {u.role}</p><button className={styles.button+' '+(u.isActive?styles.danger:styles.success)} onClick={()=>void toggleUser(u)}>{u.isActive?'Deactivate':'Activate'}</button></div>)}</div></div>;
 
@@ -270,7 +270,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const config=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Global feature controls" hint="Platform-wide switches." />{flags.map(f=><div className={styles.service} key={f.key} style={{marginBottom:8}}><strong>{f.label}</strong><p>{f.note}</p><button className={styles.button+' '+(f.enabled?styles.success:'')} onClick={async()=>{try{const r=await updatePlatformFlag(f.key,!f.enabled);setFlags(r.data);setNotice(f.label+' updated.')}catch(e){setError(e instanceof Error?e.message:'Flag update failed')}}}>{f.enabled?'Enabled':'Disabled'}</button></div>)}</div><div className={styles.card}><CardTitle title="Tenant date & time" hint="Platform operator controls presentation for an onboarded business."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<div className={styles.form} style={{marginTop:12}}><label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>setSettings({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour</option><option value="24h">24-hour</option></select></label><label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>setSettings({...settings,dateStyle:e.target.value as OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short</option><option value="medium">Medium</option><option value="log">Log</option></select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} onClick={()=>void saveDate()}>Save</button></div></div>}</div></div>;
 
-  // â”€â”€ section resolver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── section resolver ────────────────────────────────────────────────────────
   // Every live section maps to a JSX variable. Reserved sections (available:false
   // in app-navigation.ts) render an honest "Planned" state — no fake data.
   const meta = PLATFORM_SECTION_META[activeSection];
@@ -391,7 +391,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // â”€â”€ TASK-13: Services & Entitlements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── TASK-13: Services & Entitlements ──────────────────────────────────────
   const clientServicesPage = (
     <div>
       <div className={styles.card} style={{marginBottom:12}}>
@@ -424,7 +424,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // â”€â”€ TASK-14: Activity & Usage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── TASK-14: Activity & Usage ──────────────────────────────────────────────
   const clientActivityPage = (
     <div className={styles.card}>
       <CardTitle title="Activity & usage" hint="Cross-client audit activity. Filter by client, action or date range."/>
@@ -466,7 +466,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
     </div>
   );
 
-  // â”€â”€ TASK-15: Alerts & Issues â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── TASK-15: Alerts & Issues ──────────────────────────────────────────────
   const clientAlertsPage = (
     <div>
       <div className={styles.grid4} style={{marginBottom:12}}>
@@ -677,7 +677,7 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   const activeLabel = activeSection === 'client'
     ? (wsOrg?.name ?? 'Client Workspace')
     : (SECTION_LABEL[activeSection] ?? meta?.label ?? 'Platform');
-  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>{activeSection === 'client' ? (wsOrg ? `${wsOrg.slug} · ${wsOrg.status}` : 'Loading…') : 'Ellines EIP control-plane operations'}</p></div><div className={styles.topActions}><span className={styles.pill}>â— {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} clients</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
+  return <><main className={styles.main}><div className={styles.topbar}><div><div className={styles.eyebrow}>Platform Control Plane</div><h1 className={styles.title}>{activeLabel}</h1><p className={styles.sub}>{activeSection === 'client' ? (wsOrg ? `${wsOrg.slug} · ${wsOrg.status}` : 'Loading…') : 'Ellines EIP control-plane operations'}</p></div><div className={styles.topActions}><span className={styles.pill}>● {health?.status||'unknown'}</span><span className={styles.pill}>{orgs.length} clients</span></div></div>{error&&<div className={styles.alert}>{error}</div>}{notice&&<div className={styles.notice}>{notice}</div>}{content}</main>
   <ConfirmDialog operationId="platform.package.create" open={pkgDialog} onConfirm={createPackage} onCancel={()=>setPkgDialog(false)} context={pkg.displayName||pkg.name}/>
   <ConfirmDialog operationId={safeguardOp||'platform.package.delete'} open={Boolean(safeguardOp)} onConfirm={reason=>runSafeguarded(reason,safeguardOp||'platform.package.delete')} onCancel={()=>setSafeguardOp(null)} context={safeguardOp&&safeguardOp.indexOf('package')>=0?(selectedPkg?.display_name||''):(selectedPack?.name||'')}/>
   </>;
@@ -688,7 +688,7 @@ function CardTitle({title,hint}:{title:string;hint:string}){return <div classNam
 function Service({title,text,tags=[]}:{title:string;text:string;tags?:string[]}){return <div className={styles.service}><h4>{title}</h4><p>{text}</p>{tags.map(t=><span className={styles.tag} key={t}>{t}</span>)}</div>}
 function Field({label,value,set,placeholder,type='text'}:{label:string;value:string;set:(v:string)=>void;placeholder?:string;type?:string}){return <label className={styles.field}><span>{label}</span><input className={styles.input} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} type={type}/></label>}
 
-// â”€â”€ Full-page Client Workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Full-page Client Workspace ───────────────────────────────────────────────
 // Opened when the operator clicks "Open workspace" on any client org.
 // Full Work Console view per client: every section the client's own users see,
 // but scoped to their org and read via platform cross-org APIs.
@@ -790,7 +790,7 @@ function ClientWorkspace({
   integrationRequests: import('@/lib/api').IntegrationRequestDto[];
   onReviewIntegrationRequest: (reqId:string, payload:{status:'approved'|'rejected';reviewNote?:string}) => Promise<void>;
 }) {
-  // â”€â”€ Internal wizard state for Connectors tab â”€â”€
+  // ── Internal wizard state for Connectors tab ──
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizStep, setWizStep] = useState<1|2|3|4>(1);
   const [wizCatalogId, setWizCatalogId] = useState('openapi');
@@ -925,7 +925,7 @@ function ClientWorkspace({
     {id:'agents',        label:'Automation'},
     {id:'documents',     label:'Documents'},
   ];
-  // â”€â”€ Operator-only control tabs â”€â”€
+  // ── Operator-only control tabs ──
   const OP_TABS: {id: WsTab; label: string}[] = [
     {id:'users',     label:'Users & Access'},
     {id:'audit',     label:'Audit Log'},
@@ -952,7 +952,7 @@ function ClientWorkspace({
 
   return (
     <div>
-      {/* â”€â”€ Client identity banner — always visible â”€â”€ */}
+      {/* ── Client identity banner — always visible ── */}
       <div style={{
         background:'linear-gradient(135deg,rgba(124,58,237,.18),rgba(37,99,235,.1))',
         border:'1px solid rgba(124,58,237,.25)',
@@ -978,7 +978,7 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {/* â”€â”€ Work Console tabs (mirrors client's own nav) â”€â”€ */}
+      {/* ── Work Console tabs (mirrors client's own nav) ── */}
       <div style={{marginBottom:4}}>
         <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2}}>Work Console</div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
@@ -986,7 +986,7 @@ function ClientWorkspace({
         </div>
       </div>
 
-      {/* â”€â”€ Operator control tabs â”€â”€ */}
+      {/* ── Operator control tabs ── */}
       <div style={{marginBottom:18}}>
         <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'.1em',color:'#5f6d83',fontWeight:800,marginBottom:6,paddingLeft:2,marginTop:10}}>Operator Controls</div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:12,borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
@@ -996,7 +996,7 @@ function ClientWorkspace({
 
       {loading && <div style={{padding:'32px 0',color:'#8795aa',textAlign:'center'}}>Loading {org?.name ?? 'client'} workspace…</div>}
 
-      {/* â”€â”€ OVERVIEW â”€â”€ */}
+      {/* ── OVERVIEW ── */}
       {!loading && tab==='overview' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1055,7 +1055,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ GLANCE (Enterprise Snapshot) â”€â”€ */}
+      {/* ── GLANCE (Enterprise Snapshot) ── */}
       {!loading && tab==='glance' && (
         <div>
           {snapshot ? (
@@ -1091,7 +1091,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ TIMELINE â”€â”€ */}
+      {/* ── TIMELINE ── */}
       {!loading && tab==='timeline' && (
         <div>
           <div className={styles.card} style={{marginBottom:12}}>
@@ -1126,7 +1126,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ NOTIFICATIONS â”€â”€ */}
+      {/* ── NOTIFICATIONS ── */}
       {!loading && tab==='notifications' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1154,7 +1154,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ FLEET â”€â”€ */}
+      {/* ── FLEET ── */}
       {!loading && tab==='fleet' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1176,7 +1176,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ PEOPLE â”€â”€ */}
+      {/* ── PEOPLE ── */}
       {!loading && tab==='people' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1215,7 +1215,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ INBOX â”€â”€ */}
+      {/* ── INBOX ── */}
       {!loading && tab==='inbox' && (
         <div className={styles.card}>
           <CardTitle title="Inbox" hint="Email and message activity for this client (requires email connector)."/>
@@ -1230,7 +1230,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ DOCUMENTS â”€â”€ */}
+      {/* ── DOCUMENTS ── */}
       {!loading && tab==='documents' && (
         <div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
@@ -1241,7 +1241,7 @@ function ClientWorkspace({
           {documents.length>0?(<div style={{display:'flex',flexDirection:'column',gap:8}}>{documents.map(doc=>(<div key={doc.id} className={styles.card} style={{padding:'10px 14px'}}><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><span style={{fontSize:'1.3rem',lineHeight:1}}>{mimeIcon(doc.mimeType)}</span><div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:12,marginBottom:3}}>{doc.name}</div><div style={{fontSize:10,color:'#8795aa'}}>{formatBytes(doc.sizeBytes)} · {doc.mimeType} · {doc.uploadedBy} · {new Date(doc.uploadedAt).toLocaleDateString()}{doc.branch?` · ${doc.branch}`:''}</div>{doc.summary&&<p style={{fontSize:10,color:'#8795aa',margin:'4px 0 0'}}>{doc.summary}</p>}{doc.tags.length>0&&<div style={{marginTop:4}}>{doc.tags.map(t=><span key={t} className={styles.tag}>{t}</span>)}</div>}</div><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px',flexShrink:0}} disabled={busy} onClick={async()=>{if(confirm(`Delete "${doc.name}"?`))await onDeleteDocument(doc.id);}}>Delete</button></div></div>))}</div>):(!docUploadOpen&&<div className={styles.planned}><h3>No documents</h3><p>Upload the first document for this client org using the button above.</p></div>)}
         </div>
       )}
-      {/* â”€â”€ CONNECTORS â”€â”€ */}
+      {/* ── CONNECTORS ── */}
       {!loading && tab==='connectors' && (
         <div>
           {/* Entitlement header: used / allowed from package tier */}
@@ -1250,7 +1250,7 @@ function ClientWorkspace({
               <span style={{fontSize:12,color:'#c4b5fd',fontWeight:700}}>
                 {installations.filter(c=>c.status!=='deleted').length}
                 {' / '}
-                {tier.rate_limit_tiers.max_connectors ?? 'âˆž'}
+                {tier.rate_limit_tiers.max_connectors ?? '∞'}
                 {' integrations purchased'}
               </span>
               {tier.rate_limit_tiers.max_connectors !== null &&
@@ -1278,7 +1278,7 @@ function ClientWorkspace({
             }
             <button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} onClick={()=>editInstallation(inst)}>Edit</button><button className={styles.button} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{try{await onSyncConnector(inst.id);}catch(e){console.error(e);}}}>Sync</button><button className={`${styles.button} ${styles.danger}`} style={{fontSize:10,padding:'4px 7px'}} disabled={busy} onClick={async()=>{if(confirm(`Remove "${inst.displayName}"?`))await onDeleteConnector(inst.id);}}>Remove</button></td></tr>))}</tbody></table></div>):(!wizardOpen&&<div className={styles.planned}><h3>No connectors yet</h3><p>Click &quot;+ Install connector&quot; above to connect this client&apos;s first system.</p></div>)}
 
-          {/* â”€â”€ Integration Requests (TASK-09) â”€â”€ */}
+          {/* ── Integration Requests (TASK-09) ── */}
           <div className={styles.card} style={{marginTop:20}}>
             <CardTitle title="Integration requests" hint="Requests submitted by client IT for new integrations. Approve to install, reject with a note."/>
             {integrationRequests.length===0
@@ -1301,7 +1301,7 @@ function ClientWorkspace({
           </div>
         </div>
       )}
-      {/* â”€â”€ APPROVALS â”€â”€ */}
+      {/* ── APPROVALS ── */}
       {!loading && tab==='approvals' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1332,7 +1332,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ USERS & ACCESS â”€â”€ */}
+      {/* ── USERS & ACCESS ── */}
       {!loading && tab==='users' && (
         <div className={styles.grid2}>
           <div className={styles.card}>
@@ -1377,7 +1377,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ RULES â”€â”€ */}
+      {/* ── RULES ── */}
       {!loading && tab==='rules' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1408,7 +1408,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ REPORTS â”€â”€ */}
+      {/* ── REPORTS ── */}
       {!loading && tab==='reports' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1438,7 +1438,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ AUTOMATION / AGENTS â”€â”€ */}
+      {/* ── AUTOMATION / AGENTS ── */}
       {!loading && tab==='agents' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
@@ -1476,7 +1476,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ AUDIT â”€â”€ */}
+      {/* ── AUDIT ── */}
       {!loading && tab==='audit' && (
         <div className={styles.card}>
           <CardTitle title="Client audit log" hint={`Activity log for ${org?.name??'this client'}.`}/>
@@ -1503,7 +1503,7 @@ function ClientWorkspace({
         </div>
       )}
 
-      {/* â”€â”€ SETTINGS â”€â”€ */}
+      {/* ── SETTINGS ── */}
       {!loading && tab==='settings' && (
         <div>
           <div className={styles.grid2} style={{marginBottom:14}}>
