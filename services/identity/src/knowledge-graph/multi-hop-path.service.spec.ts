@@ -5,30 +5,19 @@
  *   confidence >= 0.4. The reasoning engine should never return a path
  *   containing a sub-threshold edge.
  *
- * Tests exercise ReasoningEngineService via mocked Neo4j + Prisma.
+ * Tests exercise ReasoningEngineService via mocked Prisma.
  */
 
 import { ReasoningEngineService } from '../ellinea/reasoning-engine.service';
-import { Neo4jService } from '../database/neo4j.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
-
-function makeNeo4j() {
-  return {
-    runQuery: jest.fn().mockResolvedValue([]),
-    runTransaction: jest.fn(),
-  } as unknown as Neo4jService;
-}
 
 function makePrisma() {
   return {
     knowledgeGraphEntity: {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
-    },
-    modelDecisionLog: {
-      create: jest.fn().mockResolvedValue({ id: 'dl-1' }),
     },
     enterpriseSnapshot: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -41,25 +30,15 @@ function makePrisma() {
 }
 
 function makeSvc() {
-  return new ReasoningEngineService(makeNeo4j(), makePrisma());
+  return new ReasoningEngineService(makePrisma());
 }
 
 // ─── Property 3: Multi-hop path validity ─────────────────────────────────────
 
 describe('ReasoningEngineService — Property 3: multi-hop path validity', () => {
-  /**
-   * The minimum confidence threshold for a relationship to be included in a
-   * traversal path (Req 2.2). Edges below this are dropped.
-   */
-  const MIN_CONFIDENCE = 0.4;
-
-  it('multiHopReasoning returns empty steps when no graph entities exist', async () => {
+  it('multiHopReasoning returns without throwing when no graph entities exist', async () => {
     const svc = makeSvc();
-    const result = await svc.multiHopReasoning('What is X?', 'org-1', 2);
-    expect(result).toBeDefined();
-    expect(Array.isArray(result.steps)).toBe(true);
-    // With no entities, no path can be found — gaps should indicate this
-    expect(Array.isArray(result.knowledgeGaps)).toBe(true);
+    await expect(svc.multiHopReasoning('What is X?', 'org-1', 2)).resolves.toBeDefined();
   });
 
   it('reasoning result always has steps, knowledgeGaps, and evidenceChain', async () => {
@@ -80,7 +59,7 @@ describe('ReasoningEngineService — Property 3: multi-hop path validity', () =>
     await expect(svc.multiHopReasoning('multi hop', 'org-1')).resolves.toBeDefined();
   });
 
-  it('buildEvidenceChain: a step with evidence below minimum confidence is incomplete', () => {
+  it('buildEvidenceChain: a step with evidence below minimum confidence is flagged as incomplete', () => {
     const svc = makeSvc();
     // Relationship confidence < 0.4 would produce a step with no evidence (filtered out)
     const stepsWithLowConfidence = [
@@ -89,7 +68,7 @@ describe('ReasoningEngineService — Property 3: multi-hop path validity', () =>
         operation: 'relationship_traversal',
         entities: [],
         relationships: [],
-        evidence: [], // empty = sub-threshold edge was filtered
+        evidence: [], // empty = sub-threshold edge was filtered, violating Property 4
         justification: 'Low-confidence relationship excluded',
       },
     ];
@@ -119,5 +98,20 @@ describe('ReasoningEngineService — Property 3: multi-hop path validity', () =>
     ];
     const chain = svc.buildEvidenceChain('Widget managed by Alice', validSteps as any);
     expect(chain.isComplete).toBe(true);
+  });
+
+  it('identifyCausalLinks returns empty array for empty input', () => {
+    const svc = makeSvc();
+    expect(svc.identifyCausalLinks([])).toEqual([]);
+  });
+
+  it('identifyCausalLinks returns typed array for event input', () => {
+    const svc = makeSvc();
+    const events = [
+      { id: 'e1', occurredAt: new Date(Date.now() - 10_000), description: 'DB error', source: 'sys-1' },
+      { id: 'e2', occurredAt: new Date(Date.now() - 5_000), description: 'API slow', source: 'sys-2' },
+    ];
+    const result = svc.identifyCausalLinks(events as any);
+    expect(Array.isArray(result)).toBe(true);
   });
 });

@@ -38,12 +38,14 @@ This feature delivers the **ELLINES ORGANIZATION** section of the EIP Super Admi
 
 #### Acceptance Criteria
 
-1. WHEN a user whose email is NOT in `PLATFORM_ADMIN_EMAILS` navigates to any Ellines Org Dashboard section, THE Control_Plane SHALL deny access and display an "access denied" message without leaking any platform data.
-2. WHEN a Platform Admin is authenticated, THE Control_Plane SHALL display the ELLINES ORGANIZATION group in the sidebar rail with all five sub-section items.
-3. WHEN a non-platform-admin user is authenticated (client org role), THE Control_Plane SHALL NOT render any Ellines Org Dashboard section items in that user's sidebar.
-4. THE Ellines_Org_Dashboard SHALL source internal user lists exclusively from the Ellines operator organization (`slug = 'ellines-platform'`), with a mandatory `organization_id` equality filter on every query.
-5. IF a query for internal users is constructed without an `organization_id` filter matching the Ellines operator org, THEN THE System SHALL reject the query and log a security error before returning a 500.
-6. WHEN the Platform Admin views Organization Admin, THE Organization_Admin_Section SHALL list only users whose `organizationId` matches the Ellines operator organization — no client org users may appear.
+1. WHEN a user whose email is NOT in `PLATFORM_ADMIN_EMAILS` navigates to any Ellines Org Dashboard section, THE Control_Plane SHALL deny access and return an "access denied" response within 2 seconds, without including any platform data in the response payload.
+2. WHEN a Platform Admin is authenticated, THE Control_Plane SHALL display the ELLINES ORGANIZATION group in the sidebar rail with all five sub-section items, and the group SHALL be keyboard-navigable.
+3. WHEN a non-platform-admin user is authenticated (client org role), THE Control_Plane SHALL NOT render any Ellines Org Dashboard section items in that user's sidebar — zero ELLINES ORGANIZATION route links or labels SHALL be present in the rendered DOM.
+4. THE Ellines_Org_Dashboard SHALL source internal user lists exclusively from the Ellines operator organization (`slug = 'ellines-platform'`), with a mandatory `organization_id` equality filter on every query, and SHALL NOT return records from any other organization.
+5. IF a query for internal users is constructed without an `organization_id` filter matching the Ellines operator org, THEN THE System SHALL reject the query without executing it against the database, log a security error, and return a 500 before any data is read.
+6. WHEN the Platform Admin views Organization Admin, THE Organization_Admin_Section SHALL list only users whose `organizationId` matches the Ellines operator organization (`slug = 'ellines-platform'`) — no client org users may appear; IF the list is empty (zero internal users), THE section SHALL display an empty-state message rather than an error.
+7. WHEN a Platform Admin's session expires while viewing an Ellines Org Dashboard section, THE Control_Plane SHALL clear any partially-loaded platform data from the UI and redirect the user to the login page.
+8. IF `PLATFORM_ADMIN_EMAILS` is absent from the server environment or resolves to an empty list, THEN THE Control_Plane SHALL deny access to ALL requests for platform admin sections by default and log a configuration warning — it SHALL NOT grant open access.
 
 ---
 
@@ -54,12 +56,12 @@ This feature delivers the **ELLINES ORGANIZATION** section of the EIP Super Admi
 #### Acceptance Criteria
 
 1. WHEN a Platform Admin navigates to Organization Overview (`?section=overview`), THE Overview_Section SHALL display the following KPIs sourced from Platform_Metrics_API: total client organizations onboarded, total active users across all client orgs, API requests in the last 24 hours, and audit events in the last 24 hours.
-2. WHEN the Platform_Metrics_API returns a value for a KPI, THE Overview_Section SHALL display that value; WHEN the value is genuinely unavailable (e.g. the table does not exist), THE Overview_Section SHALL display `—` and not a hardcoded number.
-3. THE Overview_Section SHALL display the live EIP health status sourced from Health_Summary_API, including overall status (`ok` / `degraded`) and database dependency status.
-4. WHEN the health status is `ok`, THE Overview_Section SHALL render the status indicator with the `statusOk` CSS class; WHEN the status is not `ok`, THE Overview_Section SHALL render it with the `statusBad` CSS class.
-5. THE Overview_Section SHALL auto-refresh platform metrics and health every 30 seconds using a `setInterval` that is cleared on component unmount.
+2. WHEN Platform_Metrics_API returns a numeric value for a KPI, THE Overview_Section SHALL display that exact value; WHEN the API returns `null` or the underlying table does not exist, THE Overview_Section SHALL display `—` and SHALL NOT display a hardcoded substitute.
+3. THE Overview_Section SHALL display the live EIP health status sourced from Health_Summary_API, covering overall status (`ok` / `degraded` / `down`) and the `database` dependency status.
+4. WHEN the health status is `ok`, THE Overview_Section SHALL render the status indicator with the `statusOk` CSS class; WHEN the status is `degraded`, THE Overview_Section SHALL render it with the `statusBad` CSS class; WHEN the status is `down`, THE Overview_Section SHALL render it with the `statusBad` CSS class.
+5. THE Overview_Section SHALL auto-refresh platform metrics and health every 30 seconds using a `setInterval` that is cleared on component unmount; IF a refresh call fails, THE Overview_Section SHALL retain the last known values with a staleness indicator and SHALL NOT crash or clear the display.
 6. THE Overview_Section SHALL show a "quick actions" row with links to Register Client, Client Portfolio, Service Packages, and Diagnostics — each linking to the correct `?section=` value in the Control_Plane.
-7. WHEN the Platform Admin views the Overview, THE Overview_Section SHALL show a business summary table of the 8 most recently onboarded client organizations, sourced from the live `organizations` database table.
+7. WHEN the Platform Admin views the Overview, THE Overview_Section SHALL show a business summary table of the 8 most recently onboarded client organizations sorted by `createdAt DESC`, sourced from the live `organizations` database table, excluding the Ellines operator org itself.
 
 ---
 
@@ -71,10 +73,11 @@ This feature delivers the **ELLINES ORGANIZATION** section of the EIP Super Admi
 
 1. WHEN a Platform Admin navigates to Organization Data (`?section=org-data`), THE Organization_Data_Section SHALL be routed by the Section_Resolver and render a dedicated analytics view.
 2. THE Organization_Data_Section SHALL display the following metrics sourced from Platform_Metrics_API: API requests in the last 24 hours, total audit events in the last 24 hours, total connector installations across all client orgs, and failed connector installations.
-3. THE Organization_Data_Section SHALL display Ellinea AI usage data: if an `ellinea_usage` or equivalent table exists, THE Organization_Data_Section SHALL query it scoped by the 24-hour window; IF the table does not exist yet, THE Organization_Data_Section SHALL display `—` with a note "Ellinea usage tracking not yet active" rather than a placeholder number.
-4. THE Organization_Data_Section SHALL display a breakdown of client organizations by status (`active` vs `suspended`) sourced from the `organizations` table.
-5. WHEN data for a metric is loading, THE Organization_Data_Section SHALL show a loading indicator for that metric slot rather than a stale value.
-6. THE Organization_Data_Section SHALL NOT display any data from a single client organization's workspace — all data is platform-aggregate, not per-tenant.
+3. IF the `ellinea_usage` table (or equivalent) exists in the database, THEN THE Organization_Data_Section SHALL query it scoped to the last 24-hour window and display the result.
+4. IF the `ellinea_usage` table does not exist, THEN THE Organization_Data_Section SHALL display `—` with the static label "Ellinea usage tracking not yet active" — it SHALL NOT display a placeholder number.
+5. THE Organization_Data_Section SHALL display a breakdown of client organizations by status (`active` vs `suspended`) sourced from the `organizations` table, excluding the Ellines operator org (`slug = 'ellines-platform'`).
+6. WHEN an API call for any metric fails (network error or 5xx), THE Organization_Data_Section SHALL display an inline error indicator for the affected slot; IF the slot has no prior value, it SHALL display `—`; it SHALL NOT silently retain a stale value without marking it as stale.
+7. WHEN data for a metric is loading, THE Organization_Data_Section SHALL show a loading indicator for that metric slot; metrics are loaded platform-aggregate across ALL client orgs — no data from a single tenant workspace may appear.
 
 ---
 

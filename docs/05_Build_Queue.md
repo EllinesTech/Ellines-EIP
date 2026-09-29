@@ -8,7 +8,12 @@
 
 The execution model is now: **green main → real connector → connector engine → tiny business system → offline/hybrid → platform operations → intelligence → generalization**. Work in small complete slices; do not create another long planning cycle before the current acceptance gate is met.
 
-**Phases 0 and 1 are done** (P0 and P1 rows below, verified 2026-09-22 with the evidence recorded in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md` §39.1 and §40.9). Phase 2 is the active phase and has **no completed deliverable yet** — each of its deliverables was re-verified against code on 2026-09-22 and recorded as open (§40.9.3), so nothing in Phase 2 may be marked done without new evidence.
+**Phases 0–3 are done** (P0–P3 rows below). Phase 4 is the active phase.
+
+- P0/P1 verified 2026-09-22 (evidence in `docs/ELLINES_EIP_SUPER_ADMIN_GOD_MODE_MASTER_SPECIFICATION.md` §39.1 and §40.9).
+- P2 verified 2026-09-23 (evidence in spec §40.9.3).
+- P3 verified 2026-09-23 (evidence in spec §40.9.3).
+- P4 is `next` — see acceptance criteria below.
 
 ## Phase Queue
 
@@ -18,7 +23,7 @@ The execution model is now: **green main → real connector → connector engine
 | P1 | Phase 1 — Master Specification | Master spec reviewed and amended; gap map re-verified against the Phase-0 baseline; this queue seeded from the Phase 2+ roadmap | done — verified 2026-09-22 (spec §40.9.2) |
 | P2 | Phase 2 — Platform Control Plane Foundation | Membership truth, AI server-side authorization/grounding, auth hardening, audit contract, permission grammar, tenant-isolation gate, health/CORS/audit UI fixes | **done** — verified 2026-09-23 (spec §40.9.3): lockout (5/15→15 min, both backends), session registry (migration 0003 + login/logout/requireAuth), unified §12.2 permission grammar (shared by Pages Functions + NestJS RBAC), isolation release gate in CI, named tests (health-probe DB failure injection + CORS matrix incl. preflight) on branch `eip/phase-2-platform-control-plane` @ `0fe82b2`; **G-15** membership truth (register + platform create now write `organization_memberships` in the same transaction — `auth.service.ts:82-95`), **G-17 core** (server-derived JWT identity, server-side grounding from DB, `ellinea:ask` permission gate, deterministic rate limit — `ask.ts` + `rate-limit.ts` free tier 10/min), **G-12** audit contract (flags PATCH + connector-packs POST + audit-logs CSV export all write `audit_rows` with before/after/reason/result/correlationId; `platform-audit.contract.spec.ts` 6/6), **G-08** audit UI depth (org/date filters, pagination Prev/Next, CSV export — `page.tsx` audit page), **G-05** health probes (`/platform/health/summary` + DB/email dependency probes), **G-19** CORS allowlist incl. preflight (`_middleware.ts`) |
 | P3 | Phase 3 — Super Admin / God Mode Core | Safeguard engine, confirmation/reason capture, privileged-operation audit fields, package/connector-pack management, window-layer groundwork | **done** — verified 2026-09-23 (spec §40.9.3): operation-class registry (`packages/shared/src/safeguards.ts` — C-0 through C-5, 17 operations), server-side reason enforcement (`apps/web/functions/shared/auth.ts` — `enforceSafeguards()`), connector-pack lifecycle endpoints (PATCH publish/deprecate/update/DELETE in `connector-packs.ts`), package edit/delete safeguards (`packages/[id].ts`), confirmation dialog + reason capture UI (`confirm-dialog.tsx` + `useSafeguardedAction`), package/connector-pack management UI (`platform/page.tsx`), window-layer/z-index token system (`super-admin.module.css` — `--z-base` through `--z-system`); tests: `safeguard-enforcement.spec.ts` 12/12, `platform-audit.contract.spec.ts` 6/6 |
-| P4 | Phase 4 — Internal Ellines Operations | DB-backed platform staff/roles/grants, scoped authorization, expiry, bootstrap | todo |
+| P4 | Phase 4 — Internal Ellines Operations | DB-backed platform staff/roles/grants, scoped authorization, expiry, bootstrap. **Includes:** connector governance fix (install-from-template platformAdmin gate + max_connectors enforcement — landed 2026-09-29 on `main`), Ellines Org Dashboard (ELLINES ORGANIZATION section — spec at `.kiro/specs/ellines-org-dashboard/requirements.md`) | **next** |
 | P5 | Phase 5 — Business / Tenant Governance | Transactional onboarding, lifecycle states, deletion/retention, search, concurrency controls | todo |
 | P6 | Phase 6 — Connector Platform | Pack lifecycle, credential rotation, sync history, retries, SoT declarations, diagnostics | todo |
 | P7 | Phase 7 — Licensing / Usage / Entitlements | Entitlements, trials, quotas, overrides, usage statements, licensing/quota notifications | todo |
@@ -129,3 +134,16 @@ Phase 3 remains **`next`**: window-layer groundwork is outstanding, and the regi
 **Start here:** `docs/REAL_WORLD_EXECUTION_ROADMAP.md` → **T0 Green Main** → **P1 Real Connector Experiment**.
 
 The target is not to finish documentation. The target is to produce a working real-world integration and then use that proof to drive the reusable connector and business-system architecture.
+
+### 2026-09-29 — Audit fixes + P4 activation (main @ `e1fa94a` → new commit)
+
+Full codebase audit run by Kiro. Findings and fixes applied:
+
+| Finding | File | Fix |
+|---|---|---|
+| **BROKEN** — `TemplateController.installFromTemplate()` had no guards; any authenticated user could install connectors via this path | `services/identity/src/connectors/template.controller.ts` | Added `@UseGuards(JwtAuthGuard)` to every route; added 3-gate platformAdmin enforcement to `installFromTemplate` (admin check, targetOrgId required, max_connectors server-side) and `testTemplate`/CRUD; injects `PrismaService` for entitlement query |
+| **BROKEN** — Pages Function proxy `install-from-template.ts` forwarded with no auth check | `apps/web/functions/api/v1/connectors/install-from-template.ts` | Rewritten to use `requireAuth` + `platformAdminFromEnv` before forwarding; returns 403 for non-admins |
+| **NEEDS AUDIT** — Build queue claimed "Phase 2 is next" but P2 and P3 were already done | `docs/05_Build_Queue.md` | Updated preamble to reflect P0–P3 done; P4 set to `next` with scope |
+| **IN PROGRESS** — 15 EIP 2.0 property test stubs committed but not verified against services | All `*.spec.ts` files in `services/identity/src/` | Tests reference real service implementations — verified imports are correct against existing service files; no missing service implementations found for the spec stubs |
+
+Build queue: P4 is now `next`. Its scope includes the Ellines Org Dashboard (spec at `.kiro/specs/ellines-org-dashboard/`) and DB-backed platform staff management.

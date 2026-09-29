@@ -71,6 +71,9 @@ function PlatformSuperAdminPage(){
  const [health,setHealth]=useState<HealthDto|null>(null),[healthSummary,setHealthSummary]=useState<PlatformHealthSummaryDto|null>(null),[audit,setAudit]=useState<PlatformAuditRow[]>([]),[auditTotal,setAuditTotal]=useState(0),[auditPageIndex,setAuditPageIndex]=useState(0),[selected,setSelected]=useState<PlatformOrg|null>(null);
  const [metrics,setMetrics]=useState<PlatformMetrics|null>(null);
  const [users,setUsers]=useState<OrgMember[]>([]),[stats,setStats]=useState<any>(null),[tier,setTier]=useState<any>(null),[settings,setSettings]=useState<OrgDateTimeSettingsDto>({timeFormat:'24h',dateStyle:'medium'});
+ // ── Ellines operator org internal staff state (org-admin section) ──
+ const [ellinesOrgUsers,setEllinesOrgUsers]=useState<OrgMember[]>([]);
+ const [internalUser,setInternalUser]=useState({email:'',fullName:'',password:'',role:'member'});
  const [query,setQuery]=useState(''),[auditQuery,setAuditQuery]=useState(''),[auditOrg,setAuditOrg]=useState(''),[auditFrom,setAuditFrom]=useState(''),[auditTo,setAuditTo]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  // ── Client workspace state (loaded when entering ?section=client&id=ORG_ID) ──
  const [wsOrg,setWsOrg]=useState<PlatformOrg|null>(null);
@@ -226,6 +229,13 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientOrgId, activeSection, router]);
  useEffect(()=>{if(!allowed)return;const t=setInterval(()=>{void fetchHealth().then(setHealth);void fetchPlatformMetrics().then(setMetrics);void fetchPlatformHealthSummary().then(setHealthSummary)},30000);return()=>clearInterval(t)},[allowed]);
+ // Load internal Ellines staff when navigating to org-admin — scoped to operator org only
+ useEffect(()=>{
+   if(!allowed||activeSection!=='org-admin')return;
+   const orgId=getSession()?.user?.organizationId;
+   if(!orgId)return;
+   listPlatformOrgUsers(orgId).then(setEllinesOrgUsers).catch(e=>setError(e instanceof Error?e.message:'Failed to load internal users'));
+ },[allowed,activeSection]);
 
  async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
  async function deleteOrg(o:PlatformOrg){const reason=window.prompt('DELETE "'+o.name+'" permanently?\n\nThis cannot be undone u2014 all users, connectors, and data for this organization will be removed.\n\nEnter a reason to confirm deletion:');if(!reason||!reason.trim())return;if(!window.confirm('Final confirmation: permanently delete "'+o.name+'" ('+o.slug+')?'))return;setBusy(true);try{await deletePlatformOrg(o.id,reason.trim());setOrgs(x=>x.filter(v=>v.id!==o.id));if(selected?.id===o.id)setSelected(null);setNotice('"'+o.name+'" has been permanently deleted.');navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Delete failed')}finally{setBusy(false)}}
@@ -565,6 +575,118 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   );
 
   function resolveContent() {
+    // ── org-data: Organization Data — usage analytics ──────────────────────────
+    const orgDataPage=(
+      <div>
+        <div className={styles.grid4}>
+          <Kpi label="API requests / 24h" value={metrics?.platform?.apiRequests24h??'—'} hint="real platform usage"/>
+          <Kpi label="Audit events / 24h" value={metrics?.platform?.auditEvents24h??'—'} hint="operator &amp; system activity"/>
+          <Kpi label="Connector installs" value={metrics?.businessServices?.connectorInstallations??'—'} hint="all client orgs"/>
+          <Kpi label="Failed connectors" value={metrics?.businessServices?.failedConnectorInstallations??'—'} hint="require attention" cls={metrics?.businessServices?.failedConnectorInstallations?styles.warn:styles.ok}/>
+        </div>
+        <div className={styles.grid2+' '+styles.section}>
+          <div className={styles.card}>
+            <CardTitle title="Client org breakdown" hint="Active vs suspended client organizations — excludes Ellines operator org."/>
+            <div className={styles.grid2} style={{marginTop:8}}>
+              <Kpi label="Active clients" value={orgs.filter(o=>o.status==='active').length} hint="running tenants" cls={styles.ok}/>
+              <Kpi label="Suspended clients" value={orgs.filter(o=>o.status!=='active').length} hint="access blocked" cls={orgs.filter(o=>o.status!=='active').length?styles.warn:styles.ok}/>
+            </div>
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Ellinea AI usage" hint="Usage tracking requires the ellinea_usage table. Not yet active."/>
+            <Service title="Ellinea usage / 24h" text="—"/>
+            <p className={styles.muted} style={{fontSize:11,marginTop:4}}>Ellinea usage tracking not yet active</p>
+          </div>
+        </div>
+      </div>
+    );
+
+    // ── org-system: Organization System — infrastructure health ────────────────
+    const dbDep=healthSummary?.dependencies.find(d=>d.name==='database');
+    const emailDep=healthSummary?.dependencies.find(d=>d.name==='email');
+    const orgSystemPage=(
+      <div>
+        <div className={styles.grid4}>
+          <Kpi label="Overall status" value={healthSummary?.status||health?.status||'unknown'} hint="probed platform" cls={healthSummary?.status==='ok'?styles.ok:styles.warn}/>
+          <Kpi label="Database" value={dbDep?.status||'unknown'} hint={dbDep?.latencyMs!=null?dbDep.latencyMs+'ms latency':'no latency data'} cls={dbDep?.status==='up'?styles.ok:styles.warn}/>
+          <Kpi label="Email" value={emailDep?.status||'unknown'} hint={emailDep?.provider||'provider unknown'} cls={emailDep?.status==='up'?styles.ok:styles.warn}/>
+          <Kpi label="Last checked" value={healthSummary?.checkedAt?new Date(healthSummary.checkedAt).toLocaleTimeString():'—'} hint="health probe time"/>
+        </div>
+        <div className={styles.grid2+' '+styles.section}>
+          <div className={styles.card}>
+            <CardTitle title="Dependency details" hint="Live infrastructure probes — no connector required."/>
+            {healthSummary?.dependencies.map(d=>(
+              <div key={d.name} className={styles.service} style={{marginBottom:8}}>
+                <h4 style={{display:'flex',gap:8,alignItems:'center'}}>
+                  {d.name}
+                  <span className={styles.status+' '+(d.status==='up'?styles.statusOk:styles.statusBad)}>{d.status}</span>
+                </h4>
+                <p>{d.latencyMs!=null?d.latencyMs+'ms':''}{d.provider?' · '+d.provider:''}{d.error?' · '+d.error:''}</p>
+              </div>
+            ))||<p className={styles.muted}>No dependency data yet — run a health check.</p>}
+          </div>
+          <div className={styles.card}>
+            <CardTitle title="Identity service" hint="EIP identity API version and runtime status."/>
+            <Service title={health?.status||'unknown'} text={'Version '+( health?.version||'—')}/>
+            <div style={{marginTop:12}}>
+              <button className={styles.button+' '+styles.primary} onClick={()=>void fetchPlatformHealthSummary().then(setHealthSummary).catch(e=>setError(e instanceof Error?e.message:'Health check failed'))}>
+                Run health check
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // ── org-admin: Organization Admin — internal staff management ──────────────
+    const ellinesOrgId=getSession()?.user?.organizationId||'';
+    const activeInternalCount=ellinesOrgUsers.filter(u=>u.isActive).length;
+    const orgAdminPage=(
+      <div className={styles.grid2}>
+        <div className={styles.card}>
+          <CardTitle title="Internal staff" hint={'Ellines operator org only — '+activeInternalCount+' active of '+ellinesOrgUsers.length+' total. Client org users never appear here.'}/>
+          {ellinesOrgUsers.length===0&&<p className={styles.muted}>No internal users loaded yet.</p>}
+          {ellinesOrgUsers.map(u=>(
+            <div key={u.id} className={styles.service} style={{marginBottom:8}}>
+              <strong>{u.fullName}</strong>
+              <p>{u.email} · {u.role} · <span className={styles.status+' '+(u.isActive?styles.statusOk:styles.statusBad)}>{u.isActive?'active':'inactive'}</span></p>
+              <button className={styles.button+' '+(u.isActive?styles.danger:styles.success)} disabled={busy} onClick={async()=>{
+                if(!ellinesOrgId)return;
+                setBusy(true);
+                try{const x=await updatePlatformOrgUser(ellinesOrgId,u.id,{isActive:!u.isActive});setEllinesOrgUsers(v=>v.map(z=>z.id===x.id?x:z))}
+                catch(e){setError(e instanceof Error?e.message:'User update failed')}
+                finally{setBusy(false)}
+              }}>{u.isActive?'Deactivate':'Activate'}</button>
+            </div>
+          ))}
+        </div>
+        <form className={styles.card} onSubmit={async(e)=>{
+          e.preventDefault();
+          if(!internalUser.role.trim()){setError('Role is required.');return;}
+          if(!ellinesOrgId)return;
+          setBusy(true);
+          try{const u=await createPlatformOrgUser(ellinesOrgId,internalUser);setEllinesOrgUsers(v=>[u,...v]);setInternalUser({email:'',fullName:'',password:'',role:'member'});setNotice('Internal user created.')}
+          catch(e){setError(e instanceof Error?e.message:'User creation failed')}
+          finally{setBusy(false)}
+        }}>
+          <CardTitle title="Add internal staff" hint="Creates a user inside the Ellines operator org only — not a client org."/>
+          <div className={styles.form}>
+            <Field label="Full name" value={internalUser.fullName} set={v=>setInternalUser(u=>({...u,fullName:v}))}/>
+            <Field label="Email" value={internalUser.email} set={v=>setInternalUser(u=>({...u,email:v}))} type="email"/>
+            <Field label="Password" value={internalUser.password} set={v=>setInternalUser(u=>({...u,password:v}))} type="password"/>
+            <label className={styles.field}><span>Role *</span>
+              <select className={styles.select} value={internalUser.role} onChange={e=>setInternalUser(u=>({...u,role:e.target.value}))}>
+                {roles.map(r=><option key={r}>{r}</option>)}
+              </select>
+            </label>
+            <div className={styles.full}>
+              <button className={styles.button+' '+styles.primary} disabled={busy||!internalUser.email||!internalUser.fullName||!internalUser.role}>Add user</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    );
+
     if (isReserved) return <Planned title={meta?.label ?? 'Planned'} note={meta?.note} />;
     switch (activeSection) {
       case 'overview':         return overview;
@@ -582,6 +704,9 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       case 'audit':            return auditPage;
       case 'configuration':    return config;
       case 'ai':               return aiPage;
+      case 'org-data':         return orgDataPage;
+      case 'org-system':       return orgSystemPage;
+      case 'org-admin':        return orgAdminPage;
       case 'client':           return <ClientWorkspace
           org={wsOrg}
           orgId={clientOrgId}

@@ -37,7 +37,10 @@ export type PlatformSectionId =
   | 'audit'
   | 'client-audit'
   | 'client'   /* full-page client org workspace — ?section=client&id=ORG_ID */
-  | 'ai';
+  | 'ai'
+  | 'org-data'    /* ELLINES ORGANIZATION — Usage Analytics */
+  | 'org-system'  /* ELLINES ORGANIZATION — Infrastructure Health */
+  | 'org-admin';  /* ELLINES ORGANIZATION — Internal Staff Management */
 
 /** The four Super Admin contexts. They must never be mixed. */
 export type NavGroupId = 'ellines-organization' | 'client-organizations' | 'platform' | 'ellinea';
@@ -118,6 +121,8 @@ export function platformSectionHref(section: PlatformSectionId): string {
   return section === 'overview' ? '/app/platform' : `/app/platform?section=${section}`;
 }
 
+const href = platformSectionHref;
+
 /** Ellines' OWN organization context (our own operations + operator work surface). */
 const ELLINES_ORGANIZATION_ITEMS: NavItem[] = [
   {
@@ -132,8 +137,9 @@ const ELLINES_ORGANIZATION_ITEMS: NavItem[] = [
   {
     id: 'org-data',
     label: 'Organization Data',
-    href: '/app/org-data',
+    href: href('org-data'),
     icon: 'org-data',
+    section: 'org-data',
     group: 'ellines-organization',
     orgSystemAccess: true,
     available: true,
@@ -141,8 +147,9 @@ const ELLINES_ORGANIZATION_ITEMS: NavItem[] = [
   {
     id: 'org-system',
     label: 'Organization System',
-    href: '/app/org-system',
+    href: href('org-system'),
     icon: 'org-system',
+    section: 'org-system',
     group: 'ellines-organization',
     orgSystemAccess: true,
     available: true,
@@ -151,8 +158,9 @@ const ELLINES_ORGANIZATION_ITEMS: NavItem[] = [
     id: 'org-admin',
     label: 'Org Admin',
     superAdminLabel: 'Organization Admin',
-    href: '/app/admin',
+    href: href('org-admin'),
     icon: 'org-admin',
+    section: 'org-admin',
     group: 'ellines-organization',
     adminOnly: true,
     available: true,
@@ -182,8 +190,6 @@ const WORK_CONSOLE_ITEMS: NavItem[] = [
   { id: 'connectors', label: 'Connectors', href: '/app/connectors', icon: 'connectors', group: 'ellines-organization', subGroup: 'work-console', adminOnly: true, available: true },
   { id: 'documents', label: 'Documents', href: '/app/documents', icon: 'documents', group: 'ellines-organization', subGroup: 'work-console', available: true },
 ];
-
-const href = platformSectionHref;
 
 /** External / customer organizations that Ellines EIP manages. */
 const CLIENT_ORGANIZATION_ITEMS: NavItem[] = [

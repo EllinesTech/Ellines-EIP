@@ -9,26 +9,15 @@
  */
 
 import { ReasoningEngineService } from './reasoning-engine.service';
-import { Neo4jService } from '../database/neo4j.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
-
-function makeNeo4j() {
-  return {
-    runQuery: jest.fn().mockResolvedValue([]),
-    runTransaction: jest.fn(),
-  } as unknown as Neo4jService;
-}
 
 function makePrisma() {
   return {
     knowledgeGraphEntity: {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
-    },
-    modelDecisionLog: {
-      create: jest.fn().mockResolvedValue({ id: 'dl-1' }),
     },
     enterpriseSnapshot: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -41,7 +30,7 @@ function makePrisma() {
 }
 
 function makeSvc() {
-  return new ReasoningEngineService(makeNeo4j(), makePrisma());
+  return new ReasoningEngineService(makePrisma());
 }
 
 // ─── Property 4: Evidence chain completeness ──────────────────────────────────
