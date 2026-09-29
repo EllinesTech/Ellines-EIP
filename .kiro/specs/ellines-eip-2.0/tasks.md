@@ -44,7 +44,7 @@ from 1.2.
     - Test Redis set/get/expire and pub/sub.
     - _Requirements: 21.3_
 
-- [-] 2. Model Orchestrator — Ellinea AI core
+- [x] 2. Model Orchestrator — Ellinea AI core
   - [x] 2.1 Create AI model registry service and schema
     - Add `AiModelRegistry` and `ModelDecisionLog` Prisma models to
       `services/identity/prisma/schema.prisma` if not already present (verify against Task 1.1
@@ -88,17 +88,17 @@ from 1.2.
     - Generate random arrays of model confidence floats; assert combined score is always between
       min and max of the inputs.
 
-  - [-] 2.6 Wire model orchestrator endpoint into Pages Functions
+  - [x] 2.6 Wire model orchestrator endpoint into Pages Functions
     - Extend `apps/web/functions/api/v1/ellinea/ask.ts` to call the model orchestrator service
       (via internal API call to identity if needed, or extract logic into a shared module).
     - Gate on `ellinea:ask` permission (already exists); enforce rate limit (already exists).
     - Return `UnifiedResult` shape; include `modelDecisions` array in response for audit.
     - _Requirements: 1.2, 1.6, 1.8_
 
-  - [~] 2.7 Checkpoint — builds and model orchestrator tests pass
+  - [x] 2.7 Checkpoint — builds and model orchestrator tests pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 3. Knowledge Graph Engine
+- [x] 3. Knowledge Graph Engine
   - [x] 3.1 Implement entity extraction service
     - Create `services/identity/src/knowledge-graph/entity-extractor.service.ts`.
     - For each connected `ConnectorInstallation` data window (from `EnterpriseSnapshot`/`UEM`),
@@ -126,7 +126,7 @@ from 1.2.
     - Build a small in-memory graph with deliberately low-confidence edges; assert that
       `reasoningEngine.traversePath()` never returns a path containing a sub-threshold edge.
 
-  - [-] 3.4 Implement entity resolution (deduplication)
+  - [x] 3.4 Implement entity resolution (deduplication)
     - Create `services/identity/src/knowledge-graph/entity-resolver.service.ts`.
     - Similarity algorithm: Levenshtein for names + exact match on `sourceEntityId`; threshold
       configurable, default 0.85.
@@ -135,7 +135,7 @@ from 1.2.
     - Persist conflict to `KnowledgeGraphEntity` `mergedIntoId` field.
     - _Requirements: 17.4_
 
-  - [~] 3.5 Implement graph query and subgraph visualisation endpoint
+  - [x] 3.5 Implement graph query and subgraph visualisation endpoint
     - Create NestJS controller `KnowledgeGraphController` at
       `services/identity/src/knowledge-graph/` with routes:
       - `GET /knowledge-graph/entities` — list entities for org with optional type filter.
@@ -148,10 +148,10 @@ from 1.2.
       window ingest.
     - _Requirements: 17.3, 17.6, 17.7, 17.8_
 
-  - [~] 3.6 Checkpoint — knowledge graph round-trip verified against local DB
+  - [x] 3.6 Checkpoint — knowledge graph round-trip verified against local DB
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 4. Advanced Reasoning Engine
+- [x] 4. Advanced Reasoning Engine
   - [x] 4.1 Implement multi-hop reasoning service
     - Create `services/identity/src/ellinea/reasoning-engine.service.ts`.
     - `multiHopReasoning(question, maxHops=3)` — traverses knowledge graph up to `maxHops`
@@ -169,7 +169,7 @@ from 1.2.
     - For a set of multi-step reasoning results, assert that no conclusion exists without at
       least one evidence item per step in its chain.
 
-  - [ ] 4.3 Implement pattern detection across systems
+  - [x] 4.3 Implement pattern detection across systems
     - Extend `ReasoningEngine` with `detectPatterns(dataSources[])`.
     - Cross-system pattern: correlate data from ≥ 3 different `sourceSystem` values; flag patterns
       where a KPI drops in system A and a related entity in system B also degrades within the same
@@ -178,7 +178,7 @@ from 1.2.
       dashboards.
     - _Requirements: 2.4, 2.5_
 
-  - [~] 4.4 Implement hypothesis generation and testing
+  - [x] 4.4 Implement hypothesis generation and testing
     - `generateHypotheses(observation)` — produce 2–5 candidate explanations ranked by
       `confidence`; each references `evidence[]` from graph + snapshot.
     - `testHypothesis(h)` — query historical `EnterpriseSnapshot` records to validate or refute;
@@ -187,7 +187,7 @@ from 1.2.
     - _Requirements: 2.5, 2.6, 2.7_
 
 - [-] 5. Self-Healing System
-  - [-] 5.1 Implement Self-Healing Detector
+  - [x] 5.1 Implement Self-Healing Detector
     - Create `services/identity/src/self-healing/detector.service.ts`.
     - Subscribe to application-level error events from NestJS global exception filter (extend
       `services/identity/src/common/` exception filter to emit events).
@@ -200,7 +200,7 @@ from 1.2.
     - `createIncident(cluster)` — persist to `RemediationExecution` with `status = 'open'`.
     - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.8_
 
-  - [-] 5.2 Implement Self-Healing Remediator
+  - [x] 5.2 Implement Self-Healing Remediator
     - Create `services/identity/src/self-healing/remediator.service.ts`.
     - `lookupStrategy(errorPattern)` — query `RemediationPlaybook` table; fallback to
       `manual_review` if no entry.
@@ -232,7 +232,7 @@ from 1.2.
     - For each `RemediationAction` type, apply it twice to a captured state snapshot and assert
       the resulting state is identical after both applications.
 
-  - [~] 5.5 Implement Self-Healing Learner
+  - [x] 5.5 Implement Self-Healing Learner
     - Create `services/identity/src/self-healing/learner.service.ts`.
     - `recordOutcome(result)` — append to `RemediationExecution`; update
       `RemediationPlaybook.historicalSuccessRate` using rolling average.
@@ -247,11 +247,11 @@ from 1.2.
       `Recommendation[]` for surfacing on the Super Admin AI panel.
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.8_
 
-  - [~] 5.6 Checkpoint — self-healing pipeline verified end-to-end against local DB
+  - [ ] 5.6 Checkpoint — self-healing pipeline verified end-to-end against local DB
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 6. Predictive Analytics Engine
-  - [~] 6.1 Implement forecasting service
+- [x] 6. Predictive Analytics Engine
+  - [x] 6.1 Implement forecasting service
     - Create `services/identity/src/analytics/predictive-analytics.service.ts`.
     - `forecast(metric, horizon=30)` — read time-series data from InfluxDB (via
       `InfluxDbService`); apply exponential smoothing (ETS) for a 30-day forward projection;
@@ -278,7 +278,7 @@ from 1.2.
     - Assert that for any `Scenario[]` returned by `generateScenarios`, the sum of
       `scenario.probability` equals exactly 1.0 (within floating-point epsilon).
 
-  - [~] 6.4 Implement leading indicator identification
+  - [x] 6.4 Implement leading indicator identification
     - `identifyLeadingIndicators(targetMetric)` — cross-correlate all available InfluxDB
       measurements against `targetMetric` with lags of 1–14 days; return `Indicator[]` sorted
       by correlation strength.
@@ -286,7 +286,7 @@ from 1.2.
       for alert rules.
     - _Requirements: 11.2_
 
-  - [~] 6.5 Expose predictive analytics API and integrate with dashboard service
+  - [x] 6.5 Expose predictive analytics API and integrate with dashboard service
     - Add `GET /api/v1/orgs/:slug/analytics/forecast?metric=&horizon=` Pages Function; gated on
       `owner` or `admin` role; includes org isolation filter.
     - Add `GET /api/v1/orgs/:slug/analytics/scenarios` Pages Function.
@@ -296,7 +296,7 @@ from 1.2.
     - _Requirements: 11.1, 7.5, 9.4_
 
 - [-] 7. Alert Correlation Engine
-  - [~] 7.1 Implement alert correlation service
+  - [x] 7.1 Implement alert correlation service
     - Create `services/identity/src/alerts/alert-correlation.service.ts`.
     - `correlateAlerts(alerts[])` — group alerts arriving within a 5-minute window by shared
       component, user, or connector; produce `AlertCluster[]`. All alerts in a cluster must fall
@@ -324,14 +324,14 @@ from 1.2.
     - For any `AlertCluster` with ≥ 2 alerts, assert `cluster.rootCause !== null` and that
       exactly one alert in `cluster.alerts` is marked as root cause.
 
-  - [~] 7.4 Wire alert correlation into self-healing detector and dashboard
+  - [x] 7.4 Wire alert correlation into self-healing detector and dashboard
     - Call `AlertCorrelationService.correlateAlerts()` from `SelfHealingDetector` after grouping
       errors, so that alert-driven incidents use correlated root causes.
     - Surface `AlertCluster[]` in the `GET /api/v1/orgs/:slug/alerts` Pages Function response
       (add `clusters` field to existing alerts endpoint or create new route).
     - _Requirements: 12.6, 12.8_
 
-  - [~] 7.5 Checkpoint — alert correlation and predictive analytics pass
+  - [x] 7.5 Checkpoint — alert correlation and predictive analytics pass
     - Ensure all tests pass, ask the user if questions arise.
 
 - [-] 8. Federated Learning Coordinator

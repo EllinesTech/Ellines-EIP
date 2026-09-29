@@ -743,6 +743,90 @@
   }
 }
 
+/* ── 23.2: Mobile-responsive layout (max-width: 768px) ───────────────────────
+ * 1-column grid for all major sections; collapsed sidebar behaviour handled
+ * by shell.module.css (sidebar becomes hidden by default on mobile).
+ */
+@media (max-width: 768px) {
+  .page {
+    padding: 0 0.5rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .kpis {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .uemStrip {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+
+  .gridAdmin,
+  .gridAdminBottom,
+  .gridClientTop,
+  .gridClientMid {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+
+  .donutWrap {
+    grid-template-columns: 1fr;
+  }
+
+  .opsRail {
+    gap: 0.25rem;
+  }
+
+  .opsLink {
+    font-size: 0.68rem;
+    padding: 0.2rem 0.45rem;
+  }
+
+  .card {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .kpi {
+    padding: 0.6rem 0.75rem;
+    min-height: 6rem;
+  }
+
+  .kpi strong {
+    font-size: 1.35rem;
+  }
+
+  .quickBar {
+    gap: 0.35rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .quickLink {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.65rem;
+  }
+
+  .healthChips {
+    gap: 0.3rem;
+  }
+
+  .healthChip {
+    min-width: 6.5rem;
+    padding: 0.35rem 0.45rem;
+  }
+}
+
 /* Shared panels used by Ellinea / Settings / Admin / Connectors */
 .brief,
 .health,

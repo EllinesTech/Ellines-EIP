@@ -25,6 +25,8 @@
   --eip-font: 'Exo 2', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
   --eip-radius: 14px;
   --eip-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  /* Smooth transitions when the data-theme attribute changes */
+  transition: background-color 0.2s, color 0.2s;
 }
 
 *,
@@ -253,4 +255,56 @@ input {
 .auth-footer a {
   color: var(--eip-accent);
   font-weight: 600;
+}
+
+
+/* ─── Theme system — Task 18.4 ───────────────────────────────────────────────
+ * Semantic aliases that widget and dashboard components consume via
+ * var(--theme-*). The default theme mirrors the EIP dark command palette.
+ * Switching data-theme="light" on <html> or any ancestor applies the light
+ * overrides below without touching the core --eip-* palette.
+ *
+ * Requirement 20.x: Dashboard theme customisation
+ */
+
+:root,
+[data-theme="dark"] {
+  --theme-bg:      #0F172A;
+  --theme-surface: #1E293B;
+  --theme-text:    #F1F5F9;
+  --theme-muted:   var(--eip-muted);
+  --theme-border:  rgba(255,255,255,0.12);
+  --theme-accent:  var(--eip-primary);
+  --theme-accent2: var(--eip-blue);
+  --theme-success: var(--eip-success);
+  --theme-warn:    var(--eip-warn);
+  --theme-danger:  var(--eip-danger);
+  /* Smooth theme transitions */
+  transition: background-color 0.2s, color 0.2s;
+}
+
+[data-theme="light"] {
+  --theme-bg:      #F8FAFC; --theme-surface: #FFFFFF; --theme-text: #0F172A; --theme-border: rgba(0,0,0,0.12);
+  --theme-muted:   #64748b;
+  --theme-accent:  #7c3aed;
+  --theme-accent2: #2563eb;
+  --theme-success: #059669;
+  --theme-warn:    #d97706;
+  --theme-danger:  #dc2626;
+}
+
+[data-theme="high-contrast"] {
+  --theme-bg:      #000000; --theme-surface: #111111; --theme-text: #FFFFFF; --theme-border: rgba(255,255,255,0.5);
+  --theme-muted:   #cccccc;
+  --theme-accent:  #a78bfa;
+  --theme-accent2: #60a5fa;
+  --theme-success: #34d399;
+  --theme-warn:    #fbbf24;
+  --theme-danger:  #f87171;
+}
+
+/* Utility: data-theme switcher toggle component hook */
+[data-theme-scope] {
+  background: var(--theme-bg);
+  color: var(--theme-text);
 }

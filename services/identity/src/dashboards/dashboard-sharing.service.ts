@@ -33,6 +33,47 @@ export class DashboardSharingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Share dashboard with a user (convenience overload).
+   * Requirement 20.4: Dashboard sharing with permissions
+   */
+  async share(
+    dashboardId: string,
+    organizationId: string,
+    sharedBy: string,
+    options: {
+      shareWith?: string;
+      permission?: 'view' | 'edit' | 'admin';
+      generateLink?: boolean;
+      expiresAt?: Date;
+    },
+  ): Promise<{ shareId?: string; shareLink?: ShareLink }> {
+    const result: { shareId?: string; shareLink?: ShareLink } = {};
+
+    if (options.shareWith) {
+      const { shareId } = await this.shareDashboard(
+        dashboardId,
+        organizationId,
+        sharedBy,
+        options.shareWith,
+        options.permission ?? 'view',
+        options.expiresAt,
+      );
+      result.shareId = shareId;
+    }
+
+    if (options.generateLink) {
+      result.shareLink = await this.generateShareLink(
+        dashboardId,
+        organizationId,
+        options.permission === 'edit' ? 'edit' : 'view',
+        options.expiresAt,
+      );
+    }
+
+    return result;
+  }
+
+  /**
    * Share dashboard with a user
    * Requirement 20.4: Dashboard sharing with permissions
    */
@@ -125,6 +166,59 @@ export class DashboardSharingService {
   }
 
   /**
+   * Generate a signed JWT share link with a 7-day TTL.
+   * Requirement 20.4: Signed share links
+   */
+  async generateSignedShareLink(
+    dashboardId: string,
+    organizationId: string,
+    permission: 'view' | 'edit',
+  ): Promise<ShareLink> {
+    // Verify dashboard exists
+    const dashboard = await this.prisma.dashboard.findFirst({
+      where: { id: dashboardId, organizationId },
+    });
+
+    if (!dashboard) {
+      throw new NotFoundException(`Dashboard ${dashboardId} not found`);
+    }
+
+    const shareId = crypto.randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 7 * 24 * 60 * 60; // 7 days
+    const expiresAt = new Date(exp * 1000);
+
+    // Build a minimal JWT (HS256) without external dependency.
+    // Payload carries dashboardId, orgId, permission, and standard JWT claims.
+    const secret = process.env.JWT_SECRET || 'eip-share-secret';
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(
+      JSON.stringify({ sub: shareId, dashboardId, organizationId, permission, iat: now, exp }),
+    ).toString('base64url');
+    const sigInput = `${header}.${payload}`;
+    const sig = crypto
+      .createHmac('sha256', secret)
+      .update(sigInput)
+      .digest('base64url');
+    const token = `${sigInput}.${sig}`;
+
+    const baseUrl = process.env.PUBLIC_URL || 'https://eip.ellines.co.ke';
+    const url = `${baseUrl}/shared/dashboard/${token}`;
+
+    this.logger.log(`Generated signed JWT share link for dashboard ${dashboardId}`);
+
+    return {
+      shareId,
+      dashboardId,
+      token,
+      url,
+      permission,
+      expiresAt,
+      isActive: true,
+    };
+  }
+
+  /**
    * Revoke share access
    */
   async revokeShare(
@@ -182,5 +276,21 @@ export class DashboardSharingService {
     // Check if token is valid and not expired
     // For now, return null (not implemented)
     return null;
+  }
+
+  /**
+   * Generate a public share link for a dashboard.
+   * Requirement 20.4: Dashboard sharing via link (task 18.3 spec interface)
+   *
+   * @param dashboardId  The dashboard to share.
+   * @param orgId        The owning organization (tenant scope).
+   * @returns            `{ shareUrl }` — the public URL for the shared dashboard.
+   */
+  async shareWithLink(
+    dashboardId: string,
+    orgId: string,
+  ): Promise<{ shareUrl: string }> {
+    const link = await this.generateShareLink(dashboardId, orgId, 'view');
+    return { shareUrl: link.url };
   }
 }

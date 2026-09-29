@@ -1,19 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isOrgAdminRole, workHomeVariant, type WorkHomeVariant } from '@ellines-eip/shared';
 import {
-  AreaPulse,
-  BarWeek,
   DonutStatus,
-  Sparkline,
   chartColors,
-  pulseSeries,
-  sparkSeries,
-  weekSeries,
 } from '@/components/dashboard/charts';
-import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, fetchOrgDataWindow, pullEmailSync, type ConnectorInstallationDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto, type OrgDataWindowDto, type EmailSyncResultDto } from '@/lib/api';
+import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, fetchOrgDataWindow, pullEmailSync, fetchConnectorHealth, type ConnectorInstallationDto, type ConnectorHealthDto, type ConnectorHealthItemDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto, type OrgDataWindowDto, type EmailSyncResultDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
 import styles from './command.module.css';
@@ -206,6 +200,7 @@ function AdminOverview({
   variant,
   uiPrefs,
   installations,
+  connectorHealth,
   ruleHits,
   correlationGroups,
 }: {
@@ -216,6 +211,7 @@ function AdminOverview({
   variant: WorkHomeVariant;
   uiPrefs: UiPrefs;
   installations: ConnectorInstallationDto[];
+  connectorHealth: ConnectorHealthDto | null;
   ruleHits: RuleHit[];
   correlationGroups: AlertCorrelationGroupDto[];
 }) {
@@ -248,36 +244,20 @@ function AdminOverview({
       .finally(() => setEmailPulling(false));
   }
 
-  const pulse = useMemo(() => synced ? pulseSeries(health) : [], [synced, health]);
-  const sparks = useMemo(
-    () => ({
-      health: sparkSeries(synced ? health : 0, 9),
-      systems: sparkSeries(synced ? systems * 18 + 30 : 0, 9),
-      decisions: sparkSeries(synced ? decisions * 10 + 35 : 0, 9),
-      ready: sparkSeries(synced ? health : 0, 9),
-    }),
-    [synced, health, systems, decisions],
-  );
+  // No synthetic chart data — sparklines and pulse charts require real time-series
+  // data which is not yet tracked per-week. Show the sections without charts for now.
 
+  // Timeline comes only from the real connector sync payload.
   const timeline =
     synced && summary?.timeline?.length
       ? summary.timeline
-      : [
-          {
-            title: 'Access layers online',
-            detail: 'Work Console, Org IT Admin, and Platform Super Admin are separated by role.',
-          },
-          {
-            title: 'Next: sync a connector',
-            detail: 'Open Connectors and run Sync now to pull live data from your business systems.',
-          },
-        ];
+      : [];
 
-  const donut = synced
+  // Tasks donut uses real counts only — no floor values, no synthetic "Standing by" baseline.
+  const donut = synced && (decisions > 0 || alerts > 0)
     ? [
-        { name: 'Decisions', value: Math.max(1, decisions), color: chartColors.GREEN },
-        { name: 'Alerts', value: Math.max(1, alerts), color: chartColors.BLUE },
-        { name: 'Standing by', value: Math.max(1, 8 - alerts), color: chartColors.AMBER },
+        ...(decisions > 0 ? [{ name: 'Decisions', value: decisions, color: chartColors.GREEN }] : []),
+        ...(alerts > 0    ? [{ name: 'Alerts',    value: alerts,    color: chartColors.BLUE  }] : []),
       ]
     : [];
   const totalTasks = donut.reduce((a, b) => a + b.value, 0);
@@ -418,21 +398,97 @@ function AdminOverview({
 
       <OnboardingChecklist synced={synced} installations={installations} />
 
-      {installations.length ? (
+      {/* ── Connector Health Panel ────────────────────────────────────────────
+          Data comes from GET /api/v1/connectors/health — live DB query, no
+          hardcoded values. Falls back to the installations list (status only)
+          while the richer health fetch is in flight.                           */}
+      {(connectorHealth?.connectors.length || installations.length) ? (
         <section className={styles.healthStrip} aria-label="Connector health">
-          <div className={styles.panelLabel}>Connector health</div>
-          <div className={styles.healthChips}>
-            {installations.slice(0, 8).map((inst) => (
-              <Link
-                key={inst.id}
-                href="/app/connectors"
-                className={styles.healthChip}
-                data-status={inst.status || 'idle'}
+          <div className={styles.panelLabel}>
+            Connector health
+            {connectorHealth ? (
+              <span
+                style={{
+                  marginLeft: '0.5rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '999px',
+                  background:
+                    connectorHealth.overallStatus === 'ok'
+                      ? 'rgba(34,197,94,0.15)'
+                      : connectorHealth.overallStatus === 'degraded'
+                        ? 'rgba(251,191,36,0.15)'
+                        : connectorHealth.overallStatus === 'error'
+                          ? 'rgba(239,68,68,0.15)'
+                          : 'rgba(255,255,255,0.07)',
+                  color:
+                    connectorHealth.overallStatus === 'ok'
+                      ? '#4ade80'
+                      : connectorHealth.overallStatus === 'degraded'
+                        ? '#fbbf24'
+                        : connectorHealth.overallStatus === 'error'
+                          ? '#f87171'
+                          : 'var(--c-muted)',
+                }}
               >
-                <strong>{inst.displayName}</strong>
-                <span>{inst.status || 'idle'}</span>
-              </Link>
-            ))}
+                {connectorHealth.overallStatus.toUpperCase()}
+              </span>
+            ) : null}
+          </div>
+          <div className={styles.healthChips}>
+            {(connectorHealth?.connectors ?? installations.map((i) => ({
+              id: i.id,
+              displayName: i.displayName,
+              catalogId: i.catalogId,
+              status: i.status as ConnectorHealthItemDto['status'],
+              lastSyncedAt: i.lastSyncedAt,
+              recordCount: 0,
+              healthScore: 0,
+              openAlerts: 0,
+              openDecisions: 0,
+              message: i.lastMessage ?? null,
+            }))).slice(0, 8).map((item) => {
+              const statusLabel =
+                item.status === 'synced' ? 'SYNCED'
+                : item.status === 'active' ? 'ACTIVE'
+                : item.status === 'error'  ? 'ERROR'
+                : item.status === 'draft'  ? 'DRAFT'
+                : 'IDLE';
+              const lastSync = item.lastSyncedAt
+                ? new Date(item.lastSyncedAt).toLocaleString(undefined, {
+                    month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })
+                : null;
+              return (
+                <Link
+                  key={item.id}
+                  href="/app/connectors"
+                  className={styles.healthChip}
+                  data-status={item.status || 'idle'}
+                  title={item.message ?? undefined}
+                >
+                  <strong>{item.displayName}</strong>
+                  <span>{statusLabel}</span>
+                  {item.healthScore > 0 ? (
+                    <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+                      {item.healthScore}% health
+                    </span>
+                  ) : null}
+                  {item.recordCount > 0 ? (
+                    <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+                      {item.recordCount.toLocaleString()} records
+                    </span>
+                  ) : null}
+                  {lastSync ? (
+                    <span style={{ fontSize: '0.62rem', opacity: 0.55 }}>
+                      {lastSync}
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -442,41 +498,21 @@ function AdminOverview({
           <span>Enterprise Health</span>
           <strong>{synced ? String(health) : '—'}</strong>
           <em className={synced ? styles.pos : undefined}>{synced ? 'Live composite' : 'Awaiting sync'}</em>
-          {uiPrefs.showSparklines ? (
-            <div className={styles.spark}>
-              <Sparkline data={sparks.health} color={chartColors.BLUE} />
-            </div>
-          ) : null}
         </article>
         <article className={styles.kpi}>
           <span>Connected Systems</span>
-          <strong>{synced ? String(systems) : '0'}</strong>
+          <strong>{synced ? String(systems) : '—'}</strong>
           <em className={synced ? styles.warn : undefined}>{synced ? 'Synced' : 'Connect to unlock'}</em>
-          {uiPrefs.showSparklines ? (
-            <div className={styles.spark}>
-              <Sparkline data={sparks.systems} color={chartColors.VIOLET} />
-            </div>
-          ) : null}
         </article>
         <Link href="/app/approvals" className={styles.kpi} style={{ textDecoration: 'none', color: 'inherit' }}>
           <span>Open Decisions</span>
           <strong>{synced ? String(decisions) : '—'}</strong>
           <em>{synced ? 'Open Approvals →' : '—'}</em>
-          {uiPrefs.showSparklines ? (
-            <div className={styles.spark}>
-              <Sparkline data={sparks.decisions} color={chartColors.BLUE} />
-            </div>
-          ) : null}
         </Link>
         <Link href="/app/ellinea" className={styles.kpi} style={{ textDecoration: 'none', color: 'inherit' }}>
           <span>Ellinea Status</span>
-          <strong>Ready</strong>
-          <em className={styles.pos}>Ask Ellinea →</em>
-          {uiPrefs.showSparklines ? (
-            <div className={styles.spark}>
-              <Sparkline data={sparks.ready} color={chartColors.GREEN} />
-            </div>
-          ) : null}
+          <strong>{synced ? 'Active' : 'Standby'}</strong>
+          <em className={synced ? styles.pos : undefined}>Ask Ellinea →</em>
         </Link>
       </div>
 
@@ -497,6 +533,91 @@ function AdminOverview({
           ))}
         </div>
       ) : null}
+
+      {/* ── 19.2: IT Admin connector health grid + data quality + alert clusters ── */}
+      {role === 'admin' && (
+        <section style={{ marginBottom: '0.75rem' }}>
+          <div className={styles.panelLabel}>IT Admin Overview</div>
+          <div className={styles.gridAdmin} style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+            {/* Connector health grid */}
+            <div className={styles.card}>
+              <div className={styles.cardHead}><h2 className={styles.cardTitle}>Connector health grid</h2></div>
+              {connectorHealth ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {(connectorHealth.connectors || []).slice(0, 6).map(c => (
+                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0.5rem', borderRadius: 6, background: c.status === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${c.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{c.displayName}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: c.status === 'synced' ? '#10b981' : c.status === 'error' ? '#ef4444' : '#f59e0b' }}>{c.status?.toUpperCase()}</span>
+                    </div>
+                  ))}
+                  {!connectorHealth.connectors?.length && <p className={styles.lede}>No connector health data yet.</p>}
+                </div>
+              ) : <p className={styles.lede}>Sync a connector to populate health grid.</p>}
+            </div>
+            {/* Data quality summary */}
+            <div className={styles.card}>
+              <div className={styles.cardHead}><h2 className={styles.cardTitle}>Data quality summary</h2></div>
+              {synced && summary ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  <article className={styles.kpi} style={{ minHeight: 'auto', padding: '0.55rem 0.65rem' }}>
+                    <span>Health score</span><strong>{summary.healthScore ?? '—'}</strong>
+                    <em className={styles.pos}>from latest sync</em>
+                  </article>
+                  <article className={styles.kpi} style={{ minHeight: 'auto', padding: '0.55rem 0.65rem' }}>
+                    <span>Connected systems</span><strong>{summary.connectedSystems ?? '—'}</strong>
+                    <em>sources contributing</em>
+                  </article>
+                </div>
+              ) : <p className={styles.lede}>Sync a connector to see data quality metrics.</p>}
+            </div>
+            {/* Alert clusters */}
+            <div className={styles.card}>
+              <div className={styles.cardHead}><h2 className={styles.cardTitle}>Alert clusters</h2></div>
+              {correlationGroups.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {correlationGroups.slice(0, 5).map(grp => (
+                    <div key={grp.id} style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: `1px solid ${grp.severity === 'critical' ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.07)'}`, background: grp.severity === 'critical' ? 'rgba(239,68,68,0.07)' : 'rgba(255,255,255,0.02)' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.78rem', color: '#fff' }}>{grp.count}× {grp.category.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#8b95a8' }}>{grp.rootCauseHint}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className={styles.lede}>{synced ? 'No alert clusters detected.' : 'Sync to detect alert clusters.'}</p>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── 19.3: Owner KPI sparklines, health radar, 30-day forecast, pending approvals ── */}
+      {role === 'owner' && synced && (
+        <section style={{ marginBottom: '0.75rem' }}>
+          <div className={styles.panelLabel}>Owner intelligence</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.7rem' }}>
+            <article className={styles.kpi}>
+              <span>Health radar</span>
+              <strong style={{ color: (summary?.healthScore ?? 0) >= 80 ? '#10b981' : (summary?.healthScore ?? 0) >= 50 ? '#f59e0b' : '#ef4444' }}>
+                {summary?.healthScore ?? '—'}
+              </strong>
+              <em>enterprise composite</em>
+            </article>
+            <article className={styles.kpi}>
+              <span>30-day forecast</span>
+              <strong>Stable</strong>
+              <em>trend: {summary?.healthScore && summary.healthScore > 70 ? 'improving' : 'monitor'}</em>
+            </article>
+            <article className={styles.kpi}>
+              <span>Pending approvals</span>
+              <strong>{summary?.openDecisions ?? '—'}</strong>
+              <em>require owner sign-off</em>
+            </article>
+            <article className={styles.kpi}>
+              <span>AI impact</span>
+              <strong>{summary?.openAlerts ?? '—'}</strong>
+              <em>open alerts flagged</em>
+            </article>
+          </div>
+        </section>
+      )}
 
       <div className={styles.gridAdmin}>
         {/* ── Email & Reports Intelligence (dashboard widget) ─────────────── */}
@@ -615,8 +736,15 @@ function AdminOverview({
               ))}
             </div>
           </div>
-          <div className={styles.chartTall}>
-            <AreaPulse data={pulse} color={range === 'year' ? chartColors.VIOLET : chartColors.BLUE} />
+          <div className={styles.chartTall} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {synced
+              ? <p style={{ color: 'var(--c-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
+                  Historical trend tracking coming soon. Sync daily to build your baseline.
+                </p>
+              : <p style={{ color: 'var(--c-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
+                  Sync a connector to start recording pulse data.
+                </p>
+            }
           </div>
         </section>
 
@@ -642,22 +770,28 @@ function AdminOverview({
               Open →
             </Link>
           </div>
-          <ul className={styles.list}>
-            {timeline.slice(0, 4).map((item, i) => (
-              <li key={item.title}>
-                <span
-                  className={styles.dot}
-                  style={{
-                    background: [chartColors.GREEN, chartColors.AMBER, chartColors.RED, chartColors.BLUE][i % 4],
-                  }}
-                />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {timeline.length > 0 ? (
+            <ul className={styles.list}>
+              {timeline.slice(0, 4).map((item, i) => (
+                <li key={item.title}>
+                  <span
+                    className={styles.dot}
+                    style={{
+                      background: [chartColors.GREEN, chartColors.AMBER, chartColors.RED, chartColors.BLUE][i % 4],
+                    }}
+                  />
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.lede} style={{ padding: '0.75rem 0' }}>
+              {synced ? 'No recent events from your connected systems.' : 'Sync a connector to see live event notifications here.'}
+            </p>
+          )}
         </section>
       </div>
 
@@ -689,20 +823,26 @@ function AdminOverview({
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Tasks Overview</h2>
           </div>
-          <div className={styles.donutWrap}>
-            <div className={styles.chartDonut}>
-              <DonutStatus segments={donut} center={String(totalTasks)} />
+          {donut.length > 0 ? (
+            <div className={styles.donutWrap}>
+              <div className={styles.chartDonut}>
+                <DonutStatus segments={donut} center={String(totalTasks)} />
+              </div>
+              <div className={styles.legend}>
+                {donut.map((d) => (
+                  <div key={d.name} className={styles.legendItem}>
+                    <span className={styles.dot} style={{ background: d.color, marginTop: 0 }} />
+                    {d.name}
+                    <strong>{d.value}</strong>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className={styles.legend}>
-              {donut.map((d) => (
-                <div key={d.name} className={styles.legendItem}>
-                  <span className={styles.dot} style={{ background: d.color, marginTop: 0 }} />
-                  {d.name}
-                  <strong>{d.value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <p className={styles.lede} style={{ padding: '0.75rem 0' }}>
+              {synced ? 'No open decisions or alerts.' : 'Sync a connector to see tasks.'}
+            </p>
+          )}
         </section>
 
         <section className={styles.card}>
@@ -712,25 +852,31 @@ function AdminOverview({
               Open →
             </Link>
           </div>
-          <ul className={styles.list}>
-            {timeline.map((item) => (
-              <li key={`act-${item.title}`}>
-                <span className={styles.dot} style={{ background: chartColors.VIOLET }} />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
-                <span className={styles.time}>
-                  {synced && summary?.syncedAt
-                    ? new Date(summary.syncedAt).toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : '—'}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {timeline.length > 0 ? (
+            <ul className={styles.list}>
+              {timeline.map((item) => (
+                <li key={`act-${item.title}`}>
+                  <span className={styles.dot} style={{ background: chartColors.VIOLET }} />
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                  <span className={styles.time}>
+                    {summary?.syncedAt
+                      ? new Date(summary.syncedAt).toLocaleTimeString(undefined, {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.lede} style={{ padding: '0.75rem 0' }}>
+              {synced ? 'No timeline events in the current snapshot.' : 'Sync a connector to populate the enterprise timeline.'}
+            </p>
+          )}
         </section>
       </div>
     </div>
@@ -753,36 +899,26 @@ function ClientOverview({
   const decisions = synced ? summary!.openDecisions : 0;
   const systems = synced ? summary!.connectedSystems : 0;
 
-  const bars = useMemo(() => synced ? weekSeries(health) : [], [synced, health]);
-  const cash = useMemo(() => synced ? pulseSeries(Math.max(0, health - 8)) : [], [synced, health]);
+  // No synthetic chart data — all charts require real time-series history.
+  // Only the calendar and real DB values are shown.
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const monthName = now.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-  const firstDow = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = now.getDate();
+  // Ops donut: real counts only — no Math.max(1,...) floors, no hardcoded baseline of 20.
+  // Show empty donut with message when there are no real alerts/decisions.
+  const opsSegments = synced && (alerts > 0 || decisions > 0) ? [
+    ...(alerts > 0     ? [{ name: 'Critical', value: alerts,    color: chartColors.RED   }] : []),
+    ...(decisions > 0  ? [{ name: 'Decisions', value: decisions, color: chartColors.AMBER }] : []),
+  ] : [];
+
+  // Calendar helpers
+  const _now = new Date();
+  const monthName = _now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const today = _now.getDate();
+  const firstDow = new Date(_now.getFullYear(), _now.getMonth(), 1).getDay();
+  const daysInMonth = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).getDate();
   const calCells: (number | null)[] = [
-    ...Array.from({ length: firstDow }, () => null),
+    ...Array(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-
-  // Department breakdown is derived from real health score — only meaningful when synced
-  const depts = synced ? [
-    { label: 'Finance', pct: Math.min(95, Math.round(health * 0.95)) },
-    { label: 'Sales', pct: Math.min(92, Math.round(health * 0.88)) },
-    { label: 'Operations', pct: Math.min(90, Math.round(health * 0.82)) },
-    { label: 'HR', pct: Math.min(88, Math.round(health * 0.76)) },
-    { label: 'IT', pct: Math.min(86, Math.round(health * 0.72)) },
-  ] : [];
-
-  // Ops donut — only shown when synced
-  const opsSegments = synced ? [
-    { name: 'Critical', value: Math.max(1, Math.min(4, alerts)), color: chartColors.RED },
-    { name: 'Warning', value: Math.max(2, Math.min(8, decisions)), color: chartColors.AMBER },
-    { name: 'Normal', value: Math.max(8, 20 - alerts - decisions), color: chartColors.GREEN },
-  ] : [];
 
   const title =
     variant === 'executive'
@@ -843,6 +979,54 @@ function ClientOverview({
         </section>
       ) : null}
 
+      {/* ── 19.5 Staff dashboard: personalised task list, team updates, quick shortcuts ── */}
+      {(variant === 'member') && (
+        <section style={{ marginBottom: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+          {/* Personalised task list */}
+          <div style={{ background: 'var(--c-card)', border: '1px solid var(--c-line)', borderRadius: 12, padding: '0.85rem 0.95rem' }}>
+            <div className={styles.panelLabel}>My tasks</div>
+            {synced && (decisions > 0 || alerts > 0) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.35rem' }}>
+                {decisions > 0 && (
+                  <Link href="/app/approvals" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.55rem', borderRadius: 7, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', textDecoration: 'none', color: 'inherit' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Open decisions</span>
+                    <span style={{ fontWeight: 800, color: '#60a5fa' }}>{decisions}</span>
+                  </Link>
+                )}
+                {alerts > 0 && (
+                  <Link href="/app/notifications" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.55rem', borderRadius: 7, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', textDecoration: 'none', color: 'inherit' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Open alerts</span>
+                    <span style={{ fontWeight: 800, color: '#f87171' }}>{alerts}</span>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--c-muted)', fontSize: '0.8rem' }}>
+                {synced ? 'No tasks pending. Check back after the next sync.' : 'Sync pending — your IT Admin connects systems.'}
+              </p>
+            )}
+          </div>
+          {/* Team updates from audit log + quick shortcuts */}
+          <div style={{ background: 'var(--c-card)', border: '1px solid var(--c-line)', borderRadius: 12, padding: '0.85rem 0.95rem' }}>
+            <div className={styles.panelLabel}>Quick access</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.35rem' }}>
+              {[
+                { href: '/app/ellinea',      label: 'Ask Ellinea' },
+                { href: '/app/approvals',    label: 'Approvals' },
+                { href: '/app/notifications',label: 'Notifications' },
+                { href: '/app/search',       label: 'Enterprise search' },
+                { href: '/app/timeline',     label: 'Timeline' },
+                { href: '/app/profile',      label: 'My profile' },
+              ].map(item => (
+                <Link key={item.href} href={item.href} style={{ display: 'flex', alignItems: 'center', padding: '0.32rem 0.55rem', borderRadius: 6, border: '1px solid var(--c-line)', background: 'rgba(255,255,255,0.02)', fontSize: '0.8rem', fontWeight: 600, color: '#c5cddb', textDecoration: 'none' }}>
+                  {item.label} →
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className={styles.gridClientTop}>
         <section className={styles.card}>
           <div className={styles.cardHead}>
@@ -850,11 +1034,13 @@ function ClientOverview({
           </div>
           <div className={styles.metricRow}>
             <strong>{synced ? health : '—'}</strong>
-            <span className={`${styles.badge} ${styles.pos}`}>+{synced ? Math.round(health / 8) : 0}% health</span>
+            <span className={styles.badge}>enterprise health</span>
           </div>
-          <div className={styles.chartMed}>
-            <BarWeek data={bars} />
-          </div>
+          {!synced && (
+            <p style={{ color: 'var(--c-muted)', fontSize: '0.82rem', marginTop: '0.5rem' }}>
+              Sync a connector to see live health data.
+            </p>
+          )}
         </section>
 
         <section className={styles.card}>
@@ -863,16 +1049,20 @@ function ClientOverview({
           </div>
           <div className={styles.donutWrap}>
             <div className={styles.chartDonut}>
-              <DonutStatus segments={opsSegments} center={`${synced ? health : 92}%`} />
+              <DonutStatus segments={opsSegments} center={synced ? `${health}%` : '—'} />
             </div>
             <div className={styles.statusRow}>
-              {opsSegments.map((s) => (
+              {opsSegments.length > 0 ? opsSegments.map((s) => (
                 <div key={s.name} className={styles.statusItem}>
                   <span className={styles.dot} style={{ background: s.color, marginTop: 0 }} />
                   {s.name}
                   <strong>{s.value}</strong>
                 </div>
-              ))}
+              )) : (
+                <p style={{ color: 'var(--c-muted)', fontSize: '0.82rem' }}>
+                  {synced ? 'No open alerts or decisions.' : 'Awaiting sync.'}
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -885,9 +1075,11 @@ function ClientOverview({
             <strong>{synced ? decisions : '—'}</strong>
             <span className={styles.badge}>open decisions</span>
           </div>
-          <div className={styles.chartMed}>
-            <AreaPulse data={cash} color={chartColors.BLUE} />
-          </div>
+          {!synced && (
+            <p style={{ color: 'var(--c-muted)', fontSize: '0.82rem', marginTop: '0.5rem' }}>
+              Sync a connector to see live decisions.
+            </p>
+          )}
         </section>
       </div>
 
@@ -896,17 +1088,28 @@ function ClientOverview({
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Department Performance</h2>
           </div>
-          <div className={styles.bars}>
-            {depts.map((d) => (
-              <div key={d.label} className={styles.barRow}>
-                <span>{d.label}</span>
-                <div className={styles.track}>
-                  <div className={styles.fill} style={{ width: `${d.pct}%` }} />
-                </div>
-                <em>{d.pct}%</em>
-              </div>
-            ))}
-          </div>
+          {synced && summary?.model?.objects && summary.model.objects.filter(o => o.kind === 'department').length > 0 ? (
+            <div className={styles.bars}>
+              {summary.model.objects
+                .filter(o => o.kind === 'department')
+                .slice(0, 8)
+                .map((dept) => (
+                  <div key={dept.id} className={styles.barRow}>
+                    <span>{dept.name}</span>
+                    <div className={styles.track}>
+                      <div className={styles.fill} style={{ width: dept.status === 'active' ? '100%' : '60%' }} />
+                    </div>
+                    <em>{dept.status || '—'}</em>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className={styles.lede} style={{ padding: '0.5rem 0' }}>
+              {synced
+                ? 'No department-level data in the current snapshot. Configure your connector to return department objects.'
+                : 'Sync a connector to see per-department data.'}
+            </p>
+          )}
         </section>
 
         <section className={styles.aiCard}>
@@ -989,6 +1192,7 @@ export default function CommandCenterPage() {
   const [isPlatform, setIsPlatform] = useState(false);
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
   const [installations, setInstallations] = useState<ConnectorInstallationDto[]>([]);
+  const [connectorHealth, setConnectorHealth] = useState<ConnectorHealthDto | null>(null);
   const [ruleHits, setRuleHits] = useState<RuleHit[]>([]);
   const [correlationGroups, setCorrelationGroups] = useState<AlertCorrelationGroupDto[]>([]);
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
@@ -1033,6 +1237,9 @@ export default function CommandCenterPage() {
       fetchAlertCorrelations()
         .then((res) => setCorrelationGroups(res.correlationGroups))
         .catch(() => setCorrelationGroups([]));
+      fetchConnectorHealth()
+        .then(setConnectorHealth)
+        .catch(() => setConnectorHealth(null));
     }
     return () => window.removeEventListener(UI_PREFS_EVENT, onPrefs);
   }, []);
@@ -1050,6 +1257,7 @@ export default function CommandCenterPage() {
         variant={variant}
         uiPrefs={uiPrefs}
         installations={installations}
+        connectorHealth={connectorHealth}
         ruleHits={ruleHits}
         correlationGroups={correlationGroups}
       />

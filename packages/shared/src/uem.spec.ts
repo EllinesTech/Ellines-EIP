@@ -176,22 +176,25 @@ describe('packTimelineStorage / unpackTimelineStorage', () => {
 });
 
 describe('inferUemFromMetrics', () => {
-  it('maps metrics to UEM counts', () => {
+  it('maps real signal counts to UEM counts', () => {
     const model = inferUemFromMetrics({
-      connectedSystems: 3,
       openAlerts: 5,
       openDecisions: 2,
       timelineLength: 10,
     });
-    expect(model.counts.branches).toBe(3);
+    // branches must stay 0 — must not be synthesised from connector counts
+    expect(model.counts.branches).toBe(0);
     expect(model.counts.notifications).toBe(5);
     expect(model.counts.tasks).toBe(2);
     expect(model.counts.events).toBe(10);
   });
 
-  it('clamps branches to 8', () => {
-    const model = inferUemFromMetrics({ connectedSystems: 20 });
-    expect(model.counts.branches).toBeLessThanOrEqual(8);
+  it('never synthesises branches from any proxy count', () => {
+    // Previously branches = Math.min(connectedSystems, 8) — this must no longer happen.
+    const model = inferUemFromMetrics({ openAlerts: 0, openDecisions: 0 });
+    expect(model.counts.branches).toBe(0);
+    expect(model.counts.people).toBe(0);
+    expect(model.counts.departments).toBe(0);
   });
 
   it('handles zeroes gracefully', () => {

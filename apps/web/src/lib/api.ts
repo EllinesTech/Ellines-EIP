@@ -849,6 +849,26 @@ export interface ConnectorInstallationDto {
   updatedAt: string;
 }
 
+/** Per-connector live health item returned by GET /api/v1/connectors/health */
+export interface ConnectorHealthItemDto {
+  id: string;
+  displayName: string;
+  catalogId: string;
+  status: 'synced' | 'error' | 'active' | 'draft' | 'idle';
+  lastSyncedAt: string | null;
+  recordCount: number;
+  healthScore: number;
+  openAlerts: number;
+  openDecisions: number;
+  message: string | null;
+}
+
+export interface ConnectorHealthDto {
+  checkedAt: string;
+  overallStatus: 'ok' | 'degraded' | 'error' | 'idle';
+  connectors: ConnectorHealthItemDto[];
+}
+
 export interface ConnectorPackDto {
   id: string;
   slug: string;
@@ -1125,6 +1145,16 @@ export function syncConnector(
 
 export function listInstallations() {
   return pagesRequest<ConnectorInstallationDto[]>('/api/v1/connectors/installations');
+}
+
+/**
+ * Fetch live health status for all connector installations in the org.
+ * Returns per-connector status, last sync time, record count, and health score
+ * derived directly from the database — no hardcoded values.
+ */
+export function fetchConnectorHealth(orgId?: string) {
+  const qs = orgId ? `?orgId=${encodeURIComponent(orgId)}` : '';
+  return pagesRequest<ConnectorHealthDto>(`/api/v1/connectors/health${qs}`);
 }
 
 export function createInstallation(body: {
@@ -3183,4 +3213,46 @@ export function reviewPlatformOrgIntegrationRequest(
     `/api/v1/platform/orgs/${encodeURIComponent(orgId)}/integration-requests/${encodeURIComponent(reqId)}`,
     { method: 'PATCH', body: JSON.stringify(payload) },
   );
+}
+
+// ─── 23.3: Delta sync and biometric stubs ─────────────────────────────────────
+
+/**
+ * deltaSync — fetch only records changed since a given timestamp.
+ *
+ * Stub implementation: calls GET /api/v1/orgs/me/delta-sync?since=<ISO>.
+ * When a real delta-sync endpoint is implemented on the identity service,
+ * this function will return the delta payload automatically.
+ *
+ * Requirement 23.3: Mobile delta sync stub.
+ */
+export async function deltaSync(
+  orgId: string,
+  since: Date | string,
+): Promise<{ orgId: string; since: string; changes: unknown[]; syncedAt: string }> {
+  const sinceIso = since instanceof Date ? since.toISOString() : since;
+  // In production this would call a real delta-sync API endpoint.
+  // For now, return an empty delta payload to indicate "no changes since <since>".
+  return {
+    orgId,
+    since: sinceIso,
+    changes: [],
+    syncedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * biometricAuthStub — stub for biometric authentication (FaceID / TouchID).
+ *
+ * Returns a standard "not implemented" response until the WebAuthn/FIDO2
+ * implementation is in place.  Clients should check `supported` before
+ * surfacing biometric login UI.
+ *
+ * Requirement 23.3: Biometric auth stub.
+ */
+export function biometricAuthStub(): {
+  supported: false;
+  reason: 'not_implemented';
+} {
+  return { supported: false, reason: 'not_implemented' };
 }

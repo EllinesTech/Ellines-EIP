@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Body, Param, UseGuards, Logger, Req } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, Query, UseGuards, Logger, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PersonalizationService } from './personalization.service';
 
@@ -359,6 +359,96 @@ export class PersonalizationController {
       return {
         success: false,
         error: 'Failed to initialize personalization',
+      };
+    }
+  }
+
+  // ─── Task 11.2 additions ──────────────────────────────────────────────────
+
+  /**
+   * GET /personalization/shortcuts?orgId=<orgId>
+   * Returns top-5 context-aware shortcuts for the authenticated user in the given org.
+   * Used by the Pages Function proxy at GET /api/v1/orgs/:slug/me/shortcuts.
+   *
+   * Requirements: 19.3, 19.7
+   */
+  @Get('shortcuts')
+  async getShortcutsForOrg(
+    @Query('orgId') orgId: string,
+    @Req() req: AuthRequest,
+  ) {
+    try {
+      // Use orgId from query if provided; otherwise fall back to the JWT org.
+      const resolvedOrgId = orgId?.trim() || req.user.organizationId;
+
+      const shortcuts = await this.personalizationService.getContextAwareShortcuts(
+        req.user.userId,
+        resolvedOrgId,
+        5,
+      );
+
+      return {
+        success: true,
+        data: shortcuts,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get shortcuts (orgId route):', error);
+      return {
+        success: false,
+        data: [],
+        error: 'Failed to retrieve shortcuts',
+      };
+    }
+  }
+
+  /**
+   * POST /personalization/preferences?orgId=<orgId>
+   * Persists an explicit preference override for the authenticated user.
+   * Explicit preferences take precedence over learned ones (Requirement 19.7).
+   *
+   * Request body: { key: string, value: unknown }
+   *
+   * Used by the Pages Function proxy at POST /api/v1/orgs/:slug/me/preferences.
+   *
+   * Requirements: 19.5, 19.7
+   */
+  @Post('preferences')
+  async setPreferenceForOrg(
+    @Query('orgId') orgId: string,
+    @Body() body: { key: string; value: unknown },
+    @Req() req: AuthRequest,
+  ) {
+    try {
+      if (typeof body?.key !== 'string' || body.key.trim() === '') {
+        return {
+          success: false,
+          error: '`key` must be a non-empty string',
+        };
+      }
+
+      // orgId from query is informational; the authoritative org comes from JWT.
+      // Log a warning if they differ (shouldn't happen in normal flow).
+      if (orgId && orgId !== req.user.organizationId) {
+        this.logger.warn(
+          `setPreferenceForOrg: query orgId ${orgId} differs from JWT org ${req.user.organizationId}`,
+        );
+      }
+
+      await this.personalizationService.updateUserPreference(
+        req.user.userId,
+        body.key.trim(),
+        body.value,
+      );
+
+      return {
+        success: true,
+        message: 'Preference updated successfully',
+      };
+    } catch (error) {
+      this.logger.error('Failed to set preference (orgId route):', error);
+      return {
+        success: false,
+        error: 'Failed to update preference',
       };
     }
   }

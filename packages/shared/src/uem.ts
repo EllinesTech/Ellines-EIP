@@ -225,23 +225,23 @@ export function unpackTimelineStorage(raw: unknown): {
 }
 
 export function inferUemFromMetrics(input: {
-  connectedSystems?: number;
   openAlerts?: number;
   openDecisions?: number;
   sourceSystem?: string;
   timelineLength?: number;
 }): UemModel {
-  const systems = Math.max(0, input.connectedSystems || 0);
   const alerts = Math.max(0, input.openAlerts || 0);
   const decisions = Math.max(0, input.openDecisions || 0);
   const events = Math.max(0, input.timelineLength || 0);
+  // branches, departments, people, documents, assets intentionally 0 —
+  // those values must come from the upstream system's data, not from the
+  // number of connector installations or other proxy counts.
   return {
     version: '1.0',
     sourceSystem: input.sourceSystem,
     capabilities: ['read', 'sync'],
     counts: {
       ...emptyUemCounts(),
-      branches: systems > 0 ? Math.min(systems, 8) : 0,
       tasks: decisions,
       notifications: alerts,
       events,

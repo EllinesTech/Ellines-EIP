@@ -95,10 +95,30 @@ export class DashboardWebSocketGateway {
   }
 
   /**
-   * Broadcast widget update to all subscribers
-   * Requirement 7.8: Sub-second latency
+   * Broadcast widget update to all subscribers of a dashboard.
+   *
+   * Two call signatures are supported:
+   *   1. broadcastWidgetUpdate(dashboardId, orgId)
+   *      — emits `{ event: 'widget-update', dashboardId }` to room `dashboard:${dashboardId}`
+   *        (Requirement 18.2 spec interface)
+   *   2. broadcastWidgetUpdate(dashboardId, widgetId, data)
+   *      — legacy signature kept for internal callers
+   *
+   * Requirement 7.8, 20.4: Sub-second latency
    */
-  broadcastWidgetUpdate(dashboardId: string, widgetId: string, data: any): void {
+  broadcastWidgetUpdate(dashboardId: string, orgIdOrWidgetId: string, data?: any): void {
+    const isSpecInterface = data === undefined;
+
+    if (isSpecInterface) {
+      // Spec-required: broadcastWidgetUpdate(dashboardId, orgId)
+      const message = { event: 'widget-update', dashboardId };
+      this.server?.to?.(`dashboard:${dashboardId}`)?.emit?.('widget-update', message);
+      this.logger.debug(`broadcastWidgetUpdate (spec): widget-update → dashboard:${dashboardId}`);
+      return;
+    }
+
+    // Legacy: broadcastWidgetUpdate(dashboardId, widgetId, data)
+    const widgetId = orgIdOrWidgetId;
     const message = {
       type: 'widget_update',
       dashboardId,
@@ -108,6 +128,8 @@ export class DashboardWebSocketGateway {
     };
 
     this.server?.to?.(`dashboard:${dashboardId}`)?.emit?.('widget_update', message);
+    // Also emit on the canonical 'widget-update' channel (Requirement 20.4)
+    this.server?.to?.(`dashboard:${dashboardId}`)?.emit?.('widget-update', message);
     this.logger.debug(`Broadcast widget update to dashboard ${dashboardId}`);
   }
 
@@ -139,6 +161,32 @@ export class DashboardWebSocketGateway {
 
     this.server?.to?.(`dashboard:${dashboardId}`)?.emit?.('alert', message);
     this.logger.log(`Broadcast alert to dashboard ${dashboardId}`);
+  }
+
+  /**
+   * Handle cache invalidation event — push widget-update to all dashboard rooms in the org.
+   * Requirement 7.8, 20.4: Real-time invalidation broadcast
+   *
+   * @param orgId  Organization whose widget cache has been invalidated.
+   *               All dashboards subscribed to by clients in this org are notified.
+   */
+  handleInvalidation(orgId: string): void {
+    const dashboardIds = Array.from(this.subscriptions.entries())
+      .filter(([, subs]) => subs.some((s) => s.organizationId === orgId))
+      .map(([dashboardId]) => dashboardId);
+
+    const payload = { event: 'widget-update', orgId, timestamp: new Date().toISOString() };
+
+    for (const dashboardId of dashboardIds) {
+      this.server?.to?.(`dashboard:${dashboardId}`)?.emit?.('widget-update', payload);
+      this.logger.debug(`handleInvalidation: pushed widget-update to dashboard:${dashboardId}`);
+    }
+
+    // Fallback: if no specific rooms are tracked yet, broadcast org-level event
+    if (dashboardIds.length === 0) {
+      this.server?.emit?.('widget-update', payload);
+      this.logger.debug(`handleInvalidation: no tracked rooms for org=${orgId}; broadcast sent`);
+    }
   }
 
   /**

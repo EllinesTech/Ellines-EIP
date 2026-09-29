@@ -5,6 +5,31 @@ import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ExecuteAgentDto, ApproveExecutionDto } from './dto/execute-agent.dto';
 import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto/webhook-subscription.dto';
 
+// ─── Task 9.1 types ───────────────────────────────────────────────────────────
+
+export type AgentContext = {
+  agentId: string;
+  action: string;
+  resourceId: string;
+  confidenceScore: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type GuardrailResult = {
+  executed: boolean;
+  requiresApproval: boolean;
+  approvalRequestId?: string;
+  decisionLogId?: string;
+  reason: string;
+};
+
+export type ConflictResult = {
+  hasConflict: boolean;
+  conflictingAgentId?: string;
+  blockedAgentId?: string;
+  reason: string;
+};
+
 // ─── Condition evaluator ──────────────────────────────────────────────────────
 
 type Condition = {
@@ -789,6 +814,250 @@ export class AgentsService {
 
     return updated;
   }
+
+  // ─── Agent Policy (Task 9.4) ──────────────────────────────────────────────
+
+  /**
+   * PATCH /api/v1/orgs/:slug/agents/:id/policy — owner only.
+   * Updates the `config` JSON on the agent with a typed policy block.
+   * Validates that `decisionThreshold` is in the range (0, 1].
+   */
+  async updateAgentPolicy(
+    organizationId: string,
+    agentId: string,
+    userId: string,
+    dto: import('./dto/update-agent-policy.dto').UpdateAgentPolicyDto,
+  ) {
+    const { allowedActions, decisionThreshold, escalationRuleId } = dto;
+
+    if (decisionThreshold <= 0 || decisionThreshold > 1) {
+      throw new Error('decisionThreshold must be in the range (0, 1]');
+    }
+
+    const existing = await this.prisma.ellineaAgent.findFirst({
+      where: { id: agentId, organizationId },
+    });
+
+    if (!existing) {
+      throw new Error('Agent not found');
+    }
+
+    // Merge policy into the existing config JSON
+    const currentConfig = (existing.config as Record<string, unknown>) ?? {};
+    const updatedConfig = {
+      ...currentConfig,
+      policy: {
+        allowedActions,
+        decisionThreshold,
+        ...(escalationRuleId !== undefined && { escalationRuleId }),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    const updated = await this.prisma.ellineaAgent.update({
+      where: { id: agentId },
+      data: { config: updatedConfig as any },
+    });
+
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId,
+        organizationId,
+        userId,
+        action: 'agent.policy_updated',
+        details: {
+          allowedActions,
+          decisionThreshold,
+          escalationRuleId: escalationRuleId ?? null,
+        } as any,
+      },
+    });
+
+    return updated;
+  }
+
+  // ─── Guardrail & Coordination (Task 9.1) ─────────────────────────────────
+
+  /**
+   * Execute an agent action autonomously only when confidence >= 0.90 (Property 13).
+   * Below threshold, creates an ApprovalRequest and defers to human review.
+   * Every invocation — autonomous or deferred — produces a ModelDecisionLog entry
+   * for auditability and explainability.
+   */
+  async executeWithGuardrail(
+    agent: import('@prisma/client').EllineaAgent,
+    context: AgentContext,
+  ): Promise<GuardrailResult> {
+    const AUTONOMOUS_THRESHOLD = 0.90;
+    const { confidenceScore, action, resourceId, agentId, metadata } = context;
+
+    // Produce a ModelDecisionLog for every invocation regardless of outcome
+    const decisionLog = await this.prisma.modelDecisionLog.create({
+      data: {
+        organizationId: agent.organizationId,
+        queryId: agentId,
+        queryType: 'reasoning',
+        selectedModelId: `agent:${agentId}`,
+        routingReason: `Agent "${agent.name}" guardrail evaluation for action "${action}" on resource "${resourceId}"`,
+        confidence: confidenceScore,
+        success: true,
+      },
+    });
+
+    if (confidenceScore >= AUTONOMOUS_THRESHOLD) {
+      // Auto-execute: update execution stats
+      await this.prisma.ellineaAgent.update({
+        where: { id: agent.id },
+        data: {
+          executionCount: { increment: 1 },
+          successCount: { increment: 1 },
+          lastExecutedAt: new Date(),
+        },
+      });
+
+      // Audit trail
+      await this.prisma.agentAuditLog.create({
+        data: {
+          agentId: agent.id,
+          organizationId: agent.organizationId,
+          action: 'agent.guardrail_autonomous',
+          details: {
+            resourceId,
+            agentAction: action,
+            confidenceScore,
+            decisionLogId: decisionLog.id,
+            metadata: metadata ?? null,
+          } as any,
+        },
+      });
+
+      return {
+        executed: true,
+        requiresApproval: false,
+        decisionLogId: decisionLog.id,
+        reason: `Confidence ${(confidenceScore * 100).toFixed(0)}% meets autonomous threshold (≥90%). Action executed.`,
+      };
+    }
+
+    // Below threshold — create an ApprovalRequest and defer
+    const approvalRequest = await this.prisma.approvalRequest.create({
+      data: {
+        organizationId: agent.organizationId,
+        title: `Agent action approval: ${action} on ${resourceId}`,
+        detail: `Agent "${agent.name}" (id: ${agentId}) wants to execute "${action}" on resource "${resourceId}". Confidence ${(confidenceScore * 100).toFixed(0)}% is below the 90% autonomous threshold.`,
+        requester: `agent:${agentId}`,
+        source: 'agent_execution',
+        status: 'pending',
+      },
+    });
+
+    // Audit trail
+    await this.prisma.agentAuditLog.create({
+      data: {
+        agentId: agent.id,
+        organizationId: agent.organizationId,
+        action: 'agent.guardrail_deferred',
+        details: {
+          resourceId,
+          agentAction: action,
+          confidenceScore,
+          approvalRequestId: approvalRequest.id,
+          decisionLogId: decisionLog.id,
+          metadata: metadata ?? null,
+        } as any,
+      },
+    });
+
+    return {
+      executed: false,
+      requiresApproval: true,
+      approvalRequestId: approvalRequest.id,
+      decisionLogId: decisionLog.id,
+      reason: `Confidence ${(confidenceScore * 100).toFixed(0)}% is below the 90% autonomous threshold. Human approval required.`,
+    };
+  }
+
+  /**
+   * Detect conflicting autonomous actions from multiple agents targeting the same resource
+   * within a 60-second window. When a conflict is found, the newer agent is blocked.
+   * Checks `lastExecutedAt` timestamps for agents active on the same org.
+   */
+  async coordinateAgents(orgId: string, resourceId: string): Promise<ConflictResult> {
+    const CONFLICT_WINDOW_MS = 60 * 1000; // 60 seconds
+    const windowStart = new Date(Date.now() - CONFLICT_WINDOW_MS);
+
+    // Fetch all active agents for the org that have run within the window
+    const recentAgents = await this.prisma.ellineaAgent.findMany({
+      where: {
+        organizationId: orgId,
+        isActive: true,
+        isPaused: false,
+        lastExecutedAt: { gte: windowStart },
+      },
+      orderBy: { lastExecutedAt: 'asc' }, // oldest first → newest last
+    });
+
+    // Find executions that reference the resourceId in their trigger payload within the window
+    const recentExecutions = await this.prisma.agentExecution.findMany({
+      where: {
+        organizationId: orgId,
+        createdAt: { gte: windowStart },
+        status: { in: ['pending', 'executed'] },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Detect: multiple executions targeting the same resourceId
+    const relevantExecutions = recentExecutions.filter((ex) => {
+      const payload = ex.triggerPayload as Record<string, unknown> | null;
+      return payload && (payload['resourceId'] === resourceId || payload['id'] === resourceId);
+    });
+
+    if (relevantExecutions.length >= 2) {
+      // The earliest execution "owns" the resource; block the rest
+      const owner = relevantExecutions[0];
+      const blocker = relevantExecutions[relevantExecutions.length - 1];
+
+      const ownerAgent = recentAgents.find((a) => a.id === owner.agentId);
+      const blockedAgent = recentAgents.find((a) => a.id === blocker.agentId);
+
+      if (ownerAgent && blockedAgent && ownerAgent.id !== blockedAgent.id) {
+        // Pause the conflicting (newer) agent temporarily
+        await this.prisma.ellineaAgent.update({
+          where: { id: blockedAgent.id },
+          data: { isPaused: true },
+        });
+
+        await this.prisma.agentAuditLog.create({
+          data: {
+            agentId: blockedAgent.id,
+            organizationId: orgId,
+            action: 'agent.conflict_blocked',
+            details: {
+              resourceId,
+              conflictingAgentId: ownerAgent.id,
+              windowMs: CONFLICT_WINDOW_MS,
+              reason: 'Concurrent action conflict within 60-second window',
+            } as any,
+          },
+        });
+
+        return {
+          hasConflict: true,
+          conflictingAgentId: ownerAgent.id,
+          blockedAgentId: blockedAgent.id,
+          reason: `Agent "${blockedAgent.name}" blocked — agent "${ownerAgent.name}" is already acting on resource "${resourceId}" within the 60-second conflict window.`,
+        };
+      }
+    }
+
+    return {
+      hasConflict: false,
+      reason: `No conflicting agents detected for resource "${resourceId}" within the 60-second window.`,
+    };
+  }
+
+  // ─── Feedback & Learning ──────────────────────────────────────────────────
 
   /**
    * Get feedback summary for an agent (avg score, distribution, recent comments).

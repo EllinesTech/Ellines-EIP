@@ -145,6 +145,17 @@ startxref
   }
 
   /**
+   * Export dashboard as PDF (convenience alias for exportDashboard with format='pdf').
+   * Requirement 20.3: Export functionality
+   */
+  async exportAsPDF(
+    dashboardId: string,
+    organizationId: string,
+  ): Promise<DashboardExportResult> {
+    return this.exportDashboard({ dashboardId, organizationId, format: 'pdf' });
+  }
+
+  /**
    * Schedule recurring export
    * Requirement 20.3: Export scheduling
    */

@@ -11,10 +11,12 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ErrorEventBus, ERROR_CAPTURED_EVENT } from './error-event-bus';
+import { AlertCorrelationService } from '../alerts/alert-correlation.service';
 import type {
   ErrorLogEntry,
   ErrorCluster,
   ErrorClassification,
+  RemediationExecutionRecord,
 } from './detector.types';
 
 /** Cluster threshold — emit incident when same error code appears ≥ N times */
@@ -25,10 +27,16 @@ const DEFAULT_WINDOW_MS = 5 * 60 * 1_000;
 
 /**
  * Endpoint patterns mapped to severity (evaluated in order — first match wins).
+ * Rules (per spec 5.1):
+ *   /auth            → critical
+ *   /api/v1/platform → high
+ *   /api/v1/         → medium
+ *   else             → low
  */
 const SEVERITY_PATTERNS: Array<{ pattern: RegExp; severity: ErrorClassification['severity'] }> = [
   { pattern: /\/auth/i, severity: 'critical' },
   { pattern: /\/api\/v1\/platform/i, severity: 'high' },
+  { pattern: /\/api\/v1\//i, severity: 'medium' },
 ];
 
 /** Sentinel playbook error pattern used when persisting open incidents */
@@ -46,6 +54,7 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: ErrorEventBus,
+    private readonly alertCorrelation: AlertCorrelationService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -61,9 +70,11 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
         this.rollingLog.shift();
       }
       // Opportunistically detect patterns on each new entry
-      this.detectErrorPattern(this.rollingLog).catch((err) =>
-        this.logger.error(`Background pattern detection failed: ${err}`),
-      );
+      this.detectErrorPattern(this.rollingLog)
+        .then(() => { /* clusters handled inside detectErrorPattern */ })
+        .catch((err) =>
+          this.logger.error(`Background pattern detection failed: ${err}`),
+        );
     });
     this.logger.log('SelfHealingDetectorService initialised — listening for error events');
   }
@@ -103,6 +114,23 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
 
     const clusters: ErrorCluster[] = [];
 
+    // Build AlertInputs from the windowed logs for correlation (Requirement 12.6, 12.8)
+    const alertInputs = windowed.map((log) => ({
+      id: log.errorCode + '-' + log.timestamp.getTime(),
+      source: log.endpoint ?? 'unknown',
+      errorCode: log.errorCode,
+      timestamp: log.timestamp,
+      message: log.message,
+    }));
+
+    // Run alert correlation in parallel with cluster building
+    const alertClustersPromise = alertInputs.length
+      ? this.alertCorrelation.correlateAlerts(alertInputs, windowMs).catch((err) => {
+          this.logger.warn(`Alert correlation failed (non-fatal): ${err}`);
+          return [];
+        })
+      : Promise.resolve([]);
+
     for (const [errorCode, entries] of groups.entries()) {
       if (entries.length < CLUSTER_THRESHOLD) {
         continue;
@@ -124,9 +152,16 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
       };
 
       clusters.push(cluster);
+    }
 
+    // Resolve alert clusters and attach root cause context to incident creation
+    const alertClusters = await alertClustersPromise;
+    const firstAlertCluster = alertClusters[0] ?? null;
+    const rootCauseCode = firstAlertCluster?.rootCause?.errorCode ?? null;
+
+    for (const cluster of clusters) {
       // Persist as an open incident (fire-and-forget; errors are logged)
-      this.createIncident(cluster).catch((err) =>
+      this.createIncident(cluster, undefined, rootCauseCode).catch((err) =>
         this.logger.error(`Failed to persist incident for cluster ${cluster.clusterId}: ${err}`),
       );
     }
@@ -194,7 +229,7 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
    *
    * Requirement 4.8 — structured incident records with diagnostic data
    */
-  async createIncident(cluster: ErrorCluster, orgId?: string): Promise<string> {
+  async createIncident(cluster: ErrorCluster, orgId?: string, rootCauseCode?: string | null): Promise<RemediationExecutionRecord> {
     // Upsert the sentinel playbook so we always have a valid FK
     const playbook = await this.prisma.remediationPlaybook.upsert({
       where: { errorPattern: INCIDENT_PLAYBOOK_PATTERN },
@@ -222,7 +257,7 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
         stagesExecuted: 0,
         actionsPerformed: [],
         confidence: 0,
-        // 'open' is not one of the enum values in the schema; use 'failure' as
+        // 'open' is not one of the enum values in the schema; use 'escalated' as
         // the closest available until a remediator processes it.  We surface
         // the real state via the escalationReason field.
         outcome: 'escalated',
@@ -235,9 +270,9 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
           affectedEndpoints: cluster.affectedEndpoints,
           firstOccurrence: cluster.firstOccurrence.toISOString(),
           lastOccurrence: cluster.lastOccurrence.toISOString(),
+          ...(rootCauseCode != null ? { rootCauseCode } : {}),
         },
       },
-      select: { id: true },
     });
 
     this.logger.warn(
@@ -245,7 +280,19 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
         `(${cluster.errorCount}× ${cluster.errorCode})`,
     );
 
-    return execution.id;
+    return {
+      id: execution.id,
+      playbookId: execution.playbookId,
+      organizationId: execution.organizationId,
+      incidentId: execution.incidentId,
+      errorPattern: execution.errorPattern,
+      stagesExecuted: execution.stagesExecuted,
+      actionsPerformed: execution.actionsPerformed as unknown[],
+      confidence: execution.confidence,
+      outcome: execution.outcome,
+      timeTaken: execution.timeTaken,
+      createdAt: execution.createdAt,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -326,11 +373,11 @@ export class SelfHealingDetectorService implements OnModuleInit, OnModuleDestroy
   // -------------------------------------------------------------------------
 
   private deriveSeverity(endpoint?: string): ErrorClassification['severity'] {
-    if (!endpoint) return 'medium';
+    if (!endpoint) return 'low';
     for (const { pattern, severity } of SEVERITY_PATTERNS) {
       if (pattern.test(endpoint)) return severity;
     }
-    return 'medium';
+    return 'low';
   }
 
   private buildSuggestedAction(

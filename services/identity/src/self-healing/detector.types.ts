@@ -27,3 +27,21 @@ export type ErrorClassification = {
   relatedErrors: string[];
   suggestedAction: string;
 };
+
+/**
+ * RemediationExecutionRecord — shape returned from createIncident().
+ * Maps to the RemediationExecution Prisma model fields.
+ */
+export type RemediationExecutionRecord = {
+  id: string;
+  playbookId: string;
+  organizationId: string | null;
+  incidentId: string;
+  errorPattern: string;
+  stagesExecuted: number;
+  actionsPerformed: unknown[];
+  confidence: number;
+  outcome: string;
+  timeTaken: number;
+  createdAt: Date;
+};

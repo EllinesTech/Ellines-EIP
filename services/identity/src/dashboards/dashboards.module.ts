@@ -5,9 +5,10 @@ import { DashboardWebSocketGateway } from './dashboard-websocket.gateway';
 import { DashboardExportService } from './dashboard-export.service';
 import { DashboardSharingService } from './dashboard-sharing.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AnalyticsModule],
   controllers: [DashboardController],
   providers: [
     DashboardService,

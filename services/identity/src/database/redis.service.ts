@@ -171,6 +171,28 @@ export class RedisService implements OnModuleDestroy {
   // ─── Pub/Sub ───────────────────────────────────────────────────────────────
 
   /**
+   * Delete all keys matching a glob pattern using SCAN + DEL (non-blocking).
+   * Returns the number of keys deleted.
+   * Returns 0 when Redis is not configured.
+   *
+   * Requirement 22.1: Domain-level cache invalidation.
+   */
+  async clearPattern(pattern: string): Promise<number> {
+    if (!this.client) return 0;
+    let cursor = '0';
+    let deleted = 0;
+    do {
+      const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await this.client.del(...keys);
+        deleted += keys.length;
+      }
+    } while (cursor !== '0');
+    return deleted;
+  }
+
+  /**
    * Publish a message to a channel.
    * Returns 0 when Redis is not configured.
    *

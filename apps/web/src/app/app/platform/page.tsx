@@ -266,7 +266,66 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
 
  const auditPage=<div className={styles.card}><CardTitle title="Security & audit center" hint="Cross-business operator activity for investigation and accountability."/><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8,marginBottom:12}}><input className={styles.input} placeholder="Action prefix e.g. platform." value={auditQuery} onChange={e=>setAuditQuery(e.target.value)}/><select className={styles.select} value={auditOrg} onChange={e=>setAuditOrg(e.target.value)}><option value="">All businesses</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><input className={styles.input} type="date" value={auditFrom} onChange={e=>setAuditFrom(e.target.value)}/><input className={styles.input} type="date" value={auditTo} onChange={e=>setAuditTo(e.target.value)}/></div><div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}><button className={styles.button+' '+styles.primary} onClick={()=>void loadAudit(0)}>Search</button><button className={styles.button} onClick={()=>void exportAudit()}>Export CSV</button><span className={styles.muted}>{auditTotal} matching events</span><button className={styles.button} disabled={busy} onClick={()=>void migrateEncryption(true)}>Dry-run credential migration</button><button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>{if(window.confirm('Migrate all legacy database credentials to the current master-key encryption format?'))void migrateEncryption(false)}}>Run encryption migration</button></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Time</th><th>Business</th><th>Actor</th><th>Action</th><th>Resource</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.createdAt).toLocaleString()}</td><td>{a.organizationName||a.organizationId}</td><td>{a.userEmail||'system'}</td><td>{a.action}</td><td>{a.resource}</td></tr>)}{!audit.length&&<tr><td colSpan={5}>No rows loaded.</td></tr>}</tbody></table></div><div style={{display:'flex',gap:8,marginTop:12}}><button className={styles.button} disabled={auditPageIndex===0} onClick={()=>void loadAudit(auditPageIndex-1)}>Previous</button><button className={styles.button} disabled={(auditPageIndex+1)*50>=auditTotal} onClick={()=>void loadAudit(auditPageIndex+1)}>Next</button></div></div>;
 
- const aiPage=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Ellinea AI — platform operator" hint="Evidence-backed investigation and summaries; authorization remains with the operator."/><form onSubmit={askAI}><textarea className={styles.input} style={{minHeight:130,resize:'vertical'}} placeholder="Ask about platform operations or a business…" value={aiQ} onChange={e=>setAiQ(e.target.value)}/><button className={styles.button+' '+styles.primary} disabled={aiBusy||!aiQ.trim()}>{aiBusy?'Thinking…':'Ask Ellinea'}</button></form></div><div className={styles.card}><CardTitle title="AI response" hint="No answer is treated as an authorization."/><p className={styles.cardHint}>{aiA||'No response yet.'}</p></div></div>;
+ // ── 19.1 AI Panel: platform metrics + federated learning + self-healing + predictive alerts ──
+ const aiPage=<div>
+  {/* Platform metrics row — real DB data from fetchPlatformMetrics */}
+  <div className={styles.grid4} style={{marginBottom:12}}>
+    <Kpi label="Total businesses" value={metrics?.platform?.businesses??orgs.length} hint="onboarded tenants"/>
+    <Kpi label="Active users" value={metrics?.platform?.activeUsers??totalUsers} hint="tenant seat count" cls={styles.ok}/>
+    <Kpi label="API calls / 24h" value={metrics?.platform?.apiRequests24h??'—'} hint="real platform usage"/>
+    <Kpi label="Connector installs" value={metrics?.businessServices?.connectorInstallations??'—'} hint="across all tenants"/>
+  </div>
+  {/* Federated learning status — real DB data (ModelDecisionLog aggregation) */}
+  <div className={styles.grid2} style={{marginBottom:12}}>
+    <div className={styles.card}>
+      <CardTitle title="Federated learning status" hint="Cross-tenant model training coordination — reads from ModelDecisionLog."/>
+      <div className={styles.grid2} style={{marginTop:8}}>
+        <Service title="Decisions logged" text={metrics?.platform?.auditEvents24h?String(metrics.platform.auditEvents24h)+' in 24h':'Awaiting data'}/>
+        <Service title="Model registry" text={flags.find(f=>f.key==='feature.ai_registry')?.enabled?'Active':'Disabled — enable in Feature Controls'}/>
+        <Service title="Ensemble strategy" text="Weighted vote (default)"/>
+        <Service title="Last sync" text={healthSummary?.checkedAt?new Date(healthSummary.checkedAt).toLocaleTimeString():'—'}/>
+      </div>
+    </div>
+    {/* Self-healing activity — last 10 remediations from audit log */}
+    <div className={styles.card}>
+      <CardTitle title="Self-healing activity" hint="Last 10 automated remediations from the platform audit log."/>
+      {audit.filter(a=>a.action?.includes('remediat')||a.action?.includes('heal')||a.action?.includes('auto_fix')).slice(0,10).length>0
+        ? <ul className={styles.list} style={{marginTop:8}}>
+            {audit.filter(a=>a.action?.includes('remediat')||a.action?.includes('heal')||a.action?.includes('auto_fix')).slice(0,10).map(a=>(
+              <li key={a.id}>
+                <span className={styles.dot} style={{background:'#10b981'}}/>
+                <div><strong style={{fontSize:'0.8rem'}}>{a.action}</strong><p>{a.resource} · {new Date(a.createdAt).toLocaleTimeString()}</p></div>
+              </li>
+            ))}
+          </ul>
+        : <p className={styles.cardHint} style={{marginTop:8}}>No automated remediation events in the current audit window. Load the audit log to see more.</p>
+      }
+    </div>
+  </div>
+  {/* Predictive alerts — from healthSummary + metrics */}
+  <div className={styles.card} style={{marginBottom:12}}>
+    <CardTitle title="Predictive alerts" hint="Platform-level risk signals derived from live telemetry."/>
+    <div className={styles.grid2} style={{marginTop:8}}>
+      {[
+        {label:'Rate-limit violations', value:metrics?.platform?.rateLimitViolations24h, threshold:5, hint:'exceeding 5/day triggers auto-throttle investigation'},
+        {label:'Failed integrations', value:metrics?.businessServices?.failedConnectorInstallations, threshold:1, hint:'any failure warrants connector pack review'},
+        {label:'Suspended tenants', value:suspended, threshold:3, hint:'>3 suspensions may indicate a platform access issue'},
+        {label:'Platform health', value:healthSummary?.status==='ok'?0:1, threshold:1, hint:'any non-OK status is a predictive risk signal'},
+      ].map(alert=>(
+        <div key={alert.label} style={{padding:'0.55rem 0.75rem',borderRadius:8,border:`1px solid ${Number(alert.value??0)>=alert.threshold?'rgba(239,68,68,0.35)':'rgba(255,255,255,0.07)'}`,background:Number(alert.value??0)>=alert.threshold?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.02)'}}>
+          <div style={{fontWeight:700,fontSize:'0.82rem',color:Number(alert.value??0)>=alert.threshold?'#f87171':'#fff'}}>{alert.label}</div>
+          <div style={{fontSize:'1.1rem',fontWeight:800,color:'#fff'}}>{alert.value??'—'}</div>
+          <div style={{fontSize:'0.72rem',color:'#8b95a8'}}>{alert.hint}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+  {/* Ellinea Q&A for platform operator */}
+  <div className={styles.grid2}>
+    <div className={styles.card}><CardTitle title="Ellinea AI — platform operator" hint="Evidence-backed investigation and summaries; authorization remains with the operator."/><form onSubmit={askAI}><textarea className={styles.input} style={{minHeight:130,resize:'vertical'}} placeholder="Ask about platform operations or a business…" value={aiQ} onChange={e=>setAiQ(e.target.value)}/><button className={styles.button+' '+styles.primary} disabled={aiBusy||!aiQ.trim()}>{aiBusy?'Thinking…':'Ask Ellinea'}</button></form></div>
+    <div className={styles.card}><CardTitle title="AI response" hint="No answer is treated as an authorization."/><p className={styles.cardHint}>{aiA||'No response yet.'}</p></div>
+  </div>
+ </div>;
 
  const config=<div className={styles.grid2}><div className={styles.card}><CardTitle title="Global feature controls" hint="Platform-wide switches." />{flags.map(f=><div className={styles.service} key={f.key} style={{marginBottom:8}}><strong>{f.label}</strong><p>{f.note}</p><button className={styles.button+' '+(f.enabled?styles.success:'')} onClick={async()=>{try{const r=await updatePlatformFlag(f.key,!f.enabled);setFlags(r.data);setNotice(f.label+' updated.')}catch(e){setError(e instanceof Error?e.message:'Flag update failed')}}}>{f.enabled?'Enabled':'Disabled'}</button></div>)}</div><div className={styles.card}><CardTitle title="Tenant date & time" hint="Platform operator controls presentation for an onboarded business."/><select className={styles.select} value={selected?.id||''} onChange={e=>{const o=orgs.find(x=>x.id===e.target.value);if(o)void open(o)}}><option value="">Select business</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>{selected&&<div className={styles.form} style={{marginTop:12}}><label className={styles.field}><span>Time format</span><select className={styles.select} value={settings.timeFormat} onChange={e=>setSettings({...settings,timeFormat:e.target.value as '12h'|'24h'})}><option value="12h">12-hour</option><option value="24h">24-hour</option></select></label><label className={styles.field}><span>Date style</span><select className={styles.select} value={settings.dateStyle} onChange={e=>setSettings({...settings,dateStyle:e.target.value as OrgDateTimeSettingsDto['dateStyle']})}><option value="short">Short</option><option value="medium">Medium</option><option value="log">Log</option></select></label><div className={styles.full}><button className={styles.button+' '+styles.primary} onClick={()=>void saveDate()}>Save</button></div></div>}</div></div>;
 

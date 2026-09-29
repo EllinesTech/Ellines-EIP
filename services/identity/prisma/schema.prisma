@@ -973,6 +973,7 @@ model EllineaAgent {
 
   // Metadata
   createdBy String   @map("created_by")
+  config    Json     @default("{}") // Agent policy config (allowed actions, decision threshold, escalation)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1452,6 +1453,8 @@ model ModelDecisionLog {
   @@index([selectedModelId])
   @@index([queryType])
   @@index([createdAt])
+  @@index([organizationId, queryType])
+  @@index([organizationId, createdAt])
   @@map("model_decision_logs")
 }
 

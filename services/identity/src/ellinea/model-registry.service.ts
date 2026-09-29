@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ModelRegistryService
  *
  * Platform-level (global) registry for AI models used by the Ellinea multi-model
@@ -297,5 +297,185 @@ export class ModelRegistryService {
     };
     const ms = map[window] ?? map['24h'];
     return new Date(now - ms);
+}
+
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Create an A/B test configuration for comparing two AI models.
+   *
+   * The test config is stored in `AiModelRegistry.configuration` JSON on the
+   * "model A" entry so it survives restarts without a dedicated schema table.
+   *
+   * Requirement 24.4: A/B model testing.
+   *
+   * @param name          Human-readable test name.
+   * @param modelAId      Primary model (receives `splitPercent`% of traffic).
+   * @param modelBId      Challenger model (receives remaining traffic).
+   * @param splitPercent  Percent of traffic routed to model A (0–100).
+   */
+  async createAbTest(
+    name: string,
+    modelAId: string,
+    modelBId: string,
+    splitPercent: number,
+  ): Promise<{
+    testId: string;
+    name: string;
+    modelAId: string;
+    modelBId: string;
+    splitPercent: number;
+    createdAt: Date;
+  }> {
+    const testId = crypto.randomUUID();
+    const createdAt = new Date();
+
+    const modelA = await this.prisma.aiModelRegistry.findUnique({
+      where: { modelId: modelAId },
+    });
+    if (!modelA) {
+      throw new NotFoundException(`Model '${modelAId}' not found in registry`);
+    }
+
+    const modelB = await this.prisma.aiModelRegistry.findUnique({
+      where: { modelId: modelBId },
+    });
+    if (!modelB) {
+      throw new NotFoundException(`Model '${modelBId}' not found in registry`);
+    }
+
+    // Merge the AB test config into the existing model A configuration JSON.
+    const existingConfig =
+      typeof modelA.configuration === 'object' && modelA.configuration !== null
+        ? (modelA.configuration as Record<string, unknown>)
+        : {};
+
+    const abTests: Record<string, unknown>[] = Array.isArray(
+      existingConfig['abTests'],
+    )
+      ? (existingConfig['abTests'] as Record<string, unknown>[])
+      : [];
+
+    abTests.push({
+      testId,
+      name,
+      modelAId,
+      modelBId,
+      splitPercent: Math.min(100, Math.max(0, splitPercent)),
+      createdAt: createdAt.toISOString(),
+      status: 'active',
+      results: null,
+    });
+
+    await this.prisma.aiModelRegistry.update({
+      where: { modelId: modelAId },
+      data: {
+        configuration: {
+          ...existingConfig,
+          abTests,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    this.logger.log(
+      `A/B test created: "${name}" (${testId}) — ${modelAId} (${splitPercent}%) vs ${modelBId} (${100 - splitPercent}%)`,
+    );
+
+    return {
+      testId,
+      name,
+      modelAId,
+      modelBId,
+      splitPercent,
+      createdAt,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // getAbTestResult (Task 24.4)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Retrieve the configuration and accumulated results for an A/B test.
+   *
+   * Results are read from the `AiModelRegistry.configuration.abTests` array
+   * stored on the model A entry.  Performance metrics (decision counts,
+   * average confidence) are derived from `ModelDecisionLog`.
+   *
+   * Requirement 24.4: A/B model testing result retrieval.
+   *
+   * @param testId  The A/B test ID returned by `createAbTest`.
+   */
+  async getAbTestResult(testId: string): Promise<{
+    testId: string;
+    name: string;
+    modelAId: string;
+    modelBId: string;
+    splitPercent: number;
+    status: string;
+    createdAt: string;
+    modelADecisions: number;
+    modelBDecisions: number;
+    modelAAvgConfidence: number | null;
+    modelBAvgConfidence: number | null;
+  }> {
+    // Scan all model registry entries for the testId in their abTests config.
+    const allModels = await this.prisma.aiModelRegistry.findMany({
+      select: { modelId: true, configuration: true },
+    });
+
+    let testConfig: Record<string, unknown> | null = null;
+
+    for (const m of allModels) {
+      const cfg =
+        typeof m.configuration === 'object' && m.configuration !== null
+          ? (m.configuration as Record<string, unknown>)
+          : {};
+
+      if (Array.isArray(cfg['abTests'])) {
+        const found = (cfg['abTests'] as Record<string, unknown>[]).find(
+          (t) => t['testId'] === testId,
+        );
+        if (found) {
+          testConfig = found;
+          break;
+        }
+      }
+    }
+
+    if (!testConfig) {
+      throw new NotFoundException(`A/B test '${testId}' not found`);
+    }
+
+    const modelAId = testConfig['modelAId'] as string;
+    const modelBId = testConfig['modelBId'] as string;
+
+    // Aggregate decision logs for each model.
+    const [modelALog, modelBLog] = await Promise.all([
+      this.prisma.modelDecisionLog.aggregate({
+        where: { selectedModelId: modelAId },
+        _count: { id: true },
+        _avg: { confidence: true },
+      }),
+      this.prisma.modelDecisionLog.aggregate({
+        where: { selectedModelId: modelBId },
+        _count: { id: true },
+        _avg: { confidence: true },
+      }),
+    ]);
+
+    return {
+      testId,
+      name: (testConfig['name'] as string) ?? testId,
+      modelAId,
+      modelBId,
+      splitPercent: (testConfig['splitPercent'] as number) ?? 50,
+      status: (testConfig['status'] as string) ?? 'active',
+      createdAt: (testConfig['createdAt'] as string) ?? '',
+      modelADecisions: modelALog._count.id,
+      modelBDecisions: modelBLog._count.id,
+      modelAAvgConfidence: modelALog._avg.confidence,
+      modelBAvgConfidence: modelBLog._avg.confidence,
+    };
   }
 }

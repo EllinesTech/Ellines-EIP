@@ -353,4 +353,155 @@ export class UserContextProfiler {
     const updated = [newItem, ...filtered].slice(0, maxItems);
     return updated;
   }
+
+  // ─── Task 11.1 additions ──────────────────────────────────────────────────
+
+  /**
+   * Build (or fetch) the context profile for a user in a given org.
+   * Mandatory `organizationId` filter on every query — Req 19.1, Tenant Isolation Rule.
+   *
+   * Returns the existing profile, or creates a sensible default if none exists.
+   */
+  async buildProfile(
+    userId: string,
+    orgId: string,
+  ): Promise<UserContextProfile> {
+    try {
+      // Read with mandatory org filter to satisfy tenant isolation.
+      const existing = await this.prisma.userContextProfile.findFirst({
+        where: { userId, organizationId: orgId },
+      });
+
+      if (existing) {
+        return existing;
+      }
+
+      // Derive role from the user record — fall back to 'member'.
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true, title: true },
+      });
+
+      const profile = await this.prisma.userContextProfile.create({
+        data: {
+          userId,
+          organizationId: orgId,
+          role: user?.role ?? 'member',
+          jobTitle: user?.title ?? null,
+          frequentlyAccessedDataTypes: [],
+          frequentlyUsedFeatures: [],
+          preferredDashboardWidgets: [],
+          totalLogins: 0,
+          averageSessionTime: 0,
+          preferredLanguage: 'en',
+          preferredTimezone: 'UTC',
+          verbosityLevel: 'medium',
+          preferredTerminology: 'business',
+        },
+      });
+
+      this.logger.log(
+        `buildProfile: created default profile for user ${userId} in org ${orgId}`,
+      );
+      return profile;
+    } catch (error) {
+      this.logger.error(
+        `buildProfile failed for user ${userId} in org ${orgId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Apply cross-role learning: aggregate `InteractionLog` entries from all users
+   * who share `roleType` inside `orgId`, then update `frequentlyUsedFeatures` on
+   * every matching `UserContextProfile` with the org-level role average.
+   *
+   * The aggregation is strictly intra-org (mandatory `organizationId` filter on
+   * every query) — cross-org inference is never performed (Req 19.6, Security Rule 6).
+   */
+  async applyCrossRoleLearning(
+    roleType: string,
+    orgId: string,
+  ): Promise<void> {
+    try {
+      // 1. Find all context profiles that match the role within this org.
+      const profiles = await this.prisma.userContextProfile.findMany({
+        where: { role: roleType, organizationId: orgId },
+        select: { id: true, frequentlyUsedFeatures: true },
+      });
+
+      if (profiles.length === 0) {
+        this.logger.log(
+          `applyCrossRoleLearning: no profiles for role "${roleType}" in org ${orgId}`,
+        );
+        return;
+      }
+
+      // 2. Fetch interaction logs for those profiles, scoped to this org.
+      const profileIds = profiles.map((p) => p.id);
+      const logs = await this.prisma.interactionLog.findMany({
+        where: {
+          contextProfileId: { in: profileIds },
+          organizationId: orgId, // mandatory org filter
+          interactionType: 'feature_use',
+        },
+        select: { resourceType: true },
+      });
+
+      // 3. Compute frequency map of features across all role members.
+      const featureFreq: Record<string, number> = {};
+      for (const log of logs) {
+        if (log.resourceType) {
+          featureFreq[log.resourceType] = (featureFreq[log.resourceType] ?? 0) + 1;
+        }
+      }
+
+      // 4. Derive the top-10 features ordered by frequency (preference weights).
+      const topFeatures = Object.entries(featureFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([feature]) => feature);
+
+      if (topFeatures.length === 0) {
+        this.logger.log(
+          `applyCrossRoleLearning: no feature_use logs for role "${roleType}" in org ${orgId} — nothing to apply`,
+        );
+        return;
+      }
+
+      // 5. Merge the role-level averages into each profile's frequentlyUsedFeatures.
+      //    Explicit per-user features take precedence: we prepend role averages only for
+      //    features not already in the user's own top list, maintaining per-user ordering.
+      for (const profile of profiles) {
+        const userFeatures = profile.frequentlyUsedFeatures as string[];
+        const merged = [...userFeatures];
+        for (const f of topFeatures) {
+          if (!merged.includes(f)) {
+            merged.push(f);
+          }
+        }
+        const capped = merged.slice(0, 10);
+
+        await this.prisma.userContextProfile.update({
+          where: { id: profile.id },
+          data: {
+            frequentlyUsedFeatures: capped,
+            lastProfiledAt: new Date(),
+          },
+        });
+      }
+
+      this.logger.log(
+        `applyCrossRoleLearning: updated ${profiles.length} profile(s) for role "${roleType}" in org ${orgId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `applyCrossRoleLearning failed for role "${roleType}" in org ${orgId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
 }

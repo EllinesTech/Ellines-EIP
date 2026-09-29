@@ -58,7 +58,6 @@ export function rowsToEnterprisePayload(
       briefHighlight: `${systemName}: query returned no rows.`,
       timeline: [{ title: `${systemName} sync`, detail: 'Empty result set' }],
       model: inferUemFromMetrics({
-        connectedSystems: 1,
         sourceSystem: systemName,
         timelineLength: 1,
       }),
@@ -113,7 +112,6 @@ export function rowsToEnterprisePayload(
   return {
     ...payload,
     model: inferUemFromMetrics({
-      connectedSystems: payload.connectedSystems,
       openAlerts: payload.openAlerts,
       openDecisions: payload.openDecisions,
       sourceSystem: systemName,

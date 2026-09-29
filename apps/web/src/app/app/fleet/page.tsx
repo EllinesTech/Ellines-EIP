@@ -3,20 +3,34 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { isOrgAdminRole } from '@ellines-eip/shared';
-import {
-  fetchEnterpriseSummary,
-  getSession,
-  type EnterpriseSummaryDto,
-} from '@/lib/api';
+import { getSession, getToken } from '@/lib/api';
 import styles from '../command.module.css';
 
-type AssetRow = {
-  id: string;
-  name: string;
-  status?: string;
-  branch?: string;
-  kind: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type GpsCoordinate = {
+  lat: number;
+  lng: number;
+  timestamp?: number;
+  speedKph?: number;
+  heading?: number;
 };
+
+type AssetLocation = {
+  assetId: string;
+  assetName: string;
+  kind: string;
+  status?: string;
+  branchId?: string;
+  gps?: GpsCoordinate;
+};
+
+type FleetLocationsResponse = {
+  assets: AssetLocation[];
+  total: number;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   active:      { bg: 'rgba(16,185,129,0.15)',  color: '#6ee7b7', border: 'rgba(16,185,129,0.3)' },
@@ -26,13 +40,6 @@ const STATUS_COLORS: Record<string, { bg: string; color: string; border: string 
   offline:     { bg: 'rgba(239,68,68,0.15)',   color: '#fca5a5', border: 'rgba(239,68,68,0.3)' },
   error:       { bg: 'rgba(239,68,68,0.15)',   color: '#fca5a5', border: 'rgba(239,68,68,0.3)' },
 };
-
-const FLEET_HINT = /\b(fleet|vehicle|car|truck|van|bus|gps|motor|plate|reg|ambulance|lorry)\b/i;
-
-function isFleetObject(obj: { kind: string; name: string; status?: string }) {
-  if (obj.kind === 'asset') return true;
-  return FLEET_HINT.test(`${obj.name} ${obj.status || ''}`);
-}
 
 function assetIcon(name: string, kind: string): string {
   const n = name.toLowerCase();
@@ -51,58 +58,80 @@ function statusStyle(status?: string) {
   return STATUS_COLORS[key] || STATUS_COLORS['active'];
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function FleetCompanionPage() {
-  const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
+  const [assets, setAssets] = useState<AssetLocation[]>([]);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
   const [orgAdmin, setOrgAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [noSnapshot, setNoSnapshot] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
 
   useEffect(() => {
-    const s = getSession();
-    if (s) setOrgAdmin(isOrgAdminRole(s.user.role));
-    fetchEnterpriseSummary()
-      .then(setSummary)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load fleet'))
+    const session = getSession();
+    if (!session) {
+      setError('Not authenticated');
+      setLoading(false);
+      return;
+    }
+    setOrgAdmin(isOrgAdminRole(session.user.role));
+
+    const slug = session.organization.slug;
+    const token = getToken();
+
+    // Resolve Pages API base (same-origin in production, :3100 in dev)
+    const pagesBase =
+      process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3100';
+
+    fetch(`${pagesBase}/api/v1/orgs/${slug}/fleet/locations`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+        return data as FleetLocationsResponse;
+      })
+      .then((data) => {
+        setAssets(data.assets ?? []);
+        setTotal(data.total ?? data.assets?.length ?? 0);
+        // If the endpoint returned empty assets with no error it means no snapshot yet
+        setNoSnapshot((data.assets ?? []).length === 0);
+      })
+      .catch((err: Error) => {
+        setError(err.message || 'Failed to load fleet');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const synced = summary?.status === 'synced';
+  // ── Derived ──────────────────────────────────────────────────────────────────
 
-  const assets = useMemo((): AssetRow[] => {
-    const objects = summary?.model?.objects ?? [];
-    return objects.filter(isFleetObject).map((o) => ({
-      id: o.id,
-      name: o.name,
-      status: o.status,
-      branch: o.branchId,
-      kind: o.kind,
-    }));
-  }, [summary]);
-
-  const assetCount = summary?.model?.counts?.assets ?? assets.length;
-  const alertCount = synced ? summary!.openAlerts : 0;
   const attentionCount = assets.filter((a) =>
     ['attention', 'maintenance', 'offline', 'error'].includes((a.status || '').toLowerCase()),
   ).length;
 
   const allStatuses = ['all', ...new Set(assets.map((a) => a.status).filter(Boolean) as string[])];
-  const allBranches = ['all', ...new Set(assets.map((a) => a.branch).filter(Boolean) as string[])];
+  const allBranches = ['all', ...new Set(assets.map((a) => a.branchId).filter(Boolean) as string[])];
 
   const needle = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
       assets.filter((a) => {
-        const blob = `${a.name} ${a.status || ''} ${a.branch || ''}`.toLowerCase();
+        const blob = `${a.assetName} ${a.status || ''} ${a.branchId || ''}`.toLowerCase();
         const matchQ = !needle || blob.includes(needle);
         const matchStatus = statusFilter === 'all' || (a.status || '').toLowerCase() === statusFilter.toLowerCase();
-        const matchBranch = branchFilter === 'all' || a.branch === branchFilter;
+        const matchBranch = branchFilter === 'all' || a.branchId === branchFilter;
         return matchQ && matchStatus && matchBranch;
       }),
     [assets, needle, statusFilter, branchFilter],
   );
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.page}>
@@ -133,8 +162,8 @@ export default function FleetCompanionPage() {
       <div className={styles.kpis}>
         <div className={styles.kpi}>
           <span>Total assets</span>
-          <strong>{loading ? '—' : assetCount}</strong>
-          <em>UEM asset objects</em>
+          <strong>{loading ? '—' : total}</strong>
+          <em>Fleet locations endpoint</em>
         </div>
         <div className={styles.kpi}>
           <span>Needing attention</span>
@@ -144,11 +173,9 @@ export default function FleetCompanionPage() {
           <em>Maintenance / offline</em>
         </div>
         <div className={styles.kpi}>
-          <span>Open alerts</span>
-          <strong className={alertCount > 0 ? styles.warn : undefined}>
-            {loading ? '—' : synced ? alertCount : '—'}
-          </strong>
-          <em>Enterprise snapshot</em>
+          <span>With GPS</span>
+          <strong>{loading ? '—' : assets.filter((a) => a.gps).length}</strong>
+          <em>Live coordinates</em>
         </div>
         <div className={styles.kpi}>
           <span>Branches covered</span>
@@ -204,7 +231,7 @@ export default function FleetCompanionPage() {
       {/* Asset grid */}
       {loading ? (
         <p className={styles.lede}>Loading fleet…</p>
-      ) : !synced ? (
+      ) : noSnapshot && !error ? (
         <div className={styles.emptyCallout}>
           <div>
             <strong>No fleet data yet</strong>
@@ -217,7 +244,7 @@ export default function FleetCompanionPage() {
             <Link href="/app/connectors" className={styles.ghostBtn}>Open Connectors</Link>
           ) : null}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && !error ? (
         <div className={styles.emptyCallout}>
           <div>
             <strong>{assets.length === 0 ? 'No assets in snapshot' : `No assets match "${query}"`}</strong>
@@ -228,7 +255,7 @@ export default function FleetCompanionPage() {
             </p>
           </div>
         </div>
-      ) : (
+      ) : !error ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
@@ -238,16 +265,16 @@ export default function FleetCompanionPage() {
             const st = statusStyle(asset.status);
             return (
               <article
-                key={asset.id}
+                key={asset.assetId}
                 className={styles.card}
                 style={{ padding: '0.85rem 1rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}
               >
                 <span style={{ fontSize: '1.5rem', lineHeight: 1, flexShrink: 0 }} aria-hidden>
-                  {assetIcon(asset.name, asset.kind)}
+                  {assetIcon(asset.assetName, asset.kind)}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.25rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {asset.name}
+                    {asset.assetName}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                     <span style={{
@@ -272,9 +299,15 @@ export default function FleetCompanionPage() {
                       {asset.kind}
                     </span>
                   </div>
-                  {asset.branch ? (
+                  {asset.branchId ? (
                     <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)', marginTop: '0.3rem' }}>
-                      📍 {asset.branch}
+                      📍 {asset.branchId}
+                    </div>
+                  ) : null}
+                  {asset.gps ? (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--c-muted)', marginTop: '0.2rem', fontFamily: 'monospace' }}>
+                      {asset.gps.lat.toFixed(5)}, {asset.gps.lng.toFixed(5)}
+                      {asset.gps.speedKph != null ? ` · ${asset.gps.speedKph} km/h` : ''}
                     </div>
                   ) : null}
                 </div>
@@ -282,7 +315,7 @@ export default function FleetCompanionPage() {
             );
           })}
         </div>
-      )}
+      ) : null}
 
       <div className={styles.emptyCallout} style={{ marginTop: '1rem', background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.3)' }}>
         <div>

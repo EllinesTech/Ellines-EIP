@@ -15,6 +15,19 @@ import { DatabaseModule } from './database/database.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { EllineaModule } from './ellinea/ellinea.module';
 import { KnowledgeGraphModule } from './knowledge-graph/knowledge-graph.module';
+import { SelfHealingModule } from './self-healing/self-healing.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { SecurityModule } from './security/security.module';
+import { DataQualityModule } from './data-quality/data-quality.module';
+import { DocumentsModule } from './documents/documents.module';
+import { EmailModule } from './email/email.module';
+import { ConnectorsModule } from './connectors/connectors.module';
+import { FleetModule } from './fleet/fleet.module';
+import { SearchModule } from './search/search.module';
+import { ReportsModule } from './reports/reports.module';
+import { CommonModule } from './common/common.module';
+import { JobsModule } from './jobs/jobs.module';
 import { HealthController } from './health.controller';
 import { CorrelationMiddleware } from './logging/correlation.middleware';
 import { LoggingMiddleware } from './middleware/logging.middleware';
@@ -43,6 +56,19 @@ import { LoggingMiddleware } from './middleware/logging.middleware';
     RateLimitModule,
     EllineaModule,
     KnowledgeGraphModule,
+    SelfHealingModule,
+    AnalyticsModule,
+    AlertsModule,
+    SecurityModule,
+    DataQualityModule,
+    DocumentsModule,
+    EmailModule,
+    ConnectorsModule,
+    FleetModule,
+    SearchModule,
+    ReportsModule,
+    CommonModule,
+    JobsModule,
   ],
   controllers: [HealthController],
 })

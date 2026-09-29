@@ -212,7 +212,6 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
     });
   } else {
     model = inferUemFromMetrics({
-      connectedSystems,
       openAlerts,
       openDecisions,
       sourceSystem: sourceSystem || undefined,

@@ -52,6 +52,19 @@ export type CausalChain = {
   sampleCount: number;
 };
 
+/**
+ * A candidate hypothesis derived from multi-hop reasoning traversal results.
+ * Requirements: 2.5, 2.6, 2.7
+ */
+export type Hypothesis = {
+  id: string;
+  statement: string;
+  confidence: number;
+  /** At least one evidence item is required (sourced from ReasoningStep.evidence). */
+  evidence: string[];
+  status: 'proposed' | 'supported' | 'refuted';
+};
+
 export type EventRecord = {
   eventType: string;
   occurredAt: Date;
@@ -573,6 +586,197 @@ export class ReasoningEngineService {
     return detectedPatterns;
   }
 
+  // ── Hypothesis generation and testing (Requirements 2.5, 2.6, 2.7) ─────────
+
+  /**
+   * Derives 2–5 candidate hypotheses from a multi-hop reasoning traversal of
+   * the knowledge graph for the given observation.
+   *
+   * Each unique relationship type in the traversal steps produces one hypothesis.
+   * Causal links from the traversal result produce additional hypotheses.
+   * Hypotheses are ranked by confidence (descending) and capped at 5.
+   * Every hypothesis carries ≥ 1 evidence item from the reasoning steps.
+   *
+   * Requirement 2.5, 2.6: Generate and rank candidate hypotheses.
+   * Requirement 2.7: Each hypothesis must reference reasoning evidence.
+   *
+   * @param observation  The observation text to reason about.
+   * @param orgId        Organisation whose graph is queried (mandatory).
+   */
+  async generateHypotheses(
+    observation: string,
+    orgId: string,
+  ): Promise<Hypothesis[]> {
+    this.logger.debug(
+      `generateHypotheses orgId=${orgId} observation="${observation}"`,
+    );
+
+    const result = await this.multiHopReasoning(observation, orgId, 2);
+
+    const hypotheses: Hypothesis[] = [];
+    let idCounter = 0;
+
+    // ── 1. One hypothesis per unique relationship type in the steps ────────────
+    const seenRelTypes = new Set<string>();
+
+    for (const step of result.steps) {
+      if (seenRelTypes.has(step.relationship)) continue;
+      seenRelTypes.add(step.relationship);
+
+      // Collect all evidence items from steps sharing this relationship type
+      const evidence: string[] = result.steps
+        .filter((s) => s.relationship === step.relationship)
+        .flatMap((s) => s.evidence);
+
+      if (evidence.length === 0) continue; // skip if no evidence (should not happen)
+
+      hypotheses.push({
+        id: `hyp-${++idCounter}`,
+        statement: `The ${step.entityType} may be causing issues via ${step.relationship}`,
+        confidence: step.confidence,
+        evidence,
+        status: 'proposed',
+      });
+    }
+
+    // ── 2. Additional hypotheses from causal links ─────────────────────────────
+    for (const link of result.causalLinks) {
+      // Build evidence string from causal link data
+      const evidence: string[] = [
+        `Causal link: ${link.causeEventType} → ${link.effectEventType} ` +
+        `(avg delay ${link.avgDelayMs}ms, ${link.sampleCount} occurrence(s))`,
+      ];
+
+      // Supplement with step evidence where available
+      const matchingStepEvidence = result.steps.flatMap((s) => s.evidence).slice(0, 3);
+      evidence.push(...matchingStepEvidence);
+
+      hypotheses.push({
+        id: `hyp-${++idCounter}`,
+        statement:
+          `${link.causeEventType} events may be causing ${link.effectEventType} ` +
+          `with a typical delay of ${link.avgDelayMs}ms`,
+        confidence: link.confidence,
+        evidence,
+        status: 'proposed',
+      });
+    }
+
+    // ── 3. Rank by confidence descending and trim to 5 ────────────────────────
+    const ranked = hypotheses
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 5);
+
+    // Guarantee at least 2 hypotheses (pad with a generic fallback if needed)
+    while (ranked.length < 2) {
+      const fallbackEvidence =
+        result.steps.length > 0
+          ? result.steps[0].evidence
+          : [`Observation: ${observation}`];
+
+      ranked.push({
+        id: `hyp-${++idCounter}`,
+        statement: `Insufficient data to fully explain "${observation}" — further investigation required`,
+        confidence: 0.3,
+        evidence: fallbackEvidence,
+        status: 'proposed',
+      });
+    }
+
+    this.logger.debug(
+      `generateHypotheses orgId=${orgId}: produced ${ranked.length} hypothesis/hypotheses`,
+    );
+
+    return ranked;
+  }
+
+  /**
+   * Tests a hypothesis against the last 30 EnterpriseSnapshot records for the
+   * organisation.
+   *
+   * Testing rules (Requirement 2.6, 2.7):
+   *  - Queries the last 30 snapshots ordered by `syncedAt` desc.
+   *  - Checks whether `briefHighlight` or `insights` JSON contains keywords
+   *    extracted from the hypothesis statement.
+   *  - ≥ 2 matching snapshots → status='supported', confidence += 0.1 (cap 1.0).
+   *  - 0 matching snapshots  → status='refuted',   confidence -= 0.1 (floor 0.0).
+   *  - Otherwise             → status='proposed' (unchanged).
+   *
+   * @param hypothesis  The hypothesis to test (returned with updated status/confidence).
+   * @param orgId       Organisation whose snapshots are queried (mandatory).
+   */
+  async testHypothesis(
+    hypothesis: Hypothesis,
+    orgId: string,
+  ): Promise<Hypothesis> {
+    this.logger.debug(
+      `testHypothesis orgId=${orgId} id=${hypothesis.id} statement="${hypothesis.statement}"`,
+    );
+
+    // ── 1. Load last 30 snapshots ──────────────────────────────────────────────
+    const snapshots = await this.prisma.enterpriseSnapshot.findMany({
+      where: { organizationId: orgId },
+      orderBy: { syncedAt: 'desc' },
+      take: 30,
+      select: {
+        briefHighlight: true,
+        insights: true,
+      },
+    });
+
+    if (snapshots.length === 0) {
+      // No snapshots available — leave as proposed
+      return { ...hypothesis };
+    }
+
+    // ── 2. Extract keywords from hypothesis statement ─────────────────────────
+    const keywords = extractKeywords(hypothesis.statement);
+
+    // ── 3. Count matching snapshots ───────────────────────────────────────────
+    let matchCount = 0;
+
+    for (const snap of snapshots) {
+      const highlightText = (snap.briefHighlight ?? '').toLowerCase();
+
+      // Serialise the insights JSON to a searchable string
+      let insightsText = '';
+      try {
+        insightsText = JSON.stringify(snap.insights ?? '').toLowerCase();
+      } catch {
+        insightsText = '';
+      }
+
+      const combinedText = `${highlightText} ${insightsText}`;
+      const hasMatch = keywords.some((kw) => combinedText.includes(kw));
+
+      if (hasMatch) matchCount += 1;
+    }
+
+    // ── 4. Determine status and adjust confidence ─────────────────────────────
+    let newStatus = hypothesis.status;
+    let newConfidence = hypothesis.confidence;
+
+    if (matchCount >= 2) {
+      newStatus = 'supported';
+      newConfidence = Math.min(newConfidence + 0.1, 1.0);
+    } else if (matchCount === 0) {
+      newStatus = 'refuted';
+      newConfidence = Math.max(newConfidence - 0.1, 0.0);
+    }
+    // matchCount === 1 → leave status and confidence unchanged ('proposed')
+
+    this.logger.debug(
+      `testHypothesis orgId=${orgId} id=${hypothesis.id}: ` +
+      `matchCount=${matchCount}/${snapshots.length} status=${newStatus} confidence=${newConfidence.toFixed(2)}`,
+    );
+
+    return {
+      ...hypothesis,
+      status: newStatus,
+      confidence: parseFloat(newConfidence.toFixed(4)),
+    };
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /**
@@ -751,4 +955,26 @@ function deriveConclusion(
     `Reasoning for "${question}" traversed ${steps.length} relationship(s) ` +
     `across ${hopsReached + 1} hop(s) involving entity types: ${uniqueTypes}.`
   );
+}
+
+/**
+ * Builds a deterministic, stable patternId from the org, the sorted system
+ * signature, and the start timestamp of the detection window.
+ *
+ * Format: `pattern:<orgId>:<signature-hash>:<windowStartMs>`
+ * The signature is hashed to a short hex string so the ID stays URL-safe
+ * regardless of how many systems are involved.
+ */
+function buildPatternId(
+  orgId: string,
+  signature: string,
+  windowStartMs: number,
+): string {
+  // Simple djb2-style hash — no crypto dependency needed for a non-secret ID.
+  let hash = 5381;
+  for (let i = 0; i < signature.length; i++) {
+    hash = ((hash << 5) + hash) ^ signature.charCodeAt(i);
+    hash = hash >>> 0; // keep unsigned 32-bit
+  }
+  return `pattern:${orgId}:${hash.toString(16)}:${windowStartMs}`;
 }

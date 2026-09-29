@@ -212,6 +212,75 @@ export class DashboardController {
   }
 
   /**
+   * POST /api/v1/dashboards/:id/schedule
+   * Schedule recurring export for a dashboard
+   * Requirement 20.3: Export scheduling
+   */
+  @Post(':id/schedule')
+  async scheduleExport(
+    @Param('id') dashboardId: string,
+    @Body()
+    input: {
+      organizationId: string;
+      format: 'pdf' | 'png';
+      schedule: string; // cron expression
+    },
+  ) {
+    return this.dashboardService.exportDashboard(
+      dashboardId,
+      input.organizationId,
+      input.format as 'pdf' | 'csv' | 'excel',
+      input.schedule,
+    );
+  }
+
+  /**
+   * POST /api/v1/dashboards/:id/versions
+   * Save a named version snapshot of the dashboard layout
+   * Requirement 20.3: Dashboard versioning
+   */
+  @Post(':id/versions')
+  async saveVersion(
+    @Param('id') dashboardId: string,
+    @Body() input: { organizationId: string; label?: string },
+  ) {
+    return this.dashboardService.saveVersion(
+      dashboardId,
+      input.organizationId,
+      input.label,
+    );
+  }
+
+  /**
+   * GET /api/v1/dashboards/:id/versions
+   * List saved versions for a dashboard
+   */
+  @Get(':id/versions')
+  async listVersions(
+    @Param('id') dashboardId: string,
+    @Body() body: { organizationId: string },
+  ) {
+    return this.dashboardService.listVersions(dashboardId, body.organizationId);
+  }
+
+  /**
+   * POST /api/v1/dashboards/:dashboardId/versions/:versionId/restore
+   * Restore a specific version
+   */
+  @Post(':dashboardId/versions/:versionId/restore')
+  async restoreVersion(
+    @Param('dashboardId') dashboardId: string,
+    @Param('versionId') versionId: string,
+    @Body() body: { organizationId: string },
+  ) {
+    return this.dashboardService.restoreVersion(
+      dashboardId,
+      body.organizationId,
+      versionId,
+    );
+  }
+
+  /**
    * POST /api/v1/dashboards/:id/export
    * Export a dashboard
    */

@@ -25,6 +25,7 @@ import {
   type DashboardExportDto,
 } from '@/lib/api';
 import DashboardBuilder from './DashboardBuilder';
+import { useDashboardSocket } from '@/hooks/useDashboardSocket';
 import styles from '../../command.module.css';
 import adminStyles from '../../admin/admin.module.css';
 
@@ -43,6 +44,30 @@ export default function DashboardClient() {
   const [alertForm, setAlertForm] = useState({ condition: 'gt' as typeof CONDITIONS[number], threshold: 0, active: true });
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // ── 19.4: Widget config panel toggle ─────────────────────────────────────
+  const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+
+  // Real-time WebSocket updates (Requirement 7.8, 20.4)
+  const { connected: wsConnected, lastEvent: wsEvent } = useDashboardSocket(
+    id || undefined,
+    orgId || undefined,
+  );
+
+  // When a widget-update event arrives, reload the dashboard silently
+  useEffect(() => {
+    if (!wsEvent || !dashboard || !orgId) return;
+    if (
+      wsEvent.dashboardId === dashboard.id &&
+      (wsEvent.type === 'widget_update' || wsEvent.type === 'widget-update')
+    ) {
+      getDashboardApi(dashboard.id, orgId)
+        .then((dto) => {
+          setDashboard(dto);
+          setLastRefreshed(new Date());
+        })
+        .catch(() => {});
+    }
+  }, [wsEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const s = getSession();
@@ -281,6 +306,28 @@ export default function DashboardClient() {
         <div className={styles.headerActions}>
           {/* Refresh indicator */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+            {/* WebSocket connection badge */}
+            <span
+              title={wsConnected ? 'Live updates active' : 'Live updates offline'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.72rem',
+                color: wsConnected ? '#10b981' : '#94a3b8',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: wsConnected ? '#10b981' : '#94a3b8',
+                  display: 'inline-block',
+                }}
+              />
+              {wsConnected ? 'Live' : 'Polling'}
+            </span>
             {dashboard.refreshRate > 0 && (
               <span title={`Auto-refresh every ${dashboard.refreshRate}s`}>
                 ⟳ {dashboard.refreshRate}s
@@ -302,12 +349,66 @@ export default function DashboardClient() {
           >
             {refreshing ? '↻ Refreshing…' : '↻ Refresh'}
           </button>
+          {/* 19.4: Widget config panel toggle */}
+          <button
+            type="button"
+            className={adminStyles.ghost}
+            onClick={() => setShowWidgetConfig((v) => !v)}
+            title="Toggle widget configuration panel"
+            style={showWidgetConfig ? { borderColor: 'rgba(124,58,237,0.6)', color: '#a78bfa' } : {}}
+          >
+            ⚙ Widget config
+          </button>
           <Link href="/app/dashboards" className={styles.ghostBtn}>All dashboards</Link>
           <button type="button" className={adminStyles.ghost} onClick={onDelete} disabled={busy}>Delete</button>
         </div>
       </header>
 
       {notice ? <p className={adminStyles.error} style={{ marginBottom: '0.65rem' }}>{notice}</p> : null}
+
+      {/* ── 19.4: Widget config panel (toggleable) ─────────────────────────── */}
+      {showWidgetConfig && (
+        <section className={styles.brief} style={{ marginBottom: '0.65rem', borderColor: 'rgba(124,58,237,0.4)', background: 'rgba(124,58,237,0.05)' }}>
+          <div className={styles.panelLabel}>Widget configuration</div>
+          <p style={{ fontSize: '0.8rem', color: '#8b95a8', margin: '0.25rem 0 0.75rem' }}>
+            Configure individual widget data sources, types, and display options. Select a widget below to edit its settings.
+          </p>
+          {(dashboard.widgets || []).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {(dashboard.widgets || []).map(w => (
+                <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{w.title}</span>
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#8b95a8', textTransform: 'uppercase' }}>{w.type}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => onUpdateWidget(w, { title: w.title })}
+                      disabled={busy}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={adminStyles.ghost}
+                      style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)' }}
+                      onClick={() => onDeleteWidget(w.id)}
+                      disabled={busy}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.8rem', color: '#8b95a8' }}>No widgets yet — add one from the Widgets panel below.</p>
+          )}
+        </section>
+      )}
 
       <section className={styles.brief} style={{ marginBottom: '0.65rem' }}>
         <div className={styles.panelLabel}>Settings</div>

@@ -16,6 +16,20 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
 
 
+  // socket.io-client is an optional peer dependency used only at runtime when the
+  // WebSocket gateway is available. Mark it as an external so webpack does not
+  // attempt to bundle it during the static export build (it is not installed).
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      config.resolve = config.resolve || {};
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        'socket.io-client': false,
+      };
+    }
+    return config;
+  },
+
   // In dev, proxy NestJS-handled /api/v1/* routes through to localhost:3001.
   // Routes that have Next.js Route Handlers (Pages-Function equivalents) are
   // served by Next.js itself and are NOT caught by this rewrite because

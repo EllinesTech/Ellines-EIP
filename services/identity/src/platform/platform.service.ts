@@ -347,13 +347,30 @@ export class PlatformService {
 
   async getPlatformMetrics() {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [orgs, activeUsers, auditEvents, rateLimitHits, connectors, failedConnectors] = await Promise.all([
+    const [orgs, activeUsers, auditEvents, rateLimitHits, connectors, failedConnectors, apiRequests] = await Promise.all([
       this.prisma.organization.count(),
       this.prisma.user.count({ where: { isActive: true } }),
       this.prisma.auditLog.count({ where: { createdAt: { gte: since } } }),
       this.prisma.auditLog.count({ where: { action: { startsWith: 'rate_limit' }, createdAt: { gte: since } } }),
       this.prisma.connectorInstallation.count().catch(() => 0),
       this.prisma.connectorInstallation.count({ where: { status: 'error' } }).catch(() => 0),
+      // Count all audit log entries that represent inbound API calls.
+      // auth.*, connector.*, enterprise.*, and platform.* actions are all
+      // triggered by real HTTP requests — this is the closest real proxy
+      // for request volume until a dedicated request-counter table exists.
+      this.prisma.auditLog.count({
+        where: {
+          createdAt: { gte: since },
+          action: {
+            in: [
+              'auth.login', 'auth.register', 'auth.refresh', 'auth.logout',
+              'connector.sync', 'connector.test', 'connector.install',
+              'enterprise.ingest', 'enterprise.snapshot',
+              'platform.org.create', 'platform.org.update',
+            ],
+          },
+        },
+      }).catch(() => 0),
     ]);
     const now = new Date().toISOString();
     return {
@@ -363,7 +380,7 @@ export class PlatformService {
         businesses: orgs,
         activeUsers,
         auditEvents24h: auditEvents,
-        apiRequests24h: 0, // not tracked at request level yet
+        apiRequests24h: apiRequests,
         rateLimitViolations24h: rateLimitHits,
       },
       businessServices: {

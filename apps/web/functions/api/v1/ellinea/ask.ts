@@ -246,6 +246,36 @@ async function callLlm(
   return { answer, provider: model };
 }
 
+// ─── Document-request keyword detection (Task 13.4) ──────────────────────────
+// If the user's question contains document-generation intent keywords, the
+// response is augmented with `documentAction` and `documentHint` fields so
+// the client can surface a "Generate document" affordance.  This is purely
+// additive — no existing behaviour is altered.
+
+const DOCUMENT_KEYWORDS = [
+  'generate',
+  'report',
+  'excel',
+  'pdf',
+  'word',
+  'download',
+  'spreadsheet',
+];
+
+function detectDocumentRequest(question: string): boolean {
+  const lower = question.toLowerCase();
+  return DOCUMENT_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+function documentHintFields(question: string): Record<string, string> {
+  if (!detectDocumentRequest(question)) return {};
+  return {
+    documentAction: 'generate_report',
+    documentHint:
+      'Use /api/v1/orgs/:slug/documents/generate to create this document',
+  };
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
   if (context.request.method !== 'POST') {
@@ -262,6 +292,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     dna?: unknown;
     role?: string;
     organizationName?: string;
+    // 20.1: multi-turn conversation support
+    conversationId?: string;
+    // 24.2: user challenge / re-evaluation (boolean or object with challenge details)
+    challenge?: unknown;
   };
   try {
     body = (await context.request.json()) as typeof body;
@@ -278,6 +312,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (question.length < 2) {
     return json({ statusCode: 400, message: 'question is required' }, 400);
   }
+
+  // 20.1: Extract conversationId to pass through for multi-turn history tracking
+  const conversationId = typeof body.conversationId === 'string' ? body.conversationId.trim() || undefined : undefined;
+
+  // 24.2: User challenge flag — re-evaluate with higher scrutiny (boolean true OR challenge object)
+  const isChallenge = body.challenge === true || (body.challenge !== null && typeof body.challenge === 'object');
 
   const supabase = getAdminClient(context.env);
   const { data: org } = await supabase
@@ -315,6 +355,50 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     organizationName,
   });
 
+  // 20.3: HR/operations grounding note — HR queries are supported by Ellinea.
+  // HR-related keywords detected in the question trigger an additional grounding hint.
+  const HR_KEYWORDS = ['employee', 'hr', 'payroll', 'leave', 'staff', 'headcount', 'recruitment', 'onboard', 'offboard', 'workforce', 'attendance', 'performance review'];
+  const lowerQ = question.toLowerCase();
+  const isHrQuery = HR_KEYWORDS.some(kw => lowerQ.includes(kw));
+  const hrGrounding = isHrQuery
+    ? '\n[hr] HR and workforce operations queries are supported. Employee data, payroll summaries, and leave balances should be sourced from the connected HRM/ERP connector snapshot.'
+    : '';
+
+  // 24.2: Challenge re-evaluation — append scrutiny instruction
+  const challengeGrounding = isChallenge
+    ? '\n[challenge] User challenged this answer. Re-evaluating with higher scrutiny. Double-check every claim against grounding sources before responding.'
+    : '';
+
+  // 24.2: User challenge support — when challenge is an object, include its content
+  let challengeObjectGrounding = '';
+  if (body.challenge && typeof body.challenge === 'object') {
+    const challengeText = JSON.stringify(body.challenge).slice(0, 200);
+    challengeObjectGrounding = `\n[challenge] User challenges the previous answer: ${challengeText}`;
+  }
+
+  const effectiveGrounding = grounding + hrGrounding + challengeGrounding + challengeObjectGrounding;
+
+  // 20.2: Derive relatedQuestions from the query type for cross-system follow-up suggestions
+  function deriveRelatedQuestions(q: string, qt?: string): string[] {
+    const lower = q.toLowerCase();
+    if (lower.includes('connector') || lower.includes('sync') || qt === 'connector') {
+      return ['What connectors have failed in the last 24 hours?', 'Which connector has the lowest health score?', 'How do I fix a connector sync error?'];
+    }
+    if (lower.includes('alert') || lower.includes('risk') || qt === 'alert') {
+      return ['What is causing the most alerts right now?', 'Which alerts require immediate attention?', 'How do I resolve a critical alert?'];
+    }
+    if (lower.includes('user') || lower.includes('access') || qt === 'access') {
+      return ['Which users have admin access?', 'Are there any inactive users with open permissions?', 'How do I revoke access for a departed employee?'];
+    }
+    if (lower.includes('health') || lower.includes('score') || qt === 'health') {
+      return ['What is driving the current health score?', 'Which system has the lowest health?', 'What actions would most improve the health score?'];
+    }
+    if (isHrQuery) {
+      return ['What is the current headcount?', 'Are there any pending leave requests?', 'Which department has the highest staff turnover?'];
+    }
+    return ['What is the current enterprise health score?', 'Are there any open decisions requiring approval?', 'Which connectors are currently active?'];
+  }
+
   /** Send a real email to the user's registered address with the Q&A result. */
   async function notifyUser(answer: string, mode: string): Promise<void> {
     const userEmail = actorEmail;
@@ -341,15 +425,51 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
+  // ── Step 1: Call model orchestrator for routing metadata (Requirement 1.8) ──
+  // Extract the JWT from the Authorization header so we can forward it to the
+  // internal orchestrate endpoint on the same origin.
+  const jwtToken = (context.request.headers.get('authorization') ?? '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
+
+  let orchestration: OrchestrateResponse | null = null;
+  if (jwtToken) {
+    orchestration = await callOrchestrate(
+      context.request,
+      jwtToken,
+      question,
+      auth.organizationId,
+    );
+  }
+
+  // Pull the audit fields we want to surface; fall back to safe defaults so
+  // the response shape is stable whether or not the orchestrator is reachable.
+  const modelDecisions = orchestration?.modelDecisions ?? [];
+  const queryType      = orchestration?.queryType      ?? undefined;
+  const routingReason  = orchestration?.routingReason  ?? undefined;
+
+  const relatedQuestions = deriveRelatedQuestions(question, queryType);
+
   try {
-    const llm = await callLlm(context.env, question, grounding, role);
+    const llm = await callLlm(context.env, question, effectiveGrounding, role);
     if (llm) {
       void notifyUser(llm.answer, `llm:${llm.provider}`);
       return json({
         answer: llm.answer,
         mode: 'llm',
         provider: llm.provider,
-        groundingChars: grounding.length,
+        groundingChars: effectiveGrounding.length,
+        // 24.1: structured explanation from orchestration pipeline
+        explanation: orchestration?.explanation ?? '',
+        // Requirement 1.8: include model selection audit trail
+        modelDecisions,
+        ...(queryType       ? { queryType }       : {}),
+        ...(routingReason   ? { routingReason }   : {}),
+        // 20.1: echo conversationId for client-side history tracking
+        ...(conversationId  ? { conversationId }  : {}),
+        // 20.2: related follow-on questions
+        relatedQuestions,
+        ...documentHintFields(question),
       });
     }
   } catch (err) {
@@ -361,17 +481,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         answer: fallbackAnswer,
         mode: 'error',
         error: message,
-        groundingChars: grounding.length,
+        groundingChars: effectiveGrounding.length,
+        // 24.1: structured explanation
+        explanation: orchestration?.explanation ?? '',
+        modelDecisions,
+        ...(queryType       ? { queryType }       : {}),
+        ...(routingReason   ? { routingReason }   : {}),
+        ...(conversationId  ? { conversationId }  : {}),
+        relatedQuestions,
+        ...documentHintFields(question),
       },
       200,
     );
   }
 
-  const ragAnswer = `RAG grounding ready (${grounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. No generated answer is available.`;
+  const ragAnswer = `RAG grounding ready (${effectiveGrounding.length} chars) but no ELLINEA_LLM_API_KEY / OPENAI_API_KEY is configured. No generated answer is available.`;
   void notifyUser(ragAnswer, 'rag_template');
   return json({
     answer: ragAnswer,
     mode: 'rag_template',
-    groundingChars: grounding.length,
+    groundingChars: effectiveGrounding.length,
+    // 24.1: structured explanation
+    explanation: orchestration?.explanation ?? '',
+    modelDecisions,
+    ...(queryType       ? { queryType }       : {}),
+    ...(routingReason   ? { routingReason }   : {}),
+    ...(conversationId  ? { conversationId }  : {}),
+    relatedQuestions,
+    ...documentHintFields(question),
   });
 };

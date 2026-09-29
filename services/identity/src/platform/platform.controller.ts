@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlatformService } from './platform.service';
 import { EnterpriseService } from '../enterprise/enterprise.service';
 import { OrgsService } from '../orgs/orgs.service';
+import { ConnectorCodeGeneratorService } from '../connectors/connector-code-generator.service';
 
 @Controller('platform')
 @UseGuards(JwtAuthGuard)
@@ -33,6 +34,7 @@ export class PlatformController {
     private readonly enterprise: EnterpriseService,
     private readonly orgs: OrgsService,
     private readonly config: ConfigService,
+    private readonly codeGenerator: ConnectorCodeGeneratorService,
   ) {}
 
   private assertPlatformAdmin(email: string) {
@@ -563,5 +565,68 @@ export class PlatformController {
   ) {
     this.assertPlatformAdmin(req.user.email);
     return this.platform.getOrgSnapshot(id);
+  }
+
+  // ── Generated Connector management (Super Admin only) ─────────────────────
+
+  /**
+   * POST /platform/orgs/:id/connectors/generate
+   * Generate a TypeScript connector stub for a system in the specified org.
+   * Requires: Super Admin. The connector is created with approvalStatus="pending".
+   *
+   * Requirement 28.5 — Connector code generation
+   * Requirement 28.7 — Generated connector approval workflow
+   */
+  @Post('orgs/:id/connectors/generate')
+  generateOrgConnector(
+    @Request() req: { user: { email: string; userId: string } },
+    @Param('id') id: string,
+    @Body() body: { systemId: string },
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    if (!body.systemId?.trim()) {
+      throw new BadRequestException('systemId is required');
+    }
+    return this.codeGenerator.generateConnectorCode(
+      body.systemId,
+      id,
+      req.user.email,
+    );
+  }
+
+  /**
+   * POST /platform/orgs/:id/connectors/approve/:generatedId
+   * Approve a previously generated connector stub (sets isApproved=true).
+   * Requires: Super Admin.
+   *
+   * Requirement 28.7 — Approval workflow
+   * Requirement 28.8 — Super Admin approval interface
+   */
+  @Post('orgs/:id/connectors/approve/:generatedId')
+  approveOrgConnector(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+    @Param('generatedId') generatedId: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.codeGenerator.approveGeneratedConnector(
+      generatedId,
+      id,
+      req.user.email,
+    );
+  }
+
+  /**
+   * GET /platform/orgs/:id/connectors/generated
+   * List generated connectors for an org (without source code).
+   * Requires: Super Admin.
+   */
+  @Get('orgs/:id/connectors/generated')
+  listOrgGeneratedConnectors(
+    @Request() req: { user: { email: string } },
+    @Param('id') id: string,
+  ) {
+    this.assertPlatformAdmin(req.user.email);
+    return this.codeGenerator.listGeneratedConnectors(id);
   }
 }

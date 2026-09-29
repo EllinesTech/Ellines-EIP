@@ -20,6 +20,7 @@ import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ExecuteAgentDto, ApproveExecutionDto } from './dto/execute-agent.dto';
 import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto/webhook-subscription.dto';
 import { ProvideFeedbackDto } from './dto/feedback.dto';
+import { UpdateAgentPolicyDto } from './dto/update-agent-policy.dto';
 
 type AuthReq = {
   user: {
@@ -88,6 +89,26 @@ export class AgentsController {
       req.user.organizationId,
       id,
       req.user.userId,
+    );
+  }
+
+  /**
+   * PATCH /api/v1/orgs/me/agents/:id/policy — Owner role only.
+   * Updates the agent's policy (allowed actions, decision threshold, optional escalation rule).
+   * `decisionThreshold` must be in the range (0, 1].
+   */
+  @Patch('me/agents/:id/policy')
+  @Roles('owner')
+  updateAgentPolicy(
+    @Request() req: AuthReq,
+    @Param('id') id: string,
+    @Body() dto: UpdateAgentPolicyDto,
+  ) {
+    return this.agents.updateAgentPolicy(
+      req.user.organizationId,
+      id,
+      req.user.userId,
+      dto,
     );
   }
 

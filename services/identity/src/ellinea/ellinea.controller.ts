@@ -33,6 +33,8 @@ import { ModelRouterService } from './model-router.service';
 import { EnsembleCombinerService, ModelResult, UnifiedResult } from './ensemble-combiner.service';
 import { ModelRegistryService } from './model-registry.service';
 import { OrchestrateDto } from './dto/orchestrate.dto';
+import { ReasoningEngineService, Hypothesis } from './reasoning-engine.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 type AuthReq = {
   user: {
@@ -91,6 +93,8 @@ export class EllineaController {
     private readonly router: ModelRouterService,
     private readonly combiner: EnsembleCombinerService,
     private readonly registry: ModelRegistryService,
+    private readonly reasoningEngine: ReasoningEngineService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -222,6 +226,94 @@ export class EllineaController {
       routingReason: routing.routingReason,
       ...(degradationNotice ? { degradationNotice } : {}),
     };
+  }
+
+  /**
+   * POST /api/v1/ellinea/reason
+   *
+   * Generates candidate hypotheses for a given observation by running
+   * multi-hop reasoning over the organisation's knowledge graph.
+   *
+   * Body: { observation: string; orgId?: string }
+   * Auth: JWT (JwtAuthGuard — applied at class level)
+   *
+   * Falls back to `req.user.organizationId` when `orgId` is not supplied.
+   *
+   * Requirement 2.5: Generate hypotheses from reasoning traversal.
+   * Requirement 2.6: Rank hypotheses by confidence.
+   * Requirement 2.7: Every hypothesis must reference evidence from the steps.
+   */
+  @Post('reason')
+  @HttpCode(HttpStatus.OK)
+  async reason(
+    @Body() body: { observation: string; orgId?: string },
+    @Request() req: AuthReq,
+  ): Promise<Hypothesis[]> {
+    const observation = (body.observation ?? '').trim();
+    const orgId = body.orgId ?? req.user.organizationId;
+
+    if (!observation) {
+      return [];
+    }
+
+    this.logger.debug(
+      `[reason] userId=${req.user.userId} orgId=${orgId} observation="${observation}"`,
+    );
+
+    return this.reasoningEngine.generateHypotheses(observation, orgId);
+  }
+
+  /**
+   * POST /api/v1/ellinea/feedback
+   *
+   * Persists feedback on an Ellinea AI answer for continuous learning.
+   *
+   * Body: { queryId: string; rating: 1 | -1; notes?: string }
+   * Auth: JWT (JwtAuthGuard — applied at class level)
+   *
+   * Requirement 24.3: Feedback loop for continuous learning.
+   */
+  @Post('feedback')
+  @HttpCode(HttpStatus.OK)
+  async feedback(
+    @Body() body: { queryId?: string; rating?: unknown; notes?: string },
+    @Request() req: AuthReq,
+  ): Promise<{ ok: boolean; feedbackId: string }> {
+    const queryId = (body.queryId ?? '').trim();
+    if (!queryId) {
+      return { ok: false, feedbackId: '' };
+    }
+
+    const rating = body.rating;
+    if (rating !== 1 && rating !== -1) {
+      return { ok: false, feedbackId: '' };
+    }
+
+    const feedbackId = `fb-${Date.now()}`;
+    const ratingLabel = rating > 0 ? 'positive' : 'negative';
+    const notesClause = body.notes ? ` — "${String(body.notes).slice(0, 500)}"` : '';
+
+    // Update the ModelDecisionLog routing_reason with feedback annotation.
+    try {
+      await this.prisma.modelDecisionLog.updateMany({
+        where: {
+          queryId,
+          organizationId: req.user.organizationId,
+        },
+        data: {
+          routingReason: `[feedback] User rated: ${ratingLabel}${notesClause}`,
+        },
+      });
+    } catch {
+      // Non-fatal — audit write failures never block the response.
+      this.logger.warn(`[feedback] Failed to update ModelDecisionLog for queryId=${queryId}`);
+    }
+
+    this.logger.log(
+      `[feedback] userId=${req.user.userId} queryId=${queryId} rating=${rating}`,
+    );
+
+    return { ok: true, feedbackId };
   }
 
   // ─── Private fallback helpers ───────────────────────────────────────────────
