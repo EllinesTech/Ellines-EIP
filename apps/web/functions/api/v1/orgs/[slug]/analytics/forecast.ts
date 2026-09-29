@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Pages Function: GET /api/v1/orgs/:slug/analytics/forecast
  *
  * Query params:
@@ -19,7 +19,7 @@ import {
   requireOrgAdmin,
   getAdminClient,
   type Env,
-} from '../../../../shared/auth';
+} from '../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 function identityBase(env: Env & Record<string, string>): string {

@@ -419,10 +419,22 @@ export function normalizeEnterprisePayload(raw: unknown) {
   // connectedSystems: only maps from fields that explicitly represent connected
   // system/integration counts. Generic record counts (count, total, length) must
   // NOT map here — those go to recordCount instead.
-  const healthScore = Math.min(
-    100,
-    Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
-  );
+  //
+  // healthScore: when the upstream API exposes an explicit health/score field,
+  // use it directly. When it does not (e.g. a catalogue API that returns records
+  // but no health metric), derive a proxy score so the dashboard shows a real
+  // signal instead of 0.  Derivation rule:
+  //   • API returned successfully and has records → start at 75 (system is up
+  //     and responding with data — reasonable baseline).
+  //   • Every open alert subtracts 3 points (capped at -20).
+  //   • Every open decision subtracts 1 point (capped at -10).
+  //   • If the API returned an explicit "status" field that equals ok/active/up/
+  //     healthy/complete, add 10 points (system self-reports healthy).
+  //   • Result clamped to [10, 100] — never shows 0 for a live system.
+  //   • If no records at all came back AND no health field, stays 0 (honest empty).
+  const rawHealthScore = asNumber(data.healthScore ?? data.health ?? data.score, -1);
+  const hasExplicitHealthField = rawHealthScore >= 0;
+  const explicitHealth = Math.min(100, Math.max(0, rawHealthScore >= 0 ? rawHealthScore : 0));
   const connectedSystems = Math.max(
     0,
     asNumber(
@@ -447,6 +459,31 @@ export function normalizeEnterprisePayload(raw: unknown) {
     0,
     asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions ?? data.pending, 0),
   );
+
+  // Derive proxy healthScore for APIs that return records but no explicit health metric.
+  // Signals: status field, success flag, and record presence all indicate system is alive.
+  const statusVal = asString(data.status ?? data.state ?? data.health_status, '').toLowerCase();
+  const successFlag = data.success === true || data.ok === true;
+  const hasRecordData = recordCount > 0 || timeline.length > 0;
+  const statusHealthy = ['ok', 'active', 'up', 'healthy', 'complete', 'success', 'running'].some(
+    (s) => statusVal === s,
+  );
+
+  let healthScore: number;
+  if (hasExplicitHealthField) {
+    healthScore = explicitHealth;
+  } else if (hasRecordData || successFlag) {
+    // System is responding and returning data — baseline 75
+    let derived = 75;
+    if (statusHealthy || successFlag) derived += 10;
+    // Penalise for alerts and decisions (signals of work needed)
+    derived -= Math.min(20, openAlerts * 3);
+    derived -= Math.min(10, openDecisions * 1);
+    healthScore = Math.min(100, Math.max(10, derived));
+  } else {
+    // No data, no health field — honestly report 0
+    healthScore = 0;
+  }
 
   // ── Brief highlight ───────────────────────────────────────────────────────────
   // Fallback chain: schema-native → common prose fields → synthesised from
@@ -479,7 +516,6 @@ export function normalizeEnterprisePayload(raw: unknown) {
     });
   } else {
     model = inferUemFromMetrics({
-      connectedSystems,
       openAlerts,
       openDecisions,
       sourceSystem: sourceSystem || undefined,

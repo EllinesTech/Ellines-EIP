@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Pages Function: GET /api/v1/orgs/:slug/data-quality/summary
  *
  * Returns the latest DataQualityScore per connector installation and the
@@ -24,7 +24,7 @@ import {
   json,
   options,
   type Env,
-} from '../../../../shared/auth';
+} from '../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 // ─── Response types ───────────────────────────────────────────────────────────

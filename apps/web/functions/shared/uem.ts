@@ -162,21 +162,30 @@ export function normalizeUemModel(
   };
 }
 
+/**
+ * Build a minimal UemModel from the real signal counts that a connector sync
+ * always produces: open alerts → notifications, open decisions → tasks,
+ * timeline length → events.
+ *
+ * branches, departments, people, documents, and assets are intentionally left
+ * at zero — those values must only come from the upstream system's actual data
+ * (via normalizeUemModel). Synthesising them from connectedSystems produced
+ * misleading "Branches: 3" displays for orgs that had 3 connectors but zero
+ * real branch records.
+ */
 export function inferUemFromMetrics(input: {
-  connectedSystems?: number;
   openAlerts?: number;
   openDecisions?: number;
   sourceSystem?: string;
   timelineLength?: number;
 }): UemModel {
-  const systems = Math.max(0, input.connectedSystems || 0);
   return {
     version: '1.0',
     sourceSystem: input.sourceSystem,
     capabilities: ['read', 'sync'],
     counts: {
       ...emptyUemCounts(),
-      branches: systems > 0 ? Math.min(systems, 8) : 0,
+      // Only populate fields backed by real signal data from the sync payload.
       tasks: Math.max(0, input.openDecisions || 0),
       notifications: Math.max(0, input.openAlerts || 0),
       events: Math.max(0, input.timelineLength || 0),
