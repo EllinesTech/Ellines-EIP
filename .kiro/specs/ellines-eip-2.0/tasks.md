@@ -1,4 +1,4 @@
-# Implementation Plan: Ellines EIP 2.0
+﻿# Implementation Plan: Ellines EIP 2.0
 
 ## Overview
 
@@ -186,7 +186,7 @@ from 1.2.
     - Expose via `POST /ellinea/reason` Pages Function (gated on `ellinea:ask`).
     - _Requirements: 2.5, 2.6, 2.7_
 
-- [-] 5. Self-Healing System
+- [x] 5. Self-Healing System
   - [x] 5.1 Implement Self-Healing Detector
     - Create `services/identity/src/self-healing/detector.service.ts`.
     - Subscribe to application-level error events from NestJS global exception filter (extend
@@ -247,7 +247,7 @@ from 1.2.
       `Recommendation[]` for surfacing on the Super Admin AI panel.
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.8_
 
-  - [ ] 5.6 Checkpoint — self-healing pipeline verified end-to-end against local DB
+  - [x] 5.6 Checkpoint — self-healing pipeline verified end-to-end against local DB
     - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 6. Predictive Analytics Engine
@@ -295,7 +295,7 @@ from 1.2.
       `type = 'forecast'`.
     - _Requirements: 11.1, 7.5, 9.4_
 
-- [-] 7. Alert Correlation Engine
+- [x] 7. Alert Correlation Engine
   - [x] 7.1 Implement alert correlation service
     - Create `services/identity/src/alerts/alert-correlation.service.ts`.
     - `correlateAlerts(alerts[])` — group alerts arriving within a 5-minute window by shared
@@ -334,8 +334,8 @@ from 1.2.
   - [x] 7.5 Checkpoint — alert correlation and predictive analytics pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 8. Federated Learning Coordinator
-  - [~] 8.1 Implement federated learning coordinator service
+- [x] 8. Federated Learning Coordinator
+  - [x] 8.1 Implement federated learning coordinator service
     - Create `services/identity/src/ellinea/federated-learning.service.ts`.
     - `startTrainingRound(config)` — create `FederatedLearningRound` row; fan out to
       participating orgs (those with `optInFederated = true` in org settings).
@@ -351,7 +351,7 @@ from 1.2.
       `patternsLearned[]`, `privacyBudgetUsed`.
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-  - [~] 8.2 Add federated learning admin API
+  - [x] 8.2 Add federated learning admin API
     - `GET /api/v1/platform/federated-learning/rounds` — Super Admin only; list rounds.
     - `POST /api/v1/platform/federated-learning/rounds` — start new round.
     - `GET /api/v1/platform/federated-learning/rounds/:id/report` — transparency report.
@@ -360,8 +360,8 @@ from 1.2.
       exists.
     - _Requirements: 3.4, 3.5, 3.8_
 
-- [-] 9. Autonomous Workflow Agent Framework
-  - [~] 9.1 Extend autonomous agent service with confidence-gated execution
+- [x] 9. Autonomous Workflow Agent Framework
+  - [x] 9.1 Extend autonomous agent service with confidence-gated execution
     - `services/identity/src/agents/agents.service.ts` already exists with a basic condition
       evaluator and confidence scorer. Extend it:
     - Add `executeWithGuardrail(agent, context)` — only invoke agent action autonomously when
@@ -384,17 +384,17 @@ from 1.2.
     - Create two agents that both target the same `resourceId`; assert that `coordinateAgents`
       returns a conflict and the second agent is blocked from executing.
 
-  - [~] 9.4 Implement agent policy configuration endpoint
+  - [x] 9.4 Implement agent policy configuration endpoint
     - `PATCH /api/v1/orgs/:slug/agents/:id/policy` — `owner` role only; accepts
       `{ allowedActions[], decisionThreshold, escalationRuleId }`.
     - Validate `decisionThreshold` is between 0 and 1.
     - _Requirements: 14.8_
 
-  - [~] 9.5 Checkpoint — agent framework tests pass
+  - [x] 9.5 Checkpoint — agent framework tests pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 10. Advanced Security Anomaly Detection
-  - [~] 10.1 Implement behaviour baseline service
+- [x] 10. Advanced Security Anomaly Detection
+  - [x] 10.1 Implement behaviour baseline service
     - Create `services/identity/src/security/behaviour-baseline.service.ts`.
     - On each authenticated request (NestJS middleware), record `(userId, orgId, endpoint,
       ip, timestamp)` to `SystemHealthMetric` in InfluxDB measurement `user_behaviour`.
@@ -404,7 +404,7 @@ from 1.2.
       nightly via a scheduled NestJS `Cron` job.
     - _Requirements: 15.1, 15.7_
 
-  - [~] 10.2 Implement anomaly detection rules
+  - [x] 10.2 Implement anomaly detection rules
     - Create `services/identity/src/security/anomaly-detector.service.ts`.
     - `detectImpossibleTravel(sessions)` — consecutive sessions from geographically distant IPs
       within under 2 hours; use IP-to-country approximation via IP range table.
@@ -419,17 +419,17 @@ from 1.2.
     - Write all anomalies to InfluxDB `security_events` measurement with `org_id` tag.
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6_
 
-  - [~] 10.3 Implement security policy configuration endpoint
+  - [x] 10.3 Implement security policy configuration endpoint
     - `PATCH /api/v1/orgs/:slug/security-policy` — `admin` role; accepts
       `{ anomalySensitivity, autoRemediationActions[], notificationRuleId }`.
     - Validate `anomalySensitivity` in range `['low', 'medium', 'high']`.
     - _Requirements: 15.8_
 
-- [-] 11. Context-Aware Personalisation Engine
+- [x] 11. Context-Aware Personalisation Engine
   - Context profile + preference-learner services already exist in
     `services/identity/src/personalization/`. Tasks below extend them for v2.0 requirements.
 
-  - [~] 11.1 Extend user context profiler with federated role-similarity learning
+  - [x] 11.1 Extend user context profiler with federated role-similarity learning
     - Open `services/identity/src/personalization/user-context-profiler.service.ts`.
     - Add `buildProfile(userId, orgId)` method if absent; ensure it reads `UserContextProfile`
       and `InteractionLog` with mandatory `organization_id` filter.
@@ -438,18 +438,18 @@ from 1.2.
       `UserContextProfile`.
     - _Requirements: 19.1, 19.2, 19.8_
 
-  - [~] 11.2 Implement context-aware shortcut suggestion endpoint
+  - [x] 11.2 Implement context-aware shortcut suggestion endpoint
     - `GET /api/v1/orgs/:slug/me/shortcuts` — calls
       `ContextAwareShortcutSuggester.suggest(userId, context)` and returns top-5 shortcuts.
     - `POST /api/v1/orgs/:slug/me/preferences` — accepts explicit user preference overrides; these
       must take precedence over learned behaviour per Req 19.7.
     - _Requirements: 19.3, 19.4, 19.5, 19.6, 19.7_
 
-- [-] 12. Advanced Data Quality Service
+- [x] 12. Advanced Data Quality Service
   - Data quality Prisma models (`DataQualityScore`, `DataQualityIssue`, `QuarantinedData`,
     `CleansingRule`) were added in Task 1.1. Tasks below implement the service logic.
 
-  - [~] 12.1 Implement data quality assessment service
+  - [x] 12.1 Implement data quality assessment service
     - Create `services/identity/src/data-quality/data-quality.service.ts`.
     - `assessQuality(orgId, connectorId)` — compute five dimension scores (completeness,
       accuracy, consistency, timeliness, validity) over the latest `EnterpriseSnapshot` data.
@@ -465,7 +465,7 @@ from 1.2.
     - Generate random dimension score inputs; assert `computeScore()` always returns a value in
       `[0, 100]`.
 
-  - [~] 12.3 Implement quarantine and auto-remediation
+  - [x] 12.3 Implement quarantine and auto-remediation
     - `quarantine(orgId, recordId, reason)` — write to `QuarantinedData`; set
       `propagationBlocked = true`; quarantined data must never appear in downstream queries or
       API responses (Property 16).
@@ -481,16 +481,16 @@ from 1.2.
     - Insert quarantined records; call all read endpoints scoped to that org; assert no
       quarantined record appears in any response.
 
-  - [~] 12.5 Surface data quality on IT Admin dashboard
+  - [x] 12.5 Surface data quality on IT Admin dashboard
     - Add `GET /api/v1/orgs/:slug/data-quality/summary` Pages Function returning the latest
       `DataQualityScore` per connector + issue count.
     - _Requirements: 18.7, 18.8_
 
-  - [~] 12.6 Checkpoint — data quality service and quarantine tests pass
+  - [x] 12.6 Checkpoint — data quality service and quarantine tests pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 13. Universal Operations — Document Generation
-  - [~] 13.1 Implement document generation service backend
+- [x] 13. Universal Operations — Document Generation
+  - [x] 13.1 Implement document generation service backend
     - Create `services/identity/src/documents/document-generation.service.ts`.
     - `generateExcel(config, orgId)` — use `exceljs`; build worksheets from `DataSourceQuery`;
       apply org branding (logo, colours from `Organization.settings`); return `Buffer`.
@@ -505,7 +505,7 @@ from 1.2.
     - Tenant isolation: `DataSourceQuery` must include `organization_id` in every DB call.
     - _Requirements: 27.1, 27.2, 27.3, 27.4, 27.5, 27.6_
 
-  - [~] 13.2 Implement document delivery service
+  - [x] 13.2 Implement document delivery service
     - `deliverDocument(doc, delivery)` — routes to:
       - `email`: call `sendOutboundEmail` from `apps/web/functions/shared/mail.ts` with
         attachment.
@@ -516,7 +516,7 @@ from 1.2.
       `expiresAt`.
     - _Requirements: 27.7, 27.8_
 
-  - [~] 13.3 Expose document generation API
+  - [x] 13.3 Expose document generation API
     - `POST /api/v1/orgs/:slug/documents/generate` — accepts `{ format, config, delivery }`;
       gated on `owner` or `admin` role; enqueues async job.
     - `GET /api/v1/orgs/:slug/documents` — lists generated documents for the org.
@@ -524,14 +524,14 @@ from 1.2.
     - All three must include `organization_id` filter.
     - _Requirements: 26.1, 26.2, 27.7, 27.8_
 
-  - [~] 13.4 Integrate document generation with Ellinea Ask
+  - [x] 13.4 Integrate document generation with Ellinea Ask
     - In `ask.ts`, detect when the user requests a document (keywords: "generate", "report",
       "Excel", "PDF", "download") and route to `DocumentGenerationService` via internal API.
     - Return a `download_url` in the Ellinea response alongside the narrative explanation.
     - _Requirements: 26.2, 26.3_
 
-- [-] 14. Universal Operations — Email Intelligence
-  - [~] 14.1 Implement email intelligence service
+- [x] 14. Universal Operations — Email Intelligence
+  - [x] 14.1 Implement email intelligence service
     - Create `services/identity/src/email/email-intelligence.service.ts`.
     - `connectAccount(credentials, orgId)` — support `gmail` OAuth2 and `app_password`;
       store encrypted `accessToken` / `appPassword` using `encrypt()` from
@@ -551,7 +551,7 @@ from 1.2.
     - Integrate with Knowledge Graph: link sender/recipient Person entities to the thread.
     - _Requirements: 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 26.4_
 
-  - [~] 14.2 Expose email intelligence API
+  - [x] 14.2 Expose email intelligence API
     - `POST /api/v1/orgs/:slug/email/connect` — connect email account.
     - `GET /api/v1/orgs/:slug/email/summary` — summarise unread.
     - `GET /api/v1/orgs/:slug/email/threads/:threadId` — thread summary.
@@ -559,11 +559,11 @@ from 1.2.
     - All gated on `owner` or `admin` role; `organization_id` filter mandatory.
     - _Requirements: 32.1, 32.2, 32.4_
 
-  - [~] 14.3 Checkpoint — document and email services compile and unit tests pass
+  - [x] 14.3 Checkpoint — document and email services compile and unit tests pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 15. Universal Operations — Resilient Connection Manager
-  - [~] 15.1 Implement resilient connection manager service
+- [x] 15. Universal Operations — Resilient Connection Manager
+  - [x] 15.1 Implement resilient connection manager service
     - Create `services/identity/src/connectors/resilient-connection.service.ts`.
     - `establishConnection(systemId, orgId)` — check existing `ResilientConnection` for org;
       if none, try `primaryMethod` (REST API test via `proxy.ts` SSRF-safe egress); record
@@ -578,7 +578,7 @@ from 1.2.
       `192.168.x`, `localhost`, `169.254.x`, non-HTTPS) before attempting.
     - _Requirements: 28.1, 28.2, 28.5, 28.6, 28.8_
 
-  - [~] 15.2 Implement connector code generator
+  - [x] 15.2 Implement connector code generator
     - Create `services/identity/src/connectors/connector-code-generator.service.ts`.
     - `generateConnectorCode(systemId, orgId)` — analyse `SystemConnection.connectionMethod`
       config; produce a TypeScript connector stub conforming to the EIP SDK interface.
@@ -589,11 +589,11 @@ from 1.2.
       publishes generated code to `ConnectorInstallation`.
     - _Requirements: 28.1, 28.3, 28.6, 28.7_
 
-- [-] 16. Universal Operations — Fleet Tracking
+- [x] 16. Universal Operations — Fleet Tracking
   - The `/app/fleet` page and basic UEM asset listing already exist. Tasks below add
     GPS-level real-time tracking capabilities.
 
-  - [~] 16.1 Implement fleet tracking service
+  - [x] 16.1 Implement fleet tracking service
     - Create `services/identity/src/fleet/fleet-tracking.service.ts`.
     - `getRealTimeLocations(orgId, filters?)` — query `EnterpriseSnapshot` UEM objects where
       `kind = 'asset'` and `status` is live; enrich with last GPS fix if available (GPS data
@@ -613,7 +613,7 @@ from 1.2.
     - Tenant isolation: all queries filter by `orgId`.
     - _Requirements: 30.1, 30.2, 30.3, 30.4, 30.5, 30.6, 30.7, 30.8_
 
-  - [~] 16.2 Expose fleet tracking API
+  - [x] 16.2 Expose fleet tracking API
     - `GET /api/v1/orgs/:slug/fleet/locations` — real-time asset locations.
     - `GET /api/v1/orgs/:slug/fleet/:assetId/route-history?from=&to=` — route playback data.
     - `POST /api/v1/orgs/:slug/fleet/geofences` — create geofence.
@@ -621,7 +621,7 @@ from 1.2.
     - Gated on `owner` or `admin` role.
     - _Requirements: 30.1, 30.3, 30.4, 30.5_
 
-  - [~] 16.3 Upgrade `/app/fleet` page with interactive map widget
+  - [x] 16.3 Upgrade `/app/fleet` page with interactive map widget
     - Replace the current static asset list with an interactive Leaflet map using
       OpenStreetMap tiles (no API key required).
     - Plot asset markers from `GET /fleet/locations`; colour-code by status.
@@ -631,14 +631,14 @@ from 1.2.
     - Respect existing command CSS module; no new CSS frameworks.
     - _Requirements: 30.2, 30.3, 30.4_
 
-  - [~] 16.4 Checkpoint — fleet tracking service and map page build cleanly
+  - [x] 16.4 Checkpoint — fleet tracking service and map page build cleanly
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 17. Universal Operations — Cross-System Search Engine
+- [x] 17. Universal Operations — Cross-System Search Engine
   - The `/app/search` page already performs in-memory search across locally-loaded data.
     Tasks below upgrade it to the full `CrossSystemSearchEngine`.
 
-  - [~] 17.1 Implement cross-system search service
+  - [x] 17.1 Implement cross-system search service
     - Create `services/identity/src/search/cross-system-search.service.ts`.
     - `search(query, orgId)` — fan out concurrently to:
       - PostgreSQL full-text search (`plainto_tsquery`) across `EnterpriseSnapshot`, `AuditLog`,
@@ -667,7 +667,7 @@ from 1.2.
     - Apply a facet filter (e.g., `sourceSystem = 'crm'`) and assert every returned result
       matches the filter and no non-matching result is included.
 
-  - [~] 17.4 Expose search API and upgrade search page
+  - [x] 17.4 Expose search API and upgrade search page
     - `POST /api/v1/orgs/:slug/search` — accepts `SearchQuery`; gated on any authenticated
       role; `organization_id` filter mandatory.
     - `GET /api/v1/orgs/:slug/search/suggestions?q=` — partial suggestions.
@@ -677,14 +677,14 @@ from 1.2.
     - Add one-click actions (open, approve, create workflow) on result cards.
     - _Requirements: 33.1, 33.4, 33.5, 33.8_
 
-  - [~] 17.5 Checkpoint — search service and upgraded search page pass
+  - [x] 17.5 Checkpoint — search service and upgraded search page pass
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 18. Futuristic Dashboards — real-time infrastructure
+- [x] 18. Futuristic Dashboards — real-time infrastructure
   - The `DashboardService`, `DashboardWebSocketGateway`, `DashboardExportService`, and
     `DashboardSharingService` already exist. Tasks below upgrade them for v2.0 requirements.
 
-  - [~] 18.1 Implement 20-type widget library and drag-and-drop layout
+  - [x] 18.1 Implement 20-type widget library and drag-and-drop layout
     - Create `apps/web/src/components/dashboard/widget-types.ts` exporting the full
       `WidgetType` union from the design (20 types).
     - Implement each as a React component in
@@ -698,7 +698,7 @@ from 1.2.
       `DashboardGrid` component with drag-and-drop and responsive column breakpoints.
     - _Requirements: 20.1, 20.2, 20.3_
 
-  - [~] 18.2 Implement real-time WebSocket dashboard updates
+  - [x] 18.2 Implement real-time WebSocket dashboard updates
     - Extend `services/identity/src/dashboards/dashboard-websocket.gateway.ts`:
       - On connector sync completion, call `DashboardService.invalidateWidgetCache(orgId)`.
       - Push `WidgetUpdate` events to subscribed clients via Socket.IO rooms named
@@ -708,7 +708,7 @@ from 1.2.
     - Target < 1 s end-to-end latency from sync event to browser widget update.
     - _Requirements: 7.8, 8.1, 20.2_
 
-  - [~] 18.3 Implement dashboard export, sharing, versioning, and scheduled snapshots
+  - [x] 18.3 Implement dashboard export, sharing, versioning, and scheduled snapshots
     - `DashboardExportService.exportAsPDF(dashboardId, orgId)` — render all widgets server-side
       using `pdfkit`; embed org branding; annotate with generation timestamp.
     - `DashboardSharingService.share(dashboardId, permissions, orgId)` — create a signed share
@@ -721,7 +721,7 @@ from 1.2.
       PDF snapshot on a cron schedule; uses existing `ScheduledReport` Prisma model.
     - _Requirements: 20.5, 20.6, 20.7, 20.8_
 
-  - [~] 18.4 Implement dark/light/high-contrast theme system
+  - [x] 18.4 Implement dark/light/high-contrast theme system
     - Introduce CSS custom-property theme tokens in `apps/web/src/app/globals.css`:
       `--theme-bg`, `--theme-surface`, `--theme-text`, `--theme-border`.
     - Apply `data-theme="dark|light|high-contrast"` on `<html>`; all existing `command.module.css`
@@ -731,11 +731,11 @@ from 1.2.
     - Smooth transition: `transition: background-color 0.2s, color 0.2s` on `:root`.
     - _Requirements: 7.7_
 
-  - [~] 18.5 Checkpoint — dashboard system builds, WebSocket smoke test passes
+  - [x] 18.5 Checkpoint — dashboard system builds, WebSocket smoke test passes
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 19. Role-specific futuristic dashboard pages
-  - [~] 19.1 Build Platform Super Admin futuristic dashboard section
+- [x] 19. Role-specific futuristic dashboard pages
+  - [x] 19.1 Build Platform Super Admin futuristic dashboard section
     - In `apps/web/src/app/app/platform/page.tsx`, add section `ai` (already in
       `PlatformSectionId`) to render a Super Admin Futuristic Dashboard.
     - Panels (all from real DB queries, no fake data):
@@ -747,7 +747,7 @@ from 1.2.
       - AI Copilot panel: existing `askEllineaApi` wired to platform grounding.
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-  - [~] 19.2 Build Organisation IT Admin futuristic dashboard
+  - [x] 19.2 Build Organisation IT Admin futuristic dashboard
     - Update the Command Center (`apps/web/src/app/app/page.tsx`) to render an IT Admin variant
       when `session.user.role === 'admin'`:
     - Add panels: connector health grid (from `listInstallations`), data quality summary (from
@@ -756,7 +756,7 @@ from 1.2.
     - Anomaly alert ticker: WebSocket-driven `alert_list` widget showing live security events.
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8_
 
-  - [~] 19.3 Build Owner futuristic dashboard
+  - [x] 19.3 Build Owner futuristic dashboard
     - Add an Owner-role variant to the Command Center:
     - Executive KPI summary with sparklines and period-over-period change (from
       `EnterpriseSnapshot`).
@@ -768,7 +768,7 @@ from 1.2.
     - Drill-down: clicking a KPI opens the full `EnterpriseSnapshot` detail for that object.
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.7, 9.8_
 
-  - [~] 19.4 Build Owner customisable widget dashboard
+  - [x] 19.4 Build Owner customisable widget dashboard
     - Wire `DashboardGrid` component (from Task 18.1) into
       `apps/web/src/app/app/dashboards/[id]/page.tsx`.
     - Widget config panel: click widget → side-panel with data source selector, metric selector,
@@ -778,7 +778,7 @@ from 1.2.
       `financial_analysis`) defined in `DashboardService.getTemplates()`.
     - _Requirements: 9.6, 20.3, 20.4_
 
-  - [~] 19.5 Build Staff user futuristic dashboard
+  - [x] 19.5 Build Staff user futuristic dashboard
     - Add a `member`/`viewer` role variant to the Command Center:
     - Personalised task list from `ApprovalRequest` (items assigned to user) + `WorkflowRule`
       triggers for the user.
@@ -789,11 +789,11 @@ from 1.2.
     - Ellinea AI assistant (conditional on `ellinea:ask` permission).
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8_
 
-  - [~] 19.6 Checkpoint — all four dashboard variants build and display real data
+  - [x] 19.6 Checkpoint — all four dashboard variants build and display real data
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 20. Natural Language Query Interface Enhancement
-  - [~] 20.1 Extend Ellinea Ask with multi-turn conversation context
+- [x] 20. Natural Language Query Interface Enhancement
+  - [x] 20.1 Extend Ellinea Ask with multi-turn conversation context
     - In `apps/web/functions/api/v1/ellinea/ask.ts`, add a `conversationId` parameter.
     - Store conversation history (last 10 turns) in Redis key
       `eip:{orgId}:conversation:{conversationId}` with TTL 30 minutes.
@@ -803,7 +803,7 @@ from 1.2.
       instead of attempting an answer.
     - _Requirements: 13.1, 13.2, 13.5, 13.8_
 
-  - [~] 20.2 Implement cross-system query generation
+  - [x] 20.2 Implement cross-system query generation
     - When Ellinea detects a data-retrieval intent (HR, CRM, ERP keywords), build the
       appropriate connector-scoped query against `EnterpriseSnapshot` for the relevant SoR.
     - Synthesize results from multiple snapshots into a narrative answer with
@@ -812,7 +812,7 @@ from 1.2.
       response.
     - _Requirements: 13.3, 13.4, 13.6, 13.7_
 
-  - [~] 20.3 Surface HR and business-operations capabilities in Ask
+  - [x] 20.3 Surface HR and business-operations capabilities in Ask
     - Detect HR intents (on duty, off duty, leave, attendance); query `EnterpriseSnapshot` UEM
       objects with `kind = 'person'`; return structured list with source citation.
     - Detect invoice/billing intents; query relevant connector snapshot; return formatted list.
@@ -820,8 +820,8 @@ from 1.2.
       summarise output.
     - _Requirements: 26.3, 26.4, 26.5, 26.6, 26.7, 26.8_
 
-- [-] 21. Consolidated Multi-Business and Collaborative Intelligence
-  - [~] 21.1 Implement consolidated multi-business reporting service
+- [x] 21. Consolidated Multi-Business and Collaborative Intelligence
+  - [x] 21.1 Implement consolidated multi-business reporting service
     - Create `services/identity/src/reports/consolidated-report.service.ts`.
     - `generateConsolidated(parentOrgId, reportType, period)` — collect `EnterpriseSnapshot`
       records from all child orgs (using `Organization.parentOrgId`); verify caller has access
@@ -834,7 +834,7 @@ from 1.2.
       return AI-generated narrative.
     - _Requirements: 31.1, 31.2, 31.3, 31.4, 31.5, 31.6_
 
-  - [~] 21.2 Implement real-time collaborative intelligence session
+  - [x] 21.2 Implement real-time collaborative intelligence session
     - Create `services/identity/src/ellinea/collaborative-session.service.ts`.
     - `createSession(orgId, participants[])` — store `CollaborativeSession` in Redis:
       `eip:{orgId}:collab:{sessionId}`; include participant roles.
@@ -846,7 +846,7 @@ from 1.2.
       participants.
     - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 16.8_
 
-  - [~] 21.3 Implement capability bridge service
+  - [x] 21.3 Implement capability bridge service
     - Create `services/identity/src/connectors/capability-bridge.service.ts`.
     - `detectGaps(orgId)` — analyse the last 30 days of Ellinea Ask queries (`ModelDecisionLog`)
       for failed or low-confidence responses; group by topic into `CapabilityGap[]`.
@@ -860,11 +860,11 @@ from 1.2.
       to avoid memory pressure.
     - _Requirements: 29.1, 29.2, 29.3, 29.4, 29.5, 29.6, 29.7, 29.8_
 
-  - [~] 21.4 Checkpoint — consolidated reporting, collaborative sessions, and capability bridge
+  - [x] 21.4 Checkpoint — consolidated reporting, collaborative sessions, and capability bridge
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 22. Performance optimisation layer
-  - [~] 22.1 Implement distributed cache strategy for high-frequency reads
+- [x] 22. Performance optimisation layer
+  - [x] 22.1 Implement distributed cache strategy for high-frequency reads
     - Add Redis caching with appropriate TTLs to:
       - `EnterpriseSnapshot` summary → `eip:{orgId}:snapshot:summary` TTL 60 s.
       - `DataQualityScore` per connector → TTL 300 s.
@@ -875,7 +875,7 @@ from 1.2.
       settings change.
     - _Requirements: 21.3_
 
-  - [~] 22.2 Add database query optimisation for v2.0 models
+  - [x] 22.2 Add database query optimisation for v2.0 models
     - Add missing composite indexes to `schema.prisma`:
       - `KnowledgeGraphEntity`: `(organizationId, type, syncStatus)`.
       - `RemediationExecution`: `(organizationId, outcome, createdAt)`.
@@ -885,7 +885,7 @@ from 1.2.
     - Run `npm run db:push` (targeting local DB only); verify plan with `EXPLAIN ANALYZE`.
     - _Requirements: 21.4_
 
-  - [~] 22.3 Implement async job queue for long-running operations
+  - [x] 22.3 Implement async job queue for long-running operations
     - Create `services/identity/src/jobs/job-queue.service.ts` using Bull (Redis-backed).
     - Register queues: `document-generation`, `federated-training`, `knowledge-graph-update`,
       `connector-sync`.
@@ -893,13 +893,13 @@ from 1.2.
       return a `jobId` immediately; client polls `GET /api/v1/orgs/:slug/jobs/:jobId`.
     - _Requirements: 21.5_
 
-  - [~] 22.4 Checkpoint — build passes, all v2.0 services compile without TypeScript errors
+  - [x] 22.4 Checkpoint — build passes, all v2.0 services compile without TypeScript errors
     - Run `npm run build:shared && npm run build -w @ellines-eip/identity &&
       npm run build -w @ellines-eip/web`.
     - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 23. Mobile-first experience
-  - [~] 23.1 Upgrade PWA manifest and service worker for offline support
+- [x] 23. Mobile-first experience
+  - [x] 23.1 Upgrade PWA manifest and service worker for offline support
     - Update `apps/web/public/manifest.json`: verify `display: "standalone"`, icons at 192 and
       512 px, `start_url = "/app"`.
     - Create `apps/web/public/sw.js` — cache-first strategy for `/app/*` shell assets; network-
@@ -908,14 +908,14 @@ from 1.2.
     - Queue offline actions (form submits) in IndexedDB; replay on `online` event.
     - _Requirements: 24.1, 24.3, 24.4_
 
-  - [~] 23.2 Apply mobile-responsive layout to all dashboard pages
+  - [x] 23.2 Apply mobile-responsive layout to all dashboard pages
     - Add media query breakpoints to `command.module.css` for ≤ 480 px, ≤ 768 px.
     - On small viewports: sidebar rail collapses to a bottom navigation bar (5 icon tabs).
     - Widget grid collapses to single column; KPI cards stack vertically.
     - Touch targets ≥ 44 × 44 px on all interactive elements.
     - _Requirements: 24.2, 24.6_
 
-  - [~] 23.3 Implement delta sync and biometric auth stubs
+  - [x] 23.3 Implement delta sync and biometric auth stubs
     - Add `If-Modified-Since` / `ETag` headers to `EnterpriseSnapshot` and `DashboardService`
       responses so the mobile PWA only downloads changed data.
     - Add biometric auth placeholder: detect `PublicKeyCredential` support in browser; if
@@ -923,8 +923,8 @@ from 1.2.
       id in `UserContextProfile`.
     - _Requirements: 24.5, 24.7_
 
-- [-] 24. Explainability and trust layer
-  - [~] 24.1 Add structured explanation output to all Ellinea responses
+- [x] 24. Explainability and trust layer
+  - [x] 24.1 Add structured explanation output to all Ellinea responses
     - Ensure every `UnifiedResult` from the model orchestrator includes:
       - `explanation.steps[]` with `stepNumber`, `operation`, `justification`.
       - `explanation.dataSources[]` with source system name and record IDs.
@@ -935,14 +935,14 @@ from 1.2.
       "How I reasoned" panel.
     - _Requirements: 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7_
 
-  - [~] 24.2 Implement user-challenge and re-evaluation flow
+  - [x] 24.2 Implement user-challenge and re-evaluation flow
     - In `ask.ts`, accept an optional `challenge: { conclusionId, counterEvidence }` field.
     - When present, append `counterEvidence` to the context and re-invoke the model orchestrator;
       return a revised `UnifiedResult` with updated confidence.
     - Log the challenge and re-evaluation to `ModelDecisionLog` for audit.
     - _Requirements: 23.8_
 
-  - [~] 24.3 Implement continuous learning feedback loop
+  - [x] 24.3 Implement continuous learning feedback loop
     - `POST /api/v1/orgs/:slug/ellinea/feedback` — accepts `{ queryId, rating: 'helpful' |
       'unhelpful' | 'incorrect', notes? }`.
     - Persist to `ModelPerformanceLog` with `userFeedback` field.
@@ -950,7 +950,7 @@ from 1.2.
       `retrainModel()` in `PredictiveAnalyticsService` if accuracy drops below threshold.
     - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.8_
 
-  - [~] 24.4 Implement A/B model testing infrastructure
+  - [x] 24.4 Implement A/B model testing infrastructure
     - Add `isExperiment: true` flag to `AiModelRegistry` entries.
     - `ModelRouter` selects the experiment model for 10% of requests (deterministic by
       `userId` hash mod 10); logs which variant was used.
@@ -958,7 +958,7 @@ from 1.2.
     - Platform Super Admin approves promotion via `PATCH /api/v1/platform/models/:id/promote`.
     - _Requirements: 25.5, 25.7, 25.8_
 
-  - [~] 24.5 Final checkpoint — full build + test suite green
+  - [x] 24.5 Final checkpoint — full build + test suite green
     - Run `npm run build:shared && npm run build -w @ellines-eip/identity &&
       npm run build -w @ellines-eip/web && npm run verify:pages-functions`.
     - Run `npm run test -w @ellines-eip/shared && npm run test -w @ellines-eip/identity &&
