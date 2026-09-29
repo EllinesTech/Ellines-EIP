@@ -253,7 +253,11 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
  if(allowed===null)return <main className={styles.main}>Checking platform access…</main>;
  if(!allowed){
    const session = getSession();
-   return <main className={styles.main}><div className={styles.card}><h2>Platform access denied</h2><p className={styles.cardHint}>Ellines platform operator access is required.</p>{session && <div style={{marginTop:16,padding:12,background:'#f5f5f5',borderRadius:4,fontSize:11,fontFamily:'monospace'}}><strong>Current session:</strong><br/>Email: {session.user?.email || 'N/A'}<br/>Role: {session.user?.role || 'N/A'}<br/>Org: {session.organization?.name || 'N/A'}<br/>Platform Admin: {session.isPlatformAdmin ? 'Yes' : 'No'}<br/><br/><em>Only email "{process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS || 'ellines.tech@gmail.com'}" can access this control plane.</em></div>}{!session && <p style={{marginTop:16,color:'#666'}}>No active session found. <a href="/login?redirect=/app/platform" style={{color:'#2563EB'}}>Log in</a></p>}</div></main>;
+   // Req 1.4: redirect non-platform-admin to /app within 2 seconds without leaking platform data
+   if(typeof window !== 'undefined') {
+     setTimeout(() => { void router.replace('/app'); }, 2000);
+   }
+   return <main className={styles.main}><div className={styles.card}><h2>Access denied</h2><p className={styles.cardHint}>Platform operator access is required. Redirecting…</p></div></main>;
  }
 
  const businessTable=(items:PlatformOrg[]) => <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Business</th><th>Status</th><th>Users</th><th>Created</th><th>Control</th></tr></thead><tbody>{items.map(o=><tr key={o.id}><td><strong>{o.name}</strong><br/><span className={styles.muted}>{o.slug}</span></td><td><span className={styles.status+' '+statusClass(o.status)}>{o.status}</span></td><td>{o.userCount}</td><td>{new Date(o.createdAt).toLocaleDateString()}</td><td><button className={styles.button+' '+styles.primary} onClick={()=>navigate('client',o.id)}>Open workspace</button>{' '}<button className={styles.button+' '+(o.status==='active'?styles.danger:styles.success)} disabled={busy} onClick={()=>void toggle(o)}>{o.status==='active'?'Disconnect':'Reconnect'}</button>{' '}<button className={styles.button+' '+styles.danger} disabled={busy} onClick={()=>void deleteOrg(o)} title='Permanently delete this organization and all its data'>Delete</button></td></tr>)}{!items.length&&<tr><td colSpan={5}>No client organizations found.</td></tr>}</tbody></table></div>;

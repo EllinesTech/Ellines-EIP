@@ -1,0 +1,123 @@
+/**
+ * DashboardHeader styles — glass-ui tokens only.
+ */
+
+.header {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  background: var(--surface-elevated);
+  border-bottom: 1px solid var(--border-default);
+  min-height: 56px;
+  z-index: 200;
+}
+
+.orgSelector {
+  flex-shrink: 0;
+}
+
+.orgSelect {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--brand-text);
+  font-size: var(--font-l4-size);
+  font-weight: var(--font-l3-weight);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+}
+
+.orgSelect:focus-visible {
+  border-color: var(--border-focus);
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.orgSelect option {
+  background: #1e293b;
+  color: var(--brand-text);
+}
+
+.orgName {
+  font-size: var(--font-l3-size);
+  font-weight: var(--font-l3-weight);
+  color: var(--brand-text);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.refreshIndicator {
+  font-size: var(--font-l5-size);
+  color: var(--brand-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.refreshError {
+  color: var(--status-error);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: var(--brand-text-muted);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.iconBtn:hover {
+  color: var(--brand-text);
+  background: rgba(241, 245, 249, 0.08);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--severity-critical);
+  color: var(--brand-text);
+  font-size: 0.625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.orgRole {
+  font-size: var(--font-l5-size);
+  color: var(--brand-text-muted);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: rgba(111, 45, 141, 0.15);
+  border: 1px solid var(--border-default);
+}

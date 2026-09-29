@@ -73,6 +73,8 @@ model Organization {
   sessions               Session[] // Phase 2: session registry (spec 24.2.3)
   integrationRequests    IntegrationRequest[] // TASK-09: integration request workflow
   documents              Document[] // Org-scoped document library
+  clientDashboards       ClientDashboard[]          @relation("ClientDashboards") // client-dashboard spec
+  emailAccounts          EmailAccount[]             // Email Intelligence: per-org IMAP accounts
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -449,6 +451,21 @@ model ConnectorInstallation {
    * Last normalized sync payload (healthScore, counts, timeline, UEM model) for this one system. Used to aggregate across all of an org's connected systems instead of last-sync-wins.
    */
   lastPayload       Json?     @map("last_payload")
+  // ── client-dashboard-connector-platform spec additions ──────────────────────
+  /** Connector lifecycle state machine position. */
+  lifecycleState    String?   @default("CONFIGURING") @map("lifecycle_state")
+  /** Latest discovery snapshot from Req 18. */
+  discoverySnapshot Json?     @map("discovery_snapshot")
+  /** Set to true when a schema change is detected vs the stored discoverySnapshot. */
+  schemaDriftDetected Boolean @default(false) @map("schema_drift_detected")
+  /** Mapping version — incremented on each field map change. */
+  mappingVersion    Int       @default(1) @map("mapping_version")
+  /** Ordered list of fallback connector configs (Req 26). */
+  fallbackChain     Json      @default("[]") @map("fallback_chain")
+  /** Configured sync interval in seconds. */
+  syncIntervalSeconds Int     @default(3600) @map("sync_interval_seconds")
+  /** Last successful sync timestamp. */
+  lastSyncAt        DateTime? @map("last_sync_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -2259,6 +2276,11 @@ model IntegrationRequest {
   reviewedById   String?
   reviewedAt     DateTime?
   reviewNote     String?
+  // ── spec additions ─────────────────────────────────────────────────────────
+  /** Connector type string (e.g. "REST", "Database"). */
+  requestedConnectorType String? @map("requested_connector_type")
+  /** Business justification supplied by the requester. */
+  businessJustification  String? @default("") @map("business_justification")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -2314,4 +2336,202 @@ model PlatformConfig {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("platform_config")
+}
+
+// ─── Client Dashboard Engine (spec: client-dashboard-connector-platform) ───────
+
+enum ClientDashboardType {
+  EXECUTIVE
+  OPERATIONS
+  FINANCE
+  HR
+  SALES
+  INVENTORY
+  CRM
+  CUSTOM
+  STAFF_MY_WORK
+}
+
+enum ClientDashboardVisibility {
+  PRIVATE
+  SHARED
+  PUBLISHED
+}
+
+enum IntegrationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/**
+ * ClientDashboard — Persistent, customizable, role-adaptive dashboard for
+ * client organization users (spec: client-dashboard-connector-platform).
+ * Distinct from the Track B `Dashboard` model which is used by the BI KPI builder.
+ */
+model ClientDashboard {
+  id             String                   @id @default(cuid())
+  organizationId String                   @map("organization_id")
+  ownerUserId    String                   @map("owner_user_id")
+  name           String                   @db.VarChar(120)
+  description    String                   @default("") @db.VarChar(500)
+  type           ClientDashboardType
+  visibility     ClientDashboardVisibility @default(PRIVATE)
+  isDefault      Boolean                  @default(false) @map("is_default")
+  layoutConfig   Json                     @default("{}") @map("layout_config")
+  refreshPolicy  Int                      @default(300) @map("refresh_policy")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  widgets      ClientDashboardWidget[]
+  organization Organization             @relation("ClientDashboards", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, ownerUserId])
+  @@index([organizationId, isDefault])
+  @@map("client_dashboards")
+}
+
+/**
+ * ClientDashboardWidget — A single widget placed on a ClientDashboard.
+ */
+model ClientDashboardWidget {
+  id                     String          @id @default(cuid())
+  dashboardId            String          @map("dashboard_id")
+  widgetTypeId           String          @db.VarChar(64) @map("widget_type_id")
+  col                    Int             @default(0)
+  row                    Int             @default(0)
+  width                  Int             @default(4)
+  height                 Int             @default(3)
+  config                 Json            @default("{}")
+  dataSourceRef          String?         @map("data_source_ref")
+  refreshOverrideSeconds Int?            @map("refresh_override_seconds")
+  lastFetchedAt          DateTime?       @map("last_fetched_at")
+  errorState             String?         @map("error_state")
+  createdAt              DateTime        @default(now()) @map("created_at")
+
+  dashboard ClientDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardId])
+  @@map("client_dashboard_widgets")
+}
+
+/**
+ * ConnectorFailedRecord — Individual record-level failure during a connector sync run.
+ * The sync engine continues processing remaining records in the batch after capturing failures.
+ * Used for replay operations via idempotency keys (sourceSystem + sourceRecordId).
+ */
+model ConnectorFailedRecord {
+  id             String   @id @default(cuid())
+  connectorId    String   @map("connector_id")
+  organizationId String   @map("organization_id")
+  sourceRecordId String   @map("source_record_id")
+  failureReason  String   @map("failure_reason")
+  rawPayloadHash String   @map("raw_payload_hash")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([connectorId, organizationId])
+  @@map("connector_failed_records")
+}
+
+
+// ─── Email Intelligence — Inbox Window ────────────────────────────────────────
+
+/**
+ * EmailAccount — An IMAP email account connected to an organisation.
+ *
+ * Multiple accounts per org are supported (owner can add Gmail, Outlook, etc.).
+ * The app password is encrypted at rest using EncryptionService (§5).
+ *
+ * Supported provider hosts:
+ *   gmail    → imap.gmail.com:993
+ *   outlook  → imap-mail.outlook.com:993
+ *   exchange → outlook.office365.com:993
+ *   custom   → user-supplied host:port
+ *
+ * Requirement: Email Inbox Window
+ */
+model EmailAccount {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  /** Display label e.g. "Sales Inbox" */
+  label          String    @default("")
+  /** The email address used for IMAP login */
+  emailAddress   String    @map("email_address")
+  /** Provider preset: gmail | outlook | exchange | custom */
+  provider       String    @default("gmail")
+  /** IMAP hostname — set automatically from provider or supplied by user */
+  imapHost       String    @map("imap_host")
+  imapPort       Int       @default(993) @map("imap_port")
+  /** App password encrypted with EncryptionService.encrypt() */
+  encryptedPassword String @map("encrypted_password")
+  /** Whether TLS is enforced (always true for managed providers) */
+  useTls         Boolean   @default(true) @map("use_tls")
+  /** Per-account Ellinea summary preference: "full" | "summary" */
+  displayMode    String    @default("summary") @map("display_mode")
+  /** Polling interval in seconds (default 5 min) */
+  pollIntervalSeconds Int  @default(300) @map("poll_interval_seconds")
+  /** Last successful IMAP sync */
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  /** UID of the last fetched message (for incremental fetching) */
+  lastUid        Int       @default(0) @map("last_uid")
+  /** true = actively polling */
+  isActive       Boolean   @default(true) @map("is_active")
+  /** Last connection error message */
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     EmailMessage[]
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("email_accounts")
+}
+
+/**
+ * EmailMessage — A single fetched email message.
+ *
+ * Stored after IMAP fetch so users can read inside EIP without opening Gmail.
+ * Body is stored as plain text (html stripped); Ellinea summary is cached here.
+ *
+ * Requirement: Email Inbox Window — message store
+ */
+model EmailMessage {
+  id              String    @id @default(cuid())
+  accountId       String    @map("account_id")
+  organizationId  String    @map("organization_id")
+  /** IMAP UID — used for idempotent upserts */
+  imapUid         Int       @map("imap_uid")
+  messageId       String?   @map("message_id") // RFC 2822 Message-ID header
+  subject         String    @default("")
+  fromAddress     String    @map("from_address")
+  fromName        String    @default("") @map("from_name")
+  toAddresses     String[]  @default([]) @map("to_addresses")
+  ccAddresses     String[]  @default([]) @map("cc_addresses")
+  /** Plain-text body (HTML stripped during fetch) */
+  bodyText        String    @default("") @map("body_text") @db.Text
+  /** Ellinea AI generated summary — null until summarized */
+  aiSummary       String?   @map("ai_summary") @db.Text
+  /** Urgency level derived by Ellinea: low | medium | high | critical */
+  urgencyLevel    String    @default("low") @map("urgency_level")
+  /** Category from EmailCategorizer: internal | external | automated | other */
+  category        String    @default("other")
+  /** true if the message has been read inside EIP */
+  isRead          Boolean   @default(false) @map("is_read")
+  /** true if Ellinea summary has been generated */
+  isSummarized    Boolean   @default(false) @map("is_summarized")
+  /** Thread ID for grouping related messages */
+  threadId        String?   @map("thread_id")
+  receivedAt      DateTime  @map("received_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  account      EmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, imapUid]) // idempotent upsert by IMAP UID
+  @@index([organizationId, isRead])
+  @@index([organizationId, receivedAt])
+  @@index([accountId])
+  @@map("email_messages")
 }

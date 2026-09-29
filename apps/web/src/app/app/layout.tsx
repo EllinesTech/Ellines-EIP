@@ -23,6 +23,8 @@ import {
   type ResolvedNavGroup,
   type ResolvedNavItem,
 } from '@/lib/app-navigation';
+import { ClientSidebar } from '@/components/client-sidebar/ClientSidebar';
+import { DashboardHeader } from '@/components/dashboard-header/DashboardHeader';
 import { OrgSwitcher } from '@/components/org-switcher';
 import {
   AuthSession,
@@ -259,6 +261,28 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const orgAdmin = isOrgAdminRole(session.user.role);
   const platformAdmin = Boolean(session.isPlatformAdmin);
   const isClientShell = !orgAdmin && !platformAdmin;
+
+  // ── Client Dashboard Shell detection ─────────────────────────────────────
+  // Routes that use the new ClientSidebar + DashboardHeader shell.
+  const CLIENT_SHELL_PREFIXES = [
+    '/app/dashboards', '/app/my-work', '/app/alerts', '/app/activity',
+    '/app/business', '/app/operations', '/app/people', '/app/crm',
+    '/app/connectors', '/app/automation', '/app/intelligence', '/app/admin',
+  ];
+  const isClientDashboardShell =
+    !platformAdmin &&
+    CLIENT_SHELL_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
+    );
+
+  // Build org memberships for DashboardHeader multi-org switcher
+  const orgMemberships = [
+    {
+      id: session.organization.id,
+      name: session.organization.name,
+      role: session.user.role,
+    },
+  ];
   const orgSystemAllowed = orgAdmin || orgUiPolicy.allowWorkRolesOrgSystem;
 
   /** Build the navigation tree for the current operator. */
@@ -449,6 +473,55 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         p.startsWith('/app/notifications'),
     },
   ];
+
+  // ── Client Dashboard Shell ────────────────────────────────────────────────
+  if (isClientDashboardShell) {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `${collapsed ? '56px' : '240px'} 1fr`,
+          gridTemplateRows: '56px 1fr',
+          minHeight: '100vh',
+          background: '#0F172A',
+          fontFamily: "'Exo 2', system-ui, sans-serif",
+          color: '#F1F5F9',
+          transition: 'grid-template-columns 250ms ease',
+        }}
+      >
+        <a
+          href="#main-content"
+          style={{ position: 'absolute', left: '-100%', top: 16, zIndex: 9999, background: '#2563EB', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}
+          onFocus={(e) => { e.currentTarget.style.left = '16px'; }}
+          onBlur={(e) => { e.currentTarget.style.left = '-100%'; }}
+        >
+          Skip to main content
+        </a>
+        <div style={{ gridColumn: '1 / -1', gridRow: '1' }}>
+          <DashboardHeader
+            orgName={session.organization.name}
+            orgRole={session.user.role}
+            orgMemberships={orgMemberships}
+            refreshingCount={0}
+            onOrgSwitch={() => { void refreshSessionFlags().then((next) => { if (next) setSessionState(next); }); }}
+          />
+        </div>
+        <div style={{ gridRow: '2', gridColumn: '1', overflow: 'hidden' }}>
+          <ClientSidebar
+            role={session.user.role as 'owner' | 'executive' | 'admin' | 'manager' | 'member' | 'viewer'}
+            packageFeatures={[]}
+            grantedPermissions={[]}
+            orgName={session.organization.name}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+          />
+        </div>
+        <main id="main-content" style={{ gridRow: '2', gridColumn: '2', overflowY: 'auto', minHeight: 0 }}>
+          {children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div

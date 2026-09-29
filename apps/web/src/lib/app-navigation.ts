@@ -670,3 +670,661 @@ export function collectActiveGroupIds(
   return acc;
 }
 
+
+// ─── Client Organization User Navigation ─────────────────────────────────────
+// Added by spec: client-dashboard-connector-platform
+// These types and constants extend the existing navigation registry without
+// touching or duplicating any Super Admin / platform navigation items.
+
+/** 9 sidebar groups for client organization users. */
+export type ClientNavGroupId =
+  | 'client-home'
+  | 'client-business'
+  | 'client-operations'
+  | 'client-people'
+  | 'client-crm'
+  | 'client-integrations'
+  | 'client-automation'
+  | 'client-intelligence'
+  | 'client-administration';
+
+/** Extended icon IDs for the client sidebar — additive, no overlap with NavIconId. */
+export type ClientNavIconId =
+  | 'dashboard'
+  | 'my-work'
+  | 'attention'
+  | 'business-overview'
+  | 'performance'
+  | 'analytics'
+  | 'sales'
+  | 'purchases'
+  | 'inventory'
+  | 'customers'
+  | 'suppliers'
+  | 'payments'
+  | 'expenses'
+  | 'assets'
+  | 'branches'
+  | 'warehouses'
+  | 'employees'
+  | 'departments'
+  | 'attendance'
+  | 'leave'
+  | 'payroll'
+  | 'leads'
+  | 'opportunities'
+  | 'activities'
+  | 'follow-ups'
+  | 'connected-systems'
+  | 'connector-health'
+  | 'integration-requests'
+  | 'schedules'
+  | 'executions'
+  | 'insights'
+  | 'recommendations'
+  | 'business-settings'
+  | 'data-privacy';
+
+export interface ClientNavItem {
+  id: string;
+  label: string;
+  href: string;
+  icon: NavIconId | ClientNavIconId;
+  group: ClientNavGroupId;
+  /** `false` = planned state — renders as disabled, never carries fake data. */
+  available: boolean;
+  note?: string;
+  /** Minimum role required. Absent = all roles. */
+  minRole?: 'owner' | 'executive' | 'manager' | 'member' | 'viewer';
+  /** Package feature key required. Absent = always shown. */
+  requiresPackageFeature?: string;
+}
+
+export interface ClientNavGroupDef {
+  id: ClientNavGroupId;
+  label: string;
+  collapsible: boolean;
+  defaultOpen: boolean;
+  itemIds: string[];
+}
+
+// ─── CLIENT_NAV_ITEMS — all 9 groups ─────────────────────────────────────────
+
+export const CLIENT_NAV_ITEMS: ClientNavItem[] = [
+  // ── HOME ──────────────────────────────────────────────────────────────────
+  {
+    id: 'client-command-center',
+    label: 'Command Center',
+    href: '/app/dashboards',
+    icon: 'dashboard',
+    group: 'client-home',
+    available: true,
+  },
+  {
+    id: 'client-my-work',
+    label: 'My Work',
+    href: '/app/my-work',
+    icon: 'my-work',
+    group: 'client-home',
+    available: true,
+  },
+  {
+    id: 'client-alerts',
+    label: 'Alerts',
+    href: '/app/alerts',
+    icon: 'alerts',
+    group: 'client-home',
+    available: true,
+  },
+  {
+    id: 'client-approvals',
+    label: 'Approvals',
+    href: '/app/approvals',
+    icon: 'approvals',
+    group: 'client-home',
+    available: true,
+  },
+  {
+    id: 'client-activity',
+    label: 'Activity',
+    href: '/app/activity',
+    icon: 'timeline',
+    group: 'client-home',
+    available: true,
+  },
+
+  // ── BUSINESS ──────────────────────────────────────────────────────────────
+  {
+    id: 'client-business-overview',
+    label: 'Overview',
+    href: '/app/business',
+    icon: 'business-overview',
+    group: 'client-business',
+    available: true,
+    minRole: 'manager',
+  },
+  {
+    id: 'client-performance',
+    label: 'Performance',
+    href: '/app/business/performance',
+    icon: 'performance',
+    group: 'client-business',
+    available: true,
+    minRole: 'manager',
+  },
+  {
+    id: 'client-reports',
+    label: 'Reports',
+    href: '/app/business/reports',
+    icon: 'reports',
+    group: 'client-business',
+    available: true,
+    minRole: 'manager',
+  },
+  {
+    id: 'client-analytics',
+    label: 'Analytics',
+    href: '/app/business/analytics',
+    icon: 'analytics',
+    group: 'client-business',
+    available: false,
+    note: 'Analytics module planned — requires connected data sources.',
+    minRole: 'manager',
+  },
+
+  // ── OPERATIONS ────────────────────────────────────────────────────────────
+  {
+    id: 'client-sales',
+    label: 'Sales',
+    href: '/app/operations/sales',
+    icon: 'sales',
+    group: 'client-operations',
+    available: false,
+    note: 'Sales module — requires a connected POS or CRM system.',
+  },
+  {
+    id: 'client-purchases',
+    label: 'Purchases',
+    href: '/app/operations/purchases',
+    icon: 'purchases',
+    group: 'client-operations',
+    available: false,
+    note: 'Purchases module — requires a connected ERP or accounting system.',
+  },
+  {
+    id: 'client-inventory',
+    label: 'Inventory',
+    href: '/app/operations/inventory',
+    icon: 'inventory',
+    group: 'client-operations',
+    available: false,
+    note: 'Inventory module — requires a connected inventory management system.',
+  },
+  {
+    id: 'client-customers',
+    label: 'Customers',
+    href: '/app/operations/customers',
+    icon: 'customers',
+    group: 'client-operations',
+    available: false,
+    note: 'Customers module — requires a connected CRM.',
+  },
+  {
+    id: 'client-suppliers',
+    label: 'Suppliers',
+    href: '/app/operations/suppliers',
+    icon: 'suppliers',
+    group: 'client-operations',
+    available: false,
+    note: 'Suppliers module — requires a connected procurement system.',
+  },
+  {
+    id: 'client-payments',
+    label: 'Payments',
+    href: '/app/operations/payments',
+    icon: 'payments',
+    group: 'client-operations',
+    available: false,
+    note: 'Payments module — requires a connected accounting or payment system.',
+  },
+  {
+    id: 'client-expenses',
+    label: 'Expenses',
+    href: '/app/operations/expenses',
+    icon: 'expenses',
+    group: 'client-operations',
+    available: false,
+    note: 'Expenses module — requires a connected finance system.',
+  },
+  {
+    id: 'client-assets',
+    label: 'Assets',
+    href: '/app/operations/assets',
+    icon: 'assets',
+    group: 'client-operations',
+    available: false,
+    note: 'Assets module — planned for a future release.',
+  },
+  {
+    id: 'client-branches',
+    label: 'Branches',
+    href: '/app/operations/branches',
+    icon: 'branches',
+    group: 'client-operations',
+    available: false,
+    note: 'Branch management — planned.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-warehouses',
+    label: 'Warehouses',
+    href: '/app/operations/warehouses',
+    icon: 'warehouses',
+    group: 'client-operations',
+    available: false,
+    note: 'Warehouse management — requires inventory system.',
+    minRole: 'manager',
+  },
+
+  // ── PEOPLE ─────────────────────────────────────────────────────────────────
+  {
+    id: 'client-employees',
+    label: 'Employees',
+    href: '/app/people/employees',
+    icon: 'employees',
+    group: 'client-people',
+    available: false,
+    note: 'Employees module — requires a connected HR system.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-departments',
+    label: 'Departments',
+    href: '/app/people/departments',
+    icon: 'departments',
+    group: 'client-people',
+    available: false,
+    note: 'Departments module — planned.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-attendance',
+    label: 'Attendance',
+    href: '/app/people/attendance',
+    icon: 'attendance',
+    group: 'client-people',
+    available: false,
+    note: 'Attendance tracking — requires a connected HR system.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-leave',
+    label: 'Leave',
+    href: '/app/people/leave',
+    icon: 'leave',
+    group: 'client-people',
+    available: false,
+    note: 'Leave management — requires a connected HR system.',
+  },
+  {
+    id: 'client-payroll',
+    label: 'Payroll',
+    href: '/app/people/payroll',
+    icon: 'payroll',
+    group: 'client-people',
+    available: false,
+    note: 'Payroll — requires a connected payroll system.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-users-access',
+    label: 'Users & Access',
+    href: '/app/people/users',
+    icon: 'people',
+    group: 'client-people',
+    available: true,
+    minRole: 'owner',
+  },
+  {
+    id: 'client-roles',
+    label: 'Roles',
+    href: '/app/people/roles',
+    icon: 'access-control',
+    group: 'client-people',
+    available: true,
+    minRole: 'owner',
+  },
+
+  // ── CUSTOMER RELATIONSHIP ─────────────────────────────────────────────────
+  {
+    id: 'client-crm-customers',
+    label: 'Customers',
+    href: '/app/crm/customers',
+    icon: 'customers',
+    group: 'client-crm',
+    available: false,
+    note: 'CRM — requires a connected CRM system.',
+  },
+  {
+    id: 'client-leads',
+    label: 'Leads',
+    href: '/app/crm/leads',
+    icon: 'leads',
+    group: 'client-crm',
+    available: false,
+    note: 'Leads management — requires a connected CRM.',
+  },
+  {
+    id: 'client-opportunities',
+    label: 'Opportunities',
+    href: '/app/crm/opportunities',
+    icon: 'opportunities',
+    group: 'client-crm',
+    available: false,
+    note: 'Opportunities — requires a connected CRM.',
+  },
+  {
+    id: 'client-crm-activities',
+    label: 'Activities',
+    href: '/app/crm/activities',
+    icon: 'activities',
+    group: 'client-crm',
+    available: false,
+    note: 'Activities — requires a connected CRM.',
+  },
+  {
+    id: 'client-follow-ups',
+    label: 'Follow-ups',
+    href: '/app/crm/follow-ups',
+    icon: 'follow-ups',
+    group: 'client-crm',
+    available: false,
+    note: 'Follow-ups — requires a connected CRM.',
+  },
+
+  // ── INTEGRATIONS ──────────────────────────────────────────────────────────
+  {
+    id: 'client-connected-systems',
+    label: 'Connected Systems',
+    href: '/app/connectors',
+    icon: 'connected-systems',
+    group: 'client-integrations',
+    available: true,
+  },
+  {
+    id: 'client-connector-health',
+    label: 'Connector Health',
+    href: '/app/connectors/health',
+    icon: 'connector-health',
+    group: 'client-integrations',
+    available: true,
+  },
+  {
+    id: 'client-integration-requests',
+    label: 'Integration Requests',
+    href: '/app/connectors/requests',
+    icon: 'integration-requests',
+    group: 'client-integrations',
+    available: true,
+  },
+
+  // ── AUTOMATION ────────────────────────────────────────────────────────────
+  {
+    id: 'client-rules',
+    label: 'Rules',
+    href: '/app/automation/rules',
+    icon: 'rules',
+    group: 'client-automation',
+    available: false,
+    note: 'Rules engine — planned.',
+    minRole: 'owner',
+  },
+  {
+    id: 'client-workflows',
+    label: 'Workflows',
+    href: '/app/automation/workflows',
+    icon: 'automation',
+    group: 'client-automation',
+    available: false,
+    note: 'Workflows — planned.',
+    minRole: 'owner',
+  },
+  {
+    id: 'client-schedules',
+    label: 'Schedules',
+    href: '/app/automation/schedules',
+    icon: 'schedules',
+    group: 'client-automation',
+    available: false,
+    note: 'Scheduled automations — planned.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-executions',
+    label: 'Executions',
+    href: '/app/automation/executions',
+    icon: 'executions',
+    group: 'client-automation',
+    available: false,
+    note: 'Execution log — planned.',
+    minRole: 'manager',
+  },
+
+  // ── INTELLIGENCE ──────────────────────────────────────────────────────────
+  {
+    id: 'client-ellinea-ai',
+    label: 'Ellinea AI',
+    href: '/app/intelligence/ellinea',
+    icon: 'ellinea-ai',
+    group: 'client-intelligence',
+    available: true,
+  },
+  {
+    id: 'client-insights',
+    label: 'Insights',
+    href: '/app/intelligence/insights',
+    icon: 'insights',
+    group: 'client-intelligence',
+    available: false,
+    note: 'Insights — requires live connected data.',
+    minRole: 'manager',
+  },
+  {
+    id: 'client-recommendations',
+    label: 'Recommendations',
+    href: '/app/intelligence/recommendations',
+    icon: 'recommendations',
+    group: 'client-intelligence',
+    available: false,
+    note: 'AI-generated recommendations — planned.',
+    minRole: 'manager',
+  },
+
+  // ── ADMINISTRATION ────────────────────────────────────────────────────────
+  {
+    id: 'client-admin-users',
+    label: 'Users & Access',
+    href: '/app/admin/users',
+    icon: 'people',
+    group: 'client-administration',
+    available: true,
+    minRole: 'owner',
+  },
+  {
+    id: 'client-business-settings',
+    label: 'Business Settings',
+    href: '/app/admin/settings',
+    icon: 'business-settings',
+    group: 'client-administration',
+    available: true,
+    minRole: 'owner',
+  },
+  {
+    id: 'client-notifications',
+    label: 'Notifications',
+    href: '/app/admin/notifications',
+    icon: 'notifications',
+    group: 'client-administration',
+    available: true,
+    minRole: 'owner',
+  },
+  {
+    id: 'client-audit',
+    label: 'Audit',
+    href: '/app/admin/audit',
+    icon: 'audit',
+    group: 'client-administration',
+    available: true,
+    minRole: 'owner',
+  },
+  {
+    id: 'client-data-privacy',
+    label: 'Data & Privacy',
+    href: '/app/admin/data-privacy',
+    icon: 'data-privacy',
+    group: 'client-administration',
+    available: false,
+    note: 'Data & Privacy controls — planned.',
+    minRole: 'owner',
+  },
+];
+
+// ─── CLIENT_NAV_GROUPS — 9 group definitions ──────────────────────────────────
+
+export const CLIENT_NAV_GROUPS: ClientNavGroupDef[] = [
+  {
+    id: 'client-home',
+    label: 'HOME',
+    collapsible: false,
+    defaultOpen: true,
+    itemIds: ['client-command-center', 'client-my-work', 'client-alerts', 'client-approvals', 'client-activity'],
+  },
+  {
+    id: 'client-business',
+    label: 'BUSINESS',
+    collapsible: true,
+    defaultOpen: true,
+    itemIds: ['client-business-overview', 'client-performance', 'client-reports', 'client-analytics'],
+  },
+  {
+    id: 'client-operations',
+    label: 'OPERATIONS',
+    collapsible: true,
+    defaultOpen: false,
+    itemIds: [
+      'client-sales', 'client-purchases', 'client-inventory', 'client-customers',
+      'client-suppliers', 'client-payments', 'client-expenses', 'client-assets',
+      'client-branches', 'client-warehouses',
+    ],
+  },
+  {
+    id: 'client-people',
+    label: 'PEOPLE',
+    collapsible: true,
+    defaultOpen: false,
+    itemIds: [
+      'client-employees', 'client-departments', 'client-attendance', 'client-leave',
+      'client-payroll', 'client-users-access', 'client-roles',
+    ],
+  },
+  {
+    id: 'client-crm',
+    label: 'CUSTOMER RELATIONSHIP',
+    collapsible: true,
+    defaultOpen: false,
+    itemIds: ['client-crm-customers', 'client-leads', 'client-opportunities', 'client-crm-activities', 'client-follow-ups'],
+  },
+  {
+    id: 'client-integrations',
+    label: 'INTEGRATIONS',
+    collapsible: true,
+    defaultOpen: true,
+    itemIds: ['client-connected-systems', 'client-connector-health', 'client-integration-requests'],
+  },
+  {
+    id: 'client-automation',
+    label: 'AUTOMATION',
+    collapsible: true,
+    defaultOpen: false,
+    itemIds: ['client-rules', 'client-workflows', 'client-schedules', 'client-executions'],
+  },
+  {
+    id: 'client-intelligence',
+    label: 'INTELLIGENCE',
+    collapsible: true,
+    defaultOpen: true,
+    itemIds: ['client-ellinea-ai', 'client-insights', 'client-recommendations'],
+  },
+  {
+    id: 'client-administration',
+    label: 'ADMINISTRATION',
+    collapsible: true,
+    defaultOpen: false,
+    itemIds: ['client-admin-users', 'client-business-settings', 'client-notifications', 'client-audit', 'client-data-privacy'],
+  },
+];
+
+// ─── resolveClientNavigation ──────────────────────────────────────────────────
+
+const ROLE_LEVEL: Record<string, number> = {
+  owner: 5,
+  executive: 4,
+  admin: 4,
+  manager: 3,
+  member: 2,
+  viewer: 1,
+};
+
+/**
+ * Filter and return the ClientNavGroupDef[] the user should see.
+ *
+ * Rules:
+ * - Items with `available: false` are retained (rendered as planned state) but not omitted.
+ * - Items requiring a higher role than the user's are removed from the group.
+ * - Empty groups (all items removed) are omitted entirely.
+ * - Staff (member / viewer) sees only HOME + explicitly-granted items.
+ * - No PlatformSectionId items are ever included — this is enforced by the fact that
+ *   CLIENT_NAV_ITEMS contains no `section` fields that map to PlatformSectionId values.
+ */
+export function resolveClientNavigation(opts: {
+  role: 'owner' | 'executive' | 'admin' | 'manager' | 'member' | 'viewer';
+  packageFeatures: string[];
+  grantedPermissions: string[];
+}): ClientNavGroupDef[] {
+  const userLevel = ROLE_LEVEL[opts.role] ?? 1;
+
+  // Build a lookup of item id → item
+  const itemById = new Map<string, ClientNavItem>(
+    CLIENT_NAV_ITEMS.map((item) => [item.id, item]),
+  );
+
+  const resolvedGroups: ClientNavGroupDef[] = [];
+
+  for (const group of CLIENT_NAV_GROUPS) {
+    // Filter items by role
+    const visibleItemIds = group.itemIds.filter((itemId) => {
+      const item = itemById.get(itemId);
+      if (!item) return false;
+
+      // Role check
+      if (item.minRole) {
+        const requiredLevel = ROLE_LEVEL[item.minRole] ?? 1;
+        if (userLevel < requiredLevel) return false;
+      }
+
+      // Package feature check
+      if (item.requiresPackageFeature) {
+        if (!opts.packageFeatures.includes(item.requiresPackageFeature)) return false;
+      }
+
+      return true;
+    });
+
+    // Omit entirely empty groups
+    if (visibleItemIds.length === 0) continue;
+
+    resolvedGroups.push({ ...group, itemIds: visibleItemIds });
+  }
+
+  return resolvedGroups;
+}

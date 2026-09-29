@@ -74,7 +74,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Fetch all installations for the org — always scoped by organization_id
   const { data: rows, error } = await supabase
     .from('connector_installations')
-    .select('id, display_name, catalog_id, status, last_message, updated_at, last_payload')
+    .select('id, display_name, catalog_id, status, last_message, updated_at, last_payload, last_sync_at, sync_interval_seconds, lifecycle_state')
     .eq('organization_id', targetOrgId)
     .neq('status', 'deleted')
     .order('updated_at', { ascending: false });
@@ -116,11 +116,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           ? (row.updated_at as string) ?? null
           : null;
 
+    // DEGRADED auto-detection: if last_sync_at is more than 2× sync_interval_seconds ago
+    // and the connector is in an active/synced state, auto-mark as degraded (Req 21.6)
+    const syncIntervalSeconds = Number(row.sync_interval_seconds ?? 3600);
+    const lastSyncAt = row.last_sync_at as string | null ?? (status === 'synced' ? row.updated_at as string : null);
+    let effectiveStatus = status;
+    if (lastSyncAt && (effectiveStatus === 'synced' || effectiveStatus === 'active')) {
+      const ageMs = Date.now() - new Date(lastSyncAt).getTime();
+      if (ageMs > syncIntervalSeconds * 2 * 1000) {
+        effectiveStatus = 'degraded';
+        // Best-effort: update status in DB (fire-and-forget, non-blocking)
+        void supabase
+          .from('connector_installations')
+          .update({ status: 'degraded', updated_at: new Date().toISOString() })
+          .eq('id', row.id as string)
+          .eq('organization_id', targetOrgId);
+      }
+    }
+
     return {
       id: row.id as string,
       displayName: (row.display_name as string) || (row.catalog_id as string),
       catalogId: row.catalog_id as string,
-      status: status as 'synced' | 'error' | 'active' | 'draft' | 'idle',
+      status: effectiveStatus as 'synced' | 'error' | 'active' | 'draft' | 'idle' | 'degraded',
       lastSyncedAt,
       recordCount,
       healthScore,

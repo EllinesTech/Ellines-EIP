@@ -819,3 +819,36 @@ export function toPackDto(row: Record<string, unknown>) {
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
 }
+
+/**
+ * Write a ConnectorFailedRecord row for a single record-level sync failure.
+ * The sync engine captures these and continues processing remaining records (Req 22.3).
+ * Idempotency: same connectorId + sourceRecordId = same rawPayloadHash won't duplicate.
+ */
+export async function writeConnectorFailedRecord(
+  supabase: ReturnType<typeof import('./auth').getAdminClient>,
+  opts: {
+    connectorId: string;
+    organizationId: string;
+    sourceRecordId: string;
+    failureReason: string;
+    rawPayloadHash: string;
+  },
+): Promise<void> {
+  try {
+    await (supabase as any)
+      .from('connector_failed_records')
+      .upsert(
+        {
+          connector_id: opts.connectorId,
+          organization_id: opts.organizationId,
+          source_record_id: opts.sourceRecordId,
+          failure_reason: opts.failureReason,
+          raw_payload_hash: opts.rawPayloadHash,
+        },
+        { onConflict: 'connector_id,source_record_id,raw_payload_hash', ignoreDuplicates: true },
+      );
+  } catch {
+    // Silent — failed-record writes must never crash the main sync path
+  }
+}

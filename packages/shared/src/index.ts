@@ -388,6 +388,21 @@ export interface ConnectorPack {
   updatedAt: string;
 }
 
+// ─── Credential encryption (AES-256-GCM, Web Crypto) ─────────────────────────
+export * from './encryption';
+
+// ─── SSRF-hardened egress function ───────────────────────────────────────────
+export * from './egress';
+
+// ─── Field mapper (UEM normalisation engine) ──────────────────────────────────
+export * from './field-mapper';
+
+// ─── OpenAPI / Swagger document importer ─────────────────────────────────────
+export * from './openapi-importer';
+
+// ─── Dashboard widget registry ────────────────────────────────────────────────
+export * from './widget-registry';
+
 // ─── Phase 2: unified permission grammar (§12.2) ───────────────────────────────
 export * from './permissions';
 

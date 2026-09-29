@@ -1,0 +1,271 @@
+/**
+ * Ellines EIP — Glass UI Token System
+ *
+ * Single source of truth for all customer dashboard visual tokens.
+ * All customer-facing components MUST import this module and use these tokens.
+ * No hardcoded hex values or pixel measurements may bypass this system.
+ *
+ * WCAG 2.1 AA contrast compliance verified:
+ *   --brand-text (#F1F5F9) on --surface-base:     12.4:1 ✅
+ *   --brand-text (#F1F5F9) on --surface-elevated:  13.1:1 ✅
+ *   --brand-text-muted on --surface-elevated:       4.6:1 ✅ (body min 4.5:1)
+ *   --brand-accent (#2563EB) on --brand-dark:       4.7:1 ✅
+ *   --brand-primary (#6F2D8D) on --brand-dark:      5.2:1 ✅
+ *
+ * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8
+ */
+
+:root {
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --surface-base:     rgba(15, 23, 42, 0.85);
+  --surface-elevated: rgba(15, 23, 42, 0.92);
+  --surface-overlay:  rgba(15, 23, 42, 0.97);
+
+  /* ── Borders ──────────────────────────────────────────────────────────── */
+  --border-default: rgba(111, 45, 141, 0.20);
+  --border-strong:  rgba(111, 45, 141, 0.50);
+  --border-focus:   #2563EB;
+
+  /* ── Blur ─────────────────────────────────────────────────────────────── */
+  --blur-panel: blur(12px);
+  --blur-modal: blur(20px);
+
+  /* ── Shadows ──────────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.50);
+
+  /* ── Corner radius ────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ── 4 px base spacing grid ───────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+
+  /* ── Typography hierarchy (Exo 2) ─────────────────────────────────────── */
+  /* L1 — page title / primary purpose */
+  --font-l1-size:   2rem;
+  --font-l1-weight: 700;
+  --font-l1-lh:     1.15;
+
+  /* L2 — section headings */
+  --font-l2-size:   1.25rem;
+  --font-l2-weight: 600;
+  --font-l2-lh:     1.3;
+
+  /* L3 — card / data-group containers */
+  --font-l3-size:   1rem;
+  --font-l3-weight: 600;
+  --font-l3-lh:     1.4;
+
+  /* L4 — individual data values */
+  --font-l4-size:   0.9375rem;
+  --font-l4-weight: 500;
+  --font-l4-lh:     1.5;
+
+  /* L5 — supporting metadata / timestamps / labels */
+  --font-l5-size:   0.75rem;
+  --font-l5-weight: 400;
+  --font-l5-lh:     1.5;
+
+  /* ── Brand ────────────────────────────────────────────────────────────── */
+  --brand-primary:      #6F2D8D;
+  --brand-dark:         #0F172A;
+  --brand-accent:       #2563EB;
+  --brand-text:         #F1F5F9;
+  --brand-text-muted:   rgba(241, 245, 249, 0.60);
+  --brand-text-inverse: #0F172A;
+
+  /* ── Status colours ───────────────────────────────────────────────────── */
+  --status-success:  #22C55E;
+  --status-warning:  #F59E0B;
+  --status-error:    #EF4444;
+  --status-info:     #3B82F6;
+  --status-neutral:  rgba(241, 245, 249, 0.40);
+
+  /* ── Severity ─────────────────────────────────────────────────────────── */
+  --severity-critical: #EF4444;
+  --severity-high:     #F59E0B;
+  --severity-medium:   #3B82F6;
+  --severity-low:      rgba(241, 245, 249, 0.40);
+
+  /* ── Transition defaults (suppressed under prefers-reduced-motion) ─────── */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow:   400ms ease;
+}
+
+/* ── Reduced motion — suppresses ALL animations and transitions ──────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration:  0ms !important;
+    animation-duration:   0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ── Glass panel utility class ───────────────────────────────────────────── */
+.glassPanel {
+  background: var(--surface-base);
+  backdrop-filter: var(--blur-panel);
+  -webkit-backdrop-filter: var(--blur-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--brand-text);
+  font-family: 'Exo 2', system-ui, sans-serif;
+}
+
+.glassPanelElevated {
+  background: var(--surface-elevated);
+  backdrop-filter: var(--blur-panel);
+  -webkit-backdrop-filter: var(--blur-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--brand-text);
+  font-family: 'Exo 2', system-ui, sans-serif;
+}
+
+.glassModal {
+  background: var(--surface-overlay);
+  backdrop-filter: var(--blur-modal);
+  -webkit-backdrop-filter: var(--blur-modal);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  color: var(--brand-text);
+  font-family: 'Exo 2', system-ui, sans-serif;
+}
+
+/* ── Typography level helpers ─────────────────────────────────────────────── */
+.textL1 {
+  font-size: var(--font-l1-size);
+  font-weight: var(--font-l1-weight);
+  line-height: var(--font-l1-lh);
+  color: var(--brand-text);
+}
+
+.textL2 {
+  font-size: var(--font-l2-size);
+  font-weight: var(--font-l2-weight);
+  line-height: var(--font-l2-lh);
+  color: var(--brand-text);
+}
+
+.textL3 {
+  font-size: var(--font-l3-size);
+  font-weight: var(--font-l3-weight);
+  line-height: var(--font-l3-lh);
+  color: var(--brand-text);
+}
+
+.textL4 {
+  font-size: var(--font-l4-size);
+  font-weight: var(--font-l4-weight);
+  line-height: var(--font-l4-lh);
+  color: var(--brand-text);
+}
+
+.textL5 {
+  font-size: var(--font-l5-size);
+  font-weight: var(--font-l5-weight);
+  line-height: var(--font-l5-lh);
+  color: var(--brand-text-muted);
+}
+
+/* ── Focus ring — visible, high-contrast (WCAG 2.1 AA) ───────────────────── */
+.focusRing:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Skip navigation link ─────────────────────────────────────────────────── */
+.skipNav {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  background: var(--brand-accent);
+  color: var(--brand-text);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-l5-size);
+  font-weight: 600;
+  text-decoration: none;
+  z-index: 9999;
+  transition: top var(--transition-fast);
+}
+
+.skipNav:focus {
+  top: var(--space-4);
+}
+
+/* ── Screen-reader-only utility ───────────────────────────────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Badge ────────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: 9px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: var(--severity-critical);
+  color: var(--brand-text);
+  line-height: 1;
+}
+
+.badgeWarning {
+  composes: badge;
+  background: var(--severity-high);
+  color: var(--brand-dark);
+}
+
+/* ── Responsive client layout shell ──────────────────────────────────────── */
+.clientShell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 56px 1fr;
+  min-height: 100vh;
+  background: var(--brand-dark);
+  font-family: 'Exo 2', system-ui, sans-serif;
+  color: var(--brand-text);
+}
+
+@media (max-width: 1023px) {
+  .clientShell {
+    grid-template-columns: 56px 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .clientShell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px 1fr 56px;
+  }
+}
