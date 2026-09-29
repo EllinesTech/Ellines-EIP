@@ -81,7 +81,43 @@ export type NavIconId =
   | 'compliance'
   | 'audit'
   | 'ellinea-console'
-  | 'ellinea-ai';
+  | 'ellinea-ai'
+  // ── Client dashboard icon IDs ──────────────────────────────────────────────
+  | 'dashboard'
+  | 'my-work'
+  | 'attention'
+  | 'business-overview'
+  | 'performance'
+  | 'analytics'
+  | 'sales'
+  | 'purchases'
+  | 'inventory'
+  | 'customers'
+  | 'suppliers'
+  | 'payments'
+  | 'expenses'
+  | 'assets'
+  | 'branches'
+  | 'warehouses'
+  | 'employees'
+  | 'departments'
+  | 'attendance'
+  | 'leave'
+  | 'payroll'
+  | 'leads'
+  | 'opportunities'
+  | 'activities'
+  | 'follow-ups'
+  | 'connected-systems'
+  | 'connector-health'
+  | 'integration-requests'
+  | 'schedules'
+  | 'executions'
+  | 'insights'
+  | 'recommendations'
+  | 'business-settings'
+  | 'data-privacy'
+  | 'users-roles';
 
 export interface NavItem {
   /** Stable key. Also the `?section=` value when the item opens a Control Plane section. */
@@ -163,6 +199,15 @@ const ELLINES_ORGANIZATION_ITEMS: NavItem[] = [
     section: 'org-admin',
     group: 'ellines-organization',
     adminOnly: true,
+    available: true,
+  },
+  {
+    id: 'ellines-inbox',
+    label: 'Email Inbox',
+    superAdminLabel: 'Email Inbox',
+    href: '/app/inbox',
+    icon: 'inbox',
+    group: 'ellines-organization',
     available: true,
   },
   {
@@ -418,7 +463,7 @@ export const SUPER_ADMIN_NAV: NavGroupDef[] = [
     label: NAV_GROUP_LABELS['ellines-organization'],
     collapsible: true,
     defaultOpen: true,
-    itemIds: ['overview', 'org-data', 'org-system', 'org-admin', 'settings'],
+    itemIds: ['overview', 'org-data', 'org-system', 'org-admin', 'ellines-inbox', 'settings'],
     subGroups: [],
   },
   {
@@ -688,48 +733,14 @@ export type ClientNavGroupId =
   | 'client-intelligence'
   | 'client-administration';
 
-/** Extended icon IDs for the client sidebar — additive, no overlap with NavIconId. */
-export type ClientNavIconId =
-  | 'dashboard'
-  | 'my-work'
-  | 'attention'
-  | 'business-overview'
-  | 'performance'
-  | 'analytics'
-  | 'sales'
-  | 'purchases'
-  | 'inventory'
-  | 'customers'
-  | 'suppliers'
-  | 'payments'
-  | 'expenses'
-  | 'assets'
-  | 'branches'
-  | 'warehouses'
-  | 'employees'
-  | 'departments'
-  | 'attendance'
-  | 'leave'
-  | 'payroll'
-  | 'leads'
-  | 'opportunities'
-  | 'activities'
-  | 'follow-ups'
-  | 'connected-systems'
-  | 'connector-health'
-  | 'integration-requests'
-  | 'schedules'
-  | 'executions'
-  | 'insights'
-  | 'recommendations'
-  | 'business-settings'
-  | 'data-privacy';
+/** Extended icon IDs for the client sidebar — now merged into NavIconId above. */
+export type ClientNavIconId = NavIconId;
 
 export interface ClientNavItem {
   id: string;
   label: string;
   href: string;
-  icon: NavIconId | ClientNavIconId;
+  icon: NavIconId;
   group: ClientNavGroupId;
   /** `false` = planned state — renders as disabled, never carries fake data. */
   available: boolean;
@@ -789,6 +800,14 @@ export const CLIENT_NAV_ITEMS: ClientNavItem[] = [
     label: 'Activity',
     href: '/app/activity',
     icon: 'timeline',
+    group: 'client-home',
+    available: true,
+  },
+  {
+    id: 'client-inbox',
+    label: 'Inbox',
+    href: '/app/inbox',
+    icon: 'inbox',
     group: 'client-home',
     available: true,
   },
@@ -1197,7 +1216,7 @@ export const CLIENT_NAV_GROUPS: ClientNavGroupDef[] = [
     label: 'HOME',
     collapsible: false,
     defaultOpen: true,
-    itemIds: ['client-command-center', 'client-my-work', 'client-alerts', 'client-approvals', 'client-activity'],
+    itemIds: ['client-command-center', 'client-my-work', 'client-alerts', 'client-approvals', 'client-activity', 'client-inbox'],
   },
   {
     id: 'client-business',

@@ -263,17 +263,13 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const isClientShell = !orgAdmin && !platformAdmin;
 
   // ── Client Dashboard Shell detection ─────────────────────────────────────
-  // Routes that use the new ClientSidebar + DashboardHeader shell.
-  const CLIENT_SHELL_PREFIXES = [
-    '/app/dashboards', '/app/my-work', '/app/alerts', '/app/activity',
-    '/app/business', '/app/operations', '/app/people', '/app/crm',
-    '/app/connectors', '/app/automation', '/app/intelligence', '/app/admin',
-  ];
+  // All non-platform-admin users get the ClientSidebar (grouped CLIENT_NAV_ITEMS)
+  // for every /app/* route. Platform admins keep the Super Admin rail.
+  // Routes explicitly excluded: /app/platform (Super Admin control plane).
   const isClientDashboardShell =
     !platformAdmin &&
-    CLIENT_SHELL_PREFIXES.some(
-      (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
-    );
+    pathname !== '/app/platform' &&
+    !pathname.startsWith('/app/platform/');
 
   // Build org memberships for DashboardHeader multi-org switcher
   const orgMemberships = [
@@ -478,47 +474,153 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   if (isClientDashboardShell) {
     return (
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `${collapsed ? '56px' : '240px'} 1fr`,
-          gridTemplateRows: '56px 1fr',
-          minHeight: '100vh',
-          background: '#0F172A',
-          fontFamily: "'Exo 2', system-ui, sans-serif",
-          color: '#F1F5F9',
-          transition: 'grid-template-columns 250ms ease',
-        }}
+        className={`${styles.shell}${collapsed ? ` ${styles.shellCollapsed}` : ''}`}
+        data-theme={uiPrefs.theme}
+        data-accent={uiPrefs.accent}
+        data-density={uiPrefs.density}
+        data-reduce-motion={uiPrefs.reduceMotion ? 'true' : 'false'}
+        style={{ '--dash-rail-w': '288px' } as React.CSSProperties}
       >
-        <a
-          href="#main-content"
-          style={{ position: 'absolute', left: '-100%', top: 16, zIndex: 9999, background: '#2563EB', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}
-          onFocus={(e) => { e.currentTarget.style.left = '16px'; }}
-          onBlur={(e) => { e.currentTarget.style.left = '-100%'; }}
-        >
-          Skip to main content
-        </a>
-        <div style={{ gridColumn: '1 / -1', gridRow: '1' }}>
-          <DashboardHeader
-            orgName={session.organization.name}
-            orgRole={session.user.role}
-            orgMemberships={orgMemberships}
-            refreshingCount={0}
-            onOrgSwitch={() => { void refreshSessionFlags().then((next) => { if (next) setSessionState(next); }); }}
-          />
+        {/* Sidebar — full-height, same slot as the Super Admin rail */}
+        <ClientSidebar
+          role={session.user.role as 'owner' | 'executive' | 'admin' | 'manager' | 'member' | 'viewer'}
+          packageFeatures={[]}
+          grantedPermissions={[]}
+          orgName={session.organization.name}
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapse}
+          clock={clock}
+          userFullName={session.user.fullName}
+          userAvatarUrl={session.user.avatarUrl ?? null}
+          userRole={session.user.title || session.user.role}
+        />
+
+        {/* Main content — same slot as the Super Admin main */}
+        <div className={styles.main}>
+          <header className={styles.topbar}>
+            <div className={styles.topLeft}>
+              <div className={styles.orgBlock}>
+                <div className={styles.orgName}>{pageTitle}</div>
+                <div className={styles.roleLabel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <OrgSwitcher
+                    session={session}
+                    onSwitch={(next) => {
+                      setSessionState(next);
+                      setSession(next);
+                    }}
+                  />
+                  <span style={{ opacity: 0.5 }}>·</span>
+                  {session.user.role}
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.topCenter}>
+              <form
+                className={styles.search}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = searchQ.trim();
+                  router.push(q ? `/app/search/?q=${encodeURIComponent(q)}` : '/app/search/');
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3.5-3.5" />
+                </svg>
+                <input
+                  type="search"
+                  placeholder="Search anything..."
+                  aria-label="Search"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                />
+              </form>
+            </div>
+
+            <div className={styles.topRight}>
+              <Link
+                href="/app/notifications"
+                className={styles.iconBtn}
+                aria-label={notifyUnread ? `Notifications (${notifyUnread} unread)` : 'Notifications'}
+                title={notifyUnread ? `${notifyUnread} pending approval${notifyUnread > 1 ? 's' : ''}` : 'Notifications'}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 7H3s3 0 3-7" />
+                  <path d="M10 19a2 2 0 004 0" />
+                </svg>
+                {notifyUnread > 0 ? (
+                  <span className={styles.badge} style={{ background: '#ef4444', minWidth: 16, height: 16, borderRadius: 99, fontSize: '0.65rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', padding: '0 3px' }}>
+                    {notifyUnread > 9 ? '9+' : notifyUnread}
+                  </span>
+                ) : null}
+              </Link>
+              <Link
+                href="/app/profile"
+                className={styles.topAvatar}
+                title="Profile"
+                aria-label="Open profile"
+              >
+                {session.user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={session.user.avatarUrl} alt="" className={styles.topAvatarImg} />
+                ) : (
+                  initials(session.user.fullName)
+                )}
+              </Link>
+              <button type="button" className={styles.signOut} onClick={logout}>
+                Sign out
+              </button>
+            </div>
+          </header>
+
+          <div className={styles.content} id="main-content">
+            {children}
+          </div>
+
+          <footer className={styles.appFooter}>
+            <div className={styles.appFooterInner}>
+              <span className={styles.appFooterBrand}>Ellines EIP</span>
+              <span className={styles.appFooterDot} aria-hidden>·</span>
+              <span>Developed by Ellines Tech</span>
+              <span className={styles.appFooterDot} aria-hidden>·</span>
+              <span>© {new Date().getFullYear()}</span>
+            </div>
+          </footer>
         </div>
-        <div style={{ gridRow: '2', gridColumn: '1', overflow: 'hidden' }}>
-          <ClientSidebar
-            role={session.user.role as 'owner' | 'executive' | 'admin' | 'manager' | 'member' | 'viewer'}
-            packageFeatures={[]}
-            grantedPermissions={[]}
-            orgName={session.organization.name}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
+
+        {/* Ellinea Ask float + phone nav — same as Super Admin shell */}
+        {showAskFloat ? (
+          <button type="button" className={styles.fab} onClick={() => setChatOpen(true)}>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M21 12a8.5 8.5 0 01-8.5 8.5H7l-4 3V12A8.5 8.5 0 0112.5 3.5 8.5 8.5 0 0121 12z" />
+            </svg>
+            Ask Ellinea AI
+          </button>
+        ) : null}
+
+        <nav className={styles.phoneBottomNav} aria-label="Phone companion">
+          {phoneNav.map((item) => {
+            const active = item.match(pathname);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={active ? `${styles.phoneNavLink} ${styles.phoneNavActive}` : styles.phoneNavLink}
+              >
+                <span className={styles.phoneNavIcon}>{item.icon}</span>
+                <span className={styles.phoneNavLabel}>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {chatOpen && (
+          <EllineaChatPanel
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
           />
-        </div>
-        <main id="main-content" style={{ gridRow: '2', gridColumn: '2', overflowY: 'auto', minHeight: 0 }}>
-          {children}
-        </main>
+        )}
       </div>
     );
   }
