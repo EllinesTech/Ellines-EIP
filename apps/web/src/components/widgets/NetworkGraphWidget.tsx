@@ -15,44 +15,44 @@ function nodeColor(status?: NetworkNode['status']): string {
   return BLUE;
 }
 
-function defaultNodes(): NetworkNode[] {
-  return [
-    { id: 'erp', label: 'ERP', status: 'ok' },
-    { id: 'crm', label: 'CRM', status: 'ok' },
-    { id: 'hrms', label: 'HRMS', status: 'warn' },
-    { id: 'eip', label: 'EIP', type: 'hub' },
-    { id: 'ai', label: 'Ellinea AI', status: 'ok' },
-    { id: 'db', label: 'Database', status: 'ok' },
-  ];
-}
-
-function defaultEdges(): NetworkEdge[] {
-  return [
-    { from: 'erp', to: 'eip' },
-    { from: 'crm', to: 'eip' },
-    { from: 'hrms', to: 'eip' },
-    { from: 'eip', to: 'ai' },
-    { from: 'eip', to: 'db' },
-  ];
-}
-
 /**
  * Network Graph widget — nodes and edges rendered as SVG.
  *
  * Config keys:
  *   nodes — [{id, label, type?, status?}]
  *   edges — [{from, to, label?, weight?}]
+ *
+ * There are deliberately NO default nodes or edges. Without configured data
+ * this used to draw an invented "ERP / CRM / HRMS / Database" topology with
+ * invented health statuses, which a tenant would reasonably read as its own
+ * connected systems. It now renders an explicit empty state instead.
  */
 export default function NetworkGraphWidget({ config = {}, onDrillDown, height = 180 }: WidgetProps) {
-  const nodes =
-    Array.isArray(config.nodes) && config.nodes.length > 0
-      ? (config.nodes as NetworkNode[])
-      : defaultNodes();
+  const nodes = Array.isArray(config.nodes) && config.nodes.length > 0 ? (config.nodes as NetworkNode[]) : [];
+  const edges = Array.isArray(config.edges) && config.edges.length > 0 ? (config.edges as NetworkEdge[]) : [];
 
-  const edges =
-    Array.isArray(config.edges) && config.edges.length > 0
-      ? (config.edges as NetworkEdge[])
-      : defaultEdges();
+  // No topology configured — say so rather than inventing one.
+  if (nodes.length === 0) {
+    return (
+      <div
+        style={{
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 6,
+          color: MUTED,
+          fontSize: '0.8rem',
+          textAlign: 'center',
+          padding: '0 1rem',
+        }}
+      >
+        No systems configured. Add nodes and edges to this widget&apos;s configuration to
+        display your integration topology here.
+      </div>
+    );
+  }
 
   // Simple force-directed layout approximation using circular positioning
   const cx = 140;

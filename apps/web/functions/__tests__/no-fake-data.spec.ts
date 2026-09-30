@@ -126,6 +126,23 @@ describe('production source contains no fabricated business data', () => {
 });
 
 describe('mojibake guard', () => {
+  it('map widget does not fall back to invented locations', () => {
+    const src = readFileSync(join(REPO, 'apps', 'web', 'src', 'components', 'widgets', 'MapWidget.tsx'), 'utf8');
+    // A map with no configured pins must render an empty state, not invented
+    // branches/sites with invented health statuses.
+    expect(src).not.toMatch(/Nairobi HQ|Mombasa Office|Kisumu Branch|Nakuru Depot|Eldoret Site/);
+    expect(src).not.toMatch(/function defaultPins/);
+    expect(src).toMatch(/No locations configured/i);
+  });
+
+  it('network graph widget does not fall back to an invented system topology', () => {
+    const src = readFileSync(join(REPO, 'apps', 'web', 'src', 'components', 'widgets', 'NetworkGraphWidget.tsx'), 'utf8');
+    // Drawing a fake "ERP/CRM/HRMS/Database" graph with invented statuses would
+    // read as the tenant's own connected systems.
+    expect(src).not.toMatch(/function defaultNodes|function defaultEdges/);
+    expect(src).toMatch(/No systems configured/i);
+  });
+
   it('production source is free of corrupted UTF-8 sequences', () => {
     const bad: string[] = [];
     for (const root of ROOTS) {

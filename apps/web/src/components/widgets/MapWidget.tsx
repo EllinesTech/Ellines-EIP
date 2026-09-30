@@ -15,16 +15,6 @@ function pinColor(status?: MapPin['status']): string {
   return BLUE;
 }
 
-function defaultPins(): MapPin[] {
-  return [
-    { id: 'nairobi', label: 'Nairobi HQ', lat: -1.286, lng: 36.82, status: 'ok' },
-    { id: 'mombasa', label: 'Mombasa Office', lat: -4.05, lng: 39.67, status: 'ok' },
-    { id: 'kisumu', label: 'Kisumu Branch', lat: -0.09, lng: 34.76, status: 'warn' },
-    { id: 'nakuru', label: 'Nakuru Depot', lat: -0.30, lng: 36.07, status: 'ok' },
-    { id: 'eldoret', label: 'Eldoret Site', lat: 0.52, lng: 35.27, status: 'error' },
-  ];
-}
-
 /**
  * Map widget — SVG projection of lat/lng pins.
  * No external map API needed — uses simple equirectangular projection.
@@ -33,15 +23,41 @@ function defaultPins(): MapPin[] {
  *   pins      — [{id, label, lat, lng, status?}]
  *   centerLat — map center latitude (default 0)
  *   centerLng — map center longitude (default 20)
+ *
+ * There are deliberately NO default pins. A map with no configured locations
+ * renders an explicit empty state; it must never display invented branches or
+ * sites with invented health statuses, because those read as real places and
+ * real operational state for the signed-in tenant.
  */
 export default function MapWidget({ config = {}, onDrillDown, height = 180 }: WidgetProps) {
   const pins =
-    Array.isArray(config.pins) && config.pins.length > 0
-      ? (config.pins as MapPin[])
-      : defaultPins();
+    Array.isArray(config.pins) && config.pins.length > 0 ? (config.pins as MapPin[]) : [];
 
   const svgW = 280;
   const svgH = height;
+
+  // No locations were supplied — say so rather than inventing them.
+  if (pins.length === 0) {
+    return (
+      <div
+        style={{
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 6,
+          color: MUTED,
+          fontSize: '0.8rem',
+          textAlign: 'center',
+          padding: '0 1rem',
+        }}
+      >
+        No locations configured. Add branch or site coordinates to this widget&apos;s
+        configuration to display them here.
+      </div>
+    );
+  }
 
   // Determine map bounds from pins (with padding)
   const lats = pins.map((p) => p.lat);
