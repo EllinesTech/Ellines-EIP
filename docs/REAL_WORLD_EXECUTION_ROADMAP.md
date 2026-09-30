@@ -1,4 +1,4 @@
-njesh# Ellines EIP — Real-World Execution Roadmap
+# Ellines EIP — Real-World Execution Roadmap
 
 **Status:** ACTIVE — execution roadmap  
 **Purpose:** Replace long sequential planning with one merged execution track that combines the remaining platform work with the new real-world connector/business-system strategy.  
