@@ -336,7 +336,12 @@ export interface EnterpriseSummary {
   organizationId: string;
   connectorId: string;
   connectorName: string;
-  healthScore: number;
+  /**
+   * null = no connected system published a health metric, so the value is
+   * UNKNOWN. It must never be coerced to 0 (which would read as "measured and
+   * critical") or to a derived baseline (which would invent a score).
+   */
+  healthScore: number | null;
   connectedSystems: number;
   /**
    * Count of RECORDS retrieved across all connected systems. Semantically

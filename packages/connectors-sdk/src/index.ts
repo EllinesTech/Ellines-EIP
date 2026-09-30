@@ -138,7 +138,12 @@ export interface ConnectorPlugin {
 }
 
 export type EnterprisePayload = {
-  healthScore: number;
+  /**
+   * null = the source system published no health metric, so the value is
+   * UNKNOWN. It must never be coerced to 0, which would report an unmeasured
+   * system as measurably critical.
+   */
+  healthScore: number | null;
   connectedSystems: number;
   /**
    * Count of RECORDS returned by this connector (e.g. a catalogue listing 15
@@ -191,10 +196,14 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
         .slice(0, 12)
     : [];
 
-  const healthScore = Math.min(
-    100,
-    Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
-  );
+  // healthScore is ONLY a real measurement. The upstream API publishing no
+  // health field means the value is UNKNOWN (null) — coercing it to 0 would
+  // report an unmeasured system as measurably critical, which is a fabricated
+  // reading. This mirrors apps/web/functions/shared/connectors.ts; the two must
+  // not diverge, or one data plane reports false health while the other does not.
+  const rawHealth = asNumber(data.healthScore ?? data.health ?? data.score, -1);
+  const healthScore: number | null =
+    rawHealth >= 0 ? Math.min(100, Math.max(0, rawHealth)) : null;
   // connectedSystems is ONLY populated from explicit connected-system aliases.
   // A generic record count must never be interpreted as a connected-systems count.
   const connectedSystems = Math.max(
@@ -217,7 +226,9 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
   );
   const briefHighlight = asString(
     data.briefHighlight ?? data.brief ?? data.summary ?? data.message,
-    'REST sync completed with no brief text.',
+    // State only what is true: a payload was retrieved. Never claim a business
+    // summary that the source system never provided.
+    'Payload retrieved. No summary field was provided by the source system.',
   );
 
   const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system ?? '', '');
@@ -257,27 +268,35 @@ export function fromTimelineStorage(raw: unknown) {
   return unpackTimelineStorage(raw);
 }
 
-/** Demo JSON / file-style connector — returns a fixed enterprise snapshot. */
+/**
+ * File/JSON-style connector that replays a caller-supplied payload.
+ *
+ * This performs NO network I/O, so it must not claim a live connection. The
+ * connection test reports UNKNOWN rather than `true`, because returning true
+ * would present a replayed payload as proof that a system is reachable.
+ */
 export function createDemoJsonConnector(seed: EnterprisePayload): ConnectorPlugin {
   return defineConnector({
     id: 'demo-json',
-    name: 'Demo JSON Systems',
+    name: 'JSON Replay (no live connection)',
     version: '0.1.0',
     type: 'file',
     async configure() {},
     async testConnection() {
-      return true;
+      // Not connected to anything — there is nothing to verify.
+      return false;
     },
     async sync() {
       return {
         ok: true,
         summary: {
           connectorId: 'demo-json',
-          connectorName: 'Demo JSON Systems',
+          connectorName: 'JSON Replay (no live connection)',
           ...seed,
           syncedAt: new Date().toISOString(),
         },
-        message: 'Synced demo enterprise snapshot',
+        message:
+          'Replayed a caller-supplied payload. No external system was contacted, so this is not live data.',
       };
     },
     async disconnect() {},
@@ -363,7 +382,8 @@ function emptyRestSummary(name: string) {
   return {
     connectorId: 'rest-api',
     connectorName: name,
-    healthScore: 0,
+    // Nothing was measured, so health is UNKNOWN — not 0.
+    healthScore: null as number | null,
     connectedSystems: 0,
     recordCount: 0,
     openAlerts: 0,
@@ -474,7 +494,8 @@ export function createCsvFileConnector(options: CsvFileConnectorOptions): Connec
           summary: {
             connectorId: 'csv-file',
             connectorName: name,
-            healthScore: 0,
+            // No measurement was taken, so health is UNKNOWN — not 0.
+            healthScore: null as number | null,
             connectedSystems: 0,
             recordCount: 0,
             openAlerts: 0,

@@ -151,7 +151,9 @@ export class EnterpriseService {
         organizationId,
         connectorId: 'none',
         connectorName: '',
-        healthScore: 0,
+        // No snapshot means no system has ever been read: health is UNKNOWN,
+        // not 0.
+        healthScore: null,
         connectedSystems: 0,
         openAlerts: 0,
         openDecisions: 0,
@@ -481,7 +483,10 @@ export class EnterpriseService {
 
     for (const inst of withPayload) {
       const p = inst.lastPayload as {
-        healthScore?: number;
+        // Health is aggregated ONLY from payloads that carry a real measurement.
+        // A payload with healthScore null (source published no health metric) is
+        // skipped rather than counted as 0, which would invent a score.
+        healthScore?: number | null;
         connectedSystems?: number;
         recordCount?: number;
         openAlerts?: number;
@@ -490,9 +495,12 @@ export class EnterpriseService {
         timeline?: { title: string; detail: string }[];
         model?: import('@ellines-eip/shared').UemModel | null;
       };
-      const weight = Math.max(1, p.connectedSystems || 1);
-      weightedHealth += (p.healthScore || 0) * weight;
-      totalWeight += weight;
+      // Only real measurements contribute to the health average.
+      if (typeof p.healthScore === 'number') {
+        const weight = Math.max(1, p.connectedSystems || 1);
+        weightedHealth += p.healthScore * weight;
+        totalWeight += weight;
+      }
       connectedSystems += p.connectedSystems || 0;
       // Record counts are aggregated across every connected system (REQ-1:
       // distinct from connectedSystems, which counts systems not records).
@@ -508,7 +516,12 @@ export class EnterpriseService {
       }
     }
 
-    const healthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : 0;
+    // null when no connected system published a health metric: the honest
+    // "unknown" answer. Falling back to 0 would report an unmeasured business
+    // as measurably critical.
+    const healthScore: number | null = totalWeight
+      ? Math.round(weightedHealth / totalWeight)
+      : null;
     const connectorName =
       names.length > 1
         ? `${names.length} connected systems (${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''})`
@@ -1068,7 +1081,8 @@ export class EnterpriseService {
     s: {
       connectorId: string;
       connectorName: string;
-      healthScore: number;
+      /** null = no connector published a health metric (unknown, not zero). */
+      healthScore: number | null;
       connectedSystems: number;
       /** Optional on the shared summary type; coerced to 0 when absent. */
       recordCount?: number;
@@ -1098,7 +1112,10 @@ export class EnterpriseService {
         organizationId,
         connectorId: s.connectorId,
         connectorName: s.connectorName,
-        healthScore: s.healthScore,
+        // The column is non-nullable Int, so an UNKNOWN health is stored as 0
+        // and mapped back to null on read (see the summary endpoint). 0 here
+        // means "not reported", never "measured and critical".
+        healthScore: s.healthScore ?? 0,
         connectedSystems: s.connectedSystems,
         recordCount: s.recordCount ?? 0,
         openAlerts: s.openAlerts,
@@ -1110,7 +1127,7 @@ export class EnterpriseService {
       update: {
         connectorId: s.connectorId,
         connectorName: s.connectorName,
-        healthScore: s.healthScore,
+        healthScore: s.healthScore ?? 0,
         connectedSystems: s.connectedSystems,
         recordCount: s.recordCount ?? 0,
         openAlerts: s.openAlerts,

@@ -121,8 +121,10 @@ export async function syncOpenApiRoutes(options: {
   systemName?: string;
   fetchImpl?: typeof fetch;
   normalize: (raw: unknown) => {
-    healthScore: number;
+    healthScore: number | null;
     connectedSystems: number;
+    /** Optional on the payload; treat as 0 when absent. */
+    recordCount?: number;
     openAlerts: number;
     openDecisions: number;
     briefHighlight: string;
@@ -153,10 +155,20 @@ export async function syncOpenApiRoutes(options: {
   }
 
   const timeline: { title: string; detail: string }[] = [];
-  let best: ReturnType<typeof options.normalize> | null = null;
   let okCount = 0;
+  // Every selected resource is retrieved independently and kept separately.
+  // Reducing them to a single "best" payload would silently discard real data
+  // (Customers, Invoices and Products are different resources, not candidates).
+  const normalizedPerRoute: { route: typeof route0; p: ReturnType<typeof options.normalize> }[] = [];
+  const route0 = gets[0];
+  let totalRecordCount = 0;
+  let sumOpenAlerts = 0;
+  let sumOpenDecisions = 0;
+  const realHealth: number[] = [];
+  const collectedTimeline: { title: string; detail: string }[] = [];
+  let allSucceeded = true;
 
-  for (const route of gets.slice(0, 12)) {
+  for (const route of gets) {
     const url = `${base}${route.path.startsWith('/') ? route.path : `/${route.path}`}`;
     try {
       const res = await fetchImpl(url, {
@@ -168,12 +180,18 @@ export async function syncOpenApiRoutes(options: {
           title: route.capability || route.path,
           detail: `HTTP ${res.status}`,
         });
+        allSucceeded = false;
         continue;
       }
       const raw = await res.json();
       okCount += 1;
       const normalized = options.normalize(raw);
-      if (!best || normalized.healthScore > best.healthScore) best = normalized;
+      normalizedPerRoute.push({ route, p: normalized });
+      totalRecordCount += normalized.recordCount ?? 0;
+      sumOpenAlerts += normalized.openAlerts;
+      sumOpenDecisions += normalized.openDecisions;
+      if (typeof normalized.healthScore === 'number') realHealth.push(normalized.healthScore);
+      collectedTimeline.push(...(normalized.timeline ?? []));
       const count = Array.isArray(raw)
         ? raw.length
         : raw && typeof raw === 'object' && Array.isArray((raw as { data?: unknown }).data)
@@ -188,6 +206,7 @@ export async function syncOpenApiRoutes(options: {
         title: route.capability || route.path,
         detail: err instanceof Error ? err.message : 'Request failed',
       });
+      allSucceeded = false;
     }
   }
 
@@ -200,10 +219,24 @@ export async function syncOpenApiRoutes(options: {
     };
   }
 
-  const payload = best || options.normalize({});
+  // Deterministic aggregation across ALL resources. No resource is discarded for
+  // having a lower health score, and no value is invented.
+  const firstPayload = normalizedPerRoute[0].p;
+  const payload = {
+    ...firstPayload,
+    healthScore: realHealth.length
+      ? Math.round(realHealth.reduce((a, b) => a + b, 0) / realHealth.length)
+      : null,
+    recordCount: totalRecordCount,
+    openAlerts: sumOpenAlerts,
+    openDecisions: sumOpenDecisions,
+    timeline: collectedTimeline.length ? collectedTimeline : timeline,
+  };
   return {
     ok: true,
-    message: `Synced ${okCount} OpenAPI route(s) from ${name}`,
+    message: allSucceeded
+      ? `Retrieved ${okCount} OpenAPI resource(s) from ${name}`
+      : `PARTIAL: retrieved ${okCount} of ${gets.length} OpenAPI resource(s) from ${name}`,
     payload: {
       ...payload,
       // Do NOT inflate connectedSystems. It is derived by the service layer from

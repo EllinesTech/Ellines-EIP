@@ -17,7 +17,7 @@ export function createSftpConnector(options: {
   config: SftpConnectorConfig;
   fetchFileText: (config: SftpConnectorConfig) => Promise<string>;
   parseCsv: (text: string) => {
-    healthScore: number;
+    healthScore: number | null;
     connectedSystems: number;
     openAlerts: number;
     openDecisions: number;

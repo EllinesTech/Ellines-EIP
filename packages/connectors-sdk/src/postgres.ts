@@ -41,7 +41,7 @@ export function rowsToEnterprisePayload(
   rows: Record<string, unknown>[],
   systemName = 'PostgreSQL',
 ): {
-  healthScore: number;
+  healthScore: number | null;
   connectedSystems: number;
   recordCount: number;
   openAlerts: number;
