@@ -12,6 +12,8 @@ out/
 .env.*.local
 .env.*.backup
 .env.cloudflare
+.dev.vars
+.dev.vars.*
 services/**/.env
 apps/**/.env
 

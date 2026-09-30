@@ -56,6 +56,31 @@ planes cannot drift on the properties that matter:
 - **Tenant isolation** — every query scoped by the JWT `organizationId`.
 - **Audit** — dashboard/connector mutations write `audit_logs` in both planes.
 
+## Running the Pages Functions plane locally
+
+The Functions plane is fail-closed by design: `shared/encryption.ts` **throws** when
+`EIP_ENCRYPTION_MASTER_KEY` is missing or shorter than 32 UTF-8 bytes. Without it,
+connector installation fails with `EIP_ENCRYPTION_MASTER_KEY is required` and, before
+this was surfaced, no obvious cause.
+
+Wrangler reads local Functions secrets from `apps/web/.dev.vars`. Generate it with:
+
+```bash
+npm run setup:local-secrets
+```
+
+This creates `apps/web/.dev.vars` (gitignored) containing a freshly generated
+32-byte master key plus `IDENTITY_API_URL` and any identity/Supabase values carried
+over from the repo-root `.env`. The generated key is for local development only —
+rotating it makes locally-stored connector credentials undecryptable, which is the
+expected and safe outcome. Pass `--force` to regenerate.
+
+`POST /api/v1/connectors/installations` now catches the encryption failure and returns
+a safe 500 (`"Connector credentials could not be encrypted. No data was saved."`) rather
+than throwing an opaque unhandled error — still fail-closed, but actionable. The error
+body names the env var and never the secret. See
+`apps/web/functions/__tests__/connector-install-encryption.spec.ts` (6 tests).
+
 ## Open gap (NOT resolved here)
 
 **Local development does not faithfully reproduce the Pages Functions plane.**

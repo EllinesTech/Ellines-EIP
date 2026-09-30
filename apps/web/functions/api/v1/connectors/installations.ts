@@ -192,8 +192,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       displayName = displayName || (pack.name as string);
     }
 
-    // Gate 4: encrypt all credential fields before writing
-    const encryptedConfig = await encryptConnectorConfig(config, targetOrgId, context.env);
+    // Gate 4: encrypt all credential fields before writing.
+    // Fail CLOSED and loudly: if the master key is missing/too short we must
+    // never fall back to writing plaintext credentials. Surface a safe, actionable
+    // configuration error (it names an env var, never a secret value).
+    let encryptedConfig: InstallConfig;
+    try {
+      encryptedConfig = await encryptConnectorConfig(config, targetOrgId, context.env);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Credential encryption failed';
+      console.error('[connectors/installations] credential encryption failed:', message);
+      return json(
+        {
+          statusCode: 500,
+          message: 'Connector credentials could not be encrypted. No data was saved.',
+          detail: message,
+        },
+        500,
+      );
+    }
 
     const now = new Date().toISOString();
     const row = {
