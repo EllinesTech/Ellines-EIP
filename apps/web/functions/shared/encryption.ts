@@ -26,9 +26,22 @@ function b64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function fromB64(value: string): Uint8Array {
+/**
+ * Decode base64 into an ArrayBuffer-BACKED Uint8Array.
+ *
+ * `Uint8Array.from(...)` yields `Uint8Array<ArrayBufferLike>`, which newer
+ * `lib.dom` rejects as a `BufferSource` (Web Crypto requires an
+ * ArrayBuffer-backed view). Allocating explicitly guarantees the backing store,
+ * keeps the Workers build unchanged, and makes every downstream `crypto.subtle`
+ * call typecheck in both programs.
+ */
+function fromB64(value: string) {
   const binary = atob(value);
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    out[i] = binary.charCodeAt(i);
+  }
+  return out;
 }
 
 async function deriveV2Key(env: { EIP_ENCRYPTION_MASTER_KEY?: string }, organizationId: string): Promise<CryptoKey> {

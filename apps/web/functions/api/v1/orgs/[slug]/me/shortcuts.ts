@@ -80,7 +80,8 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
     return json({ shortcuts: [] });
   }
 
-  const data = await upstream.json<{ success: boolean; data: unknown[] }>();
+  // `Response.json<T>()` is generic in the Workers types but not in lib.dom.
+  const data = (await upstream.json()) as { success: boolean; data: unknown[] };
   const shortcuts = Array.isArray(data?.data) ? data.data.slice(0, 5) : [];
 
   return json({ shortcuts });

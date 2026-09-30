@@ -149,7 +149,9 @@ class Page {
           this.pending.delete(id);
           reject(new Error(`CDP timeout: ${method}`));
         }
-      }, 30_000);
+      // Next.js dev compiles routes on first request, so a cold page can take a
+      // while. Keep a generous ceiling rather than flaking a real verification.
+      }, 90_000);
     });
   }
 

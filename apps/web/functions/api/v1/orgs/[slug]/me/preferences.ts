@@ -44,7 +44,10 @@ export const onRequest: PagesFunction<EnvWithIdentity> = async (context) => {
   // Parse and validate the request body.
   let body: PreferenceBody;
   try {
-    const raw = await context.request.json<PreferenceBody>();
+    // `Request.json<T>()` is generic in the Workers types but not in lib.dom, so
+    // the cast is what keeps this compiling in BOTH programs. Behaviour is
+    // identical — Workers' generic form is a type-level convenience only.
+    const raw = (await context.request.json()) as PreferenceBody;
     if (typeof raw?.key !== 'string' || raw.key.trim() === '') {
       return json({ statusCode: 400, message: '`key` must be a non-empty string' }, 400);
     }

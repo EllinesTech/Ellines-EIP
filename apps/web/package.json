@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_ENV=development NEXT_DIST_DIR=.next-dev next dev -p 3100",
+    "dev": "npm run -w @ellines-eip/web predev:shims && cross-env NODE_ENV=development NEXT_DIST_DIR=.next-dev next dev -p 3100",
+    "predev:shims": "node ../../scripts/generate-pages-shims.mjs",
+    "prebuild": "node ../../scripts/generate-pages-shims.mjs --clean",
     "build": "cross-env NODE_ENV=production NEXT_DIST_DIR=.next EIP_STATIC_EXPORT=1 next build",
     "start": "next start -p 3100",
     "lint": "next lint",

@@ -14,6 +14,12 @@ out/
 .env.cloudflare
 .dev.vars
 .dev.vars.*
+
+# Generated local-dev Route Handler shims (see scripts/generate-pages-shims.mjs).
+# They mirror the Cloudflare Pages Functions so `next dev` serves the real API,
+# and are regenerated on every `npm run dev`. They must never be committed:
+# production builds serve /api natively from Cloudflare Pages and remove them.
+apps/web/src/app/api/
 services/**/.env
 apps/**/.env
 

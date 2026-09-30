@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@cloudflare/workers-types": [
+        "./src/types/workers-types-stub.d.ts"
       ]
     }
   },
