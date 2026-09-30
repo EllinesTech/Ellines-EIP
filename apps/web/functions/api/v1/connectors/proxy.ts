@@ -26,6 +26,29 @@ import {
 import { buildAuthHeaders, normalizeEnterprisePayload, toTimelineStorage, decryptConnectorConfig } from '../../../shared/connectors';
 import type { InstallConfig } from '../../../shared/connectors';
 import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../shared/egress';
+import { assertCapability, type ConnectorCapability } from '@ellines-eip/shared';
+
+/**
+ * Capabilities an org IT admin / owner may exercise through the proxy.
+ *
+ * The proxy is already gated by `requireOrgAdmin`, so the user-permission gate
+ * is satisfied for these roles. The connector-capability gate below is what
+ * actually narrows the request: a connector that does not declare a write
+ * capability can never issue a write, regardless of the caller's role.
+ */
+const ALL_CONNECTOR_CAPABILITIES_FOR_ORG_ADMIN: ConnectorCapability[] = [
+  'READ',
+  'CREATE',
+  'UPDATE',
+  'DELETE',
+  'APPROVE',
+  'EXPORT',
+  'SEARCH',
+  'WEBHOOK',
+  'REPORT',
+  'SYNC',
+  'EXECUTE',
+];
 
 type ProxyBody = {
   /** Resolve config from a saved installation instead of sending credentials inline. */
@@ -45,10 +68,30 @@ type ProxyBody = {
 
   /** When true: skip UEM normalisation, return raw response (for test-connection). */
   raw?: boolean;
+
+  /** Capabilities requested for an inline (non-saved) call. Defaults to READ/SYNC. */
+  capabilities?: string[];
 };
 
 /** Hard limit: 512 KB response body to prevent edge memory abuse. */
 const MAX_RESPONSE_BYTES = 512 * 1024;
+
+/**
+ * Map an outbound HTTP method to the capability it requires.
+ *
+ * A write method is a destructive operation, so it is gated behind the
+ * connector's configured capability set — a connector that only declares READ
+ * can never be used to issue a POST/PUT/PATCH/DELETE against the source system.
+ */
+const METHOD_CAPABILITY: Record<string, ConnectorCapability> = {
+  GET: 'READ',
+  HEAD: 'READ',
+  OPTIONS: 'READ',
+  POST: 'CREATE',
+  PUT: 'UPDATE',
+  PATCH: 'UPDATE',
+  DELETE: 'DELETE',
+};
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -152,6 +195,41 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const method = (body.method || 'GET').toUpperCase();
+
+  // ── Capability authorization ────────────────────────────────────────────────
+  // A connector can never grant a capability the caller lacks. Write methods are
+  // gated behind the connector's declared capability set; an installation that
+  // declares no capabilities is READ/SYNC only.
+  const requiredCapability = METHOD_CAPABILITY[method];
+  if (!requiredCapability) {
+    return json({ statusCode: 400, message: `Unsupported method: ${method}` }, 400);
+  }
+
+  const declaredCapabilities = body.installationId
+    ? ((config.capabilities as string[] | undefined) ?? ['READ', 'SYNC'])
+    : (body.capabilities ?? ['READ', 'SYNC']);
+
+  // The proxy is already restricted to IT Admin / Owner, whose connector
+  // permission set is enforced by requireOrgAdmin above. We still evaluate the
+  // full intersection so a capability declared by the connector but not
+  // permitted for the caller is denied.
+  const capabilityDecision = assertCapability(requiredCapability, {
+    connectorCapabilities: declaredCapabilities,
+    userPermissions: ALL_CONNECTOR_CAPABILITIES_FOR_ORG_ADMIN,
+  });
+
+  if (!capabilityDecision.allowed) {
+    return json(
+      {
+        statusCode: 403,
+        message: `Capability ${requiredCapability} is not permitted for this connector`,
+        deniedBy: capabilityDecision.deniedBy,
+        reason: capabilityDecision.reason,
+      },
+      403,
+    );
+  }
+
   const fetchInit: RequestInit = {
     method,
     headers: allHeaders,

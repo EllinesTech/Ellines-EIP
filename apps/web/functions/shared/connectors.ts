@@ -92,6 +92,13 @@ export type InstallConfig = {
   sftpRemotePath?: string;
   /** 0 = manual only; otherwise minutes between automatic syncs. */
   syncIntervalMinutes?: number;
+  /**
+   * Capabilities this connector is permitted to exercise. Used as one of the
+   * four gates of effective authorization (capability ∩ user permission ∩
+   * business policy ∩ package entitlement). When absent, the connector is
+   * treated as READ/SYNC only — never as write-capable.
+   */
+  capabilities?: string[];
   /** ISO timestamp when the next automatic sync is due. */
   nextSyncAt?: string;
 };
