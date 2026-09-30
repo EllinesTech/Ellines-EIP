@@ -766,7 +766,12 @@ export const CLIENT_NAV_ITEMS: ClientNavItem[] = [
   {
     id: 'client-command-center',
     label: 'Command Center',
-    href: '/app/dashboards',
+    // The Command Center is the role-adaptive operational view rendered by
+    // `src/app/app/page.tsx` (CommandCenterPage): live KPIs, alerts, approvals,
+    // connector health and Ellinea — spec Requirement 2. `/app/dashboards` is
+    // the Dashboard Engine *management* screen (spec Requirement 3) and must not
+    // be the Command Center entry point.
+    href: '/app',
     icon: 'dashboard',
     group: 'client-home',
     available: true,

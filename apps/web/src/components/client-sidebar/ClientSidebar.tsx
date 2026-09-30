@@ -221,9 +221,16 @@ export function ClientSidebar({
                     const item = itemById.get(itemId);
                     if (!item) return null;
 
+                    // Mirror the canonical `isNavItemActive` rule. `/app` is the
+                    // Command Center root: with `trailingSlash: true` the live
+                    // pathname is `/app/`, so an exact `pathname === href` match
+                    // would never fire. The prefix clause is deliberately
+                    // excluded for `/app` so `/app/dashboards/` does not also
+                    // highlight the Command Center.
                     const isActive =
-                      pathname === item.href ||
-                      (item.href !== '/app' && pathname.startsWith(`${item.href}/`));
+                      item.href === '/app'
+                        ? pathname === '/app' || pathname === '/app/'
+                        : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                     if (!item.available) {
                       return (
