@@ -500,13 +500,25 @@ export async function checkPermission(
   resourceId?: string,
 ): Promise<boolean> {
   const supabase = getAdminClient(env);
-  const { data: membership } = await supabase.from('organization_memberships')
+  const { data: membership } = await supabase
+    .from('organization_memberships')
     .select('role, custom_role_id, is_active')
     .eq('user_id', userId).eq('organization_id', organizationId).maybeSingle();
+
+  // Membership is the single source of truth (G-15). A user with no membership
+  // row has no granted role, and must not be granted permissions via the role
+  // carried in their token — otherwise removing someone from an organization
+  // (which is expressed by deleting/deactivating their membership) would not
+  // revoke access, and a custom role could be bypassed with a plain role.
   if (!membership || !membership.is_active) return false;
+
   if (membership.custom_role_id) {
-    const { data: customRole } = await supabase.from('custom_roles')
-      .select('permissions').eq('id', membership.custom_role_id).eq('is_active', true).maybeSingle();
+    const { data: customRole } = await supabase
+      .from('custom_roles')
+      .select('permissions')
+      .eq('id', membership.custom_role_id)
+      .eq('is_active', true)
+      .maybeSingle();
     if (customRole?.permissions) {
       const perms = customRole.permissions as PermissionEntry[];
       return perms.some((e) => evalEntry(e, permission, resourceId));

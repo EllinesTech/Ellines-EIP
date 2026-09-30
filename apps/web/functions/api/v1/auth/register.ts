@@ -123,6 +123,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ statusCode: 500, message: userErr.message }, 500);
     }
 
+    // The registering user IS a member of the org they just created. Without
+    // this row, every permission check that consults organization_memberships
+    // fails and the owner is locked out of their own connectors/users/settings.
+    const { error: memberErr } = await supabase.from('organization_memberships').insert({
+      id: crypto.randomUUID(),
+      organization_id: orgId,
+      user_id: userId,
+      role: 'owner',
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    });
+    if (memberErr) {
+      // Roll back the partially-created tenant rather than leave an owner who
+      // cannot access their own organization.
+      await supabase.from('users').delete().eq('id', userId);
+      await supabase.from('organizations').delete().eq('id', orgId);
+      return json({ statusCode: 500, message: memberErr.message }, 500);
+    }
+
     await supabase.from('audit_logs').insert(
       auditRow({
         organizationId: orgId,
