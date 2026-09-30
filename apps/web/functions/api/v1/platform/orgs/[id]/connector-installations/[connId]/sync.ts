@@ -277,16 +277,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .select('*')
       .single();
 
+    // connected_systems must reflect the org's REAL active connector count.
+    // A payload's own connectedSystems (or a floor of 1) is not authoritative —
+    // `Math.max(payload.connectedSystems, 1)` fabricates a value, and per REQ-1 a
+    // generic record count must never be read as a systems count.
+    const { count: activeConnectorCount } = await supabase
+      .from('connector_installations')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .in('status', ['active', 'synced']);
+
     const summary = await upsertSnapshot(
       context.env,
       orgId,
       auth.sub,
       connId,
       displayName,
-      // Ensure connectedSystems ≥ 1: this installation itself IS a connected system.
-      // APIs like Haven return count=15 (books) which maps to recordCount, leaving
-      // connectedSystems=0. A successful sync always means at least 1 system connected.
-      { ...payload, connectedSystems: Math.max(payload.connectedSystems, 1) },
+      { ...payload, connectedSystems: activeConnectorCount ?? 0 },
     );
 
     await supabase.from('audit_logs').insert(

@@ -338,6 +338,11 @@ export interface EnterpriseSummary {
   connectorName: string;
   healthScore: number;
   connectedSystems: number;
+  /**
+   * Count of RECORDS retrieved across all connected systems. Semantically
+   * distinct from `connectedSystems` (which counts systems, not records).
+   */
+  recordCount?: number;
   openAlerts: number;
   openDecisions: number;
   briefHighlight: string;

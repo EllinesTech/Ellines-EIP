@@ -470,6 +470,7 @@ export class EnterpriseService {
     let weightedHealth = 0;
     let totalWeight = 0;
     let connectedSystems = 0;
+    let recordCount = 0;
     let openAlerts = 0;
     let openDecisions = 0;
     let bestHighlight = '';
@@ -482,6 +483,7 @@ export class EnterpriseService {
       const p = inst.lastPayload as {
         healthScore?: number;
         connectedSystems?: number;
+        recordCount?: number;
         openAlerts?: number;
         openDecisions?: number;
         briefHighlight?: string;
@@ -492,6 +494,9 @@ export class EnterpriseService {
       weightedHealth += (p.healthScore || 0) * weight;
       totalWeight += weight;
       connectedSystems += p.connectedSystems || 0;
+      // Record counts are aggregated across every connected system (REQ-1:
+      // distinct from connectedSystems, which counts systems not records).
+      recordCount += p.recordCount || 0;
       openAlerts += p.openAlerts || 0;
       openDecisions += p.openDecisions || 0;
       names.push(inst.displayName);
@@ -519,6 +524,7 @@ export class EnterpriseService {
         connectorName,
         healthScore,
         connectedSystems,
+        recordCount,
         openAlerts,
         openDecisions,
         briefHighlight: bestHighlight,
@@ -1064,6 +1070,8 @@ export class EnterpriseService {
       connectorName: string;
       healthScore: number;
       connectedSystems: number;
+      /** Optional on the shared summary type; coerced to 0 when absent. */
+      recordCount?: number;
       openAlerts: number;
       openDecisions: number;
       briefHighlight: string;
@@ -1077,6 +1085,7 @@ export class EnterpriseService {
     const packedTimeline = toTimelineStorage({
       healthScore: s.healthScore,
       connectedSystems: s.connectedSystems,
+      recordCount: s.recordCount ?? 0,
       openAlerts: s.openAlerts,
       openDecisions: s.openDecisions,
       briefHighlight: s.briefHighlight,
@@ -1091,6 +1100,7 @@ export class EnterpriseService {
         connectorName: s.connectorName,
         healthScore: s.healthScore,
         connectedSystems: s.connectedSystems,
+        recordCount: s.recordCount ?? 0,
         openAlerts: s.openAlerts,
         openDecisions: s.openDecisions,
         briefHighlight: s.briefHighlight,
@@ -1102,6 +1112,7 @@ export class EnterpriseService {
         connectorName: s.connectorName,
         healthScore: s.healthScore,
         connectedSystems: s.connectedSystems,
+        recordCount: s.recordCount ?? 0,
         openAlerts: s.openAlerts,
         openDecisions: s.openDecisions,
         briefHighlight: s.briefHighlight,

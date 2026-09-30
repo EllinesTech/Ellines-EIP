@@ -1,5 +1,37 @@
 # Universal Connector Engine — Tasks
 
+## Verification record (2026-09-30, branch `eip/complete-dashboard-connector-platform`)
+
+Every task below was re-verified against the code, not assumed from file presence.
+
+| Task | Status | Evidence |
+|---|---|---|
+| TASK-1 `recordCount` / `connectedSystems` | done | `recordCount` present in **both** data planes: `apps/web/functions/shared/connectors.ts` and `packages/connectors-sdk/src/index.ts`. 11 invariant tests in `packages/connectors-sdk/src/__tests__/normalization.spec.ts`. |
+| TASK-2 `record_count` column | done | `services/identity/prisma/schema.prisma:415` `recordCount Int @default(0) @map("record_count")`. |
+| TASK-3 active connector count in sync | done | `apps/web/functions/api/v1/connectors/installations/[id]/sync.ts` derives `connected_systems` from the `connector_installations` active-install count, not from payload fields. |
+| TASK-4 `systemLabel` / `businessId` / `branchId` | done | Declared in `InstallConfig` (both planes) and exposed in the connector wizard Step 1. |
+| TASK-5 configurable date window | done | `dateWindowEnabled`, `dateParamFrom`, `dateParamTo` implemented and covered by `haven-connector.spec.ts`. |
+| TASK-6 `validateFieldMap()` | done | Implemented; semantic validation covered by `haven-connector.spec.ts`. |
+| TASK-7 webhook `connected_systems` | done | `apps/web/functions/api/v1/webhooks/inbound.ts:275-280` uses the org's real active-installation count; the `Math.max(..., 1)` inflation was removed. |
+| TASK-8 Haven test suites | done | `apps/web/functions/__tests__/haven-connector.spec.ts` plus new capability/SDK suites. |
+| TASK-9 build verification | done | See "Full verification" below. |
+| TASK-10 commit to working branch | done | Committed on `eip/complete-dashboard-connector-platform`; **not** merged or pushed to `main`. |
+
+### Additional work completed beyond the original task list
+
+- **Capability authorization** (`packages/shared/src/capabilities.ts`) — 25 invariant tests.
+- **Capability enforcement on the proxy** (`apps/web/functions/api/v1/connectors/proxy.ts`) — 8 end-to-end tests.
+- **NestJS credential encryption at rest** (`services/identity/src/enterprise/enterprise.service.ts`).
+- **Real-world connector proof** — `npm run verify:haven-connector`, 51/51 passing.
+
+### Known remaining gap (not claimed complete)
+
+- **Browser / website automation connector** is not implemented. The spec's authorized-browser
+  path (authenticated session retrieval for systems that expose no API) remains outstanding.
+  No bypass of CAPTCHA/MFA/access controls is implemented or planned.
+
+---
+
 ## Task Execution Order
 
 Tasks must be completed in order. Each task has a clear acceptance test. Do not mark a task done without build + runtime evidence.
@@ -19,7 +51,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** `normalizeEnterprisePayload({ count: 15, business: 'Ellines Haven' })` → `{ recordCount: 15, connectedSystems: 0, briefHighlight includes '15 records' }`.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -34,7 +66,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** Schema diff shows `record_count` column; `upsertSnapshot` writes `record_count`.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -49,7 +81,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** After sync, `enterprise_snapshots.connected_systems` equals the number of active installations for the org, not the `recordCount` of the API response.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -65,7 +97,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** Wizard Step 1 shows "System Label" input; installed connector config JSON contains `systemLabel`; snapshot `connector_name` uses `systemLabel` when set.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -86,7 +118,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 - `appendDateWindowToUrl(url, { dateWindow: 'today', dateWindowEnabled: true, dateParamFrom: 'startDate', dateParamTo: 'endDate' })` → `?startDate=...&endDate=...`.
 - `appendDateWindowToUrl(url, { dateWindow: 'today', dateWindowEnabled: true })` → `?window=today&from=...&to=...`.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -105,7 +137,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 - `validateFieldMap({ systemName: 'briefHighlight' })` → `[]`.
 - After sync with a risky fieldMap, `connector_installations.last_message` contains the warning text.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -120,7 +152,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** Webhook handler snapshot row: `connected_systems = active_installer_count`, `record_count = payload.recordCount`.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -137,7 +169,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** All test suites pass. `npm run test -w @ellines-eip/web` green.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -153,7 +185,7 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** All builds pass, all tests pass, no TypeScript errors.
 
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -167,4 +199,4 @@ Tasks must be completed in order. Each task has a clear acceptance test. Do not 
 
 **Acceptance:** Push succeeds, SHA reported.
 
-**Status:** todo
+**Status:** done
