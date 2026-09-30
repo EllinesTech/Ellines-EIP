@@ -265,8 +265,8 @@
 **Live Site:** [eip.ellines.co.ke](https://eip.ellines.co.ke)
 
 **Demo Login:**
-- Email: `demo@ellines.co.ke`
-- Password: `EllinesDemo2026!`
+- Email: `<set DEMO_EMAIL>`
+- Password: `<set DEMO_PASSWORD>`
 
 **What to Try:**
 1. Log in as Owner; see Org Admin, create connector, run auto-scan

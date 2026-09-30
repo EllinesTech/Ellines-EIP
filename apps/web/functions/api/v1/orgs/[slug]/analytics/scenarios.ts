@@ -1,10 +1,10 @@
-/**
+ï»¿/**
  * Pages Function: GET /api/v1/orgs/:slug/analytics/scenarios
  *
  * Query params:
- *   metric        — metric name (required)
- *   currentValue  — current observed value (required, numeric)
- *   trend         — 'up' | 'down' | 'stable' (optional, default 'stable')
+ *   metric        â€” metric name (required)
+ *   currentValue  â€” current observed value (required, numeric)
+ *   trend         â€” 'up' | 'down' | 'stable' (optional, default 'stable')
  *
  * Gate: owner or admin role only.
  * Forwards to the identity service GET /api/v1/ellinea/analytics/scenarios.

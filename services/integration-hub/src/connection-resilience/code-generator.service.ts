@@ -142,33 +142,93 @@ ${methodConfigs}
     }
   }
 
-  private connectViaApi(config: any): Promise<any> {
-    return axios.get(\`\${config.endpoint}/health\`, { timeout: 5000 });
+  /**
+   * Connection result statuses.
+   *
+   * CONNECTED is only ever returned after a real network operation succeeded.
+   * There is deliberately no code path returning `connected: true` without
+   * having actually talked to the target system.
+   */
+  private unconfigured(type: string, reason: string) {
+    return { connected: false, type, status: 'AUTHENTICATION_REQUIRED', message: reason };
   }
 
-  private connectViaDatabase(config: any): Promise<any> {
-    // Database connection logic
-    return Promise.resolve({ connected: true, type: 'database' });
+  private connectViaApi(config: any): Promise<any> {
+    if (!config?.endpoint) {
+      return Promise.resolve(
+        this.unconfigured('api', 'No API endpoint is configured. Set the endpoint before testing the connection.'),
+      );
+    }
+    return axios
+      .get(`${config.endpoint}/health`, { timeout: 5000 })
+      .then((res: any) => ({ connected: true, type: 'api', status: 'CONNECTED', httpStatus: res.status }));
+  }
+
+  private async connectViaDatabase(config: any): Promise<any> {
+    // A real database probe requires an actual driver and credentials. Without a
+    // verified connection we report AUTHENTICATION_REQUIRED, never "connected".
+    if (!config?.connectionString) {
+      return this.unconfigured('database', 'No connection string is configured for this database.');
+    }
+    try {
+      const pg: any = await import('pg');
+      const client = new pg.Client({ connectionString: config.connectionString, connectionTimeoutMillis: 5000 });
+      await client.connect();
+      await client.query('SELECT 1');
+      await client.end();
+      return { connected: true, type: 'database', status: 'CONNECTED' };
+    } catch (err) {
+      return {
+        connected: false,
+        type: 'database',
+        status: 'CONNECTION_FAILED',
+        message: err instanceof Error ? err.message : 'Database connection failed',
+      };
+    }
   }
 
   private connectViaMessageQueue(config: any): Promise<any> {
-    // Message queue connection logic
-    return Promise.resolve({ connected: true, type: 'message_queue' });
+    // No queue client is wired for this connector type. Report honestly rather
+    // than asserting a connection that was never attempted.
+    return Promise.resolve(
+      this.unconfigured(
+        'message_queue',
+        'No message queue client is configured. Provide broker URL and credentials to verify the connection.',
+      ),
+    );
   }
 
   private connectViaFileSync(config: any): Promise<any> {
-    // File sync connection logic
-    return Promise.resolve({ connected: true, type: 'file_sync' });
+    if (!config?.path && !config?.remotePath) {
+      return this.unconfigured('file_sync', 'No file path or remote path is configured.');
+    }
+    return Promise.resolve(
+      this.unconfigured(
+        'file_sync',
+        'File sync verification is not implemented; the path is stored but no transfer has been performed.',
+      ),
+    );
   }
 
   private connectViaScreenScrape(config: any): Promise<any> {
-    // Screen scraping logic
-    return Promise.resolve({ connected: true, type: 'screen_scrape' });
+    if (!config?.url) {
+      return this.unconfigured('screen_scrape', 'No target URL is configured for browser automation.');
+    }
+    return Promise.resolve(
+      this.unconfigured(
+        'screen_scrape',
+        'Browser automation verification is not implemented; no session has been established.',
+      ),
+    );
   }
 
   private connectViaWebhook(config: any): Promise<any> {
-    // Webhook registration logic
-    return Promise.resolve({ connected: true, type: 'webhook' });
+    if (!config?.endpoint) {
+      return this.unconfigured('webhook', 'No webhook registration URL is configured.');
+    }
+    return Promise.resolve(
+      this.unconfigured('webhook', 'Webhooks are receiver-side in EIP; no outbound registration was performed.'),
+    );
   }
 
   /**

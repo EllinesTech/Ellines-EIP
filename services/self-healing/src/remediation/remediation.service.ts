@@ -531,14 +531,15 @@ export class RemediationService implements OnModuleDestroy {
     components: string[],
     phase: 'before' | 'after',
   ): Promise<SystemSnapshot> {
-    // Production: collect actual CPU/memory/connections/error-rate from Prometheus / InfluxDB
+    // No metrics backend (Prometheus / InfluxDB) is wired, so no real CPU,
+    // memory, connection or error-rate values exist to report. Inventing them
+    // would make a remediation look evidence-backed when it is not. Each
+    // component is recorded as explicitly unavailable.
     const metrics: Record<string, any> = {};
     for (const comp of components) {
       metrics[comp] = {
-        cpuPercent: Math.round(Math.random() * 100),
-        memoryPercent: Math.round(Math.random() * 100),
-        openConnections: Math.floor(Math.random() * 500),
-        errorRatePer5m: Math.round(Math.random() * 50),
+        available: false,
+        reason: 'No metrics backend is configured; these values were not measured.',
       };
     }
     this.logger.debug(`System snapshot (${phase}) captured for components: ${components.join(', ')}`);
@@ -551,10 +552,20 @@ export class RemediationService implements OnModuleDestroy {
    * Probe whether the incident is still active.
    * In production: query InfluxDB / log pipeline / health endpoints.
    */
+  /**
+   * Probe whether the incident is still active.
+   *
+   * There is no incident store or health endpoint wired here, so the incident
+   * cannot be probed. Returning a random "still active" answer would drive
+   * remediation decisions on invented evidence, so we report the incident as
+   * still active and flag that the probe was unavailable — the safe direction,
+   * since it prevents premature closure of a real problem.
+   */
   private async probeIncident(_incident: Incident): Promise<boolean> {
-    // Simulate 70% success probability for unit-testability
-    await this.sleep(200);
-    return Math.random() > 0.3;
+    this.logger.warn(
+      'No incident/health probe is configured; reporting the incident as still active rather than guessing.',
+    );
+    return true;
   }
 
   private mapPlaybookToStrategy(playbook: any): RemediationStrategy {

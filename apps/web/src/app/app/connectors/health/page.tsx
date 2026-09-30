@@ -108,14 +108,26 @@ export default function ConnectorHealthPage() {
                   </div>
                 </div>
                 {c.message && (
-                  <div style={{ marginTop: '12px', fontSize: '0.75rem', color: c.status === 'error' ? '#EF4444' : 'rgba(241,245,249,0.60)', borderTop: '1px solid rgba(111,45,141,0.20)', paddingTop: '8px' }}>
-                    {c.message}
+                  <div style={{ marginTop: '12px', fontSize: '0.75rem', color: c.status === 'AUTHENTICATION_FAILED' || c.status === 'UNAVAILABLE' ? '#EF4444' : 'rgba(241,245,249,0.60)', borderTop: '1px solid rgba(111,45,141,0.20)', paddingTop: '8px' }}>
+                    {c.evidence || c.message}
                   </div>
                 )}
-                {(c.recordCount > 0 || c.healthScore > 0) && (
+                {(c.retrievedRecordCount > 0 || c.healthScore !== null) && (
                   <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)' }}>
-                    {c.recordCount > 0 && <span>Records synced: {c.recordCount.toLocaleString()}</span>}
-                    {c.healthScore > 0 && <span>Health score: {c.healthScore}%</span>}
+                    {c.retrievedRecordCount > 0 && (
+                      <span>
+                        Records retrieved: {c.retrievedRecordCount.toLocaleString()}
+                        {c.reportedRecordCount > c.retrievedRecordCount
+                          ? ` of ${c.reportedRecordCount.toLocaleString()} reported`
+                          : ''}
+                      </span>
+                    )}
+                    {c.healthScore !== null && <span>Health score: {c.healthScore}%</span>}
+                  </div>
+                )}
+                {!c.retrievalComplete && c.retrievedRecordCount > 0 && (
+                  <div style={{ marginTop: '6px', fontSize: '0.72rem', color: '#F59E0B' }}>
+                    Partial read — not all authorized data was retrieved. This is not a complete sync.
                   </div>
                 )}
               </div>

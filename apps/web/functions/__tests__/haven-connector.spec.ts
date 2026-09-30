@@ -62,11 +62,26 @@ describe('normalizeEnterprisePayload — Haven Cloud Function JSON shape', () =>
     expect(payload.recordCount).toBe(0);
   });
 
-  it('returns healthScore derived from record data when no explicit health field', () => {
+  it('returns healthScore null (unknown) when the source publishes no health metric', () => {
     const payload = normalizeEnterprisePayload({ count: 5, business: 'Acme' });
 
-    // System responded with data → derived health should be ≥ 10 (never 0 for live system)
-    expect(payload.healthScore).toBeGreaterThanOrEqual(10);
+    // EIP cannot know how a customer's system scores its own health. Returning a
+    // derived baseline (e.g. 75) or a floor (e.g. 10) would make an unmeasured
+    // system look healthy, so the honest answer is null = unknown.
+    expect(payload.healthScore).toBeNull();
+    expect(payload.recordCount).toBe(5);
+  });
+
+  it('never derives connectedSystems from a record count', () => {
+    // 15 books is 15 records, NOT 15 connected systems.
+    const payload = normalizeEnterprisePayload({ count: 15, total: 15 });
+    expect(payload.connectedSystems).toBe(0);
+    expect(payload.recordCount).toBe(15);
+  });
+
+  it('reports zero connected systems when none were configured', () => {
+    const payload = normalizeEnterprisePayload({ records: [{ id: 1 }] });
+    expect(payload.connectedSystems).toBe(0);
   });
 });
 

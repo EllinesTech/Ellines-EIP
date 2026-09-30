@@ -25,7 +25,7 @@ import {
 import { DEFAULT_UI_PREFS, readUiPrefs, type UiPrefs } from '@/lib/ui-prefs';
 import styles from '../command.module.css';
 
-type TrendDir = 'up' | 'down' | 'same';
+type TrendDir = 'up' | 'down' | 'same' | 'unknown';
 
 function trendArrow(dir: TrendDir, isPositive: boolean) {
   if (dir === 'same') return <span style={{ color: '#64748b', fontSize: '0.75rem' }}>→</span>;
@@ -39,7 +39,14 @@ function trendArrow(dir: TrendDir, isPositive: boolean) {
 }
 
 const PREV_KEY = 'eip_glance_prev';
-type PrevSnapshot = { healthScore: number; openAlerts: number; openDecisions: number; connectedSystems: number; at: string };
+type PrevSnapshot = {
+  /** null = health was not reported, so it cannot be trended. */
+  healthScore: number | null;
+  openAlerts: number;
+  openDecisions: number;
+  connectedSystems: number;
+  at: string;
+};
 
 function readPrev(): PrevSnapshot | null {
   try { return JSON.parse(localStorage.getItem(PREV_KEY) || 'null'); } catch { return null; }
@@ -48,8 +55,15 @@ function savePrev(snap: PrevSnapshot) {
   localStorage.setItem(PREV_KEY, JSON.stringify(snap));
 }
 
-function calcTrend(current: number, prev: number | undefined): TrendDir {
-  if (prev === undefined || prev === current) return 'same';
+/**
+ * Trend between two values. `null`/undefined on either side means the value is
+ * unknown, which is reported as 'unknown' — never coerced to 0, which would
+ * fabricate a movement from nothing.
+ */
+function calcTrend(current: number | null | undefined, prev: number | null | undefined): TrendDir {
+  if (current === null || current === undefined) return 'unknown';
+  if (prev === null || prev === undefined) return 'unknown';
+  if (prev === current) return 'same';
   return current > prev ? 'up' : 'down';
 }
 
@@ -104,7 +118,7 @@ export default function GlanceCompanionPage() {
         setPreview(
           buildReportPreview({
             orgName: s.organization.name,
-            healthScore: synced ? snap.healthScore : 0,
+            healthScore: synced ? snap.healthScore : null,
             openAlerts: snap.openAlerts || 0,
             openDecisions: snap.openDecisions || 0,
             connectedSystems: snap.connectedSystems || 0,
@@ -175,7 +189,7 @@ export default function GlanceCompanionPage() {
       label: 'Health',
       value: synced ? summary!.healthScore : null,
       unit: '/100',
-      trend: calcTrend(summary?.healthScore ?? 0, prev?.healthScore),
+      trend: calcTrend(summary?.healthScore, prev?.healthScore),
       positive: true, // higher is better
       href: '/app',
     },

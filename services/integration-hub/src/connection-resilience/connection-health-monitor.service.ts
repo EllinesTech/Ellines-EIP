@@ -195,27 +195,20 @@ export class ConnectionHealthMonitorService {
   }
 
   /**
-   * Simulate connection check
+   * Connection check.
+   *
+   * A random latency and a coin-flip 5% failure rate mean this reported
+   * fabricated health: a genuinely broken connection would be marked healthy
+   * 95% of the time, and a healthy one would be failed at random. Health
+   * monitoring must not invent availability, so this fails closed and says
+   * that no real probe is available.
    */
-  private simulateConnectionCheck(connection: ResilientConnection): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Connection check timeout'));
-      }, 5000);
-
-      // Simulate network latency
-      const latency = Math.random() * 1000;
-      setTimeout(() => {
-        clearTimeout(timeout);
-
-        // Simulate occasional failures (5% chance)
-        if (Math.random() < 0.05) {
-          reject(new Error('Connection check failed'));
-        } else {
-          resolve();
-        }
-      }, latency);
-    });
+  private simulateConnectionCheck(_connection: ResilientConnection): Promise<void> {
+    return Promise.reject(
+      new Error(
+        'Connection health cannot be verified: no real probe is configured for this connection. Reporting unavailable rather than a simulated result.',
+      ),
+    );
   }
 
   /**

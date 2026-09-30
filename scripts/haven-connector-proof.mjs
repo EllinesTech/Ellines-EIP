@@ -1,17 +1,35 @@
 /**
- * EIP connector — real end-to-end proof against the Haven sample business system.
+ * EIP connector engine — integration proof against a CONTROLLED LOCAL test system.
  *
- * This is a REPRODUCIBLE integration proof, not a mock. It starts the controlled
- * authorized business API (scripts/haven-test-api.mjs) on a local port and drives
- * the REAL EIP connector engine over actual HTTP:
+ * IMPORTANT SCOPE — read this before quoting a "pass" from this script:
  *
+ *   This is NOT a real external-business integration test.
+ *   It starts scripts/haven-test-api.mjs, which lives in THIS repository, on a
+ *   loopback port, and drives the real EIP connector engine against it.
+ *
+ * What it genuinely proves:
+ *   the connector engine performs real network I/O, real HTTP auth, real
+ *   pagination, real response parsing and real normalization — and that the
+ *   engine reports partial/failed retrievals honestly.
+ *
+ * What it does NOT prove:
+ *   anything about a real customer's system. No external credentials exist in
+ *   this environment, so no external integration has been tested.
+ *
+ * The first genuine external test requires, from the business:
+ *   • API base URL            • auth method (API key / OAuth2 client+secret)
+ *   • credentials or client id/secret      • scopes
+ *   • account / tenant ID     • API version
+ *   • expected response shape and pagination style
+ *
+ * Stages exercised:
  *   Connect → Authenticate → Test → Discover (OpenAPI) → Retrieve → Normalize
  *   → Dashboard consumption → Freshness → Health → Failure handling → Audit
  *
  * Run:
  *   node scripts/haven-connector-proof.mjs
  *
- * Exit code 0 = proof passed. Any failed stage exits non-zero and prints why.
+ * Exit code 0 = the engine passed against the controlled test system.
  */
 
 import { spawn } from 'node:child_process';
@@ -86,9 +104,19 @@ async function main() {
   try {
     const up = await waitForServer(`${BASE}/health`);
     if (!up) {
-      process.stdout.write('FATAL: Haven sample API did not start\n');
+      process.stdout.write('FATAL: local controlled test API did not start\n');
       process.exit(1);
     }
+
+    // Print the scope up-front so a passing run can never be mistaken for a
+    // real external-business integration test.
+    process.stdout.write(
+      'SCOPE: connector engine vs. a CONTROLLED LOCAL test system started by this\n' +
+        '       script. This is NOT a real external business integration — no\n' +
+        '       external credentials exist in this environment.\n' +
+        '       What it proves: real network I/O, auth, pagination, parsing and\n' +
+        '       honest partial/failure reporting by the connector engine.\n\n',
+    );
 
     // ══ 1. CONNECT + AUTHENTICATE ══════════════════════════════════════════
     section('1. Connect & Authenticate');

@@ -52,7 +52,7 @@ export interface AuthSession {
   user: AuthUser;
   organization: AuthOrganization;
   isPlatformAdmin?: boolean;
-  /** v1.1 â€” all orgs this user belongs to; populated after listMyOrgs() */
+  /** v1.1 — all orgs this user belongs to; populated after listMyOrgs() */
   orgs?: OrgMembership[];
 }
 
@@ -572,7 +572,7 @@ export function updatePlatformOrgStatus(orgId: string, status: 'active' | 'suspe
 }
 
 /**
- * Super Admin only â€” permanently delete an organization and all its data.
+ * Super Admin only — permanently delete an organization and all its data.
  * Requires a non-empty reason which is written to the audit log before deletion.
  */
 export function deletePlatformOrg(orgId: string, reason: string) {
@@ -646,7 +646,7 @@ export function createPlatformPackage(payload: {
   });
 }
 
-/** PATCH /platform/packages/:id payload â€” camelCase keys mapped server-side to snake_case columns. */
+/** PATCH /platform/packages/:id payload — camelCase keys mapped server-side to snake_case columns. */
 export interface PlatformPackageUpdatePayload {
   displayName?: string;
   requestsPerDay?: number;
@@ -743,11 +743,20 @@ export interface EnterpriseSummaryDto {
   organizationId: string;
   connectorId: string;
   connectorName: string;
-  healthScore: number;
+  /** null = no connected system published a health metric (unknown, not zero). */
+  healthScore: number | null;
   connectedSystems: number;
   openAlerts: number;
   openDecisions: number;
   briefHighlight: string;
+  /** Records EIP actually retrieved across all connectors. */
+  retrievedRecordCount: number;
+  /** Total the source systems reported; may exceed what EIP retrieved. */
+  reportedRecordCount: number;
+  /** False when any connector's retrieval was incomplete or failed. */
+  retrievalComplete: boolean;
+  syncStatus: 'synced' | 'partial' | 'error' | 'idle';
+  syncError: string | null;
   timeline: { title: string; detail: string }[];
   model?: {
     version: '1.0';
@@ -849,15 +858,43 @@ export interface ConnectorInstallationDto {
   updatedAt: string;
 }
 
-/** Per-connector live health item returned by GET /api/v1/connectors/health */
+/**
+ * Evidence-based connector status. A stored DB flag is not proof of reachability —
+ * see `functions/api/v1/connectors/health.ts` for the full model.
+ */
+export type ConnectorStatus =
+  | 'CONFIGURED'
+  | 'AUTHENTICATED'
+  | 'CONNECTED'
+  | 'HEALTHY'
+  | 'DEGRADED'
+  | 'STALE'
+  | 'AUTHENTICATION_FAILED'
+  | 'UNAVAILABLE'
+  | 'SYNCING'
+  | 'PARTIAL';
+
+/** Per-connector health item returned by GET /api/v1/connectors/health */
 export interface ConnectorHealthItemDto {
   id: string;
   displayName: string;
   catalogId: string;
-  status: 'synced' | 'error' | 'active' | 'draft' | 'idle';
+  status: ConnectorStatus;
+  /** Human-readable justification for the reported status. */
+  evidence: string;
   lastSyncedAt: string | null;
-  recordCount: number;
-  healthScore: number;
+  /** When this connector was last verified healthy (a past observation). */
+  lastVerifiedHealthyAt: string | null;
+  /** False — this endpoint does not perform a live probe. */
+  currentlyVerified: boolean;
+  /** Records EIP actually retrieved and retained. */
+  retrievedRecordCount: number;
+  /** Total the source system reported; 0 when it published no total. */
+  reportedRecordCount: number;
+  /** False when the last retrieval was truncated or failed partway. */
+  retrievalComplete: boolean;
+  /** null when the source published no health metric (unknown, not zero). */
+  healthScore: number | null;
   openAlerts: number;
   openDecisions: number;
   message: string | null;
@@ -865,7 +902,7 @@ export interface ConnectorHealthItemDto {
 
 export interface ConnectorHealthDto {
   checkedAt: string;
-  overallStatus: 'ok' | 'degraded' | 'error' | 'idle';
+  overallStatus: 'ok' | 'degraded' | 'error' | 'partial' | 'idle';
   connectors: ConnectorHealthItemDto[];
 }
 
@@ -897,7 +934,7 @@ export interface OpenApiParseResult {
 }
 
 // enterprise/summary and enterprise/ingest are Cloudflare Pages Functions that
-// read/write enterprise_snapshots on Supabase â€” must use pagesRequest.
+// read/write enterprise_snapshots on Supabase — must use pagesRequest.
 export function fetchEnterpriseSummary() {
   return pagesRequest<EnterpriseSummaryDto>('/api/v1/enterprise/summary');
 }
@@ -933,7 +970,7 @@ export function rotateWebhookSecret() {
   });
 }
 
-// â”€â”€â”€ Webhook Delivery (B.3.4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Webhook Delivery (B.3.4) ─────────────────────────────────────────────
 
 export type WebhookDeliveryStatus = 'success' | 'failure' | 'pending' | 'permanently_failed';
 
@@ -1018,7 +1055,7 @@ export function retryWebhookDelivery(deliveryId: string) {
   });
 }
 
-// â”€â”€â”€ Database Configuration (Multi-database Support) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Database Configuration (Multi-database Support) ──────────────────────
 
 export type DatabaseConfigurationDto = {
   id: string;
@@ -1137,7 +1174,7 @@ export function syncConnector(
   });
 }
 
-// â”€â”€ Connector installations â€” all routed via pagesRequest so they hit the
+// ── Connector installations — all routed via pagesRequest so they hit the
 // Cloudflare Pages Function (Supabase-backed) both in dev and production.
 // Using request() would proxy to NestJS (localhost:3001 in dev) which reads
 // from the local PostgreSQL DB and would miss Super Admin-installed connectors
@@ -1303,7 +1340,7 @@ export function deletePlatformConnectorPack(id: string, reason: string) {
   });
 }
 
-// â”€â”€â”€ Platform â€” God-mode extensions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform — God-mode extensions ─────────────────────────────────────────
 
 export interface PlatformUserDto {
   id: string;
@@ -1395,7 +1432,7 @@ export function listPlatformAuditLogs(params?: {
   return pagesRequest<PlatformAuditPage>(`/api/v1/platform/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
-// â”€â”€â”€ Phase 5 â€” Workflow & Automation API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Phase 5 — Workflow & Automation API ─────────────────────────────────────
 
 export type ApprovalStepDto = {
   key: string;
@@ -1447,7 +1484,7 @@ export function decideApprovalApi(
   });
 }
 
-// â”€â”€â”€ Email Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Email Intelligence ────────────────────────────────────────────────────────
 
 export type EmailSyncResultDto = {
   emails: {
@@ -1478,7 +1515,7 @@ export function pullEmailSync() {
   });
 }
 
-// â”€â”€â”€ Report Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Report Intelligence ──────────────────────────────────────────────────────
 
 export type ReportInterpretResultDto = {
   interpretation: string;
@@ -1598,7 +1635,7 @@ export function deleteReportApi(id: string) {
   });
 }
 
-// â”€â”€â”€ Data Export (B.3.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Data Export (B.3.1) ──────────────────────────────────────────────────────
 
 export type ExportType = 'uem' | 'timeline' | 'approvals' | 'all';
 export type ExportFormat = 'csv' | 'json';
@@ -1631,7 +1668,7 @@ export async function exportOrgData(type: ExportType, format: ExportFormat): Pro
   return res.blob();
 }
 
-// â”€â”€â”€ Compliance Export (D.2.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Compliance Export (D.2.1) ───────────────────────────────────────────────
 
 export type ComplianceTemplate = 'soc2' | 'hipaa' | 'gdpr' | 'pci' | 'all';
 
@@ -1665,7 +1702,7 @@ export async function exportComplianceReport(opts: {
   return res.blob();
 }
 
-// â”€â”€â”€ Data Access Log (D.2.2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Data Access Log (D.2.2) ─────────────────────────────────────────────────
 
 export type DataAccessResourceCategory =
   | 'connector' | 'report' | 'document' | 'export' | 'api_key'
@@ -1736,7 +1773,7 @@ export async function downloadDataAccessLog(opts?: {
   return res.blob();
 }
 
-// â”€â”€â”€ Compliance Report Templates (D.2.3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Compliance Report Templates (D.2.3) ─────────────────────────────────────
 
 export type ComplianceControlStatus = 'pass' | 'partial' | 'missing';
 
@@ -1788,7 +1825,7 @@ export async function downloadComplianceReport(
   return res.blob();
 }
 
-// â”€â”€â”€ Evidence Pack (D.2.4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Evidence Pack (D.2.4) ───────────────────────────────────────────────────
 
 /** Owner/IT: generate and download a full compliance evidence pack as HTML. */
 export async function downloadEvidencePack(opts: {
@@ -1860,7 +1897,7 @@ export function publishEnterpriseEventApi(payload: {
   });
 }
 
-// â”€â”€â”€ v1.1 â€” Multi-company / Multi-org â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── v1.1 — Multi-company / Multi-org ────────────────────────────────────────
 
 /** List all organizations the current user belongs to. */
 export function listMyOrgs() {
@@ -1919,13 +1956,13 @@ export type OrgGroupSummaryEntry = {
 
 /**
  * Owner: combined health summary of the current org's own window plus every
- * linked child org â€” see the whole business group at a glance, not just one at a time.
+ * linked child org — see the whole business group at a glance, not just one at a time.
  */
 export function fetchGroupSummary() {
   return request<OrgGroupSummaryEntry[]>('/api/v1/orgs/me/group-summary');
 }
 
-// â”€â”€â”€ Document Hub API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Document Hub API ─────────────────────────────────────────────────────────
 
 export type DocumentRecordDto = {
   id: string;
@@ -1971,14 +2008,14 @@ export function deleteDocument(id: string) {
   });
 }
 
-// â”€â”€â”€ Notification unread count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Notification unread count ───────────────────────────────────────────────
 
 export type NotifyUnreadDto = {
   unread: number;
   total: number;
 };
 
-/** Lightweight unread count â€” polls outbox for unread in-app items. */
+/** Lightweight unread count — polls outbox for unread in-app items. */
 export function fetchNotifyUnreadCount() {
   return request<NotifyUnreadDto>('/api/v1/notifications/deliver').then((items) => {
     // items is OutboxItem[] from the GET endpoint
@@ -1991,7 +2028,7 @@ export function fetchNotifyUnreadCount() {
   });
 }
 
-// â”€â”€â”€ Reports with email status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reports with email status ────────────────────────────────────────────────
 
 export type ScheduledReportRunDto = {
   id: string;
@@ -2021,7 +2058,7 @@ export function runReportFullApi(id: string) {
   });
 }
 
-// â”€â”€â”€ Platform per-org stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform per-org stats ──────────────────────────────────────────────────
 
 export type PlatformOrgStatsDto = {
   id: string;
@@ -2239,7 +2276,7 @@ export function fetchPlatformOrgStats(orgId: string) {
   return pagesRequest<PlatformOrgStatsDto>(`/api/v1/platform/orgs/${orgId}/stats`);
 }
 
-// â”€â”€â”€ Platform cross-org Work Console reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform cross-org Work Console reads ────────────────────────────────────
 
 export type PlatformOrgConnectorDto = {
   id: string;
@@ -2336,7 +2373,7 @@ export function fetchPlatformOrgSnapshot(orgId: string) {
   return pagesRequest<PlatformOrgSnapshotDto>(`/api/v1/platform/orgs/${orgId}/snapshot`);
 }
 
-// â”€â”€â”€ Platform cross-org connector management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform cross-org connector management ──────────────────────────────────
 
 export function fetchPlatformOrgConnectorInstallations(orgId: string) {
   return pagesRequest<ConnectorInstallationDto[]>(`/api/v1/platform/orgs/${orgId}/connector-installations`);
@@ -2371,7 +2408,7 @@ export function deletePlatformOrgConnector(orgId: string, connId: string) {
 }
 
 /**
- * Super Admin only â€” activate a connector for the given org (draft|suspended â†’ active).
+ * Super Admin only — activate a connector for the given org (draft|suspended → active).
  * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
  */
 export function activatePlatformOrgConnector(orgId: string, connId: string) {
@@ -2382,7 +2419,7 @@ export function activatePlatformOrgConnector(orgId: string, connId: string) {
 }
 
 /**
- * Super Admin only â€” deactivate (suspend) a connector for the given org.
+ * Super Admin only — deactivate (suspend) a connector for the given org.
  * Client org members cannot call this; it is gated on platformAdminFromEnv server-side.
  */
 export function deactivatePlatformOrgConnector(orgId: string, connId: string) {
@@ -2406,7 +2443,7 @@ export function syncPlatformOrgConnector(orgId: string, connId: string) {
   );
 }
 
-// â”€â”€â”€ Platform cross-org document management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform cross-org document management ───────────────────────────────────
 
 export type PlatformDocumentDto = {
   id: string;
@@ -2445,7 +2482,7 @@ export function deletePlatformOrgDocument(orgId: string, docId: string) {
   });
 }
 
-// â”€â”€â”€ Platform cross-org org profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Platform cross-org org profile ──────────────────────────────────────────
 
 export type PlatformOrgProfileDto = {
   id: string;
@@ -2465,7 +2502,7 @@ export function updatePlatformOrgProfile(orgId: string, name: string) {
   });
 }
 
-// â”€â”€â”€ v2.0 Phase A â€” Ellinea Agents (Autonomous AI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── v2.0 Phase A — Ellinea Agents (Autonomous AI) ──────────────────────────
 
 export type EllineaAgentDto = {
   id: string;
@@ -2734,7 +2771,7 @@ export function fetchAgentCohortSignals() {
   }>('/api/v1/orgs/me/agent-cohort-signals');
 }
 
-// â”€â”€â”€ v2.0 Phase A â€” Alert Correlation (A.3.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── v2.0 Phase A — Alert Correlation (A.3.1) ────────────────────────────────
 
 export type AlertCorrelationGroupDto = {
   id: string;
@@ -2775,7 +2812,7 @@ export function fetchAlertRootCause(
 }
 
 
-// â”€â”€â”€ v2.0 Phase A â€” Ellinea Autonomous Agents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── v2.0 Phase A — Ellinea Autonomous Agents ────────────────────────────────
 
 export type AgentDto = {
   id: string;
@@ -2827,7 +2864,7 @@ export type AgentExecutionDto = {
   createdAt: string;
   updatedAt?: string;
   agent?: { name: string };
-  /** Feedback (v2.0 A.2 â€” learning) */
+  /** Feedback (v2.0 A.2 — learning) */
   feedbackScore?: number | null; // -1, 0, or 1
   feedbackComment?: string | null;
   feedbackAt?: string | null;
@@ -2894,7 +2931,7 @@ export function decideExecutionApi(
   );
 }
 
-// â”€â”€â”€ S6.2 â€” Invite magic link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── S6.2 — Invite magic link ─────────────────────────────────────────────────
 
 export type PendingInviteDto = {
   email: string;
@@ -2946,7 +2983,7 @@ export function revokeInvite(email: string) {
   });
 }
 
-// â”€â”€â”€ S6.6 â€” API Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── S6.6 — API Keys ──────────────────────────────────────────────────────────
 
 export type ApiKeyDto = {
   id: string;
@@ -2979,7 +3016,7 @@ export function revokeApiKey(id: string) {
   });
 }
 
-// â”€â”€â”€ Organization Data Window â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Organization Data Window ─────────────────────────────────────────────────
 
 export type OrgDataEmailDto = {
   id: string;
@@ -3016,7 +3053,7 @@ export function fetchOrgDataWindow() {
   return pagesRequest<OrgDataWindowDto>('/api/v1/orgs/me/org-data-window');
 }
 
-// â”€â”€â”€ Sprint 7 â€” Health + Org Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sprint 7 — Health + Org Status ──────────────────────────────────────────
 
 export interface HealthDto {
   status: string;
@@ -3031,7 +3068,7 @@ export interface HealthDto {
   };
 }
 
-/** Unauthenticated â€” safe to call without a token. */
+/** Unauthenticated — safe to call without a token. */
 export function fetchHealth() {
   return fetch(`${API_URL}/api/v1/health`)
     .then((r) => r.json() as Promise<HealthDto>)
@@ -3052,7 +3089,7 @@ export function fetchOrgStatus() {
   return request<OrgStatusDto>('/api/v1/orgs/me/status');
 }
 
-// â”€â”€â”€ Sprint 9 â€” Report upload + Ellinea digest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sprint 9 — Report upload + Ellinea digest ────────────────────────────────
 
 export type ReportUploadResultDto = {
   id: string;
@@ -3097,7 +3134,7 @@ export function sendEllineaDigest(force = false) {
   });
 }
 
-// â”€â”€â”€ Report Comparison (S10.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Report Comparison (S10.1) ───────────────────────────────────────────────
 
 export type ReportCompareResultDto = {
   reportAId: string;
@@ -3162,7 +3199,7 @@ export async function exportPlatformAuditLogs(params?: {
   return res.blob();
 }
 
-// â”€â”€â”€ Integration Requests (TASK-09) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Integration Requests (TASK-09) ──────────────────────────────────────────
 
 export interface IntegrationRequestDto {
   id: string;

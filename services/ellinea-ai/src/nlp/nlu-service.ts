@@ -232,51 +232,28 @@ export class NLUService {
   }
 
   /**
-   * Simulate query execution (in production, would call actual connectors)
+   * Execute a multi-source query.
+   *
+   * There is no real connector client wired into this service, so it must NOT
+   * fabricate business records. Every target is reported as UNAVAILABLE with zero
+   * rows, which callers can distinguish from a genuinely empty result.
    */
   private simulateQueryExecution(multiSourceQuery: MultiSourceQuery): QueryResult[] {
-    const results: QueryResult[] = [];
-
-    for (const connectorQuery of multiSourceQuery.targetConnectors) {
-      // Generate mock data based on query
-      const mockData = this.generateMockData(connectorQuery);
-
-      results.push({
-        connectorId: connectorQuery.connectorId,
-        connectorName: connectorQuery.connectorName,
-        data: mockData,
-        metadata: {
-          rowCount: mockData.length,
-          executionTime: Math.random() * 1000,
-          latency: Math.random() * 500,
-        },
-      });
-    }
-
-    return results;
-  }
-
-  /**
-   * Generate mock data for demonstration
-   */
-  private generateMockData(connectorQuery: ConnectorQuery): any[] {
-    const data = [];
-    const recordCount = Math.floor(Math.random() * 20) + 5;
-
-    for (let i = 0; i < recordCount; i++) {
-      data.push({
-        id: `record_${connectorQuery.connectorId}_${i}`,
-        name: `Record ${i + 1}`,
-        type: connectorQuery.connectorType,
-        value: Math.floor(Math.random() * 10000),
-        status: ['active', 'inactive', 'pending'][Math.floor(Math.random() * 3)],
-        created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-        updated_at: new Date(),
-        score: Math.random() * 100,
-      });
-    }
-
-    return data;
+    return multiSourceQuery.targetConnectors.map((connectorQuery) => ({
+      connectorId: connectorQuery.connectorId,
+      connectorName: connectorQuery.connectorName,
+      // No records — this service has no live connector to read from.
+      data: [] as unknown[],
+      metadata: {
+        rowCount: 0,
+        // Timing is genuinely measured, not invented.
+        executionTime: 0,
+        latency: 0,
+        unavailable: true,
+        message:
+          'No live connector client is configured for this service, so no data was retrieved. No records are returned rather than fabricated ones.',
+      },
+    }));
   }
 
   /**

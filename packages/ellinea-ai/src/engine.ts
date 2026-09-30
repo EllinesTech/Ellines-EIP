@@ -1,4 +1,5 @@
 import type { EllineaEnterpriseSnapshot } from './types';
+import { describeHealth, healthBelow, healthUnknown } from './types';
 
 export type { EllineaEnterpriseSnapshot };
 
@@ -443,7 +444,7 @@ export function buildEllineaRecommendations(
       rationale: `${summary.openDecisions} open decision(s) / task(s) are blocking flow.${cautious}`,
       evidence: [
         `Model tasks: ${counts?.tasks ?? summary.openDecisions}`,
-        `Health score: ${summary.healthScore}/100`,
+        `Health score: ${describeHealth(summary.healthScore)}`,
         ...dnaEvidence.filter((e) => e.startsWith('DNA')).slice(0, 2),
         timeline[0] ? `Timeline: ${timeline[0].title}` : '',
       ].filter(Boolean),
@@ -466,11 +467,11 @@ export function buildEllineaRecommendations(
     });
   }
 
-  if (summary.healthScore < 70) {
+  if (healthBelow(summary.healthScore, 70)) {
     out.push({
       id: 'health',
       title: 'Investigate enterprise health dip',
-      rationale: `Health is ${summary.healthScore}/100 across ${summary.connectedSystems} wrapped system(s). Diagnose connector/sync before changing SoR data.`,
+      rationale: `Health is ${describeHealth(summary.healthScore)} across ${summary.connectedSystems} wrapped system(s). Diagnose connector/sync before changing SoR data.`,
       evidence: [
         summary.briefHighlight,
         counts
@@ -479,13 +480,28 @@ export function buildEllineaRecommendations(
         `Pressure score: ${pressure}`,
         ...dnaEvidence.slice(0, 1),
       ],
-      confidence: Math.min(88, 70 + (70 - summary.healthScore)),
-      priority: summary.healthScore < 50 ? 'high' : 'medium',
+      confidence: Math.min(88, 70 + (70 - (summary.healthScore as number))),
+      priority: healthBelow(summary.healthScore, 50) ? 'high' : 'medium',
+    });
+  } else if (healthUnknown(summary.healthScore)) {
+    // Health is unknown, not good. Say so rather than implying health is fine.
+    out.push({
+      id: 'health-unknown',
+      title: 'Enterprise health is not being reported',
+      rationale:
+        'No connected system has published a health metric, so EIP cannot state whether this business is healthy. Configure a connector that exposes a health/score field, or treat health as unmeasured.',
+      evidence: [
+        summary.briefHighlight,
+        `${summary.connectedSystems} connected system(s)`,
+        ...dnaEvidence.slice(0, 1),
+      ],
+      confidence: 100,
+      priority: 'medium',
     });
   }
 
   const hasPressure =
-    summary.openAlerts > 0 || summary.openDecisions > 0 || attention.length > 0 || summary.healthScore < 70;
+    summary.openAlerts > 0 || summary.openDecisions > 0 || attention.length > 0 || healthBelow(summary.healthScore, 70);
 
   if (!hasPressure && branches.length > 0) {
     out.push({
@@ -570,9 +586,9 @@ function briefBuckets(
   const decide: string[] = [];
   const delegate: string[] = [];
 
-  if (summary.healthScore < 70) {
-    watch.push(`Health ${summary.healthScore}/100 via ${summary.connectorName}`);
-  } else {
+  if (healthBelow(summary.healthScore, 70)) {
+    watch.push(`Health ${describeHealth(summary.healthScore)} via ${summary.connectorName}`);
+  } else if (typeof summary.healthScore === 'number') {
     watch.push(`Health steady at ${summary.healthScore}/100`);
   }
   if (summary.openAlerts > 0) {
@@ -600,7 +616,7 @@ function briefBuckets(
     const avoid = context.dna!.traits.find((t) => t.label.startsWith('Avoids:'));
     if (avoid) decide.push(`DNA caution: ${avoid.label}`);
   }
-  if (summary.healthScore < 50 && (lens.authority === 'owner' || lens.authority === 'it')) {
+  if (healthBelow(summary.healthScore, 50) && (lens.authority === 'owner' || lens.authority === 'it')) {
     decide.push('Health critically low — decide whether to pause non-essential syncs');
   }
 
@@ -659,7 +675,7 @@ export function buildDailyBriefText(
   const decide = buckets.decide.length ? ` Decide: ${buckets.decide.join('; ')}.` : '';
   const delegate = buckets.delegate.length ? ` Delegate: ${buckets.delegate.join('; ')}.` : '';
 
-  return `Daily brief${org} (${synced} via ${summary.connectorName}): health ${summary.healthScore}/100, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}${framed}${watch}${decide}${delegate}`;
+  return `Daily brief${org} (${synced} via ${summary.connectorName}): health ${describeHealth(summary.healthScore)}, ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}.${uem}${framed}${watch}${decide}${delegate}`;
 }
 
 type Intent =
@@ -708,7 +724,7 @@ function confidenceFromSignals(
   if (summary.openDecisions > 0 && (intents.has('decision') || intents.has('recommend'))) c += 6;
   if (memoryHits) c += Math.min(10, memoryHits * 4);
   if (dnaUsed) c += 4;
-  if (summary.healthScore < 70 && intents.has('health')) c += 5;
+  if (healthBelow(summary.healthScore, 70) && intents.has('health')) c += 5;
   if ((summary.timeline || []).length) c += 3;
   return Math.max(40, Math.min(94, c));
 }
@@ -751,7 +767,7 @@ function synthesizeEnterpriseAnswer(
 
   // Situation
   const situationParts: string[] = [
-    `Health ${summary.healthScore}/100 across ${summary.connectedSystems} connected system(s) (${summary.connectorName})`,
+    `Health ${describeHealth(summary.healthScore)} across ${summary.connectedSystems} connected system(s) (${summary.connectorName})`,
   ];
   if (intents.has('branch') && branches.length) {
     situationParts.push(
@@ -817,8 +833,10 @@ function synthesizeEnterpriseAnswer(
   if (summary.openDecisions > 0) {
     risks.push(`${summary.openDecisions} open decision(s) stall operational flow`);
   }
-  if (summary.healthScore < 70) {
+  if (healthBelow(summary.healthScore, 70)) {
     risks.push(`Health below 70 — treat connector/sync before changing Systems of Record`);
+  } else if (healthUnknown(summary.healthScore)) {
+    risks.push('Enterprise health is not reported by any connected system — treat health as unmeasured');
   }
   if (attention.length) {
     risks.push(`${attention.length} UEM object(s) flagged for attention`);
@@ -842,7 +860,7 @@ function synthesizeEnterpriseAnswer(
         : `${lens.actionVerb}. ${recs[0]?.title || 'Review the daily brief Watch / Decide / Delegate sections.'}`;
   } else if (lens.authority === 'it') {
     action =
-      summary.openAlerts > 0 || summary.healthScore < 70
+      summary.openAlerts > 0 || healthBelow(summary.healthScore, 70)
         ? `Verify connector sync and access hygiene first; do not invent SoR writes. ${lens.actionVerb}.`
         : `${lens.actionVerb}. Confirm read-only connectors stay healthy for the next brief.`;
   } else if (lens.authority === 'viewer') {

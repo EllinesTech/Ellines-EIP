@@ -59,38 +59,22 @@ export class MonitoringService {
   }
 
   /**
-   * Check health of a specific component
+   * Check health of a specific component.
+   *
+   * No real health probe (metrics endpoint, ping, DB check) is wired for these
+   * components, so EIP reports UNKNOWN with no metrics rather than inventing
+   * CPU/memory/latency figures. `reportHealth()` remains the path by which a
+   * component publishes genuinely measured status.
    */
   private async checkComponentHealth(component: ComponentIdentifier): Promise<HealthStatus> {
-    try {
-      // In a real implementation, this would make actual health check calls
-      // For now, we simulate health metrics collection
-      const metrics: HealthMetrics = {
-        cpuUsage: Math.random() * 100,
-        memoryUsage: Math.random() * 100,
-        responseTime: Math.random() * 1000,
-        errorRate: Math.random() * 5,
-      };
-
-      const status: ComponentStatus = this.determineStatus(metrics);
-
-      return {
-        component: this.getComponentKey(component),
-        status,
-        metrics,
-        timestamp: new Date(),
-        message: status === 'healthy' ? undefined : `Component health check: ${status}`,
-      };
-    } catch (error) {
-      this.logger.error(`Health check failed for ${component.service}:`, error);
-      return {
-        component: this.getComponentKey(component),
-        status: 'down',
-        metrics: {},
-        timestamp: new Date(),
-        message: error.message,
-      };
-    }
+    return {
+      component: this.getComponentKey(component),
+      status: 'unknown' as ComponentStatus,
+      metrics: undefined,
+      timestamp: new Date(),
+      message:
+        'No health probe is configured for this component. Status is unknown — no metrics were measured.',
+    };
   }
 
   /**

@@ -1,4 +1,5 @@
 import type { EllineaEnterpriseSnapshot } from './types';
+import { describeHealth, healthBelow } from './types';
 import type { EllineaMemoryNote, EnterpriseDnaSnapshot } from './engine';
 
 export type RagChunk = {
@@ -160,11 +161,11 @@ export function retrieveEllineaContext(input: {
       id: 'snap_health',
       source: 'snapshot',
       title: 'Enterprise health',
-      text: `Health ${summary.healthScore}/100 via ${summary.connectorName}. ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}`,
+      text: `Health ${describeHealth(summary.healthScore)} via ${summary.connectorName}. ${summary.openAlerts} alerts, ${summary.openDecisions} open decisions. ${summary.briefHighlight}`,
       score:
         0.32 +
         scoreText(tokens, `${summary.briefHighlight} health alerts decisions performance`) +
-        (summary.healthScore < 70 ? 0.12 : 0),
+        (healthBelow(summary.healthScore, 70) ? 0.12 : 0),
     });
 
     if (summary.openAlerts > 0 || attention.length > 0) {

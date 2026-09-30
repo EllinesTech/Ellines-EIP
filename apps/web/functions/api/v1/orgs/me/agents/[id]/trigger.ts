@@ -28,7 +28,8 @@ type ExecutionRecord = {
   id: string;
   agentId: string;
   status: string;
-  confidenceScore: number;
+  /** null = no model-scored confidence is available (unknown, not zero). */
+  confidenceScore: number | null;
   requiresApproval: boolean;
   aiReasoning: Record<string, unknown>;
   canRollback: boolean;
@@ -65,10 +66,19 @@ function asObj(raw: unknown): Record<string, unknown> {
   return {};
 }
 
-function evalConfidence(agent: AgentRecord): number {
+/**
+ * Autonomy-level mapping.
+ *
+ * Previously this returned a random 60-95 for intermediate autonomy levels,
+ * which presented an invented number to the user as an AI confidence score.
+ * There is no real model-scored confidence available, so the honest value is
+ * null (unknown). Levels 1 and 3 are fixed policy values, not measurements —
+ * they are returned as-is only because they are deterministic configuration.
+ */
+function evalConfidence(agent: AgentRecord): number | null {
   if (agent.autonomyLevel === 1) return 100;
   if (agent.autonomyLevel === 3) return 90;
-  return 60 + Math.floor(Math.random() * 36);
+  return null;
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -103,7 +113,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const now = new Date().toISOString();
   const confidence = evalConfidence(agent);
-  const requiresApproval = agent.autonomyLevel === 2 && confidence < agent.confidenceThreshold;
+  // When confidence is unknown (no model-scored value available), the safe
+  // direction is to require human approval rather than auto-execute. Auto-running
+  // an action with an unknown confidence would be acting without evidence.
+  const requiresApproval =
+    agent.autonomyLevel === 2 &&
+    (confidence === null || confidence < agent.confidenceThreshold);
 
   const execId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const execution: ExecutionRecord = {

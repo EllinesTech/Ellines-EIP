@@ -417,6 +417,23 @@ model EnterpriseSnapshot {
   openDecisions    Int      @map("open_decisions")
   briefHighlight   String   @map("brief_highlight")
   timeline         Json
+  /// Records EIP actually retrieved and retained during the last sync.
+  /// Distinct from reportedRecordCount, which is only what the remote API claimed.
+  retrievedCount   Int      @default(0) @map("retrieved_count")
+  /// Total the source system reported. 0 = the source published no total.
+  reportedCount    Int      @default(0) @map("reported_count")
+  /// True only when pagination provably reached the end of the authorized set.
+  retrievalComplete Boolean @default(false) @map("retrieval_complete")
+  /// Why retrieval stopped: complete | empty-page | max-pages | max-records | error | no-more-indicator
+  retrievalStopReason String @default("") @map("retrieval_stop_reason")
+  /// Number of resources (API routes) that were retrieved successfully.
+  resourcesRetrieved Int    @default(0) @map("resources_retrieved")
+  /// Number of resources that failed. Surfaced so partial syncs are visible.
+  resourcesFailed    Int    @default(0) @map("resources_failed")
+  /// Explicit sync state: synced | partial | error | idle
+  syncStatus       String   @default("idle") @map("sync_status")
+  /// Human-readable reason when the sync was partial or failed.
+  syncError        String?  @map("sync_error")
   /// JSON array of DetectedPattern objects persisted by ReasoningEngineService.detectPatterns().
   insights         Json     @default("[]")
   syncedAt         DateTime @map("synced_at")

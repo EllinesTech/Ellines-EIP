@@ -5,8 +5,8 @@ Use this account to open the live Command Center.
 | Field | Value |
 |-------|-------|
 | **Live site** | https://eip.ellines.co.ke/login |
-| **Email** | `demo@ellines.co.ke` |
-| **Password** | `EllinesDemo2026!` |
+| **Email** | `<set DEMO_EMAIL>` |
+| **Password** | `<set DEMO_PASSWORD>` |
 | **Organization** | Ellines Demo Org |
 | **Role** | `owner` (full Command Center + Organization System + Connectors) |
 
@@ -57,7 +57,7 @@ node scripts/set-pages-secrets.mjs
 
 ```bash
 npm run db:push    # sync schema
-npm run seed:demo  # create/reset demo@ellines.co.ke
+npm run seed:demo  # create/reset <set DEMO_EMAIL>
 ```
 
 Override with env if needed: `DEMO_EMAIL`, `DEMO_PASSWORD`, `DEMO_ORG_NAME`, `DEMO_ORG_SLUG`, `DEMO_FULL_NAME`.

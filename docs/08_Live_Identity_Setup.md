@@ -39,7 +39,7 @@ Health check: `http://localhost:3001/api/v1/health`
 
 https://eip.ellines.co.ke/login
 
-- Email: `demo@ellines.co.ke`
-- Password: `EllinesDemo2026!`
+- Email: `<set DEMO_EMAIL>`
+- Password: `<set DEMO_PASSWORD>`
 
 Details: [07_Demo_Login.md](./07_Demo_Login.md)

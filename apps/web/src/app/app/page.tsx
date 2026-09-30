@@ -441,20 +441,28 @@ function AdminOverview({
               id: i.id,
               displayName: i.displayName,
               catalogId: i.catalogId,
-              status: i.status as ConnectorHealthItemDto['status'],
+              // No health record yet: the connector is configured but unverified.
+              status: 'CONFIGURED' as ConnectorHealthItemDto['status'],
+              evidence: 'No sync has been recorded for this connector yet.',
               lastSyncedAt: i.lastSyncedAt,
-              recordCount: 0,
-              healthScore: 0,
+              lastVerifiedHealthyAt: null,
+              currentlyVerified: false,
+              retrievedRecordCount: 0,
+              reportedRecordCount: 0,
+              retrievalComplete: false,
+              // null = unknown. Not 0, which would read as "measured and terrible".
+              healthScore: null,
               openAlerts: 0,
               openDecisions: 0,
               message: i.lastMessage ?? null,
             }))).slice(0, 8).map((item) => {
-              const statusLabel =
-                item.status === 'synced' ? 'SYNCED'
-                : item.status === 'active' ? 'ACTIVE'
-                : item.status === 'error'  ? 'ERROR'
-                : item.status === 'draft'  ? 'DRAFT'
-                : 'IDLE';
+              // Evidence-based status, not a boolean. The evidence string is
+              // surfaced as the tooltip so the user can see WHY.
+              const isProblem =
+                item.status === 'AUTHENTICATION_FAILED' ||
+                item.status === 'UNAVAILABLE' ||
+                item.status === 'PARTIAL' ||
+                item.status === 'STALE';
               const lastSync = item.lastSyncedAt
                 ? new Date(item.lastSyncedAt).toLocaleString(undefined, {
                     month: 'short', day: 'numeric',
@@ -467,18 +475,28 @@ function AdminOverview({
                   href="/app/connectors"
                   className={styles.healthChip}
                   data-status={item.status || 'idle'}
-                  title={item.message ?? undefined}
+                  title={item.evidence || item.message || undefined}
                 >
                   <strong>{item.displayName}</strong>
-                  <span>{statusLabel}</span>
-                  {item.healthScore > 0 ? (
+                  <span>{item.status}</span>
+                  {item.healthScore !== null ? (
                     <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
                       {item.healthScore}% health
                     </span>
-                  ) : null}
-                  {item.recordCount > 0 ? (
+                  ) : (
+                    <span style={{ fontSize: '0.65rem', opacity: 0.55 }}>health unknown</span>
+                  )}
+                  {item.retrievedRecordCount > 0 ? (
                     <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
-                      {item.recordCount.toLocaleString()} records
+                      {item.retrievedRecordCount.toLocaleString()} records
+                      {item.reportedRecordCount > item.retrievedRecordCount
+                        ? ` of ${item.reportedRecordCount.toLocaleString()}`
+                        : ''}
+                    </span>
+                  ) : null}
+                  {!item.retrievalComplete && item.retrievedRecordCount > 0 ? (
+                    <span style={{ fontSize: '0.65rem', opacity: 0.7, color: '#f59e0b' }}>
+                      partial read
                     </span>
                   ) : null}
                   {lastSync ? (
@@ -544,12 +562,19 @@ function AdminOverview({
               <div className={styles.cardHead}><h2 className={styles.cardTitle}>Connector health grid</h2></div>
               {connectorHealth ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  {(connectorHealth.connectors || []).slice(0, 6).map(c => (
-                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0.5rem', borderRadius: 6, background: c.status === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${c.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
+                  {(connectorHealth.connectors || []).slice(0, 6).map(c => {
+                    const bad =
+                      c.status === 'AUTHENTICATION_FAILED' ||
+                      c.status === 'UNAVAILABLE' ||
+                      c.status === 'PARTIAL' ||
+                      c.status === 'STALE';
+                    return (
+                    <div key={c.id} title={c.evidence} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0.5rem', borderRadius: 6, background: bad ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bad ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{c.displayName}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: c.status === 'synced' ? '#10b981' : c.status === 'error' ? '#ef4444' : '#f59e0b' }}>{c.status?.toUpperCase()}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: c.status === 'HEALTHY' ? '#10b981' : bad ? '#ef4444' : '#f59e0b' }}>{c.status}</span>
                     </div>
-                  ))}
+                    );
+                  })}
                   {!connectorHealth.connectors?.length && <p className={styles.lede}>No connector health data yet.</p>}
                 </div>
               ) : <p className={styles.lede}>Sync a connector to populate health grid.</p>}

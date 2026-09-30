@@ -32,11 +32,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       organizationId: auth.organizationId,
       connectorId: 'none',
       connectorName: '',
-      healthScore: 0,
+      // No snapshot means no connected system has ever been read. Every metric
+      // is honestly zero/unknown rather than a plausible-looking placeholder.
+      healthScore: null,
       connectedSystems: 0,
       openAlerts: 0,
       openDecisions: 0,
       briefHighlight: 'No connector sync yet. Open Connectors and sync your first system to unlock live KPIs.',
+      retrievedRecordCount: 0,
+      reportedRecordCount: 0,
+      retrievalComplete: false,
+      syncStatus: 'idle',
+      syncError: null,
       timeline: [],
       model: null,
       syncedAt: null,
@@ -45,19 +52,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const { events, model } = unpackTimelineStorage(snap.timeline);
+  const retrievalComplete = (snap.retrieval_complete as boolean | null) ?? true;
+  const syncStatus = (snap.sync_status as 'synced' | 'partial' | 'error' | 'idle' | null) ?? 'synced';
 
   return json({
     organizationId: snap.organization_id,
     connectorId: snap.connector_id,
     connectorName: snap.connector_name,
-    healthScore: snap.health_score,
+    // The DB column is non-nullable, so 0 with no connector reporting a score
+    // means "unknown" — surfaced as null rather than a misleading 0.
+    healthScore: snap.health_score > 0 ? snap.health_score : null,
     connectedSystems: snap.connected_systems,
     openAlerts: snap.open_alerts,
     openDecisions: snap.open_decisions,
     briefHighlight: snap.brief_highlight,
+    retrievedRecordCount: (snap.retrieved_count as number | null) ?? snap.record_count ?? 0,
+    reportedRecordCount: (snap.reported_count as number | null) ?? 0,
+    retrievalComplete,
+    syncStatus,
+    syncError: (snap.sync_error as string | null) ?? null,
     timeline: events,
     model,
     syncedAt: new Date(snap.synced_at as string).toISOString(),
-    status: 'synced',
+    status: syncStatus,
   });
 };

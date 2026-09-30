@@ -119,7 +119,7 @@ export default function ReportsPage() {
       .then((summary) => {
         setPreview(buildReportPreview({
           orgName: s.organization.name,
-          healthScore: summary.status === 'synced' ? summary.healthScore : 0,
+          healthScore: summary.syncStatus === 'synced' ? summary.healthScore : null,
           openAlerts: summary.openAlerts || 0,
           openDecisions: summary.openDecisions || 0,
           connectedSystems: summary.connectedSystems || 0,

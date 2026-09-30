@@ -24,9 +24,52 @@ import {
 } from '../../../../../shared/connectors';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
 import {
+  retrieveAllPages,
+  type RetrievalResult,
+} from '../../../../../shared/pagination';
+import {
   isFirestoreResponse,
   normalizeFirestoreResponse,
 } from '../../../../../shared/firestore-normalizer';
+
+/**
+ * Explicit, non-optimistic sync states. EIP never reports a fabricated success:
+ * a source system that could not be read is UNAVAILABLE / AUTHENTICATION_FAILED.
+ */
+type SyncFailureStatus = 'AUTHENTICATION_FAILED' | 'INVALID_RESPONSE' | 'UNAVAILABLE' | 'PARTIAL';
+
+/** Raised when a source returns 200 with a body that is not the expected format. */
+class InvalidResponseError extends Error {
+  readonly kind = 'INVALID_RESPONSE' as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidResponseError';
+  }
+}
+
+/** Projection of a retrieval result that is safe to persist and to return. */
+function retrievalMeta(r: RetrievalResult) {
+  return {
+    retrievedRecordCount: r.retrievedRecordCount,
+    reportedRecordCount: r.reportedRecordCount,
+    complete: r.complete,
+    stopReason: r.stopReason,
+    pagesFetched: r.pagesFetched,
+    duplicateCount: r.duplicateCount,
+    warnings: r.warnings,
+    errors: r.errors,
+  };
+}
+
+/** A non-secret identifier for a resource, safe to log and store. */
+function safeResourceName(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}${u.pathname}`.slice(0, 200);
+  } catch {
+    return String(url).slice(0, 200);
+  }
+}
 
 // ─── IMAP sync via Cloudflare TCP sockets ─────────────────────────────────────
 
@@ -286,7 +329,7 @@ function decodeImapText(text: string): string {
 }
 
 type StoredPayload = {
-  healthScore?: number;
+  healthScore?: number | null;
   connectedSystems?: number;
   recordCount?: number;
   openAlerts?: number;
@@ -294,6 +337,34 @@ type StoredPayload = {
   briefHighlight?: string;
   timeline?: { title: string; detail: string }[];
   model?: import('@ellines-eip/shared').UemModel | null;
+  /**
+   * Truthful retrieval metadata. `retrievalComplete` is the load-bearing field:
+   * it is false whenever EIP could not prove it read the whole authorized set.
+   */
+  retrieval?: {
+    retrievedRecordCount: number;
+    reportedRecordCount: number;
+    complete: boolean;
+    stopReason: string;
+    pagesFetched: number;
+    duplicateCount: number;
+    warnings: string[];
+    errors: { page: number; reason: string }[];
+    /** Resources retrieved independently — never collapsed into one "best". */
+    resources: ResourceResult[];
+  };
+};
+
+/** One API resource (route) retrieved independently, with its own outcome. */
+type ResourceResult = {
+  /** Path/URL identifier preserved so resource identity is never lost. */
+  resource: string;
+  ok: boolean;
+  retrievedRecordCount: number;
+  reportedRecordCount: number;
+  complete: boolean;
+  stopReason: string;
+  error?: string;
 };
 
 /**
@@ -309,7 +380,13 @@ async function upsertSnapshot(
   installationId: string,
   connectorId: string,
   connectorName: string,
-  payload: ReturnType<typeof normalizeEnterprisePayload>,
+  payload: StoredPayload & {
+    /** Present when the connector retrieved via the pagination engine. */
+    retrievedRecordCount?: number;
+    reportedRecordCount?: number;
+    complete?: boolean;
+    resources?: import('../../../../../shared/connectors').OpenApiResourceResult[];
+  },
   fieldMapWarnings?: string[],
 ) {
   const syncedAt = new Date().toISOString();
@@ -333,8 +410,6 @@ async function upsertSnapshot(
   byId.set(installationId, { id: installationId, display_name: connectorName, last_payload: ownPayload });
   const merged = Array.from(byId.values()).filter((r) => r.last_payload);
 
-  let weightedHealth = 0;
-  let totalWeight = 0;
   let connectedSystems = 0;
   let totalRecordCount = 0;
   let openAlerts = 0;
@@ -347,9 +422,6 @@ async function upsertSnapshot(
 
   for (const inst of merged) {
     const p = inst.last_payload as StoredPayload;
-    const weight = Math.max(1, p.connectedSystems || 1);
-    weightedHealth += (p.healthScore || 0) * weight;
-    totalWeight += weight;
     connectedSystems += p.connectedSystems || 0;
     totalRecordCount += p.recordCount || 0;
     openAlerts += p.openAlerts || 0;
@@ -363,18 +435,49 @@ async function upsertSnapshot(
     }
   }
 
-  // Use the count of active connector installations as the authoritative
-  // connected_systems value — not a sum of inferred payload fields.
-  // connectedSystems from payloads is still aggregated for completeness,
-  // but the active install count is the ground truth.
+  // Health is aggregated ONLY from connectors that published a real health
+  // metric. Connectors reporting null (unknown) are excluded from the average
+  // rather than being counted as 0 (which would unfairly drag health down) or as
+  // a fabricated baseline (which would invent a score EIP does not have).
+  const scored = merged.filter((inst) => {
+    const p = inst.last_payload as StoredPayload;
+    return typeof p.healthScore === 'number';
+  });
+  const aggHealthScore = scored.length
+    ? Math.round(
+        scored.reduce((sum, inst) => sum + ((inst.last_payload as StoredPayload).healthScore as number), 0) /
+          scored.length,
+      )
+    : null;
+
+  // Completeness across every connected connector. A single incomplete connector
+  // makes the organization's aggregate data partial — the Command Center must be
+  // able to tell the difference between a full read and a partial one.
+  const retrievals = merged
+    .map((inst) => (inst.last_payload as StoredPayload).retrieval)
+    .filter((r): r is NonNullable<StoredPayload['retrieval']> => Boolean(r));
+  const resourcesRetrieved = retrievals.filter((r) => r.complete).length;
+  const resourcesFailed = retrievals.length - resourcesRetrieved;
+  const retrievedCount = retrievals.reduce((s, r) => s + r.retrievedRecordCount, 0);
+  const reportedCount = retrievals.reduce((s, r) => s + r.reportedRecordCount, 0);
+  const retrievalComplete = retrievals.length > 0 && retrievals.every((r) => r.complete);
+  const syncStatus: 'synced' | 'partial' =
+    retrievals.length === 0 ? 'synced' : retrievalComplete ? 'synced' : 'partial';
+  const syncError =
+    syncStatus === 'partial'
+      ? `Incomplete retrieval: ${retrievals
+          .filter((r) => !r.complete)
+          .map((r) => `${r.stopReason} (${r.retrievedRecordCount} of ${r.reportedRecordCount || '?'} records)`)
+          .join('; ')}`
+      : null;
+
   const { count: activeCount } = await supabase
     .from('connector_installations')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', organizationId)
     .in('status', ['active', 'synced']);
-  const activeConnectorCount = activeCount ?? Math.max(merged.length, connectedSystems);
+  const activeConnectorCount = activeCount ?? merged.length;
 
-  const aggHealthScore = totalWeight ? Math.round(weightedHealth / totalWeight) : payload.healthScore;
   const aggConnectorName =
     names.length > 1
       ? `${names.length} connected systems (${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''})`
@@ -397,9 +500,19 @@ async function upsertSnapshot(
     organization_id: organizationId,
     connector_id: aggConnectorId,
     connector_name: aggConnectorName,
-    health_score: aggHealthScore,
+    // Null means "no connector published a health metric" — surfaced as unknown,
+    // never silently rendered as 0 or as an invented baseline.
+    health_score: aggHealthScore ?? 0,
     connected_systems: activeConnectorCount,
     record_count: totalRecordCount,
+    retrieved_count: retrievedCount,
+    reported_count: reportedCount,
+    retrieval_complete: retrievalComplete,
+    retrieval_stop_reason: retrievals.find((r) => !r.complete)?.stopReason ?? '',
+    resources_retrieved: resourcesRetrieved,
+    resources_failed: resourcesFailed,
+    sync_status: syncStatus,
+    sync_error: syncError,
     open_alerts: openAlerts,
     open_decisions: openDecisions,
     brief_highlight: bestHighlight,
@@ -425,6 +538,14 @@ async function upsertSnapshot(
         health_score: row.health_score,
         connected_systems: row.connected_systems,
         record_count: row.record_count,
+        retrieved_count: row.retrieved_count,
+        reported_count: row.reported_count,
+        retrieval_complete: row.retrieval_complete,
+        retrieval_stop_reason: row.retrieval_stop_reason,
+        resources_retrieved: row.resources_retrieved,
+        resources_failed: row.resources_failed,
+        sync_status: row.sync_status,
+        sync_error: row.sync_error,
         open_alerts: row.open_alerts,
         open_decisions: row.open_decisions,
         brief_highlight: row.brief_highlight,
@@ -453,16 +574,22 @@ async function upsertSnapshot(
     organizationId,
     connectorId,
     connectorName,
-    healthScore: payload.healthScore,
+    // null = the source published no health metric. Not zero, not a baseline.
+    healthScore: payload.healthScore ?? null,
     connectedSystems: activeConnectorCount,
     recordCount: payload.recordCount,
+    retrievedCount,
+    reportedCount,
+    retrievalComplete,
+    syncStatus,
+    syncError,
     openAlerts: payload.openAlerts,
     openDecisions: payload.openDecisions,
     briefHighlight: payload.briefHighlight,
     timeline: payload.timeline,
     model: payload.model || null,
     syncedAt,
-    status: 'synced' as const,
+    status: syncStatus,
     fieldMapWarnings: fieldMapWarnings ?? [],
   };
 }
@@ -534,43 +661,107 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           400,
         );
       }
-      const res = await safeFetch(endpoint, {
-        method: 'GET',
-        headers: { Accept: 'application/json', ...buildAuthHeaders(config) },
+
+      // Retrieve the FULL authorized result set, following pagination to the end.
+      // retrieveAllPages reports completeness explicitly; we never assume page 1
+      // is the whole dataset.
+      const retrieval = await retrieveAllPages({
+        startUrl: endpoint,
+        strategy: config.paginationStrategy ?? 'auto',
+        pageSize: Number(config.pageSize) || 100,
+        fetchPage: async (pageUrl) => {
+          const check = isSafeEgressTarget(pageUrl);
+          if (!check.safe) {
+            throw new SsrfError(check.reason ?? 'Pagination URL blocked by egress policy', pageUrl);
+          }
+          const res = await safeFetch(pageUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json', ...buildAuthHeaders(config) },
+          });
+          const headers: Record<string, string> = {};
+          res.headers.forEach((v, k) => {
+            headers[k.toLowerCase()] = v;
+          });
+          const text = await res.text();
+          if (!res.ok) {
+            // Return the status; the engine classifies it (auth/rate-limit/other).
+            return { status: res.status, body: null, headers };
+          }
+          let parsed: unknown = null;
+          let parseError = false;
+          try {
+            parsed = text ? JSON.parse(text) : null;
+          } catch {
+            parseError = true;
+          }
+          if (parseError) {
+            // A 200 that is not JSON is almost always a login/error page. It must
+            // never be presented as a successful sync of business data.
+            const looksLikeHtml = /^\s*<(?:!doctype|html)/i.test(text);
+            throw new InvalidResponseError(
+              looksLikeHtml
+                ? 'Endpoint returned an HTML page instead of JSON. This usually means the request was not authenticated and the server returned a login page.'
+                : 'Endpoint returned a 200 response that is not valid JSON.',
+            );
+          }
+          return { status: res.status, body: parsed, headers };
+        },
       });
-      if (!res.ok) {
+
+      // Classify an authentication failure explicitly rather than as a generic error.
+      if (retrieval.errors.some((e) => /HTTP 40[13]/.test(e.reason))) {
+        const authLike = retrieval.errors.find((e) => /HTTP 40[13]/.test(e.reason));
+        const status: SyncFailureStatus =
+          authLike && /HTTP 401|HTTP 403/.test(authLike.reason)
+            ? 'AUTHENTICATION_FAILED'
+            : 'UNAVAILABLE';
         return json(
-          { statusCode: 502, message: `REST endpoint returned ${res.status}` },
+          {
+            statusCode: 502,
+            status,
+            connectorId: catalogId,
+            connectorName: displayName,
+            message: `Source system rejected the request (${authLike?.reason}). Credentials or permissions may be wrong.`,
+            retrieval: retrievalMeta(retrieval),
+          },
           502,
         );
       }
-      const text = await res.text();
-      let raw: unknown;
-      try {
-        raw = JSON.parse(text);
-      } catch {
-        raw = {
-          briefHighlight: text.slice(0, 400) || `Sync from ${new URL(endpoint).hostname}`,
-          timeline: [{ title: 'HTTP sync', detail: `200 from ${new URL(endpoint).hostname}` }],
-        };
+
+      if (retrieval.errors.length && retrieval.retrievedRecordCount === 0) {
+        return json(
+          {
+            statusCode: 502,
+            status: 'UNAVAILABLE',
+            connectorId: catalogId,
+            connectorName: displayName,
+            message: `Retrieval failed: ${retrieval.errors.map((e) => `page ${e.page} ${e.reason}`).join('; ')}`,
+            retrieval: retrievalMeta(retrieval),
+          },
+          502,
+        );
       }
-      // Unpack Firestore REST typed-value envelopes if present — applies to any
-      // endpoint backed by Firestore's REST API regardless of which system it is.
+
+      // Build a payload from what was ACTUALLY retrieved. reportedRecordCount is
+      // carried separately and is never presented as EIP's own retrieval count.
+      let raw: unknown = {
+        records: retrieval.records,
+        retrievedCount: retrieval.retrievedRecordCount,
+      };
       if (isFirestoreResponse(raw)) {
         raw = normalizeFirestoreResponse(raw);
       }
-      // Apply field-name remapping (config.fieldMap) before normalization.
-      // Lets operators map upstream-specific field names to EIP field names
-      // without touching EIP code.
-      if (config.fieldMap && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      if (config.fieldMap && typeof raw === 'object' && raw !== null) {
         raw = applyFieldMap(raw as Record<string, unknown>, config.fieldMap);
       }
-      // Validate fieldMap for semantic risks and capture any warnings.
       const fieldMapWarnings = validateFieldMap(config.fieldMap);
-      // Inject config context (systemLabel) into raw before normalization.
-      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      if (typeof raw === 'object' && raw !== null) {
         raw = injectConfigContext(raw as Record<string, unknown>, config);
       }
+      const normalized = normalizeEnterprisePayload(raw);
+      // recordCount must reflect what EIP retrieved, not what the API claimed.
+      normalized.recordCount = retrieval.retrievedRecordCount;
+
       summary = await upsertSnapshot(
         context.env,
         auth.organizationId,
@@ -578,7 +769,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         id,
         'rest-api',
         config.systemLabel || displayName || 'REST API Systems',
-        normalizeEnterprisePayload(raw),
+        {
+          ...normalized,
+          retrieval: {
+            ...retrievalMeta(retrieval),
+            resources: [
+              {
+                resource: safeResourceName(endpoint),
+                ok: retrieval.errors.length === 0,
+                retrievedRecordCount: retrieval.retrievedRecordCount,
+                reportedRecordCount: retrieval.reportedRecordCount,
+                complete: retrieval.complete,
+                stopReason: retrieval.stopReason,
+                error: retrieval.errors.map((e) => e.reason).join('; ') || undefined,
+              },
+            ],
+          },
+        },
         fieldMapWarnings,
       );
     } else if (catalogId === 'graphql') {

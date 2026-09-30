@@ -75,15 +75,22 @@ export function writeScheduledReports(organizationId: string, items: ScheduledRe
 
 export function buildReportPreview(input: {
   orgName: string;
-  healthScore: number;
+  /** null = no source system published a health metric (unknown). */
+  healthScore: number | null;
   openAlerts: number;
   openDecisions: number;
   connectedSystems: number;
   briefHighlight: string;
   template?: ReportTemplate;
 }): string {
+  // Never print "Health 0/100" for an unknown score — that reads as "measured
+  // and catastrophic". Say it is unknown.
+  const healthText =
+    input.healthScore === null
+      ? 'Health not reported by the connected system'
+      : `Health ${input.healthScore}/100`;
   const base = [
-    `Health ${input.healthScore}/100 · ${input.connectedSystems} system(s)`,
+    `${healthText} · ${input.connectedSystems} system(s)`,
     `Alerts ${input.openAlerts} · Open decisions ${input.openDecisions}`,
     input.briefHighlight,
   ];

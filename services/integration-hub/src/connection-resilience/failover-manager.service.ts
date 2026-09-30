@@ -128,129 +128,76 @@ export class FailoverManagerService {
   }
 
   /**
-   * Test API connection
+   * Test API connection.
+   *
+   * Performs a REAL HTTP request against the configured endpoint. There is no
+   * random outcome: the result is whatever the target system actually returned.
+   * A failed probe must fail, because failover decisions drive real traffic.
    */
   private async testApiConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('API connection timeout'));
-      }, 5000);
-
-      // Simulate API test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.1) {
-          resolve();
-        } else {
-          reject(new Error('API connection test failed'));
-        }
-      }, Math.random() * 2000);
-    });
+    const config = (method as { config?: Record<string, unknown> }).config ?? {};
+    const endpoint = String(config.endpoint ?? config.url ?? '').trim();
+    if (!endpoint) {
+      throw new Error('API connection test failed: no endpoint is configured');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch(endpoint, { method: 'GET', signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`API connection test failed: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('API connection timeout');
+      }
+      throw err instanceof Error
+        ? err
+        : new Error('API connection test failed');
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
-   * Test database connection
+   * Test database connection.
+   *
+   * No database driver is wired in this service, so the connection cannot be
+   * verified. Failover must not act on a fabricated "pass", so this fails
+   * closed and says why.
    */
-  private async testDatabaseConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Database connection timeout'));
-      }, 5000);
-
-      // Simulate database test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.1) {
-          resolve();
-        } else {
-          reject(new Error('Database connection test failed'));
-        }
-      }, Math.random() * 1500);
-    });
+  private async testDatabaseConnection(_method: ConnectionMethod): Promise<void> {
+    throw new Error(
+      'Database connection cannot be verified: no database client is configured in this service. Failing closed rather than assuming a healthy connection.',
+    );
   }
 
-  /**
-   * Test file sync connection
-   */
-  private async testFileSyncConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('File sync connection timeout'));
-      }, 10000);
-
-      // Simulate file sync test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.2) {
-          resolve();
-        } else {
-          reject(new Error('File sync connection test failed'));
-        }
-      }, Math.random() * 3000);
-    });
+  /** No file-transfer client is wired; fail closed instead of guessing. */
+  private async testFileSyncConnection(_method: ConnectionMethod): Promise<void> {
+    throw new Error(
+      'File sync connection cannot be verified: no file transfer client is configured in this service.',
+    );
   }
 
-  /**
-   * Test screen scrape connection
-   */
-  private async testScreenScrapeConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Screen scrape connection timeout'));
-      }, 15000);
-
-      // Simulate screen scrape test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.3) {
-          resolve();
-        } else {
-          reject(new Error('Screen scrape connection test failed'));
-        }
-      }, Math.random() * 5000);
-    });
+  /** No browser client is wired; fail closed instead of guessing. */
+  private async testScreenScrapeConnection(_method: ConnectionMethod): Promise<void> {
+    throw new Error(
+      'Screen scrape connection cannot be verified: no browser session client is configured in this service.',
+    );
   }
 
-  /**
-   * Test message queue connection
-   */
-  private async testMessageQueueConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Message queue connection timeout'));
-      }, 5000);
-
-      // Simulate message queue test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.1) {
-          resolve();
-        } else {
-          reject(new Error('Message queue connection test failed'));
-        }
-      }, Math.random() * 2000);
-    });
+  /** No queue client is wired; fail closed instead of guessing. */
+  private async testMessageQueueConnection(_method: ConnectionMethod): Promise<void> {
+    throw new Error(
+      'Message queue connection cannot be verified: no broker client is configured in this service.',
+    );
   }
 
-  /**
-   * Test webhook connection
-   */
-  private async testWebhookConnection(method: ConnectionMethod): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Webhook connection timeout'));
-      }, 10000);
-
-      // Simulate webhook test
-      setTimeout(() => {
-        clearTimeout(timeout);
-        if (Math.random() > 0.15) {
-          resolve();
-        } else {
-          reject(new Error('Webhook connection test failed'));
-        }
-      }, Math.random() * 2500);
-    });
+  /** No outbound registration client is wired; fail closed instead of guessing. */
+  private async testWebhookConnection(_method: ConnectionMethod): Promise<void> {
+    throw new Error(
+      'Webhook connection cannot be verified: no outbound registration client is configured in this service.',
+    );
   }
 
   /**

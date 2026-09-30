@@ -145,8 +145,8 @@
 
 | Credential | Value |
 |-----------|-------|
-| **Email** | demo@ellines.co.ke |
-| **Password** | EllinesDemo2026! |
+| **Email** | <set DEMO_EMAIL> |
+| **Password** | <set DEMO_PASSWORD> |
 | **URL** | https://eip.ellines.co.ke |
 | **Org** | Ellines Demo |
 | **Role** | Owner (all features) |

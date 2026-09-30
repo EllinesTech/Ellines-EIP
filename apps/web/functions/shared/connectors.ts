@@ -2,10 +2,12 @@ import {
   inferUemFromMetrics,
   normalizeUemModel,
   packTimelineStorage,
+  type UemCounts,
   type UemModel,
 } from './uem';
 import { isSafeEgressTarget, safeFetch, SsrfError } from './egress';
 import { encrypt, decrypt, isEncrypted } from './encryption';
+import { retrieveAllPages } from './pagination';
 
 /** Connector helpers for Cloudflare Pages Functions (mirrors connectors-sdk). */
 
@@ -99,6 +101,14 @@ export type InstallConfig = {
    * treated as READ/SYNC only — never as write-capable.
    */
   capabilities?: string[];
+  /**
+   * Pagination strategy for REST reads. 'auto' (default) detects page/offset/
+   * cursor/token/next-link from the first response. Force a strategy when the
+   * source's shape is ambiguous.
+   */
+  paginationStrategy?: 'auto' | 'page' | 'offset' | 'cursor' | 'token' | 'next-link' | 'single';
+  /** Page size requested for page/offset pagination. */
+  pageSize?: number;
   /** ISO timestamp when the next automatic sync is due. */
   nextSyncAt?: string;
 };
@@ -427,21 +437,18 @@ export function normalizeEnterprisePayload(raw: unknown) {
   // system/integration counts. Generic record counts (count, total, length) must
   // NOT map here — those go to recordCount instead.
   //
-  // healthScore: when the upstream API exposes an explicit health/score field,
-  // use it directly. When it does not (e.g. a catalogue API that returns records
-  // but no health metric), derive a proxy score so the dashboard shows a real
-  // signal instead of 0.  Derivation rule:
-  //   • API returned successfully and has records → start at 75 (system is up
-  //     and responding with data — reasonable baseline).
-  //   • Every open alert subtracts 3 points (capped at -20).
-  //   • Every open decision subtracts 1 point (capped at -10).
-  //   • If the API returned an explicit "status" field that equals ok/active/up/
-  //     healthy/complete, add 10 points (system self-reports healthy).
-  //   • Result clamped to [10, 100] — never shows 0 for a live system.
-  //   • If no records at all came back AND no health field, stays 0 (honest empty).
+  // healthScore: ONLY set from a metric the upstream system actually reported.
+  // When the API exposes no health/score field we CANNOT compute one honestly —
+  // EIP does not know how a customer's system scores its own health. Fabricating
+  // a baseline (a 75 "system is up" score, a 10 floor) makes a broken or empty
+  // system look healthy, which is exactly what EIP must never do. We therefore
+  // return null (= unknown) and let the connector health model report UNKNOWN.
   const rawHealthScore = asNumber(data.healthScore ?? data.health ?? data.score, -1);
   const hasExplicitHealthField = rawHealthScore >= 0;
   const explicitHealth = Math.min(100, Math.max(0, rawHealthScore >= 0 ? rawHealthScore : 0));
+  // connectedSystems: only maps from fields that explicitly represent connected
+  // system/integration counts. Generic record counts (count, total, length) must
+  // NOT map here — those go to recordCount instead. Zero stays zero.
   const connectedSystems = Math.max(
     0,
     asNumber(
@@ -450,9 +457,10 @@ export function normalizeEnterprisePayload(raw: unknown) {
       0,
     ),
   );
-  // recordCount: the count of records returned by this connector.
-  // Maps from generic count aliases that many catalogue/inventory APIs return.
-  // This is distinct from connectedSystems — 15 books ≠ 15 connected systems.
+  // recordCount counts records EIP can point at in the payload it received.
+  // It is NOT a claim of completeness — the connector retrieval engine tracks
+  // `retrievedRecordCount` vs `reportedRecordCount` separately, because a remote
+  // `count`/`total` is the API's word, not proof EIP actually read that many rows.
   const recordCount = Math.max(
     0,
     asNumber(
@@ -467,30 +475,10 @@ export function normalizeEnterprisePayload(raw: unknown) {
     asNumber(data.openDecisions ?? data.decisions ?? data.open_decisions ?? data.pending, 0),
   );
 
-  // Derive proxy healthScore for APIs that return records but no explicit health metric.
-  // Signals: status field, success flag, and record presence all indicate system is alive.
-  const statusVal = asString(data.status ?? data.state ?? data.health_status, '').toLowerCase();
-  const successFlag = data.success === true || data.ok === true;
-  const hasRecordData = recordCount > 0 || timeline.length > 0;
-  const statusHealthy = ['ok', 'active', 'up', 'healthy', 'complete', 'success', 'running'].some(
-    (s) => statusVal === s,
-  );
-
-  let healthScore: number;
-  if (hasExplicitHealthField) {
-    healthScore = explicitHealth;
-  } else if (hasRecordData || successFlag) {
-    // System is responding and returning data — baseline 75
-    let derived = 75;
-    if (statusHealthy || successFlag) derived += 10;
-    // Penalise for alerts and decisions (signals of work needed)
-    derived -= Math.min(20, openAlerts * 3);
-    derived -= Math.min(10, openDecisions * 1);
-    healthScore = Math.min(100, Math.max(10, derived));
-  } else {
-    // No data, no health field — honestly report 0
-    healthScore = 0;
-  }
+  // Health is reported ONLY when the upstream system published a real health
+  // metric. There is deliberately no derived baseline and no minimum floor:
+  // inventing 75 (or 10) would render a disconnected or empty system as healthy.
+  const healthScore: number | null = hasExplicitHealthField ? explicitHealth : null;
 
   // ── Brief highlight ───────────────────────────────────────────────────────────
   // Fallback chain: schema-native → common prose fields → synthesised from
@@ -511,7 +499,9 @@ export function normalizeEnterprisePayload(raw: unknown) {
       : businessName
         ? `${businessName}: sync completed.`
         : undefined),
-    'REST sync completed.',
+    // No upstream prose: say only what is actually true — that a payload was
+    // retrieved — and never imply business data was understood or verified.
+    'Payload retrieved. No summary field was provided by the source system.',
   );
 
   const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system ?? businessName, '');
@@ -687,6 +677,10 @@ export async function syncOpenApiRoutes(options: {
   routes: { method: string; path: string; capability?: string }[];
   headers?: Record<string, string>;
   systemName?: string;
+  /** Page size for paginated OpenAPI resources. */
+  pageSize?: number;
+  /** Force a pagination strategy instead of auto-detecting it. */
+  paginationStrategy?: 'auto' | 'page' | 'offset' | 'cursor' | 'token' | 'next-link' | 'single';
 }) {
   const base = options.baseUrl.replace(/\/$/, '');
   if (!base) throw new Error('OpenAPI base URL is required');
@@ -700,13 +694,28 @@ export async function syncOpenApiRoutes(options: {
   }
 
   const timeline: { title: string; detail: string }[] = [];
-  let best = normalizeEnterprisePayload({});
   let okCount = 0;
+
+  // Per-resource outcome. Every selected resource is retrieved INDEPENDENTLY and
+  // kept separately — resources are never collapsed into a single "best" result,
+  // because doing so silently discards real data (Customers vs Invoices vs
+  // Products are different resources, not competing candidates).
+  const resources: OpenApiResourceResult[] = [];
+  let totalRetrieved = 0;
+  let totalReported = 0;
+  let anyIncomplete = false;
+  // Deterministic aggregation inputs — no health-based selection.
+  let sumOpenAlerts = 0;
+  let sumOpenDecisions = 0;
+  let sumRecordCount = 0;
+  const realHealthScores: number[] = [];
+  const collectedModels: UemModel[] = [];
+  const collectedTimeline: { title: string; detail: string }[] = [];
 
   // Per-route timeout: 4 seconds per endpoint to avoid Cloudflare Worker CPU timeout (10s total)
   const ROUTE_TIMEOUT_MS = 4000;
 
-  for (const route of gets.slice(0, 12)) {
+  for (const route of gets) {
     const url = `${base}${route.path.startsWith('/') ? route.path : `/${route.path}`}`;
     try {
       const controller = new AbortController();
@@ -722,15 +731,67 @@ export async function syncOpenApiRoutes(options: {
 
       if (!res.ok) {
         timeline.push({ title: route.capability || route.path, detail: `HTTP ${res.status}` });
+        resources.push({
+          resource: route.path, ok: false, retrievedRecordCount: 0, reportedRecordCount: 0,
+          complete: false, stopReason: 'error', error: `HTTP ${res.status}`,
+        });
+        anyIncomplete = true;
         continue;
       }
-      const raw = await res.json();
+
+      // Retrieve this resource to exhaustion, following its own pagination.
+      const retrieval = await retrieveAllPages({
+        startUrl: url,
+        strategy: options.paginationStrategy ?? 'auto',
+        pageSize: options.pageSize ?? 100,
+        fetchPage: async (pageUrl) => {
+          const perPage = await safeFetch(pageUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+          });
+          const headers: Record<string, string> = {};
+          perPage.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
+          const text = await perPage.text();
+          if (!perPage.ok) return { status: perPage.status, body: null, headers };
+          try {
+            return { status: perPage.status, body: text ? JSON.parse(text) : null, headers };
+          } catch {
+            throw new Error('Resource returned a non-JSON body');
+          }
+        },
+      });
+
       okCount += 1;
-      const normalized = normalizeEnterprisePayload(raw);
-      if (normalized.healthScore >= best.healthScore) best = normalized;
+      const normalized = normalizeEnterprisePayload({
+        records: retrieval.records,
+        retrievedCount: retrieval.retrievedRecordCount,
+      });
+      // recordCount reflects what EIP retrieved, never what the API merely claimed.
+      normalized.recordCount = retrieval.retrievedRecordCount;
+
+      totalRetrieved += retrieval.retrievedRecordCount;
+      totalReported += retrieval.reportedRecordCount;
+      sumRecordCount += normalized.recordCount;
+      sumOpenAlerts += normalized.openAlerts;
+      sumOpenDecisions += normalized.openDecisions;
+      if (typeof normalized.healthScore === 'number') realHealthScores.push(normalized.healthScore);
+      if (normalized.model) collectedModels.push(normalized.model);
+      collectedTimeline.push(...normalized.timeline);
+      if (!retrieval.complete) anyIncomplete = true;
+
+      resources.push({
+        resource: route.path, ok: true,
+        retrievedRecordCount: retrieval.retrievedRecordCount,
+        reportedRecordCount: retrieval.reportedRecordCount,
+        complete: retrieval.complete, stopReason: retrieval.stopReason,
+        error: retrieval.errors.map((e) => e.reason).join('; ') || undefined,
+      });
+
       timeline.push({
         title: route.capability || route.path,
-        detail: Array.isArray(raw) ? `${raw.length} records` : `OK from ${route.path}`,
+        detail: retrieval.complete
+          ? `${retrieval.retrievedRecordCount} record(s) retrieved`
+          : `PARTIAL — ${retrieval.retrievedRecordCount} of ${retrieval.reportedRecordCount || '?'} record(s) (${retrieval.stopReason})`,
       });
     } catch (err) {
       const errMsg =
@@ -741,23 +802,81 @@ export async function syncOpenApiRoutes(options: {
             ? 'Request timeout'
             : err.message
           : 'Request failed';
-      timeline.push({
-        title: route.capability || route.path,
-        detail: errMsg,
+      timeline.push({ title: route.capability || route.path, detail: errMsg });
+      resources.push({
+        resource: route.path, ok: false, retrievedRecordCount: 0, reportedRecordCount: 0,
+        complete: false, stopReason: 'error', error: errMsg,
       });
+      anyIncomplete = true;
     }
   }
 
   if (!okCount) throw new Error('No selected OpenAPI endpoints returned data');
   const name = options.systemName || 'OpenAPI System';
+
+  // Deterministic aggregation across ALL resources. No resource is discarded for
+  // having a lower health score, and no value is invented.
   return {
-    ...best,
-    connectedSystems: Math.max(best.connectedSystems, 1),
-    briefHighlight:
-      best.briefHighlight && !best.briefHighlight.includes('no brief')
-        ? best.briefHighlight
-        : `${name}: synced ${okCount} API capability route(s).`,
-    timeline: timeline.length ? timeline : best.timeline,
+    healthScore: realHealthScores.length
+      ? Math.round(realHealthScores.reduce((a, b) => a + b, 0) / realHealthScores.length)
+      : null,
+    connectedSystems: 0,
+    recordCount: sumRecordCount,
+    retrievedRecordCount: totalRetrieved,
+    reportedRecordCount: totalReported,
+    complete: !anyIncomplete,
+    openAlerts: sumOpenAlerts,
+    openDecisions: sumOpenDecisions,
+    briefHighlight: anyIncomplete
+      ? `${name}: PARTIAL retrieval — ${totalRetrieved} record(s) from ${okCount} of ${gets.length} resource(s); not all authorized data was read.`
+      : `${name}: retrieved ${totalRetrieved} record(s) from ${okCount} resource(s).`,
+    timeline: collectedTimeline.length ? collectedTimeline : timeline,
+    model: collectedModels.length ? mergeUemModelList(collectedModels) : null,
+    resources,
+  };
+}
+
+/** One OpenAPI resource's independent retrieval outcome. Resource identity is preserved. */
+export interface OpenApiResourceResult {
+  resource: string;
+  ok: boolean;
+  retrievedRecordCount: number;
+  reportedRecordCount: number;
+  complete: boolean;
+  stopReason: string;
+  error?: string;
+}
+
+/**
+ * Merge several resource models into one. Identity of each resource is retained
+ * via sourceSystem naming — resources are combined, never discarded.
+ */
+function mergeUemModelList(models: UemModel[]): UemModel | null {
+  if (!models.length) return null;
+  const objects = models.flatMap((m) => m.objects ?? []);
+  const seen = new Set<string>();
+  const uniqueObjects = objects.filter((o) => {
+    const key = `${o.kind}:${o.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const base = models[0];
+  const counts = models.reduce<UemCounts>(
+    (acc, m) => {
+      const src = (m.counts ?? {}) as Partial<UemCounts>;
+      for (const k of Object.keys(acc) as (keyof UemCounts)[]) {
+        acc[k] = (acc[k] ?? 0) + (src[k] ?? 0);
+      }
+      return acc;
+    },
+    { ...(models[0].counts as UemCounts) },
+  );
+  return {
+    ...base,
+    sourceSystem: models.map((m) => m.sourceSystem).filter(Boolean).join(' + '),
+    objects: uniqueObjects,
+    counts,
   };
 }
 

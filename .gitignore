@@ -14,6 +14,8 @@ out/
 .env.cloudflare
 .dev.vars
 .dev.vars.*
+# Local verification/build logs written by the verification scripts.
+.dev-logs/
 
 # Local-dev API routes.
 #

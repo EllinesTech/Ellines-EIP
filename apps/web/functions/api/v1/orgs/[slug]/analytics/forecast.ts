@@ -1,9 +1,9 @@
-/**
+ï»¿/**
  * Pages Function: GET /api/v1/orgs/:slug/analytics/forecast
  *
  * Query params:
- *   metric   — InfluxDB measurement / field name to forecast (required)
- *   horizon  — number of future days (optional, default 30)
+ *   metric   â€” InfluxDB measurement / field name to forecast (required)
+ *   horizon  â€” number of future days (optional, default 30)
  *
  * Gate: owner or admin role only.
  * Forwards to the identity service GET /api/v1/ellinea/analytics/forecast
