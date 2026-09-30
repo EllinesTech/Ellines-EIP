@@ -37,6 +37,7 @@ import mysql from 'mysql2/promise';
 import { Client } from 'pg';
 import SftpClient from 'ssh2-sftp-client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 
 const SECRET_KEYS = [
   'apiKey',
@@ -95,7 +96,51 @@ function mergeConfig(
 
 @Injectable()
 export class EnterpriseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryption: EncryptionService,
+  ) {}
+
+  /**
+   * Encrypt every credential field before persistence.
+   *
+   * Mirrors `encryptConnectorConfig` in the Pages Functions plane so both
+   * data planes store connector secrets identically. Already-encrypted
+   * values are left untouched, which keeps this idempotent.
+   */
+  private async encryptConfig(
+    config: ConnectorInstallConfig,
+    organizationId: string,
+  ): Promise<ConnectorInstallConfig> {
+    const out: ConnectorInstallConfig = { ...config };
+    for (const key of SECRET_KEYS) {
+      const val = out[key];
+      if (typeof val === 'string' && val.length > 0 && !this.encryption.isEncrypted(val)) {
+        (out as Record<string, unknown>)[key] = await this.encryption.encrypt(val, organizationId);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Decrypt credentials immediately before an outbound connection.
+   *
+   * The returned config must NEVER reach an API response — responses go
+   * through `toInstallationDto`/`redactConfig`.
+   */
+  private async decryptConfig(
+    config: ConnectorInstallConfig,
+    organizationId: string,
+  ): Promise<ConnectorInstallConfig> {
+    const out: ConnectorInstallConfig = { ...config };
+    for (const key of SECRET_KEYS) {
+      const val = out[key];
+      if (typeof val === 'string' && this.encryption.isEncrypted(val)) {
+        (out as Record<string, unknown>)[key] = await this.encryption.decrypt(val, organizationId);
+      }
+    }
+    return out;
+  }
 
   async getSummary(organizationId: string): Promise<EnterpriseSummary> {
     const snap = await this.prisma.enterpriseSnapshot.findUnique({
@@ -272,12 +317,15 @@ export class EnterpriseService {
       displayName = displayName || pack.name;
     }
 
+    // Secrets are encrypted at rest before they touch the database.
+    const encryptedConfig = await this.encryptConfig(config, organizationId);
+
     const row = await this.prisma.connectorInstallation.create({
       data: {
         organizationId,
         catalogId,
         displayName,
-        config: config as object,
+        config: encryptedConfig as object,
         status: 'draft',
         packId,
       },
@@ -305,11 +353,13 @@ export class EnterpriseService {
     if (!row) throw new NotFoundException('Installation not found');
     const existing = asInstallConfig(row.config);
     const config = patch.config ? mergeConfig(existing, patch.config) : existing;
+    // Encrypt any newly-submitted credentials before persistence.
+    const encryptedConfig = await this.encryptConfig(config, organizationId);
     const updated = await this.prisma.connectorInstallation.update({
       where: { id },
       data: {
         displayName: patch.displayName?.trim() || row.displayName,
-        config: config as object,
+        config: encryptedConfig as object,
       },
     });
     return this.toInstallationDto(updated);
@@ -337,7 +387,9 @@ export class EnterpriseService {
       where: { id, organizationId },
     });
     if (!row) throw new NotFoundException('Installation not found');
-    const config = asInstallConfig(row.config);
+    const stored = asInstallConfig(row.config);
+    // Decrypt only for the outbound connection; never persisted or returned.
+    const config = await this.decryptConfig(stored, organizationId);
 
     try {
       const ok = await this.runTest(row.catalogId, config);
@@ -366,13 +418,24 @@ export class EnterpriseService {
       where: { id, organizationId },
     });
     if (!row) throw new NotFoundException('Installation not found');
-    const config = asInstallConfig(row.config);
+    const stored = asInstallConfig(row.config);
+    const config = await this.decryptConfig(stored, organizationId);
     const summary = await this.runSync(row.catalogId, config, row.displayName);
     const nextAt = (() => {
       const mins = Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0));
       if (!mins) return undefined;
       return new Date(Date.now() + mins * 60_000).toISOString();
     })();
+    // Re-encrypt before writing back: `config` above is decrypted plaintext and
+    // must never be persisted.
+    const configToPersist = await this.encryptConfig(
+      {
+        ...config,
+        syncIntervalMinutes: Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0)),
+        nextSyncAt: nextAt,
+      } as ConnectorInstallConfig,
+      organizationId,
+    );
     await this.prisma.connectorInstallation.update({
       where: { id },
       data: {
@@ -382,11 +445,7 @@ export class EnterpriseService {
         // Store this one system's payload; the org's snapshot is the aggregate
         // of every connected system below, not just this one.
         lastPayload: summary as object,
-        config: {
-          ...config,
-          syncIntervalMinutes: Math.max(0, Math.round(Number(config.syncIntervalMinutes) || 0)),
-          nextSyncAt: nextAt,
-        } as object,
+        config: configToPersist as object,
       },
     });
     return this.aggregateAndPersistSnapshot(organizationId, actorUserId);
