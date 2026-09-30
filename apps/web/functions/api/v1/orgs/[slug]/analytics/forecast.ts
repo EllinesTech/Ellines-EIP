@@ -1,9 +1,9 @@
-ï»¿/**
+/**
  * Pages Function: GET /api/v1/orgs/:slug/analytics/forecast
  *
  * Query params:
- *   metric   â€” InfluxDB measurement / field name to forecast (required)
- *   horizon  â€” number of future days (optional, default 30)
+ *   metric   — InfluxDB measurement / field name to forecast (required)
+ *   horizon  — number of future days (optional, default 30)
  *
  * Gate: owner or admin role only.
  * Forwards to the identity service GET /api/v1/ellinea/analytics/forecast
@@ -22,8 +22,8 @@ import {
 } from '../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
-function identityBase(env: Env & Record<string, string>): string {
-  return (env as unknown as Record<string, string>)['IDENTITY_API_URL'] ?? 'http://localhost:3001';
+function identityBase(env: Env): string {
+  return env.IDENTITY_API_URL ?? 'http://localhost:3001';
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -69,7 +69,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Forward to identity service
   const bearerToken = (context.request.headers.get('authorization') ?? '').trim();
-  const base = identityBase(context.env as Env & Record<string, string>);
+  const base = identityBase(context.env);
   const identityUrl = `${base}/api/v1/ellinea/analytics/forecast?metric=${encodeURIComponent(metric)}&horizon=${horizon}&orgId=${encodeURIComponent(auth.organizationId)}`;
 
   let upstream: Response;

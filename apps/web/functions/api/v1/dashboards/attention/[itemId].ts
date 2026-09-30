@@ -1,5 +1,6 @@
 import {
   auditRow,
+  getClientIp,
   getAdminClient,
   json,
   options,
@@ -25,17 +26,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Parse category and severity from the composite itemId (e.g. "connector-abc123")
   const [category] = itemId.split('-');
 
-  await auditRow(supabase, {
-    organizationId: auth.organizationId,
-    userId: auth.sub,
-    action: 'attention:dismissed',
-    resource: itemId,
-    metadata: {
-      item_id: itemId,
-      category: category ?? 'unknown',
-      timestamp: new Date().toISOString(),
-    },
-  });
+  await supabase
+    .from('audit_logs')
+    .insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'attention:dismissed',
+        resource: itemId,
+        metadata: {
+          item_id: itemId,
+          category: category ?? 'unknown',
+          timestamp: new Date().toISOString(),
+        },
+        ip: getClientIp(context.request),
+      }),
+    );
 
   return json({ dismissed: true, itemId });
 };

@@ -63,6 +63,12 @@ export interface Env {
   ELLINEA_VAPID_PUBLIC_KEY?: string;
   ELLINEA_VAPID_PRIVATE_KEY?: string;
   ELLINEA_VAPID_SUBJECT?: string;
+  /**
+   * Base URL of the NestJS identity service. Pages Functions proxy several
+   * routes (inbox, email, analytics, federated learning, connector templates)
+   * to this origin. Declared here so callers never resort to unsafe casts.
+   */
+  IDENTITY_API_URL?: string;
 }
 
 export function getAdminClient(env: Env): SupabaseClient {

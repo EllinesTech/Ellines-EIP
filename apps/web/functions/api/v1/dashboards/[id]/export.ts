@@ -1,6 +1,7 @@
 import {
   auditRow,
   getAdminClient,
+  getClientIp,
   json,
   options,
   requireAuth,
@@ -54,13 +55,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const exportedAt = new Date().toISOString();
 
-  await auditRow(supabase, {
-    organizationId: auth.organizationId,
-    userId: auth.sub,
-    action: 'dashboard:exported',
-    resource: id,
-    metadata: { export_format: format, widget_count: count ?? 0, exported_at: exportedAt },
-  });
+  await supabase
+    .from('audit_logs')
+    .insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'dashboard:exported',
+        resource: id,
+        metadata: { export_format: format, widget_count: count ?? 0, exported_at: exportedAt },
+        ip: getClientIp(context.request),
+      }),
+    );
 
   // Return metadata — actual file generation is a future step (PDF/XLSX requires server-side tooling)
   return json({

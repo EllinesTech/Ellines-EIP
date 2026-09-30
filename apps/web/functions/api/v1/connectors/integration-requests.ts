@@ -20,7 +20,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const supabase = getAdminClient(context.env);
-  const isPlatformAdmin = platformAdminFromEnv(auth.email, context.env);
+  const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (context.request.method === 'GET') {

@@ -1,6 +1,7 @@
 import {
   auditRow,
   getAdminClient,
+  getClientIp,
   json,
   options,
   requireAuth,
@@ -96,13 +97,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (updateErr) return json({ statusCode: 500, message: updateErr.message }, 500);
 
     if (updates.visibility && updates.visibility !== visibilityBefore) {
-      await auditRow(supabase, {
-        organizationId: auth.organizationId,
-        userId: auth.sub,
-        action: 'dashboard:visibility_changed',
-        resource: id,
-        metadata: { visibility_before: visibilityBefore, visibility_after: updates.visibility },
-      });
+      await supabase
+        .from('audit_logs')
+        .insert(
+          auditRow({
+            organizationId: auth.organizationId,
+            userId: auth.sub,
+            action: 'dashboard:visibility_changed',
+            resource: id,
+            metadata: { visibility_before: visibilityBefore, visibility_after: updates.visibility },
+            ip: getClientIp(context.request),
+          }),
+        );
     }
 
     return json({ dashboard: updated });
@@ -127,13 +133,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     if (delErr) return json({ statusCode: 500, message: delErr.message }, 500);
 
-    await auditRow(supabase, {
-      organizationId: auth.organizationId,
-      userId: auth.sub,
-      action: 'dashboard:deleted',
-      resource: id,
-      metadata: { was_default: existing.is_default },
-    });
+    await supabase
+      .from('audit_logs')
+      .insert(
+        auditRow({
+          organizationId: auth.organizationId,
+          userId: auth.sub,
+          action: 'dashboard:deleted',
+          resource: id,
+          metadata: { was_default: existing.is_default },
+          ip: getClientIp(context.request),
+        }),
+      );
 
     return json({
       deleted: true,

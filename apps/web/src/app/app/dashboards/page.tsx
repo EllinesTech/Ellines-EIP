@@ -1,28 +1,23 @@
 'use client';
 
 /**
- * /app/dashboards — Client Dashboard list page.
- * Uses the new /api/v1/dashboards (client_dashboards table, spec: client-dashboard-connector-platform).
- * All roles can view; owners/managers can create.
+ * /app/dashboards — Client Dashboard list (Command Center entry point).
+ * Uses authenticated API helpers from api.ts — Authorization header included automatically.
  * Requirements: 30.1, 3.1–3.8
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getSession } from '@/lib/api';
-
-interface ClientDashboard {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  visibility: string;
-  is_default: boolean;
-  refresh_policy: number;
-  created_at: string;
-  updated_at: string;
-}
+import {
+  getSession,
+  listClientDashboards,
+  createClientDashboard,
+  deleteClientDashboard,
+  duplicateClientDashboard,
+  setDefaultClientDashboard,
+  type ClientDashboardSummary,
+} from '@/lib/api';
 
 const DASHBOARD_TYPES = [
   'EXECUTIVE', 'OPERATIONS', 'FINANCE', 'HR', 'SALES',
@@ -31,7 +26,7 @@ const DASHBOARD_TYPES = [
 
 export default function ClientDashboardsPage() {
   const router = useRouter();
-  const [dashboards, setDashboards] = useState<ClientDashboard[]>([]);
+  const [dashboards, setDashboards] = useState<ClientDashboardSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -42,10 +37,9 @@ export default function ClientDashboardsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch('/api/v1/dashboards');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { dashboards: ClientDashboard[] };
+      const data = await listClientDashboards();
       setDashboards(data.dashboards ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboards');
@@ -65,14 +59,14 @@ export default function ClientDashboardsPage() {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch('/api/v1/dashboards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, description: form.description, type: form.type, visibility: form.visibility, refreshPolicy: form.refreshPolicy }),
+      const data = await createClientDashboard({
+        name: form.name,
+        description: form.description,
+        type: form.type,
+        visibility: form.visibility,
+        refreshPolicy: form.refreshPolicy,
       });
-      const data = await res.json() as { dashboard?: ClientDashboard; message?: string };
-      if (!res.ok) throw new Error(data.message ?? `HTTP ${res.status}`);
-      setDashboards((prev) => [data.dashboard!, ...prev]);
+      setDashboards((prev) => [data.dashboard, ...prev]);
       setShowForm(false);
       setForm({ name: '', description: '', type: 'CUSTOM', visibility: 'PRIVATE', refreshPolicy: 300 });
     } catch (err) {
@@ -85,64 +79,51 @@ export default function ClientDashboardsPage() {
   const onDelete = async (id: string, name: string) => {
     if (!confirm(`Delete dashboard "${name}"? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`/api/v1/dashboards/${id}`, { method: 'DELETE' });
-      if (!res.ok) { const d = await res.json() as { message?: string }; throw new Error(d.message ?? 'Failed'); }
+      await deleteClientDashboard(id);
       setDashboards((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
     }
   };
 
-  const panelStyle: React.CSSProperties = {
-    background: 'var(--surface-base)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-6)',
-    marginBottom: 'var(--space-4)',
+  const onDuplicate = async (id: string) => {
+    try {
+      const data = await duplicateClientDashboard(id);
+      setDashboards((prev) => [data.dashboard, ...prev]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Duplicate failed');
+    }
   };
 
-  const btnPrimary: React.CSSProperties = {
-    padding: 'var(--space-2) var(--space-6)',
-    background: 'var(--brand-primary)',
-    color: 'var(--brand-text)',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    fontSize: 'var(--font-l5-size)',
-    fontWeight: 600,
+  const onSetDefault = async (id: string) => {
+    try {
+      await setDefaultClientDashboard(id);
+      await load(); // reload to reflect updated is_default flags
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set default');
+    }
   };
 
-  const btnGhost: React.CSSProperties = {
-    ...btnPrimary,
-    background: 'transparent',
-    border: '1px solid var(--border-default)',
-    color: 'var(--brand-text-muted)',
+  // ── Styles using glass-ui tokens ─────────────────────────────────────────
+  const panel: React.CSSProperties = {
+    background: 'var(--surface-base, rgba(15,23,42,0.85))',
+    border: '1px solid var(--border-default, rgba(111,45,141,0.20))',
+    borderRadius: 'var(--radius-lg, 12px)',
+    padding: '16px',
+    marginBottom: '12px',
   };
-
-  const inputStyle: React.CSSProperties = {
-    background: 'var(--surface-elevated)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--brand-text)',
-    padding: 'var(--space-2) var(--space-3)',
-    fontFamily: 'inherit',
-    fontSize: 'var(--font-l4-size)',
-    width: '100%',
-    boxSizing: 'border-box',
-  };
+  const btnPrimary: React.CSSProperties = { padding: '8px 24px', background: 'var(--brand-primary, #6F2D8D)', color: '#F1F5F9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 600 };
+  const btnGhost: React.CSSProperties = { ...btnPrimary, background: 'transparent', border: '1px solid rgba(111,45,141,0.3)', color: 'rgba(241,245,249,0.60)' };
+  const btnAccent: React.CSSProperties = { ...btnPrimary, background: 'var(--brand-accent, #2563EB)' };
+  const inputStyle: React.CSSProperties = { background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(111,45,141,0.20)', borderRadius: '8px', color: '#F1F5F9', padding: '8px 12px', fontFamily: 'inherit', fontSize: '0.9375rem', width: '100%', boxSizing: 'border-box' };
 
   return (
-    <main
-      id="main-content"
-      style={{ padding: 'var(--space-6)', maxWidth: 900, margin: '0 auto', fontFamily: "'Exo 2', system-ui, sans-serif", color: 'var(--brand-text)' }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
+    <main id="main-content" style={{ padding: '24px', maxWidth: 960, margin: '0 auto', fontFamily: "'Exo 2', system-ui, sans-serif", color: '#F1F5F9' }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: 'var(--font-l1-size)', fontWeight: 'var(--font-l1-weight)', margin: 0 }}>
-            Dashboards
-          </h1>
-          <p style={{ color: 'var(--brand-text-muted)', margin: 'var(--space-1) 0 0', fontSize: 'var(--font-l5-size)' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0 }}>Dashboards</h1>
+          <p style={{ color: 'rgba(241,245,249,0.60)', margin: '4px 0 0', fontSize: '0.75rem' }}>
             {session?.organization?.name} · {dashboards.length} dashboard{dashboards.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -151,43 +132,47 @@ export default function ClientDashboardsPage() {
         </button>
       </div>
 
+      {/* Error */}
       {error && (
-        <div role="alert" style={{ color: 'var(--status-error)', background: 'rgba(239,68,68,0.08)', border: '1px solid var(--severity-critical)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', fontSize: 'var(--font-l5-size)' }}>
+        <div role="alert" style={{ color: '#EF4444', background: 'rgba(239,68,68,0.08)', border: '1px solid #EF4444', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '0.75rem' }}>
           {error}
         </div>
       )}
 
+      {/* Create form */}
       {showForm && (
-        <div style={panelStyle}>
-          <h2 style={{ fontSize: 'var(--font-l2-size)', margin: '0 0 var(--space-4)' }}>Create dashboard</h2>
-          <form onSubmit={onCreate} style={{ display: 'grid', gap: 'var(--space-4)' }}>
-            <label>
-              <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Name *</span>
-              <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required minLength={1} maxLength={120} placeholder="Executive Overview" />
-            </label>
-            <label>
-              <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Description</span>
-              <input style={inputStyle} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} maxLength={500} placeholder="KPIs, trends, and alerts" />
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-4)' }}>
+        <div style={panel}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 16px' }}>Create dashboard</h2>
+          <form onSubmit={onCreate} style={{ display: 'grid', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <label>
-                <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Type</span>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', display: 'block', marginBottom: '4px' }}>Name *</span>
+                <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required minLength={1} maxLength={120} placeholder="Executive Overview" />
+              </label>
+              <label>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', display: 'block', marginBottom: '4px' }}>Type</span>
                 <select style={inputStyle} value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
                   {DASHBOARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </label>
+            </div>
+            <label>
+              <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', display: 'block', marginBottom: '4px' }}>Description</span>
+              <input style={inputStyle} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} maxLength={500} placeholder="KPIs, trends, and operational alerts" />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <label>
-                <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Visibility</span>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', display: 'block', marginBottom: '4px' }}>Visibility</span>
                 <select style={inputStyle} value={form.visibility} onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))}>
-                  {['PRIVATE','SHARED','PUBLISHED'].map((v) => <option key={v} value={v}>{v}</option>)}
+                  {['PRIVATE', 'SHARED', 'PUBLISHED'].map((v) => <option key={v} value={v}>{v}</option>)}
                 </select>
               </label>
               <label>
-                <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Refresh (seconds)</span>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', display: 'block', marginBottom: '4px' }}>Auto-refresh (seconds)</span>
                 <input style={inputStyle} type="number" min={30} max={86400} value={form.refreshPolicy} onChange={(e) => setForm((f) => ({ ...f, refreshPolicy: Number(e.target.value) }))} />
               </label>
             </div>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button type="button" style={btnGhost} onClick={() => setShowForm(false)}>Cancel</button>
               <button type="submit" style={btnPrimary} disabled={creating}>{creating ? 'Creating…' : 'Create'}</button>
             </div>
@@ -195,34 +180,37 @@ export default function ClientDashboardsPage() {
         </div>
       )}
 
+      {/* Dashboard list */}
       {loading ? (
-        <p style={{ color: 'var(--brand-text-muted)' }}>Loading dashboards…</p>
+        <p style={{ color: 'rgba(241,245,249,0.60)' }}>Loading dashboards…</p>
       ) : dashboards.length === 0 ? (
-        <div style={{ ...panelStyle, textAlign: 'center', color: 'var(--brand-text-muted)', padding: 'var(--space-12)' }}>
-          <p style={{ fontSize: 'var(--font-l4-size)', margin: 0 }}>No dashboards yet.</p>
-          <p style={{ fontSize: 'var(--font-l5-size)', margin: 'var(--space-2) 0 0' }}>Create your first dashboard to get started.</p>
+        <div style={{ ...panel, textAlign: 'center', padding: '48px', color: 'rgba(241,245,249,0.60)' }}>
+          <p style={{ fontSize: '0.9375rem', margin: 0 }}>No dashboards yet.</p>
+          <p style={{ fontSize: '0.75rem', margin: '8px 0 0' }}>Create your first dashboard to start tracking your business.</p>
+          <button style={{ ...btnPrimary, marginTop: '16px' }} onClick={() => setShowForm(true)}>Create first dashboard</button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'grid', gap: '12px' }}>
           {dashboards.map((d) => (
-            <div key={d.id} style={{ ...panelStyle, display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 0 }}>
+            <div key={d.id} style={{ ...panel, display: 'flex', alignItems: 'center', gap: '16px', marginBottom: 0 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <Link href={`/app/dashboards/${d.id}`} style={{ fontSize: 'var(--font-l3-size)', fontWeight: 600, color: 'var(--brand-accent)', textDecoration: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <Link href={`/app/dashboards/${d.id}`} style={{ fontSize: '1rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}>
                     {d.name}
                   </Link>
-                  {d.is_default && (
-                    <span style={{ fontSize: 'var(--font-l5-size)', background: 'rgba(111,45,141,0.25)', color: 'var(--brand-text)', padding: '1px var(--space-2)', borderRadius: 'var(--radius-sm)' }}>Default</span>
-                  )}
-                  <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)' }}>{d.type}</span>
-                  <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)' }}>·</span>
-                  <span style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)' }}>{d.visibility}</span>
+                  {d.is_default && <span style={{ fontSize: '0.625rem', background: 'rgba(111,45,141,0.25)', color: '#F1F5F9', padding: '1px 8px', borderRadius: '4px', fontWeight: 600 }}>DEFAULT</span>}
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.40)', textTransform: 'uppercase' }}>{d.type}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.40)' }}>·</span>
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.40)' }}>{d.visibility}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.40)' }}>· refresh {d.refresh_policy}s</span>
                 </div>
-                {d.description && <p style={{ fontSize: 'var(--font-l5-size)', color: 'var(--brand-text-muted)', margin: 'var(--space-1) 0 0' }}>{d.description}</p>}
+                {d.description && <p style={{ fontSize: '0.75rem', color: 'rgba(241,245,249,0.60)', margin: '4px 0 0' }}>{d.description}</p>}
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
-                <Link href={`/app/dashboards/${d.id}`} style={{ ...btnPrimary, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Open</Link>
-                <button style={btnGhost} onClick={() => onDelete(d.id, d.name)}>Delete</button>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+                <Link href={`/app/dashboards/${d.id}`} style={{ ...btnAccent, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Open</Link>
+                {!d.is_default && <button style={btnGhost} onClick={() => onSetDefault(d.id)}>Set default</button>}
+                <button style={btnGhost} onClick={() => onDuplicate(d.id)}>Duplicate</button>
+                <button style={{ ...btnGhost, color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => onDelete(d.id, d.name)}>Delete</button>
               </div>
             </div>
           ))}

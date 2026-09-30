@@ -20,8 +20,8 @@ import {
 } from '../../../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
-function identityBase(env: Env & Record<string, string>): string {
-  return (env as unknown as Record<string, string>)['IDENTITY_API_URL'] ?? 'http://localhost:3001';
+function identityBase(env: Env): string {
+  return env.IDENTITY_API_URL ?? 'http://localhost:3001';
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -54,7 +54,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Forward to identity service
   const bearerHeader = (context.request.headers.get('authorization') ?? '').trim();
-  const base = identityBase(context.env as Env & Record<string, string>);
+  const base = identityBase(context.env);
   const identityUrl = `${base}/api/v1/email/threads/${encodeURIComponent(threadId)}`;
 
   let upstream: Response;

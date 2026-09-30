@@ -1,6 +1,7 @@
 import {
   auditRow,
   getAdminClient,
+  getClientIp,
   json,
   options,
   platformAdminFromEnv,
@@ -41,21 +42,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
+  const supabase = getAdminClient(context.env);
+
   // Platform Admin only (Req 12.1)
-  if (!platformAdminFromEnv(auth.email, context.env)) {
-    const supabase = getAdminClient(context.env);
-    await auditRow(supabase, {
-      organizationId: auth.organizationId,
-      userId: auth.sub,
-      action: 'connector:lifecycle:denied',
-      resource: context.params['id'] as string,
-      metadata: { reason: 'insufficient_privilege' },
-    });
+  if (!platformAdminFromEnv(context.env, auth.email)) {
+    await supabase
+      .from('audit_logs')
+      .insert(
+        auditRow({
+          organizationId: auth.organizationId,
+          userId: auth.sub,
+          action: 'connector:lifecycle:denied',
+          resource: context.params['id'] as string,
+          metadata: { reason: 'insufficient_privilege' },
+          ip: getClientIp(context.request),
+        }),
+      );
     return json({ statusCode: 403, message: 'Connector lifecycle management requires Platform Admin privileges' }, 403);
   }
 
   const connectorId = context.params['id'] as string;
-  const supabase = getAdminClient(context.env);
 
   let body: Record<string, unknown> = {};
   try { body = await context.request.json() as Record<string, unknown>; }
@@ -106,19 +112,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (updateErr) return json({ statusCode: 500, message: updateErr.message }, 500);
 
   // Audit every transition (Req 20.x)
-  await auditRow(supabase, {
-    organizationId: connector.organization_id as string,
-    userId: auth.sub,
-    action: 'connector:lifecycle:transition',
-    resource: connectorId,
-    metadata: {
-      connector_id: connectorId,
-      previous_status: fromState,
-      new_status: toState,
-      reason,
-      timestamp: new Date().toISOString(),
-    },
-  });
+  await supabase
+    .from('audit_logs')
+    .insert(
+      auditRow({
+        organizationId: connector.organization_id as string,
+        userId: auth.sub,
+        action: 'connector:lifecycle:transition',
+        resource: connectorId,
+        metadata: {
+          connector_id: connectorId,
+          previous_status: fromState,
+          new_status: toState,
+          reason,
+          timestamp: new Date().toISOString(),
+        },
+        ip: getClientIp(context.request),
+      }),
+    );
 
   return json({ connector: updated, transition: { from: fromState, to: toState } });
 };

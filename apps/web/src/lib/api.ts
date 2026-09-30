@@ -3256,3 +3256,322 @@ export function biometricAuthStub(): {
 } {
   return { supported: false, reason: 'not_implemented' };
 }
+
+// ─── Email Inbox Window ────────────────────────────────────────────────────────
+
+export interface EmailAccountDto {
+  id: string;
+  label: string;
+  emailAddress: string;
+  provider: string;
+  imapHost: string;
+  imapPort: number;
+  displayMode: 'full' | 'summary';
+  pollIntervalSeconds: number;
+  lastSyncedAt: string | null;
+  isActive: boolean;
+  lastError: string | null;
+  createdAt: string;
+}
+
+export interface EmailMessageDto {
+  id: string;
+  accountId: string;
+  subject: string;
+  fromAddress: string;
+  fromName: string;
+  toAddresses: string[];
+  bodyText: string;
+  aiSummary: string | null;
+  urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+  category: string;
+  isRead: boolean;
+  isSummarized: boolean;
+  threadId: string | null;
+  receivedAt: string;
+}
+
+export interface AddEmailAccountDto {
+  label?: string;
+  emailAddress: string;
+  provider: 'gmail' | 'outlook' | 'exchange' | 'custom';
+  appPassword: string;
+  customHost?: string;
+  customPort?: number;
+  displayMode?: 'full' | 'summary';
+  pollIntervalSeconds?: number;
+}
+
+/** List all email accounts for this org (no passwords returned). */
+export function fetchInboxAccounts() {
+  return request<{ success: boolean; data: EmailAccountDto[] }>('/api/v1/inbox/accounts');
+}
+
+/** Add a new email account (owner / admin only). */
+export function addInboxAccount(dto: AddEmailAccountDto) {
+  return request<{ success: boolean; data: EmailAccountDto }>('/api/v1/inbox/accounts', {
+    method: 'POST',
+    body: JSON.stringify(dto),
+  });
+}
+
+/** Update an account label / display mode / password. */
+export function updateInboxAccount(id: string, dto: Partial<AddEmailAccountDto> & { isActive?: boolean }) {
+  return request<{ success: boolean; data: EmailAccountDto }>(`/api/v1/inbox/accounts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(dto),
+  });
+}
+
+/** Delete an account and all its messages. */
+export function deleteInboxAccount(id: string) {
+  return request<{ success: boolean }>(`/api/v1/inbox/accounts/${id}`, { method: 'DELETE' });
+}
+
+/** Test IMAP connection for an account. */
+export function testInboxAccount(id: string) {
+  return request<{ success: boolean; data: { ok: boolean; error?: string } }>(
+    `/api/v1/inbox/accounts/${id}/test`,
+    { method: 'POST', body: '{}' },
+  );
+}
+
+/** Trigger an immediate sync for one account. */
+export function syncInboxAccount(id: string) {
+  return request<{ success: boolean; data: { newMessages: number } }>(
+    `/api/v1/inbox/accounts/${id}/sync`,
+    { method: 'POST', body: '{}' },
+  );
+}
+
+/** Sync all due accounts for this org. */
+export function syncAllInboxAccounts() {
+  return request<{ success: boolean; data: { synced: number; newMessages: number } }>(
+    '/api/v1/inbox/sync',
+    { method: 'POST', body: '{}' },
+  );
+}
+
+/** List messages. */
+export function fetchInboxMessages(opts: {
+  accountId?: string;
+  unreadOnly?: boolean;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const params = new URLSearchParams();
+  if (opts.accountId)  params.set('accountId', opts.accountId);
+  if (opts.unreadOnly) params.set('unreadOnly', 'true');
+  if (opts.limit)      params.set('limit', String(opts.limit));
+  if (opts.offset)     params.set('offset', String(opts.offset));
+  const qs = params.toString();
+  return request<{ success: boolean; data: { messages: EmailMessageDto[]; total: number } }>(
+    `/api/v1/inbox/messages${qs ? `?${qs}` : ''}`,
+  );
+}
+
+/** Get a single message (marks it as read). */
+export function fetchInboxMessage(id: string) {
+  return request<{ success: boolean; data: EmailMessageDto }>(`/api/v1/inbox/messages/${id}`);
+}
+
+/** Get or generate an Ellinea summary for a message. */
+export function fetchInboxMessageSummary(id: string) {
+  return request<{ success: boolean; data: { summary: string } }>(
+    `/api/v1/inbox/messages/${id}/summary`,
+  );
+}
+
+/** Mark a message as read. */
+export function markInboxMessageRead(id: string) {
+  return request<{ success: boolean }>(`/api/v1/inbox/messages/${id}/read`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+// ─── Client Dashboard API helpers ────────────────────────────────────────────
+
+export interface ClientDashboardSummary {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  description: string;
+  type: string;
+  visibility: string;
+  is_default: boolean;
+  refresh_policy: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientDashboardWidget {
+  id: string;
+  dashboard_id: string;
+  widget_type_id: string;
+  col: number;
+  row: number;
+  width: number;
+  height: number;
+  config: Record<string, unknown>;
+  data_source_ref: string | null;
+  refresh_override_seconds: number | null;
+  last_fetched_at: string | null;
+  error_state: string | null;
+  created_at: string;
+}
+
+export interface ClientDashboardFull extends ClientDashboardSummary {
+  client_dashboard_widgets: ClientDashboardWidget[];
+}
+
+export interface AttentionItem {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: string;
+  sourceConnectorId: string | null;
+  affectedEntity: string;
+  evidence: string;
+  detectedAt: string;
+  availableAction: 'view' | 'approve' | 'investigate' | 'dismiss';
+  recurrence: boolean;
+}
+
+export interface ClientIntegrationRequestDto {
+  id: string;
+  organization_id: string;
+  requested_by_id: string;
+  system_name: string;
+  purpose: string | null;
+  requested_connector_type: string | null;
+  business_justification: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Response of GET /api/v1/connectors/health.
+ * Alias of the authoritative `ConnectorHealthDto` (declared near the connector
+ * DTOs at the top of this module) so both consumers stay type-compatible.
+ */
+export type ConnectorHealthResponse = ConnectorHealthDto;
+
+/** List client dashboards for the authenticated org. */
+export function listClientDashboards(opts?: { type?: string }): Promise<{ dashboards: ClientDashboardSummary[] }> {
+  const params = opts?.type ? `?type=${encodeURIComponent(opts.type)}` : '';
+  return request<{ dashboards: ClientDashboardSummary[] }>(`/api/v1/dashboards${params}`);
+}
+
+/** Get a single client dashboard with its widgets. */
+export function getClientDashboard(id: string): Promise<{ dashboard: ClientDashboardFull }> {
+  return request<{ dashboard: ClientDashboardFull }>(`/api/v1/dashboards/${id}`);
+}
+
+/** Create a new client dashboard. */
+export function createClientDashboard(body: {
+  name: string;
+  description?: string;
+  type: string;
+  visibility?: string;
+  refreshPolicy?: number;
+}): Promise<{ dashboard: ClientDashboardSummary }> {
+  return request<{ dashboard: ClientDashboardSummary }>('/api/v1/dashboards', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Delete a client dashboard. */
+export function deleteClientDashboard(id: string): Promise<{ deleted: boolean; defaultCleared: boolean }> {
+  return request<{ deleted: boolean; defaultCleared: boolean }>(`/api/v1/dashboards/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Duplicate a client dashboard. */
+export function duplicateClientDashboard(id: string): Promise<{ dashboard: ClientDashboardSummary }> {
+  return request<{ dashboard: ClientDashboardSummary }>(`/api/v1/dashboards/${id}/duplicate`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+/** Set a dashboard as the user's default. */
+export function setDefaultClientDashboard(id: string): Promise<{ dashboard: ClientDashboardSummary }> {
+  return request<{ dashboard: ClientDashboardSummary }>(`/api/v1/dashboards/${id}/default`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+/** Add a widget to a dashboard. */
+export function addClientDashboardWidget(dashboardId: string, body: {
+  widgetTypeId: string;
+  col?: number;
+  row?: number;
+  width?: number;
+  height?: number;
+  config?: Record<string, unknown>;
+  dataSourceRef?: string;
+  refreshOverrideSeconds?: number;
+}): Promise<{ widget: ClientDashboardWidget }> {
+  return request<{ widget: ClientDashboardWidget }>(`/api/v1/dashboards/${dashboardId}/widgets`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Remove a widget from a dashboard. */
+export function removeClientDashboardWidget(dashboardId: string, widgetId: string): Promise<void> {
+  return request<void>(`/api/v1/dashboards/${dashboardId}/widgets/${widgetId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Get attention items (critical/high connector failures, pending approvals). */
+export function getAttentionItems(): Promise<{ items: AttentionItem[] }> {
+  return request<{ items: AttentionItem[] }>('/api/v1/dashboards/attention');
+}
+
+/** Dismiss an attention item. */
+export function dismissAttentionItem(itemId: string): Promise<{ dismissed: boolean }> {
+  return request<{ dismissed: boolean }>(`/api/v1/dashboards/attention/${itemId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Get connector health for the authenticated org. */
+export function getConnectorHealth(): Promise<ConnectorHealthResponse> {
+  return request<ConnectorHealthResponse>('/api/v1/connectors/health');
+}
+
+/** List integration requests for the authenticated org (client dashboard). */
+export function listClientIntegrationRequests(): Promise<{ requests: ClientIntegrationRequestDto[] }> {
+  return request<{ requests: ClientIntegrationRequestDto[] }>('/api/v1/connectors/integration-requests');
+}
+
+/** Submit a new connector integration request (client dashboard wizard). */
+export function createClientIntegrationRequest(body: {
+  requestedSystemName: string;
+  requestedConnectorType: string;
+  businessJustification?: string;
+}): Promise<{ request: ClientIntegrationRequestDto }> {
+  return request<{ request: ClientIntegrationRequestDto }>('/api/v1/connectors/integration-requests', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Test a connector URL through the SSRF guard. */
+export function testConnectorConnection(url: string, authConfig?: Record<string, unknown>): Promise<{
+  success: boolean;
+  latencyMs: number;
+  statusCode: number | null;
+  message: string;
+}> {
+  return request('/api/v1/connectors/test-connection', {
+    method: 'POST',
+    body: JSON.stringify({ url, authConfig }),
+  });
+}

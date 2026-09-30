@@ -1,5 +1,6 @@
 import {
   auditRow,
+  getClientIp,
   getAdminClient,
   json,
   options,
@@ -59,13 +60,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (setErr) return json({ statusCode: 500, message: setErr.message }, 500);
 
-  await auditRow(supabase, {
-    organizationId: auth.organizationId,
-    userId: auth.sub,
-    action: 'dashboard:set_default',
-    resource: id,
-    metadata: {},
-  });
+  await supabase
+    .from('audit_logs')
+    .insert(
+      auditRow({
+        organizationId: auth.organizationId,
+        userId: auth.sub,
+        action: 'dashboard:set_default',
+        resource: id,
+        metadata: {},
+        ip: getClientIp(context.request),
+      }),
+    );
 
   return json({ dashboard: updated });
 };

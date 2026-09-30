@@ -1,10 +1,10 @@
-ï»¿/**
+/**
  * Pages Function: GET /api/v1/orgs/:slug/analytics/scenarios
  *
  * Query params:
- *   metric        â€” metric name (required)
- *   currentValue  â€” current observed value (required, numeric)
- *   trend         â€” 'up' | 'down' | 'stable' (optional, default 'stable')
+ *   metric        — metric name (required)
+ *   currentValue  — current observed value (required, numeric)
+ *   trend         — 'up' | 'down' | 'stable' (optional, default 'stable')
  *
  * Gate: owner or admin role only.
  * Forwards to the identity service GET /api/v1/ellinea/analytics/scenarios.
@@ -22,8 +22,8 @@ import {
 } from '../../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
 
-function identityBase(env: Env & Record<string, string>): string {
-  return (env as unknown as Record<string, string>)['IDENTITY_API_URL'] ?? 'http://localhost:3001';
+function identityBase(env: Env): string {
+  return env.IDENTITY_API_URL ?? 'http://localhost:3001';
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -76,7 +76,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Forward to identity service
   const bearerToken = (context.request.headers.get('authorization') ?? '').trim();
-  const base = identityBase(context.env as Env & Record<string, string>);
+  const base = identityBase(context.env);
   const identityUrl =
     `${base}/api/v1/ellinea/analytics/scenarios` +
     `?metric=${encodeURIComponent(metric)}` +

@@ -61,26 +61,57 @@ export class RedisService implements OnModuleDestroy {
 
     this.isEnabled = true;
 
+    // Track whether we've already logged the first connection error so we
+    // don't spam the log every 2 s when Redis is unavailable locally.
+    let clientErrLogged = false;
+    let subscriberErrLogged = false;
+
+    const retryStrategy = (attempt: number): number | null => {
+      // Exponential back-off: 500 ms, 1 s, 2 s … capped at 60 s.
+      // Returning null would stop retrying entirely; we keep trying but
+      // slow down aggressively so logs stay quiet.
+      const delay = Math.min(500 * 2 ** attempt, 60_000);
+      return delay;
+    };
+
     this.client = new Redis(url, {
-      lazyConnect: false,
+      lazyConnect: true,          // don't connect until first command
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
+      retryStrategy,
     });
 
     this.subscriber = new Redis(url, {
-      lazyConnect: false,
+      lazyConnect: true,
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
+      retryStrategy,
     });
 
-    this.client.on('error', (err) =>
-      this.logger.error('Redis client error', err),
-    );
-    this.subscriber.on('error', (err) =>
-      this.logger.error('Redis subscriber error', err),
-    );
+    this.client.on('error', (err) => {
+      if (!clientErrLogged) {
+        this.logger.error('Redis client error — will retry silently. Start Redis to enable caching.', err);
+        clientErrLogged = true;
+      }
+    });
+    this.subscriber.on('error', (err) => {
+      if (!subscriberErrLogged) {
+        this.logger.error('Redis subscriber error — will retry silently.', err);
+        subscriberErrLogged = true;
+      }
+    });
 
-    this.logger.log(`Redis client initialised → ${this.redactUrl(url)}`);
+    // Reset log-once flag on successful reconnect so operators see the recovery.
+    this.client.on('ready', () => {
+      clientErrLogged = false;
+      this.logger.log('Redis client connected ✓');
+    });
+    this.subscriber.on('ready', () => {
+      subscriberErrLogged = false;
+      this.logger.log('Redis subscriber connected ✓');
+    });
+
+    this.logger.log(`Redis client initialised (lazy) → ${this.redactUrl(url)}`);
   }
 
   // ─── Key helper ────────────────────────────────────────────────────────────

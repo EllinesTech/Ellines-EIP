@@ -1,0 +1,457 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `packages/shared/src/encryption.ts` with `encrypt()` and `decrypt()` functions": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691652726
+      },
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691678654
+      }
+    ],
+    "1.3 Export `encryption` from `packages/shared/src/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691652953
+      }
+    ],
+    "2.1 Create `packages/shared/src/egress.ts` with `EgressBlockedError`, `validateEgressUrl()`, and `egressRequest()`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691653392
+      },
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691684489
+      }
+    ],
+    "2.3 Export `egress` from `packages/shared/src/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691653700
+      }
+    ],
+    "3.1 Create `packages/shared/src/field-mapper.ts` with `applyFieldMap()` and `validateFieldMap()`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691654064
+      },
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691690096
+      }
+    ],
+    "3.3 Export `field-mapper` from `packages/shared/src/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691654271
+      }
+    ],
+    "4.1 Create `packages/shared/src/openapi-importer.ts` with `parseOpenApiDocument()`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691654451
+      },
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691695982
+      }
+    ],
+    "4.2 Export `openapi-importer` from `packages/shared/src/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691654674
+      }
+    ],
+    "5.1 Create `packages/shared/src/widget-registry.ts` with `WIDGET_REGISTRY`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691654915
+      },
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691701881
+      }
+    ],
+    "5.2 Export `widget-registry` from `packages/shared/src/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691655050
+      }
+    ],
+    "6. Shared Package build verification checkpoint": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691655239
+      }
+    ],
+    "7.1 Add `Dashboard`, `DashboardWidget`, `DashboardType`, `DashboardVisibility` to `services/identity/prisma/schema.prisma`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691655582
+      }
+    ],
+    "7.2 Add `DashboardWidget` model to schema": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691655915
+      }
+    ],
+    "7.3 Add `ConnectorFailedRecord`, `IntegrationRequest`, `IntegrationRequestStatus` enum to schema": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656183
+      }
+    ],
+    "7.4 Extend `connector_installations` model with new columns": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656378
+      }
+    ],
+    "7.5 Run `npm run db:generate` then `npm run db:push` against `ellines_eip_local`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656472
+      }
+    ],
+    "8.1 Create `apps/web/src/styles/glass-ui.module.css` with the full token set": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656594
+      }
+    ],
+    "9.1 Add `ClientNavGroupId`, `ClientNavIconId`, `ClientNavItem`, `ClientNavGroupDef` type definitions to `apps/web/src/lib/app-navigation.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656780
+      }
+    ],
+    "9.2 Add `CLIENT_NAV_ITEMS` constant (array of `ClientNavItem`) covering all 9 groups": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691656989
+      }
+    ],
+    "9.3 Add `CLIENT_NAV_GROUPS` constant and `resolveClientNavigation()` function": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691657194
+      }
+    ],
+    "10.1 Create `apps/web/src/components/client-sidebar/ClientSidebar.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691657468
+      }
+    ],
+    "10.2 Create `apps/web/src/components/client-sidebar/ClientSidebar.module.css`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691657784
+      }
+    ],
+    "11.1 Create `apps/web/src/components/dashboard-header/DashboardHeader.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691657976
+      }
+    ],
+    "11.2 Create `apps/web/src/components/dashboard-header/DashboardHeader.module.css`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691658197
+      }
+    ],
+    "12.1 Create `apps/web/src/components/freshness-indicator/FreshnessIndicator.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691658311
+      }
+    ],
+    "13.1 Create `apps/web/src/components/widget/Widget.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691658486
+      }
+    ],
+    "14.1 Create `apps/web/src/components/attention-center/AttentionCenter.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691658657
+      }
+    ],
+    "15.1 Create `apps/web/src/components/connector-wizard/ConnectorWizard.tsx`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691658836
+      }
+    ],
+    "16. Checkpoint — Shared modules + Prisma + UI components": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691659298
+      }
+    ],
+    "17.1 Implement `GET /api/v1/dashboards` and `POST /api/v1/dashboards` in `apps/web/functions/api/v1/dashboards/index.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691659479
+      }
+    ],
+    "17.2 Implement `GET /api/v1/dashboards/[id]`, `PATCH /api/v1/dashboards/[id]`, `DELETE /api/v1/dashboards/[id]` in `apps/web/functions/api/v1/dashboards/[id].ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691659601
+      }
+    ],
+    "17.3 Implement `POST /api/v1/dashboards/[id]/duplicate` and `POST /api/v1/dashboards/[id]/default`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691659884
+      }
+    ],
+    "18.1 Implement widget sub-endpoints in `apps/web/functions/api/v1/dashboards/[id]/widgets/`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691660113
+      }
+    ],
+    "18.2 Implement `POST /api/v1/dashboards/[id]/export` in `apps/web/functions/api/v1/dashboards/[id]/export.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691660418
+      }
+    ],
+    "18.3 Implement `GET /api/v1/dashboards/attention` and `DELETE /api/v1/dashboards/attention/[itemId]`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691660628
+      }
+    ],
+    "19.1 Implement `POST /api/v1/connectors/integration-requests` and `GET /api/v1/connectors/integration-requests` in `apps/web/functions/api/v1/connectors/integration-requests.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691660755
+      }
+    ],
+    "19.2 Implement `POST /api/v1/connectors/test-connection` in `apps/web/functions/api/v1/connectors/test-connection.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691660978
+      }
+    ],
+    "20.1 Add `PATCH /api/v1/connectors/[id]/lifecycle` endpoint": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691661072
+      }
+    ],
+    "21.1 Update connector install flow to encrypt all credential fields before DB write": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691661354
+      }
+    ],
+    "21.2 Update `apps/web/functions/api/v1/connectors/health.ts` to source data from live DB only": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691661671
+      }
+    ],
+    "21.3 Update `apps/web/functions/api/v1/connectors/run-due.ts` for DEGRADED auto-detection": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691661849
+      }
+    ],
+    "22.1 Update sync run error handling to write `ConnectorFailedRecord` rows": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662030
+      }
+    ],
+    "22.2 Implement replay for failed sync runs using idempotency keys": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662124
+      }
+    ],
+    "23.1 Update `apps/web/functions/api/v1/connectors/openapi/` to use `parseOpenApiDocument()`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662225
+      }
+    ],
+    "24.1 Wire `applyFieldMap()` into the sync run path and expose field map save/validate endpoint": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662311
+      }
+    ],
+    "25.1 Implement discovery phase in `apps/web/functions/api/v1/connectors/[id]/` — add `discovery.ts`": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662406
+      }
+    ],
+    "26.1 Update Dashboard widget data source resolution to check connector capability": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662488
+      }
+    ],
+    "26.2 Implement connector fallback chain resolution": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662572
+      }
+    ],
+    "27.1 Constrain Ellinea customer-dashboard queries to authorized org data": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662671
+      }
+    ],
+    "28.1 Add `Browser_Automation` connector type support": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662757
+      }
+    ],
+    "29.1 Modify `apps/web/src/app/app/layout.tsx` to branch between client and platform admin shells": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662848
+      }
+    ],
+    "30.1 Create `apps/web/src/app/app/dashboards/page.tsx` — dashboard list page": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691662948
+      }
+    ],
+    "30.2 Create `apps/web/src/app/app/dashboards/[id]/page.tsx` — dashboard canvas page": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691663040
+      }
+    ],
+    "30.3 Implement client-side access guard for `/app/platform` routes": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691663244
+      }
+    ],
+    "31.1 Create or update connector pages under `/app/connectors/` to show health view for client org users": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691663698
+      }
+    ],
+    "32.2 Verify all audit rows are present for required operations": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691663908
+      }
+    ],
+    "33.1 Run `npm run build:shared` — must pass with zero TypeScript errors": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691664193
+      }
+    ],
+    "33.2 Run `npm run build -w @ellines-eip/web` — must produce successful static export with all expected pages": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691664741
+      }
+    ],
+    "33.3 Run `npm run build -w @ellines-eip/identity` — required because Prisma schema changed": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691665013
+      }
+    ],
+    "33.4 Run `npm run verify:pages-functions` (if script exists) — report no new broken imports": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691665361
+      }
+    ],
+    "34.1 Connect a real external business system and demonstrate end-to-end flow": [
+      {
+        "executionId": "c8e5b26a-fb09-4a65-a401-e0e55e2868a5",
+        "chatSessionId": "sess_0990954c-fa44-491c-a8ca-53e6498f599f",
+        "timestamp": 1790691665580
+      }
+    ]
+  }
+}

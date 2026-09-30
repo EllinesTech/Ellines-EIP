@@ -1,6 +1,7 @@
 import {
   auditRow,
   getAdminClient,
+  getClientIp,
   json,
   options,
   platformAdminFromEnv,
@@ -95,13 +96,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (updateErr) return json({ statusCode: 500, message: updateErr.message }, 500);
 
-  await auditRow(supabase, {
-    organizationId: connector.organization_id as string,
-    userId: auth.sub,
-    action: 'connector:discovery:completed',
-    resource: connectorId,
-    metadata: { schema_drift_detected: schemaDriftDetected },
-  });
+  await supabase
+    .from('audit_logs')
+    .insert(
+      auditRow({
+        organizationId: connector.organization_id as string,
+        userId: auth.sub,
+        action: 'connector:discovery:completed',
+        resource: connectorId,
+        metadata: { schema_drift_detected: schemaDriftDetected },
+        ip: getClientIp(context.request),
+      }),
+    );
 
   return json({ discoverySnapshot: discoveryResult, schemaDriftDetected });
 };

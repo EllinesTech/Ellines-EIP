@@ -1,400 +1,723 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isOrgAdminRole } from '@ellines-eip/shared';
 import {
-  askEllineaApi,
-  fetchEllineaMemory,
-  fetchEnterpriseSummary,
+  addInboxAccount,
+  deleteInboxAccount,
+  fetchInboxAccounts,
+  fetchInboxMessage,
+  fetchInboxMessageSummary,
+  fetchInboxMessages,
   getSession,
-  listInstallations,
-  type ConnectorInstallationDto,
-  type EnterpriseSummaryDto,
-  type EllineaMemoryNoteDto,
+  markInboxMessageRead,
+  syncAllInboxAccounts,
+  syncInboxAccount,
+  testInboxAccount,
+  updateInboxAccount,
+  type AddEmailAccountDto,
+  type EmailAccountDto,
+  type EmailMessageDto,
 } from '@/lib/api';
 import styles from '../command.module.css';
 
-type EmailThread = {
-  id: string;
-  subject: string;
-  from: string;
-  preview: string;
-  at: string;
-  unread: boolean;
-  priority: 'high' | 'normal' | 'low';
-  source: string; // connector displayName
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type View = 'inbox' | 'message' | 'add-account';
+type Filter = 'all' | 'unread' | 'high' | 'critical';
+
+const URGENCY_COLORS: Record<string, string> = {
+  critical: '#ef4444',
+  high:     '#f59e0b',
+  medium:   '#3b82f6',
+  low:      '#6b7280',
 };
 
-type SummaryState = { busy: boolean; text: string; error: string };
+const PROVIDER_LABELS: Record<string, string> = {
+  gmail:    'Gmail',
+  outlook:  'Outlook',
+  exchange: 'Exchange',
+  custom:   'Custom IMAP',
+};
 
-/** Extract email-like threads from UEM timeline objects */
-function buildEmailThreads(
-  summary: EnterpriseSummaryDto | null,
-  installs: ConnectorInstallationDto[],
-): EmailThread[] {
-  if (!summary || summary.status !== 'synced') return [];
-  const emailInstall = installs.find(
-    (i) =>
-      i.catalogId?.toLowerCase().includes('email') ||
-      i.displayName?.toLowerCase().includes('email') ||
-      i.catalogId?.toLowerCase().includes('imap'),
-  );
-  if (!emailInstall) return [];
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1)   return 'just now';
+  if (diffMins < 60)  return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24)   return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7)   return `${diffDays}d ago`;
+  return d.toLocaleDateString();
+}
 
-  // Build threads from UEM document objects + timeline events that look like emails
-  const threads: EmailThread[] = [];
-  const EMAIL_HINT = /\b(email|mail|inbox|message|subject|from|re:|fwd:)\b/i;
+// ─── Add account form ─────────────────────────────────────────────────────────
 
-  for (const obj of summary.model?.objects ?? []) {
-    if (obj.kind !== 'document' && !EMAIL_HINT.test(obj.name)) continue;
-    threads.push({
-      id: obj.id,
-      subject: obj.name,
-      from: obj.status?.includes('@') ? obj.status : emailInstall.config.imapUser || emailInstall.displayName,
-      preview: obj.status || 'No preview available',
-      at: summary.syncedAt || new Date().toISOString(),
-      unread: (obj.status || '').toLowerCase().includes('unread') || (obj.status || '').toLowerCase().includes('new'),
-      priority: (obj.status || '').toLowerCase().includes('urgent') || (obj.status || '').toLowerCase().includes('critical') ? 'high' : 'normal',
-      source: emailInstall.displayName,
-    });
-  }
+function AddAccountForm({
+  onSaved,
+  onCancel,
+}: {
+  onSaved: (account: EmailAccountDto) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<AddEmailAccountDto>({
+    emailAddress: '',
+    provider: 'gmail',
+    appPassword: '',
+    displayMode: 'summary',
+    pollIntervalSeconds: 300,
+    label: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
-  // Fill from timeline if no document objects yet
-  if (!threads.length) {
-    for (const ev of (summary.timeline || []).slice(0, 10)) {
-      if (!EMAIL_HINT.test(`${ev.title} ${ev.detail}`)) continue;
-      threads.push({
-        id: `tl-${ev.title}`,
-        subject: ev.title,
-        from: emailInstall.config.imapUser || emailInstall.displayName,
-        preview: ev.detail,
-        at: summary.syncedAt || new Date().toISOString(),
-        unread: ev.title.toLowerCase().includes('new') || ev.title.toLowerCase().includes('unread'),
-        priority: 'normal',
-        source: emailInstall.displayName,
-      });
+  const set = (field: keyof AddEmailAccountDto, value: unknown) =>
+    setForm(f => ({ ...f, [field]: value }));
+
+  const imapHint = {
+    gmail:    'imap.gmail.com:993 (use an App Password — myaccount.google.com → Security → App passwords)',
+    outlook:  'imap-mail.outlook.com:993 (use your Microsoft account password or app password)',
+    exchange: 'outlook.office365.com:993 (Microsoft 365 app password)',
+    custom:   'Enter the IMAP hostname and port below',
+  }[form.provider];
+
+  async function handleSave() {
+    setError('');
+    if (!form.emailAddress.trim()) { setError('Email address is required'); return; }
+    if (!form.appPassword.trim())  { setError('App password is required'); return; }
+    setBusy(true);
+    try {
+      const res = await addInboxAccount(form);
+      if (!res.success) throw new Error('Failed to save account');
+      setSavedId(res.data.id);
+      onSaved(res.data);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
-  return threads.slice(0, 30);
-}
-
-function priorityBadge(priority: EmailThread['priority']) {
-  if (priority === 'high')
-    return (
-      <span style={{ padding: '0.1rem 0.4rem', borderRadius: 99, fontSize: '0.65rem', fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }}>
-        Urgent
-      </span>
-    );
-  return null;
-}
-
-export default function InboxCompanionPage() {
-  const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
-  const [installs, setInstalls] = useState<ConnectorInstallationDto[]>([]);
-  const [memory, setMemory] = useState<EllineaMemoryNoteDto[]>([]);
-  const [orgAdmin, setOrgAdmin] = useState(false);
-  const [role, setRole] = useState('member');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [aiSummary, setAiSummary] = useState<SummaryState>({ busy: false, text: '', error: '' });
-
-  useEffect(() => {
-    const s = getSession();
-    if (!s) return;
-    setOrgAdmin(isOrgAdminRole(s.user.role));
-    setRole(s.user.role);
-
-    Promise.all([
-      fetchEnterpriseSummary().catch(() => null),
-      listInstallations().catch(() => [] as ConnectorInstallationDto[]),
-      fetchEllineaMemory().catch(() => [] as EllineaMemoryNoteDto[]),
-    ])
-      .then(([snap, list, mem]) => {
-        setSummary(snap);
-        setInstalls(list);
-        setMemory(mem);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load inbox'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const emailInstalls = useMemo(
-    () =>
-      installs.filter(
-        (i) =>
-          i.catalogId?.toLowerCase().includes('email') ||
-          i.catalogId?.toLowerCase().includes('imap') ||
-          i.displayName?.toLowerCase().includes('email') ||
-          i.displayName?.toLowerCase().includes('mail'),
-      ),
-    [installs],
-  );
-
-  const threads = useMemo(
-    () => buildEmailThreads(summary, installs),
-    [summary, installs],
-  );
-
-  const synced = summary?.status === 'synced';
-  const needle = query.trim().toLowerCase();
-  const filtered = threads.filter((t) => {
-    if (!needle) return true;
-    return `${t.subject} ${t.from} ${t.preview}`.toLowerCase().includes(needle);
-  });
-
-  const unreadCount = threads.filter((t) => t.unread).length;
-  const highPriorityCount = threads.filter((t) => t.priority === 'high').length;
-
-  async function summarizeWithEllinea() {
-    if (!summary) return;
-    setAiSummary({ busy: true, text: '', error: '' });
+  async function handleTest() {
+    if (!savedId) { setTestResult('Save the account first, then test.'); return; }
+    setBusy(true);
+    setTestResult(null);
     try {
-      const threadContext = threads.length
-        ? threads.slice(0, 8).map((t) => `• ${t.subject} (from: ${t.from}): ${t.preview}`).join('\n')
-        : 'No email threads available yet.';
-      const question = `Summarize the most important work emails and inbox activity. Context:\n${threadContext}`;
-      const res = await askEllineaApi({
-        question,
-        summary,
-        memory,
-        templateAnswer: threads.length
-          ? `Inbox summary: ${threads.length} emails from ${emailInstalls.length} connector(s). ${highPriorityCount > 0 ? `${highPriorityCount} urgent. ` : ''}Most recent: ${threads[0]?.subject || 'n/a'}.`
-          : 'No emails in current snapshot. Connect and sync an email connector to get inbox intelligence.',
-        role,
-      });
-      setAiSummary({ busy: false, text: res.answer, error: '' });
-    } catch (err) {
-      setAiSummary({ busy: false, text: '', error: err instanceof Error ? err.message : 'AI summary failed' });
+      const res = await testInboxAccount(savedId);
+      setTestResult(res.data.ok ? '✓ Connection successful' : `✗ ${res.data.error ?? 'Connection failed'}`);
+    } catch (e) {
+      setTestResult(`✗ ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Mobile Work Companion · Inbox</p>
-          <h1>Work email</h1>
-          <p className={styles.lede}>
-            Ellinea surfaces highlights from the work email connector. EIP wraps the inbox — it
-            does not become your mail server.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.aiBtn} onClick={summarizeWithEllinea} disabled={aiSummary.busy}>
-            {aiSummary.busy ? 'Summarizing…' : '✦ Ellinea Summary'}
+    <div style={{ maxWidth: 520 }}>
+      <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: '#f4f7fb' }}>
+        Connect Email Account
+      </h2>
+
+      {/* Provider */}
+      <label style={labelStyle}>Provider</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {(['gmail', 'outlook', 'exchange', 'custom'] as const).map(p => (
+          <button key={p} onClick={() => set('provider', p)}
+            style={{ ...chipStyle, background: form.provider === p ? '#6F2D8D' : '#1a2030',
+              borderColor: form.provider === p ? '#9b4dca' : 'rgba(255,255,255,0.1)' }}>
+            {PROVIDER_LABELS[p]}
           </button>
-          <Link href="/app/ellinea" className={styles.ghostBtn}>Ask Ellinea</Link>
-          {orgAdmin ? (
-            <Link href="/app/connectors" className={styles.ghostBtn}>Connectors</Link>
-          ) : null}
-        </div>
-      </header>
-
-      {error ? (
-        <div className={styles.emptyCallout} role="alert">
-          <div><strong>Error</strong><p>{error}</p></div>
-        </div>
-      ) : null}
-
-      {/* Ellinea AI Summary */}
-      {(aiSummary.text || aiSummary.error) ? (
-        <section className={styles.aiCard} style={{ marginBottom: '1rem' }}>
-          <span className={styles.aiBadge}>Ellinea AI · Inbox Brief</span>
-          {aiSummary.error ? (
-            <p style={{ color: '#fca5a5', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>{aiSummary.error}</p>
-          ) : (
-            <p style={{ margin: '0.5rem 0 0', fontSize: '0.88rem', whiteSpace: 'pre-line', lineHeight: 1.6 }}>{aiSummary.text}</p>
-          )}
-        </section>
-      ) : null}
-
-      {/* KPIs */}
-      <div className={styles.kpis}>
-        <div className={styles.kpi}>
-          <span>Email connectors</span>
-          <strong>{emailInstalls.length}</strong>
-          <em>{emailInstalls.length ? emailInstalls.map((e) => e.displayName).join(', ').slice(0, 30) : 'None installed'}</em>
-        </div>
-        <div className={styles.kpi}>
-          <span>Threads in model</span>
-          <strong>{loading ? '—' : threads.length}</strong>
-          <em>From last connector sync</em>
-        </div>
-        <div className={styles.kpi}>
-          <span>Unread</span>
-          <strong className={unreadCount > 0 ? styles.warn : undefined}>{loading ? '—' : unreadCount}</strong>
-          <em>Flagged as unread</em>
-        </div>
-        <div className={styles.kpi}>
-          <span>Urgent</span>
-          <strong className={highPriorityCount > 0 ? styles.warn : undefined}>{loading ? '—' : highPriorityCount}</strong>
-          <em>High-priority messages</em>
-        </div>
+        ))}
       </div>
 
-      {/* Not connected */}
-      {!loading && !emailInstalls.length ? (
-        <div className={styles.emptyCallout}>
-          <div>
-            <strong>No email connector installed</strong>
-            <p>
-              Owner / IT installs the Email (IMAP) connector under Connectors. Once synced,
-              Ellinea surfaces inbox highlights here.
-            </p>
-          </div>
-          {orgAdmin ? (
-            <Link href="/app/connectors" className={styles.aiBtn}>Install Email Connector</Link>
-          ) : (
-            <Link href="/app/ellinea" className={styles.aiBtn}>Ask Ellinea</Link>
-          )}
-        </div>
-      ) : null}
+      <p style={{ fontSize: '0.78rem', color: '#8b95a8', marginBottom: '1rem', lineHeight: 1.5 }}>{imapHint}</p>
 
-      {/* Connected but not synced */}
-      {!loading && emailInstalls.length > 0 && !synced ? (
-        <div className={styles.emptyCallout}>
-          <div>
-            <strong>{emailInstalls.length} email connector{emailInstalls.length > 1 ? 's' : ''} installed</strong>
-            <p>Run a sync to populate inbox threads. Status: {emailInstalls.map((e) => `${e.displayName} (${e.status})`).join(', ')}.</p>
-          </div>
-          {orgAdmin ? (
-            <Link href="/app/connectors" className={styles.ghostBtn}>Run Sync</Link>
-          ) : null}
-        </div>
-      ) : null}
+      {/* Email address */}
+      <label style={labelStyle}>Email Address</label>
+      <input style={inputStyle} type="email" placeholder="you@gmail.com"
+        value={form.emailAddress} onChange={e => set('emailAddress', e.target.value)} />
 
-      {/* Synced — show threads */}
-      {!loading && emailInstalls.length > 0 && synced ? (
+      {/* App password */}
+      <label style={labelStyle}>App Password</label>
+      <input style={inputStyle} type="password" placeholder="xxxx xxxx xxxx xxxx"
+        value={form.appPassword} onChange={e => set('appPassword', e.target.value)} />
+
+      {/* Custom host/port */}
+      {form.provider === 'custom' && (
         <>
-          {/* Search */}
-          <div style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0 0.75rem' }}>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search emails…"
-              aria-label="Search emails"
-              style={{
-                flex: 1,
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 6,
-                color: 'inherit',
-                padding: '0.4rem 0.7rem',
-                fontSize: '0.85rem',
-              }}
-            />
-            <span style={{ color: 'var(--c-muted)', fontSize: '0.8rem', alignSelf: 'center' }}>
-              {filtered.length} {filtered.length !== threads.length ? `of ${threads.length}` : ''}
-            </span>
-          </div>
-
-          {threads.length === 0 ? (
-            <div className={styles.emptyCallout}>
-              <div>
-                <strong>No email objects in current snapshot</strong>
-                <p>
-                  The connector synced but no email-type objects were found in the UEM model. Try
-                  asking Ellinea about your inbox for template-based insights.
-                </p>
-              </div>
-              <button type="button" className={styles.ghostBtn} onClick={summarizeWithEllinea}>Ask Ellinea</button>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className={styles.emptyCallout}>
-              <div><strong>No emails match "{query}"</strong><p>Clear the search to see all threads.</p></div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {filtered.map((thread) => (
-                <article
-                  key={thread.id}
-                  className={styles.card}
-                  style={{
-                    padding: '0.8rem 1rem',
-                    display: 'flex',
-                    gap: '0.75rem',
-                    alignItems: 'flex-start',
-                    borderLeft: thread.unread ? '3px solid rgba(124,58,237,0.7)' : '3px solid transparent',
-                  }}
-                >
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: thread.priority === 'high' ? 'rgba(239,68,68,0.2)' : 'rgba(124,58,237,0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1rem',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {thread.priority === 'high' ? '🔴' : '✉️'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: thread.unread ? 800 : 600, fontSize: '0.88rem', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {thread.subject}
-                      </span>
-                      {thread.unread ? (
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', flexShrink: 0 }} aria-label="unread" />
-                      ) : null}
-                      {priorityBadge(thread.priority)}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--c-muted)', marginBottom: '0.2rem' }}>
-                      From: {thread.from} · {new Date(thread.at).toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#c5cddb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {thread.preview}
-                    </div>
-                  </div>
-                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
-                      via {thread.source}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const q = `Summarize this email: Subject: ${thread.subject}. From: ${thread.from}. Preview: ${thread.preview}`;
-                        window.location.href = `/app/ellinea`;
-                        setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('ellinea-prefill', { detail: { question: q } }));
-                        }, 500);
-                      }}
-                      style={{
-                        background: 'rgba(124,58,237,0.2)',
-                        border: '1px solid rgba(124,58,237,0.35)',
-                        borderRadius: 6,
-                        color: '#c4b5fd',
-                        padding: '0.2rem 0.5rem',
-                        cursor: 'pointer',
-                        fontSize: '0.72rem',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      ✦ Ask
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+          <label style={labelStyle}>IMAP Host</label>
+          <input style={inputStyle} type="text" placeholder="mail.yourdomain.com"
+            value={form.customHost ?? ''} onChange={e => set('customHost', e.target.value)} />
+          <label style={labelStyle}>Port</label>
+          <input style={{ ...inputStyle, width: 100 }} type="number" placeholder="993"
+            value={form.customPort ?? 993} onChange={e => set('customPort', Number(e.target.value))} />
         </>
-      ) : null}
+      )}
 
-      {/* Ask Ellinea tip */}
-      <div className={styles.emptyCallout} style={{ marginTop: '1rem', background: 'rgba(124,58,237,0.08)', borderColor: 'rgba(124,58,237,0.3)' }}>
-        <div>
-          <strong>Ellinea can summarize your inbox</strong>
-          <p>Ask: "Summarize important work emails" · "Which emails need my attention?" · "Urgent messages this week?"</p>
-        </div>
-        <Link href="/app/ellinea" className={styles.ghostBtn}>Ask Ellinea</Link>
+      {/* Label */}
+      <label style={labelStyle}>Label (optional)</label>
+      <input style={inputStyle} type="text" placeholder="e.g. Sales Inbox"
+        value={form.label ?? ''} onChange={e => set('label', e.target.value)} />
+
+      {/* Display mode */}
+      <label style={labelStyle}>Default View</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem' }}>
+        {(['summary', 'full'] as const).map(m => (
+          <button key={m} onClick={() => set('displayMode', m)}
+            style={{ ...chipStyle, background: form.displayMode === m ? '#2563EB' : '#1a2030',
+              borderColor: form.displayMode === m ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}>
+            {m === 'summary' ? '✦ Ellinea Summary' : '📧 Full Email'}
+          </button>
+        ))}
+      </div>
+
+      {/* Poll interval */}
+      <label style={labelStyle}>Check for new emails every</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {[60, 300, 600, 1800].map(s => (
+          <button key={s} onClick={() => set('pollIntervalSeconds', s)}
+            style={{ ...chipStyle, background: form.pollIntervalSeconds === s ? '#1e3a5f' : '#1a2030',
+              borderColor: form.pollIntervalSeconds === s ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}>
+            {s < 60 ? `${s}s` : s < 3600 ? `${s / 60}m` : `${s / 3600}h`}
+          </button>
+        ))}
+      </div>
+
+      {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '0.75rem' }}>{error}</p>}
+      {testResult && (
+        <p style={{ color: testResult.startsWith('✓') ? '#10b981' : '#ef4444',
+          fontSize: '0.82rem', marginBottom: '0.75rem' }}>{testResult}</p>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={handleSave} disabled={busy} style={primaryBtnStyle}>
+          {busy ? 'Saving…' : savedId ? 'Saved ✓' : 'Save Account'}
+        </button>
+        {savedId && (
+          <button onClick={handleTest} disabled={busy} style={ghostBtnStyle}>
+            Test Connection
+          </button>
+        )}
+        <button onClick={onCancel} style={ghostBtnStyle}>Cancel</button>
       </div>
     </div>
   );
 }
+
+// ─── Message view ─────────────────────────────────────────────────────────────
+
+function MessageView({
+  message,
+  onBack,
+}: {
+  message: EmailMessageDto;
+  onBack: () => void;
+}) {
+  const [summary, setSummary] = useState(message.aiSummary);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [viewMode, setViewMode] = useState<'full' | 'summary'>(
+    message.aiSummary ? 'summary' : 'full',
+  );
+
+  async function loadSummary() {
+    if (summary) { setViewMode('summary'); return; }
+    setSummaryBusy(true);
+    try {
+      const res = await fetchInboxMessageSummary(message.id);
+      setSummary(res.data.summary);
+      setViewMode('summary');
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
+
+  const urgencyColor = URGENCY_COLORS[message.urgencyLevel] ?? '#6b7280';
+
+  return (
+    <div>
+      <button onClick={onBack} style={{ ...ghostBtnStyle, marginBottom: '1.25rem' }}>
+        ← Back to inbox
+      </button>
+
+      <div style={{ background: '#161b26', borderRadius: 10, padding: '1.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f4f7fb', margin: 0, flex: 1 }}>
+            {message.subject || '(no subject)'}
+          </h2>
+          <span style={{ background: urgencyColor + '22', color: urgencyColor, border: `1px solid ${urgencyColor}44`,
+            borderRadius: 6, padding: '2px 10px', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {message.urgencyLevel.toUpperCase()}
+          </span>
+        </div>
+
+        <div style={{ fontSize: '0.82rem', color: '#8b95a8', marginBottom: '1rem', lineHeight: 1.6 }}>
+          <span style={{ color: '#c4cadc' }}>From:</span> {message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress}
+          <br />
+          <span style={{ color: '#c4cadc' }}>To:</span> {message.toAddresses.join(', ')}
+          <br />
+          <span style={{ color: '#c4cadc' }}>Received:</span> {new Date(message.receivedAt).toLocaleString()}
+          <br />
+          <span style={{ color: '#c4cadc' }}>Category:</span> {message.category}
+        </div>
+
+        {/* View mode toggle */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+          <button onClick={() => setViewMode('full')}
+            style={{ ...chipStyle, background: viewMode === 'full' ? '#1e3a5f' : '#1a2030',
+              borderColor: viewMode === 'full' ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}>
+            📧 Full Email
+          </button>
+          <button onClick={loadSummary} disabled={summaryBusy}
+            style={{ ...chipStyle, background: viewMode === 'summary' ? '#2d1a4a' : '#1a2030',
+              borderColor: viewMode === 'summary' ? '#9b4dca' : 'rgba(255,255,255,0.1)' }}>
+            {summaryBusy ? 'Generating…' : '✦ Ellinea Summary'}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ background: '#0f1420', borderRadius: 8, padding: '1.25rem',
+          fontSize: '0.86rem', color: '#d4dae8', lineHeight: 1.75, whiteSpace: 'pre-wrap',
+          maxHeight: '60vh', overflowY: 'auto', fontFamily: 'monospace' }}>
+          {viewMode === 'summary'
+            ? (summary ?? 'No summary available.')
+            : (message.bodyText || '(empty body)')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Account settings row ─────────────────────────────────────────────────────
+
+function AccountRow({
+  account,
+  onSync,
+  onDelete,
+  onToggleMode,
+}: {
+  account: EmailAccountDto;
+  onSync: (id: string) => void;
+  onDelete: (id: string) => void;
+  onToggleMode: (id: string, mode: 'full' | 'summary') => void;
+}) {
+  const nextMode = account.displayMode === 'summary' ? 'full' : 'summary';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0',
+      borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+      <span style={{ flex: 1, fontSize: '0.85rem', color: '#f4f7fb', minWidth: 180 }}>
+        <span style={{ fontWeight: 600 }}>{account.label}</span>
+        <span style={{ color: '#8b95a8', marginLeft: 6, fontSize: '0.78rem' }}>{account.emailAddress}</span>
+      </span>
+      <span style={{ fontSize: '0.74rem', color: '#8b95a8' }}>
+        {PROVIDER_LABELS[account.provider] ?? account.provider}
+      </span>
+      <span style={{ fontSize: '0.74rem', color: account.lastError ? '#ef4444' : '#10b981' }}>
+        {account.lastError ? `Error: ${account.lastError.slice(0, 40)}` : (account.lastSyncedAt ? `Synced ${formatDate(account.lastSyncedAt)}` : 'Never synced')}
+      </span>
+      <button onClick={() => onToggleMode(account.id, nextMode)} style={{ ...chipStyle, fontSize: '0.73rem' }}>
+        {account.displayMode === 'summary' ? '✦ Summary' : '📧 Full'}
+      </button>
+      <button onClick={() => onSync(account.id)} style={{ ...chipStyle, fontSize: '0.73rem' }}>↻ Sync</button>
+      <button onClick={() => onDelete(account.id)}
+        style={{ ...chipStyle, fontSize: '0.73rem', borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>
+        Remove
+      </button>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+export default function InboxPage() {
+  const session = getSession();
+  const isAdmin = isOrgAdminRole(session?.user?.role ?? '');
+
+  const [view, setView]           = useState<View>('inbox');
+  const [filter, setFilter]       = useState<Filter>('all');
+  const [accounts, setAccounts]   = useState<EmailAccountDto[]>([]);
+  const [messages, setMessages]   = useState<EmailMessageDto[]>([]);
+  const [total, setTotal]         = useState(0);
+  const [selectedMsg, setSelectedMsg] = useState<EmailMessageDto | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [offset, setOffset]       = useState(0);
+  const [loading, setLoading]     = useState(false);
+  const [syncing, setSyncing]     = useState(false);
+  const [error, setError]         = useState('');
+  const [showAccounts, setShowAccounts] = useState(false);
+
+  const LIMIT = 30;
+
+  // ── Load accounts ────────────────────────────────────────────────────────
+
+  const loadAccounts = useCallback(async () => {
+    try {
+      const res = await fetchInboxAccounts();
+      if (res.success) setAccounts(res.data);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  // ── Load messages ────────────────────────────────────────────────────────
+
+  const loadMessages = useCallback(async (reset = false) => {
+    setLoading(true);
+    setError('');
+    const currentOffset = reset ? 0 : offset;
+    if (reset) setOffset(0);
+    try {
+      const res = await fetchInboxMessages({
+        accountId: selectedAccountId || undefined,
+        unreadOnly: filter === 'unread',
+        limit: LIMIT,
+        offset: currentOffset,
+      });
+      if (res.success) {
+        const filtered = filter === 'high' || filter === 'critical'
+          ? res.data.messages.filter(m => m.urgencyLevel === filter || (filter === 'high' && m.urgencyLevel === 'critical'))
+          : res.data.messages;
+        setMessages(filtered);
+        setTotal(res.data.total);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedAccountId, filter, offset]);
+
+  useEffect(() => { void loadAccounts(); }, [loadAccounts]);
+  useEffect(() => { if (view === 'inbox') void loadMessages(true); }, [view, filter, selectedAccountId]);
+
+  // ── Auto-refresh every 60 s ───────────────────────────────────────────────
+
+  const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    refreshRef.current = setInterval(() => {
+      if (view === 'inbox') void loadMessages();
+    }, 60_000);
+    return () => { if (refreshRef.current) clearInterval(refreshRef.current); };
+  }, [view, loadMessages]);
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      await syncAllInboxAccounts();
+      await loadMessages(true);
+      await loadAccounts();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleSyncAccount(id: string) {
+    try {
+      await syncInboxAccount(id);
+      await loadMessages(true);
+      await loadAccounts();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function handleDeleteAccount(id: string) {
+    if (!confirm('Remove this email account and all its messages?')) return;
+    try {
+      await deleteInboxAccount(id);
+      setAccounts(a => a.filter(x => x.id !== id));
+      if (selectedAccountId === id) setSelectedAccountId('');
+      await loadMessages(true);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function handleToggleMode(id: string, mode: 'full' | 'summary') {
+    try {
+      const res = await updateInboxAccount(id, { displayMode: mode });
+      if (res.success) setAccounts(a => a.map(x => x.id === id ? res.data : x));
+    } catch {}
+  }
+
+  async function handleOpenMessage(msg: EmailMessageDto) {
+    setSelectedMsg(msg);
+    setView('message');
+    if (!msg.isRead) {
+      void markInboxMessageRead(msg.id);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isRead: true } : m));
+    }
+  }
+
+  function handleAccountSaved(account: EmailAccountDto) {
+    setAccounts(prev => {
+      const exists = prev.find(a => a.id === account.id);
+      return exists ? prev.map(a => a.id === account.id ? account : a) : [...prev, account];
+    });
+    setView('inbox');
+  }
+
+  const unreadCount = messages.filter(m => !m.isRead).length;
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  if (view === 'add-account') {
+    return (
+      <div className={styles.page} style={{ padding: '1.5rem' }}>
+        <AddAccountForm onSaved={handleAccountSaved} onCancel={() => setView('inbox')} />
+      </div>
+    );
+  }
+
+  if (view === 'message' && selectedMsg) {
+    return (
+      <div className={styles.page} style={{ padding: '1.5rem' }}>
+        <MessageView message={selectedMsg} onBack={() => setView('inbox')} />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.page} style={{ padding: '1.5rem' }}>
+      {/* Header */}
+      <div className={styles.header}>
+        <div>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f4f7fb', margin: 0 }}>
+            Email Inbox
+            {unreadCount > 0 && (
+              <span style={{ marginLeft: 8, background: '#6F2D8D', color: '#fff', borderRadius: 12,
+                padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700 }}>
+                {unreadCount} unread
+              </span>
+            )}
+          </h1>
+          <p style={{ fontSize: '0.8rem', color: '#8b95a8', margin: '2px 0 0' }}>
+            {accounts.length === 0
+              ? 'No email accounts connected yet'
+              : `${accounts.length} account${accounts.length === 1 ? '' : 's'} • ${total} messages`}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={handleSync} disabled={syncing} style={primaryBtnStyle}>
+            {syncing ? 'Syncing…' : '↻ Sync All'}
+          </button>
+          {isAdmin && (
+            <button onClick={() => setView('add-account')} style={ghostBtnStyle}>
+              + Add Email Account
+            </button>
+          )}
+          {isAdmin && accounts.length > 0 && (
+            <button onClick={() => setShowAccounts(s => !s)} style={ghostBtnStyle}>
+              {showAccounts ? 'Hide Accounts' : 'Manage Accounts'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Account management panel */}
+      {showAccounts && accounts.length > 0 && (
+        <div style={{ background: '#161b26', borderRadius: 10, padding: '1rem', marginBottom: '1.25rem' }}>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#8b95a8', margin: '0 0 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Connected Accounts
+          </h3>
+          {accounts.map(a => (
+            <AccountRow key={a.id} account={a}
+              onSync={handleSyncAccount}
+              onDelete={handleDeleteAccount}
+              onToggleMode={handleToggleMode} />
+          ))}
+        </div>
+      )}
+
+      {/* Account filter tabs */}
+      {accounts.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setSelectedAccountId('')}
+            style={{ ...chipStyle, background: selectedAccountId === '' ? '#1e3a5f' : '#1a2030',
+              borderColor: selectedAccountId === '' ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}>
+            All Accounts
+          </button>
+          {accounts.map(a => (
+            <button key={a.id} onClick={() => setSelectedAccountId(a.id)}
+              style={{ ...chipStyle, background: selectedAccountId === a.id ? '#1e3a5f' : '#1a2030',
+                borderColor: selectedAccountId === a.id ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filter bar */}
+      <div className={styles.opsRail} style={{ marginBottom: '1rem' }}>
+        {(['all', 'unread', 'high', 'critical'] as Filter[]).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ ...chipStyle,
+              background: filter === f ? '#2d1a4a' : '#1a2030',
+              borderColor: filter === f ? '#9b4dca' : 'rgba(255,255,255,0.1)',
+              color: filter === f ? '#d8b4fe' : '#8b95a8' }}>
+            {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : f === 'high' ? '⚠ Important' : '🔴 Critical'}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.84rem', color: '#ef4444' }}>
+          {error}
+        </div>
+      )}
+
+      {/* Empty states */}
+      {accounts.length === 0 && !loading && (
+        <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📭</div>
+          <h3 style={{ color: '#f4f7fb', fontWeight: 600, margin: '0 0 0.5rem' }}>No email accounts connected</h3>
+          <p style={{ color: '#8b95a8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            Connect a Gmail, Outlook, or custom IMAP account to see your emails here,
+            with Ellinea AI summaries and urgency detection.
+          </p>
+          {isAdmin && (
+            <button onClick={() => setView('add-account')} style={primaryBtnStyle}>
+              + Connect Email Account
+            </button>
+          )}
+        </div>
+      )}
+
+      {accounts.length > 0 && messages.length === 0 && !loading && (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📬</div>
+          <p style={{ color: '#8b95a8', fontSize: '0.85rem' }}>
+            No messages found. Click <strong>↻ Sync All</strong> to fetch new emails.
+          </p>
+        </div>
+      )}
+
+      {/* Message list */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#8b95a8', fontSize: '0.85rem' }}>
+          Loading messages…
+        </div>
+      )}
+
+      {!loading && messages.length > 0 && (
+        <div style={{ background: '#161b26', borderRadius: 10, overflow: 'hidden' }}>
+          {messages.map((msg, i) => {
+            const urgColor = URGENCY_COLORS[msg.urgencyLevel] ?? '#6b7280';
+            const account = accounts.find(a => a.id === msg.accountId);
+            return (
+              <button key={msg.id} onClick={() => handleOpenMessage(msg)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent',
+                  border: 'none', cursor: 'pointer',
+                  borderBottom: i < messages.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  padding: '0.85rem 1.1rem',
+                  transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  {/* Unread dot */}
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', marginTop: 6, flexShrink: 0,
+                    background: msg.isRead ? 'transparent' : '#6F2D8D',
+                    border: msg.isRead ? '1px solid rgba(255,255,255,0.12)' : 'none' }} />
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 2, alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: msg.isRead ? 400 : 600,
+                        color: msg.isRead ? '#9ca3af' : '#f4f7fb', overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {msg.fromName || msg.fromAddress}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        {msg.urgencyLevel !== 'low' && (
+                          <span style={{ background: urgColor + '22', color: urgColor,
+                            border: `1px solid ${urgColor}44`, borderRadius: 4,
+                            padding: '1px 6px', fontSize: '0.68rem', fontWeight: 600 }}>
+                            {msg.urgencyLevel}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.74rem', color: '#6b7280' }}>
+                          {formatDate(msg.receivedAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.82rem', color: msg.isRead ? '#6b7280' : '#d4dae8',
+                      fontWeight: msg.isRead ? 400 : 500, overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
+                      {msg.subject || '(no subject)'}
+                    </div>
+
+                    <div style={{ fontSize: '0.77rem', color: '#6b7280', overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {msg.aiSummary
+                        ? <><span style={{ color: '#9b4dca', marginRight: 4 }}>✦</span>{msg.aiSummary}</>
+                        : msg.bodyText.slice(0, 120)}
+                      {account && accounts.length > 1 && (
+                        <span style={{ marginLeft: 8, color: '#4b5563', fontSize: '0.7rem' }}>
+                          · {account.label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {total > LIMIT && (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: '1rem' }}>
+          <button disabled={offset === 0} onClick={() => { setOffset(Math.max(0, offset - LIMIT)); void loadMessages(); }}
+            style={ghostBtnStyle}>← Prev</button>
+          <span style={{ color: '#8b95a8', fontSize: '0.82rem', padding: '0 8px', alignSelf: 'center' }}>
+            {Math.floor(offset / LIMIT) + 1} / {Math.ceil(total / LIMIT)}
+          </span>
+          <button disabled={offset + LIMIT >= total} onClick={() => { setOffset(offset + LIMIT); void loadMessages(); }}
+            style={ghostBtnStyle}>Next →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Shared micro-styles ──────────────────────────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: '0.78rem', color: '#8b95a8',
+  marginBottom: 4, fontWeight: 500,
+};
+
+const inputStyle: React.CSSProperties = {
+  display: 'block', width: '100%', background: '#0f1420',
+  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 7,
+  color: '#f4f7fb', fontSize: '0.87rem', padding: '8px 12px',
+  marginBottom: '1rem', outline: 'none', boxSizing: 'border-box',
+};
+
+const chipStyle: React.CSSProperties = {
+  background: '#1a2030', border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 7, color: '#c4cadc', fontSize: '0.8rem',
+  padding: '5px 12px', cursor: 'pointer',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  background: '#6F2D8D', border: 'none', borderRadius: 7,
+  color: '#fff', fontSize: '0.85rem', fontWeight: 600,
+  padding: '8px 18px', cursor: 'pointer',
+};
+
+const ghostBtnStyle: React.CSSProperties = {
+  background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+  borderRadius: 7, color: '#c4cadc', fontSize: '0.85rem',
+  padding: '7px 14px', cursor: 'pointer',
+};

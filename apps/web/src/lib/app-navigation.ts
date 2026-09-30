@@ -996,18 +996,11 @@ export const CLIENT_NAV_ITEMS: ClientNavItem[] = [
     minRole: 'manager',
   },
   {
-    id: 'client-users-access',
-    label: 'Users & Access',
-    href: '/app/people/users',
-    icon: 'people',
-    group: 'client-people',
-    available: true,
-    minRole: 'owner',
-  },
-  {
     id: 'client-roles',
     label: 'Roles',
-    href: '/app/people/roles',
+    // Points at the real, implemented custom-roles surface. `/app/people/roles`
+    // was declared live but never existed, producing a user-visible 404.
+    href: '/app/settings/custom-roles',
     icon: 'access-control',
     group: 'client-people',
     available: true,
@@ -1243,7 +1236,7 @@ export const CLIENT_NAV_GROUPS: ClientNavGroupDef[] = [
     defaultOpen: false,
     itemIds: [
       'client-employees', 'client-departments', 'client-attendance', 'client-leave',
-      'client-payroll', 'client-users-access', 'client-roles',
+      'client-payroll', 'client-roles',
     ],
   },
   {
