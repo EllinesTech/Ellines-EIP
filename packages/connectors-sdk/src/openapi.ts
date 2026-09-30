@@ -206,7 +206,9 @@ export async function syncOpenApiRoutes(options: {
     message: `Synced ${okCount} OpenAPI route(s) from ${name}`,
     payload: {
       ...payload,
-      connectedSystems: Math.max(payload.connectedSystems, 1),
+      // Do NOT inflate connectedSystems. It is derived by the service layer from
+      // the org's ACTIVE connector installation count — a connector cannot know
+      // that, and a floor of 1 would be a fabricated number.
       briefHighlight:
         payload.briefHighlight && !payload.briefHighlight.includes('no brief')
           ? payload.briefHighlight

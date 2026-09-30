@@ -33,7 +33,10 @@ export function emailsToEnterprisePayload(
 
   return {
     healthScore: messages.length ? Math.min(100, 55 + Math.min(40, messages.length * 2)) : 40,
-    connectedSystems: 1,
+    // An IMAP connector represents one mailbox, not "one connected system" —
+    // the service layer derives the real active-installation count.
+    connectedSystems: 0,
+    recordCount: messages.length,
     openAlerts,
     openDecisions: Math.max(0, Math.min(5, Math.floor(openAlerts / 2))),
     briefHighlight: messages[0]
@@ -102,6 +105,7 @@ export function createImapConnector(options: {
             connectorName: name,
             healthScore: 0,
             connectedSystems: 0,
+            recordCount: 0,
             openAlerts: 0,
             openDecisions: 0,
             briefHighlight: '',

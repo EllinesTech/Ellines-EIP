@@ -56,6 +56,7 @@ export function createSqlServerConnector(options: SqlServerConnectorOptions) {
             connectorName: name,
             healthScore: 0,
             connectedSystems: 0,
+            recordCount: 0,
             openAlerts: 0,
             openDecisions: 0,
             briefHighlight: '',

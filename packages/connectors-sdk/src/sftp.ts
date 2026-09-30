@@ -57,7 +57,8 @@ export function createSftpConnector(options: {
             connectorId: 'sftp',
             connectorName: name,
             ...payload,
-            connectedSystems: Math.max(payload.connectedSystems, 1),
+            // Do NOT inflate connectedSystems — see openapi.ts. The service layer
+            // supplies the real active-installation count.
             briefHighlight:
               payload.briefHighlight ||
               `${name}: imported ${config.remotePath}`,

@@ -412,6 +412,9 @@ export * from './lockout';
 // ─── Phase 3: safeguard engine & operation-class registry ────────────────────────
 export * from './safeguards';
 
+// ─── Connector capability authorization (capability ∩ permission ∩ policy ∩ package) ──
+export * from './capabilities';
+
 /**
  * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.
  * Used to derive session-registry `expiresAt` from the issued token TTL;

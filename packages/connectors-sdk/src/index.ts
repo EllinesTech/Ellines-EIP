@@ -140,6 +140,12 @@ export interface ConnectorPlugin {
 export type EnterprisePayload = {
   healthScore: number;
   connectedSystems: number;
+  /**
+   * Count of RECORDS returned by this connector (e.g. a catalogue listing 15
+   * books). Semantically distinct from `connectedSystems` — 15 records is not
+   * 15 connected systems. Never derive one from the other.
+   */
+  recordCount: number;
   openAlerts: number;
   openDecisions: number;
   briefHighlight: string;
@@ -189,9 +195,20 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
     100,
     Math.max(0, asNumber(data.healthScore ?? data.health ?? data.score, 0)),
   );
+  // connectedSystems is ONLY populated from explicit connected-system aliases.
+  // A generic record count must never be interpreted as a connected-systems count.
   const connectedSystems = Math.max(
     0,
-    asNumber(data.connectedSystems ?? data.systems ?? data.connected_systems, 0),
+    asNumber(
+      data.connectedSystems ?? data.connected_systems ?? data.systems ??
+      data.integrations ?? data.connections,
+      0,
+    ),
+  );
+  // recordCount is the number of RECORDS the upstream returned.
+  const recordCount = Math.max(
+    0,
+    asNumber(data.recordCount ?? data.record_count ?? data.count ?? data.total ?? data.length, 0),
   );
   const openAlerts = Math.max(0, asNumber(data.openAlerts ?? data.alerts ?? data.open_alerts, 0));
   const openDecisions = Math.max(
@@ -203,7 +220,7 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
     'REST sync completed with no brief text.',
   );
 
-  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system, '');
+  const sourceSystem = asString(data.systemName ?? data.sourceSystem ?? data.system ?? '', '');
   let model: UemModel | null = null;
   if (data.model || data.uem || data.objects || data.counts) {
     model = normalizeUemModel(data, {
@@ -222,6 +239,7 @@ export function normalizeEnterprisePayload(raw: unknown): EnterprisePayload {
   return {
     healthScore,
     connectedSystems,
+    recordCount,
     openAlerts,
     openDecisions,
     briefHighlight,
@@ -347,6 +365,7 @@ function emptyRestSummary(name: string) {
     connectorName: name,
     healthScore: 0,
     connectedSystems: 0,
+    recordCount: 0,
     openAlerts: 0,
     openDecisions: 0,
     briefHighlight: '',
@@ -395,7 +414,10 @@ export function parseCsvToEnterprisePayload(csvText: string): EnterprisePayload 
 
   return normalizeEnterprisePayload({
     healthScore: map.healthscore ?? map.health ?? map.score,
+    // Only explicit systems columns map to connectedSystems.
     connectedSystems: map.connectedsystems ?? map.systems ?? map.connected_systems,
+    // Generic count columns are RECORD counts (REQ-1) — never systems.
+    recordCount: map.recordcount ?? map.record_count ?? map.count ?? map.total ?? map.length,
     openAlerts: map.openalerts ?? map.alerts ?? map.open_alerts,
     openDecisions: map.opendecisions ?? map.decisions ?? map.open_decisions,
     briefHighlight:
@@ -454,6 +476,7 @@ export function createCsvFileConnector(options: CsvFileConnectorOptions): Connec
             connectorName: name,
             healthScore: 0,
             connectedSystems: 0,
+            recordCount: 0,
             openAlerts: 0,
             openDecisions: 0,
             briefHighlight: '',

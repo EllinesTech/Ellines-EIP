@@ -43,6 +43,7 @@ export function rowsToEnterprisePayload(
 ): {
   healthScore: number;
   connectedSystems: number;
+  recordCount: number;
   openAlerts: number;
   openDecisions: number;
   briefHighlight: string;
@@ -52,7 +53,8 @@ export function rowsToEnterprisePayload(
   if (!rows.length) {
     return {
       healthScore: 0,
-      connectedSystems: 1,
+      connectedSystems: 0,
+      recordCount: 0,
       openAlerts: 0,
       openDecisions: 0,
       briefHighlight: `${systemName}: query returned no rows.`,
@@ -89,10 +91,14 @@ export function rowsToEnterprisePayload(
       100,
       Math.max(0, asNumber(map.healthscore ?? map.health ?? map.score, 65)),
     ),
+    // Only an EXPLICIT connected-system column may set this. A generic row
+    // count is a record count, not a systems count — the service layer derives
+    // the real connected-system total from active installations.
     connectedSystems: Math.max(
-      1,
-      asNumber(map.connectedsystems ?? map.systems ?? map.connected_systems, 1),
+      0,
+      asNumber(map.connectedsystems ?? map.systems ?? map.connected_systems, 0),
     ),
+    recordCount: rows.length,
     openAlerts: Math.max(0, asNumber(map.openalerts ?? map.alerts ?? map.open_alerts, 0)),
     openDecisions: Math.max(
       0,
@@ -172,6 +178,7 @@ export function createPostgresConnector(options: PostgresConnectorOptions) {
             connectorName: name,
             healthScore: 0,
             connectedSystems: 0,
+            recordCount: 0,
             openAlerts: 0,
             openDecisions: 0,
             briefHighlight: '',
