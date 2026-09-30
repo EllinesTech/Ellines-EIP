@@ -38,7 +38,7 @@ export type EllineaEnterpriseSnapshot = {
   /** Records EIP actually retrieved, as opposed to what the source reported. */
   retrievedRecordCount?: number;
   reportedRecordCount?: number;
-  syncStatus?: 'synced' | 'partial' | 'error' | 'idle';
+  syncStatus?: 'synced' | 'partial' | 'error' | 'idle' | 'unknown' | 'reported';
   syncError?: string | null;
   timeline: { title: string; detail: string }[];
   model?: {

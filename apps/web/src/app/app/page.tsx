@@ -528,6 +528,14 @@ function AdminOverview({
                       partial read
                     </span>
                   ) : null}
+                  {/*
+                    `message` carries the last sync's own error, so a failed or
+                    partial retrieval is stated rather than looking like a
+                    healthy connector. `evidence` is already the tooltip.
+                  */}
+                  {item.message ? (
+                    <span style={{ fontSize: '0.62rem', opacity: 0.7 }}>{item.message}</span>
+                  ) : null}
                   {lastSync ? (
                     <span style={{ fontSize: '0.62rem', opacity: 0.55 }}>
                       {lastSync}
@@ -805,6 +813,18 @@ function AdminOverview({
         <section className={styles.aiCard}>
           <span className={styles.aiBadge}>Ellinea AI</span>
           <h3>AI Insights</h3>
+          {/*
+            A snapshot that was pushed to EIP rather than read and verified by a
+            connector is labelled as unconfirmed. Without this, externally
+            supplied numbers render exactly like a verified sync.
+          */}
+          {synced && (summary!.syncStatus === 'reported' || summary!.syncStatus === 'unknown') ? (
+            <p style={{ color: '#f59e0b', fontSize: '0.8rem' }}>
+              {summary!.syncStatus === 'reported'
+                ? `Reported by ${summary!.connectorName || 'an external system'} — EIP did not verify this read.`
+                : 'Sync state unknown — sync this connector to confirm these figures.'}
+            </p>
+          ) : null}
           <p>
             {synced
               ? summary!.briefHighlight

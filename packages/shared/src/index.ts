@@ -426,6 +426,7 @@ export * from './safeguards';
 export * from './capabilities';
 export * from './capability-registry';
 export * from './website-engine';
+export * from './source-discovery';
 
 /**
  * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.

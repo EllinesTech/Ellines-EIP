@@ -12,8 +12,20 @@ import {
 } from '../../../shared/connectors';
 
 /**
- * Bring-your-own System B ingest (Phase 6.4).
+ * Bring-your-own System B ingest.
  * POST any JSON that normalizeEnterprisePayload understands → upsert org snapshot.
+ *
+ * TRUST BOUNDARY
+ * --------------
+ * This endpoint writes numbers that the Command Center renders as the
+ * organization's business data. EIP did NOT read a system to produce them, so
+ * the snapshot is stored as `sync_status = 'reported'` with
+ * `retrieval_complete = false`. The client labels it as reported-but-unverified.
+ *
+ * It is therefore NOT a substitute for a connector, and must never be
+ * presented as one. The manual JSON textarea that used to sit on the Connectors
+ * page was removed for exactly this reason: it invited a human to type a
+ * plausible health score that the dashboard would then show as real.
  */
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -59,6 +71,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(context.env);
   const packedTimeline = toTimelineStorage(payload);
+  // EIP did not read a system for this payload, so the retrieval-truthfulness
+  // columns must say so. Without this the row would default to
+  // retrieval_complete=true / sync_status='synced' and the Command Center
+  // would present hand-supplied numbers as a verified full read.
+  const provenance = {
+    sync_status: 'reported',
+    retrieval_complete: false,
+    retrieval_stop_reason: 'reported-not-retrieved',
+    resources_retrieved: 0,
+    resources_failed: 0,
+    retrieved_count: 0,
+    reported_count: 0,
+    sync_error:
+      'Reported by an external system through manual ingest. EIP did not perform ' +
+      'or verify this read, so the values are unconfirmed. Install a connector for verified data.',
+  };
   const row = {
     id: crypto.randomUUID(),
     organization_id: auth.organizationId,
@@ -73,6 +101,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     synced_at: syncedAt,
     created_at: syncedAt,
     updated_at: syncedAt,
+    ...provenance,
   };
 
   const { data: existing } = await supabase
@@ -96,6 +125,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         timeline: packedTimeline,
         synced_at: syncedAt,
         updated_at: syncedAt,
+        ...provenance,
       })
       .eq('id', existing.id as string));
   } else {

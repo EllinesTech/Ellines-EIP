@@ -55,9 +55,15 @@ export interface WebsiteBusinessCapability {
 }
 
 /**
- * Paths commonly used by commerce/business APIs. This is a PROBE LIST, not a
- * capability list: each path is requested, and only what actually answers is
- * reported. A site publishing none of them simply exposes none.
+ * Default business-API probe paths, used ONLY as a last-resort hint when a
+ * source publishes no machine-readable specification.
+ *
+ * These are conventional REST mount points, not a capability list: probing one
+ * proves nothing by itself. A path is reported only when it actually answers,
+ * and the preferred path is always `discoverSource()`, which derives endpoints
+ * from the target itself (spec document, sitemap, JSON-LD, the URLs the app
+ * actually calls). This list is a fallback for sources that publish no
+ * specification at all — it never invents a capability.
  */
 export const BUSINESS_PROBE_PATHS: { path: string; label: string; resource: string }[] = [
   { path: '/api/products', label: 'Products', resource: 'products' },

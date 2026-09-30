@@ -755,7 +755,7 @@ export interface EnterpriseSummaryDto {
   reportedRecordCount: number;
   /** False when any connector's retrieval was incomplete or failed. */
   retrievalComplete: boolean;
-  syncStatus: 'synced' | 'partial' | 'error' | 'idle';
+  syncStatus: 'synced' | 'partial' | 'error' | 'idle' | 'unknown' | 'reported';
   syncError: string | null;
   timeline: { title: string; detail: string }[];
   model?: {

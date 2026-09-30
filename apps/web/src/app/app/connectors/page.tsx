@@ -14,7 +14,6 @@ import {
   testInstallation,
   updateInstallation,
   runDueConnectorSyncs,
-  ingestEnterpriseSnapshot,
   fetchWebhookSecret,
   rotateWebhookSecret,
   type ConnectorInstallConfigDto,
@@ -160,8 +159,6 @@ export default function ConnectorsPage() {
   const [apiKeyHeader, setApiKeyHeader] = useState('');
   /** JSON field map: upstream field → EIP field, e.g. {"total_sales":"connectedSystems"} */
   const [fieldMapText, setFieldMapText] = useState('');
-  /** BYO JSON ingest — empty by default, schema shown as placeholder */
-  const [byoJson, setByoJson] = useState('');
   const [webhookConfigured, setWebhookConfigured] = useState(false);
   const [webhookPreview, setWebhookPreview] = useState<string | null>(null);
   const [webhookOrgId, setWebhookOrgId] = useState('');
@@ -533,49 +530,22 @@ export default function ConnectorsPage() {
         />
       </div>
 
-      <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
-        <div className={styles.panelLabel}>Bring-your-own System B</div>
-        <p className={styles.lede}>
-          Paste any UEM / metrics JSON and ingest it as this org’s enterprise snapshot (no vendor
-          connector required). API: <code>POST /api/v1/enterprise/ingest</code>.
-        </p>
-        <label className={adminStyles.form} style={{ display: 'block' }}>
-          <span className={styles.panelLabel}>JSON payload</span>
-          <textarea
-            value={byoJson}
-            onChange={(e) => setByoJson(e.target.value)}
-            rows={8}
-            style={{ width: '100%', fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem' }}
-            placeholder={'{\n  "healthScore": 80,\n  "connectedSystems": 5,\n  "openAlerts": 1,\n  "openDecisions": 2,\n  "briefHighlight": "Your system summary here",\n  "timeline": [{ "title": "Event", "detail": "Detail" }]\n}'}
-          />
-        </label>
-        <button
-          type="button"
-          className={adminStyles.primary}
-          disabled={busy}
-          style={{ marginTop: '0.5rem' }}
-          onClick={() => {
-            setBusy(true);
-            setError('');
-            try {
-              const parsedJson = JSON.parse(byoJson) as Record<string, unknown>;
-              void ingestEnterpriseSnapshot(parsedJson)
-                .then((res) => {
-                  setNotice(res.message || `Ingested · health ${res.healthScore}`);
-                })
-                .catch((err) => {
-                  setError(err instanceof Error ? err.message : 'Ingest failed');
-                })
-                .finally(() => setBusy(false));
-            } catch {
-              setBusy(false);
-              setError('BYO JSON is invalid');
-            }
-          }}
-        >
-          Ingest external snapshot
-        </button>
-      </section>
+      {/*
+        Bring-your-own JSON ingest was removed from this page.
+
+        It was a textarea plus a button that let a human type arbitrary
+        healthScore / connectedSystems / openAlerts values, which were written
+        straight to enterprise_snapshots and then rendered by the Command Center
+        as the organization's real business data. That is precisely the
+        fabricated-metric failure EIP must never produce, and nothing in the
+        payload identified it as unverified.
+
+        The endpoint (POST /api/v1/enterprise/ingest) still exists for genuine
+        machine-to-machine integrations; it now stores such payloads as
+        sync_status='reported' with retrieval_complete=false so the dashboard
+        labels them as reported-but-unverified. A person with no connected system
+        should see an honest empty Command Center, not a typed-in health score.
+      */}
 
       <section className={styles.brief} style={{ marginBottom: '1.1rem' }}>
         <div className={styles.panelLabel}>Webhooks / events</div>

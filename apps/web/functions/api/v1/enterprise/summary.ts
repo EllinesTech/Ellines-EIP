@@ -7,6 +7,21 @@ import {
 } from '../../../shared/auth';
 import { unpackTimelineStorage } from '../../../shared/uem';
 
+/**
+ * Explicit sync state. `unknown` and `reported` are deliberately distinct:
+ *
+ *  - `unknown`  EIP has no evidence about this snapshot (legacy row / never synced).
+ *  - `reported` an external system pushed the numbers; EIP did not perform or
+ *               verify the read itself, so it must never look like a verified sync.
+ */
+export type SyncStatus =
+  | 'synced'
+  | 'partial'
+  | 'error'
+  | 'idle'
+  | 'unknown'
+  | 'reported';
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
   if (context.request.method !== 'GET') {
@@ -52,8 +67,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const { events, model } = unpackTimelineStorage(snap.timeline);
-  const retrievalComplete = (snap.retrieval_complete as boolean | null) ?? true;
-  const syncStatus = (snap.sync_status as 'synced' | 'partial' | 'error' | 'idle' | null) ?? 'synced';
+  // These default to the UNKNOWN state, never to the healthy one. A row written
+  // before these columns existed (or by a path that does not set them) has
+  // NULL here, and NULL must not be read as "EIP read the whole source".
+  const retrievalComplete = (snap.retrieval_complete as boolean | null) ?? false;
+  const syncStatus = (snap.sync_status as SyncStatus | null) ?? 'unknown';
 
   return json({
     organizationId: snap.organization_id,

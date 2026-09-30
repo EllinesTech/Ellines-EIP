@@ -55,7 +55,9 @@
     "perf:bundle:baseline": "node scripts/bundle-size-check.mjs --save-baseline",
     "lint": "npm run lint --workspaces --if-present",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "db:apply-migrations": "node scripts/apply-pending-migrations.mjs",
+    "verify:schema": "node scripts/verify-schema-sync.mjs"
   },
   "devDependencies": {
     "autocannon": "^7.15.0",
