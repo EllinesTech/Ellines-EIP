@@ -39,6 +39,7 @@ model Organization {
   passwordResetTokens    PasswordResetToken[]
   enterpriseSnapshot     EnterpriseSnapshot?
   connectorInstallations ConnectorInstallation[]
+  capabilityRegistries  ConnectorCapabilityRegistry[]
   approvalRequests       ApprovalRequest[]
   businessRules          BusinessRule[]
   scheduledReports       ScheduledReport[]
@@ -489,6 +490,8 @@ model ConnectorInstallation {
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   pack         ConnectorPack?     @relation(fields: [packId], references: [id], onDelete: SetNull)
   template     ConnectorTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  /// Capability inventory for THIS connection (one registry, many capabilities).
+  capabilityRegistry ConnectorCapabilityRegistry?
 
   @@unique([organizationId, packId])
   @@index([organizationId])
@@ -2551,4 +2554,32 @@ model EmailMessage {
   @@index([organizationId, receivedAt])
   @@index([accountId])
   @@map("email_messages")
+}
+
+/// Capability inventory discovered from ONE connected system.
+///
+/// A registry is always scoped to a single installation: one connection may
+/// expose many capabilities, but capabilities are never shared between
+/// connections. `registry` holds the CapabilityRegistry JSON produced by
+/// buildRegistryFromOpenApi, so availability states survive across syncs.
+model ConnectorCapabilityRegistry {
+  id             String   @id @default(cuid())
+  installationId String   @unique @map("installation_id")
+  organizationId String   @map("organization_id")
+  /// True for the current inventory; older rows are kept for history.
+  isCurrent      Boolean  @default(true) @map("is_current")
+  /// Number of resources whose retrieval genuinely completed.
+  availableCount Int      @default(0) @map("available_count")
+  /// Number of resources discovered but not readable/retrieved yet.
+  unavailableCount Int    @default(0) @map("unavailable_count")
+  registry       Json
+  discoveredAt   DateTime @default(now()) @map("discovered_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  installation ConnectorInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isCurrent])
+  @@map("connector_capability_registries")
 }

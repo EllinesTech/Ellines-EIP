@@ -425,6 +425,7 @@ export * from './safeguards';
 // ─── Connector capability authorization (capability ∩ permission ∩ policy ∩ package) ──
 export * from './capabilities';
 export * from './capability-registry';
+export * from './website-engine';
 
 /**
  * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.
