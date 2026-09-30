@@ -35,6 +35,31 @@ exist, so every Pages-Functions-only route is proxied to NestJS, which does not 
 /api/v1/connectors/attention    -> 404   (Pages-Functions-only route)
 ```
 
+### Reproduced in a real browser (headless Chrome over CDP)
+
+`npm run verify:client-ui` drives a real headless Chrome (via `scripts/cdp.mjs`,
+Node's native WebSocket — no npm dependencies), performs a real login, and
+inspects the rendered client UI. Because auth is JWT-in-localStorage, this is
+the only way to see the sidebar and dashboard at all; HTTP probes cannot.
+
+Result: **12 passed, 2 failed**. Both failures are this same gap:
+
+```
+FAIL  Dashboard renders content — 187 chars
+      (because GET /api/v1/dashboards 404s locally)
+FAIL  Connector Health shows an honest state — Cannot GET /api/v1/connectors/health
+```
+
+Passing in the real browser: session injection, client shell + brand, sidebar
+group headers and navigation links, `aria-current` active-route state, no stuck
+loading state, no horizontal overflow at 390px, navigation present at mobile
+width, and **Super Admin separation** (`/app/platform` renders the platform
+control plane and contains no client-only routes).
+
+This turns the parity gap from an inference into an observed, reproducible
+user-visible defect — which is exactly why the assertion is kept rather than
+relaxed.
+
 ## Decision
 
 **Pages Functions is authoritative** for the client dashboard, connector and

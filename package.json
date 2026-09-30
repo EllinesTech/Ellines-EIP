@@ -21,6 +21,7 @@
     "haven:test-api": "node scripts/haven-test-api.mjs",
     "verify:haven-connector": "node scripts/haven-connector-proof.mjs",
     "setup:local-secrets": "node scripts/setup-local-secrets.mjs",
+    "verify:client-ui": "node scripts/verify-client-ui.mjs",
     "set-pages-secrets": "node scripts/set-pages-secrets.mjs",
     "deploy:pages": "npm run verify:pages-functions && npm run build:web && npm run deploy:pages -w @ellines-eip/web",
     "db:push": "npm run prisma:push -w @ellines-eip/identity",
