@@ -188,6 +188,25 @@ function inferPagination(parameters?: string[]): PaginationStyle {
 
 
 /**
+ * The minimum a discovered operation must expose to become a capability.
+ *
+ * Deliberately narrower than the OpenAPI importer's `EndpointDef`: capability
+ * discovery must work from ANY source of operation metadata (a hand-built
+ * route list, a GraphQL introspection result, a future importer), not only from
+ * a fully parsed OpenAPI document. Requiring `requiresAuth` and the content-type
+ * fields here would make discovery impossible without a complete spec.
+ */
+export interface DiscoveredOperation {
+  path: string;
+  method?: string;
+  operationId?: string | null;
+  summary?: string | null;
+  tags?: string[];
+  /** Domain hint derived by the importer (e.g. "HR", "Fleet"). */
+  capability?: string;
+}
+
+/**
  * Build a capability registry from what a source ACTUALLY published.
  *
  * Every entry here traces back to a real endpoint in the document. Nothing is
@@ -198,7 +217,7 @@ function inferPagination(parameters?: string[]): PaginationStyle {
  */
 export function buildRegistryFromOpenApi(input: {
   systemName: string;
-  endpoints: EndpointDef[];
+  endpoints: DiscoveredOperation[];
   /** Query parameter names per path, when the source documented them. */
   parametersByPath?: Record<string, string[]>;
   /** Paths the credential is not permitted to read (401/403 observed). */

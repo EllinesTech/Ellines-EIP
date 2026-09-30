@@ -22,6 +22,7 @@ import {
   injectConfigContext,
   type InstallConfig,
 } from '../../../../../shared/connectors';
+import { buildInstallationRegistry, saveCapabilityRegistry } from '../../../../../shared/capability-store';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
 import {
   retrieveAllPages,
@@ -881,34 +882,63 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const parsed = parseOpenApiDocument(config.openApiDocument);
         if (!baseUrl) baseUrl = parsed.baseUrl;
         systemName = displayName || config.systemName || parsed.title;
-      }
-      const routes = config.selectedRoutes?.length
-        ? config.selectedRoutes
-        : config.openApiDocument
-          ? parseOpenApiDocument(config.openApiDocument)
-              .endpoints.filter((e) => e.selectable)
+
+        // Capability discovery is built from EVERY selectable operation the
+        // source published, not just the handful EIP reads. A customer must be
+        // able to see that their ERP exposes fleet and payroll even before EIP
+        // has a reader for them. Knowing a capability is not the same as
+        // reading it, and conflating the two is how a system looks smaller
+        // than it really is.
+        const allSelectable = parsed.endpoints.filter((e) => e.selectable);
+        const routes = config.selectedRoutes?.length
+          ? config.selectedRoutes
+          : allSelectable
               .slice(0, 5)
-              .map((e) => ({
-                method: e.method,
-                path: e.path,
-                capability: e.capability,
-              }))
-          : [];
-      const payload = await syncOpenApiRoutes({
-        baseUrl,
-        routes,
-        headers: buildAuthHeaders(config),
-        systemName,
-      });
-      summary = await upsertSnapshot(
-        context.env,
-        auth.organizationId,
-        auth.sub,
-        id,
-        'openapi',
-        systemName,
-        payload,
-      );
+              .map((e) => ({ method: e.method, path: e.path, capability: e.capability }));
+        const payload = await syncOpenApiRoutes({
+          baseUrl,
+          routes,
+          headers: buildAuthHeaders(config),
+          systemName,
+        });
+
+        // Record the honest inventory for this one connection. Resources that
+        // were not read stay NOT_YET_SUPPORTED; only real retrieval outcomes
+        // can promote them to AVAILABLE or PARTIAL.
+        const registry = buildInstallationRegistry({
+          systemName,
+          endpoints: allSelectable,
+          outcomes: payload.resources ?? [],
+        });
+        await saveCapabilityRegistry(context.env, {
+          installationId: id,
+          organizationId: auth.organizationId,
+          registry,
+        });
+
+        summary = await upsertSnapshot(
+          context.env,
+          auth.organizationId,
+          auth.sub,
+          id,
+          'openapi',
+          systemName,
+          payload,
+        );
+      } else {
+        // No OpenAPI document was supplied, so there is nothing to discover
+        // and nothing to read. Sync the (empty) selection honestly rather than
+        // inventing resources, and say so in the installation's own message.
+        summary = await upsertSnapshot(
+          context.env,
+          auth.organizationId,
+          auth.sub,
+          id,
+          'openapi',
+          systemName,
+          normalizeEnterprisePayload({}),
+        );
+      }
     } else if (catalogId === 'csv-file') {
       const csvText = (config.csvText && config.csvText.trim());
       if (!csvText) {
