@@ -15,25 +15,24 @@ out/
 .dev.vars
 .dev.vars.*
 
-# Generated local-dev API bridges (see scripts/generate-pages-shims.mjs). They
-# invoke the real Cloudflare Pages Function so `next dev` serves the same API
-# production does, and are regenerated on every `npm run dev`. Never committed.
-# NOTE: this must not ignore the whole src/pages/api directory — it also holds
-# hand-written dev routes that ARE tracked.
-apps/web/src/pages/api/v1/dashboards/
-apps/web/src/pages/api/v1/connectors/
-apps/web/src/pages/api/v1/inbox/
-apps/web/src/pages/api/v1/orgs/
-apps/web/src/pages/api/v1/platform/
-apps/web/src/pages/api/v1/auth/
-apps/web/src/pages/api/v1/ellinea/
-apps/web/src/pages/api/v1/enterprise/
-apps/web/src/pages/api/v1/notifications/
-apps/web/src/pages/api/v1/webhooks/
-apps/web/src/pages/api/v1/workflows/
-apps/web/src/pages/api/v1/error-capture/
-apps/web/src/pages/api/v1/health/
-apps/web/src/pages/api/v1/agents-webhook-trigger.ts
+# Local-dev API routes.
+#
+# `src/pages/api/**` holds LOCAL-ONLY API routes. Pages Router API routes are
+# IGNORED by the production static export, so none of this reaches the deployed
+# bundle — production serves /api natively from Cloudflare Pages Functions.
+#
+# Two kinds live here:
+#   1. hand-written dev routes (invite, webhook-*, …) — tracked, authored by hand
+#   2. GENERATED bridges produced by scripts/generate-pages-shims.mjs, which
+#      invoke the real `functions/api/**` handler so `next dev` serves the same
+#      API production does. These are committed rather than gitignored: the
+#      generator's output location and filename convention have already changed
+#      once, and a path-based ignore list silently let generated files through.
+#      Regeneration is idempotent (`npm run generate:pages-shims --check`), so
+#      they stay in sync and diffs stay clean.
+#
+# Do NOT add a build step that deletes them — that breaks any dev server that is
+# already running.
 services/**/.env
 apps/**/.env
 
