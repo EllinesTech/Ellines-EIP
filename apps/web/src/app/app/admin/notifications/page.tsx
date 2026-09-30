@@ -30,7 +30,12 @@ export default function AdminNotificationsPage() {
   const router = useRouter();
   const [outbox, setOutbox] = useState<NotifyOutboxItemDto[]>([]);
   const [policy, setPolicy] = useState<NotifyDeliveryPolicyDto | null>(null);
-  const [unread, setUnread] = useState(0);
+  // null = the unread count could not be loaded. Null is NOT zero: an
+  // unavailable count must not be displayed as "0 unread", which would read
+  // as "nothing outstanding" when in fact the state is simply unknown.
+  const [unread, setUnread] = useState<number | null>(0);
+  /** false when the outbox request failed, so its length is not a real reading. */
+  const [outboxLoaded, setOutboxLoaded] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -39,14 +44,24 @@ export default function AdminNotificationsPage() {
     if (!session) { router.replace('/login'); return; }
     if (!isOrgAdminRole(session.user.role)) { router.replace('/app'); return; }
 
+    // The outbox promise resolves to the list on success and null on failure,
+    // so a failed load is distinguishable from a genuinely empty outbox.
     Promise.all([
-      listNotifyOutbox().catch(() => [] as NotifyOutboxItemDto[]),
+      listNotifyOutbox().catch(() => null),
       fetchNotifyDeliveryPolicy().catch(() => null as NotifyDeliveryPolicyDto | null),
-      fetchNotifyUnreadCount().catch(() => ({ unread: 0, total: 0 })),
+      // A failed unread count must NOT become 0 — "0 unread" reads as "all clear".
+      // The null sentinel below renders as "unavailable" instead.
+      fetchNotifyUnreadCount().catch(() => null),
     ]).then(([o, p, u]) => {
-      setOutbox(o);
+      if (o === null) {
+        setOutboxLoaded(false);
+      } else {
+        setOutbox(o);
+        setOutboxLoaded(true);
+      }
       setPolicy(p);
-      setUnread(typeof u === 'number' ? u : (u as { unread: number }).unread ?? 0);
+      // null = the count could not be read; keep it null so the UI says so.
+      setUnread(typeof u === 'number' ? u : u ? (u as { unread: number }).unread ?? 0 : null);
     }).catch((e) => setError(e instanceof Error ? e.message : 'Failed')).finally(() => setLoading(false));
   }, [router]);
 
@@ -71,12 +86,28 @@ export default function AdminNotificationsPage() {
       {/* KPIs */}
       <div className={styles.kpis} style={{ marginBottom: '1.5rem' }}>
         <div className={styles.kpi}>
-          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f4f7fb' }}>{outbox.length}</span>
-          <span style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 2 }}>Total in outbox</span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f4f7fb' }}>
+            {outboxLoaded ? outbox.length : '—'}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 2 }}>
+            Total in outbox{outboxLoaded ? '' : ' (unavailable)'}
+          </span>
         </div>
         <div className={styles.kpi}>
-          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: unread > 0 ? '#f59e0b' : '#f4f7fb' }}>{unread}</span>
-          <span style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 2 }}>Unread</span>
+          {/* Never render an unread count that was not actually read. A failed
+              fetch must not look like "0 outstanding". */}
+          <span
+            style={{
+              fontSize: '1.75rem',
+              fontWeight: 800,
+              color: unread !== null && unread > 0 ? '#f59e0b' : '#f4f7fb',
+            }}
+          >
+            {unread === null ? '—' : unread}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: '#8b95a8', marginTop: 2 }}>
+            Unread{unread === null ? ' (unavailable)' : ''}
+          </span>
         </div>
         <div className={styles.kpi}>
           <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ef4444' }}>{outbox.filter((o) => o.status === 'failed').length}</span>

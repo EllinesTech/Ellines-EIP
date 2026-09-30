@@ -203,6 +203,7 @@ function AdminOverview({
   connectorHealth,
   ruleHits,
   correlationGroups,
+  unavailableSources,
 }: {
   name: string;
   role: string;
@@ -214,9 +215,13 @@ function AdminOverview({
   connectorHealth: ConnectorHealthDto | null;
   ruleHits: RuleHit[];
   correlationGroups: AlertCorrelationGroupDto[];
+  /** Live sources that failed to load — rendered as unavailable, not as empty. */
+  unavailableSources: string[];
 }) {
   const isOwner = role === 'owner';
-  const health = synced ? summary!.healthScore : 0;
+  // health may be null (not reported). Never coerce to 0 — that would read as
+  // "measured and catastrophic" rather than "unknown".
+  const health = synced ? summary!.healthScore : null;
   const systems = synced ? summary!.connectedSystems : 0;
   const alerts = synced ? summary!.openAlerts : 0;
   const decisions = synced ? summary!.openDecisions : 0;
@@ -327,6 +332,30 @@ function AdminOverview({
           </Link>
         </section>
       ) : null}
+
+      {unavailableSources.length > 0 && (
+        <section
+          className={styles.emptyCallout}
+          role="status"
+          style={{ borderColor: '#d97706' }}
+        >
+          <div style={{ flex: 1 }}>
+            <strong>Some data could not be loaded</strong>
+            <p>
+              Unavailable right now: {unavailableSources.join(', ')}. These panels are not
+              showing a real reading — a value is not being displayed rather than a
+              default being shown in its place.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={styles.aiBtn}
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </button>
+        </section>
+      )}
 
       {correlationGroups.length > 0 && (
         <section className={styles.emptyCallout} role="status" style={{ borderColor: correlationGroups[0].severity === 'critical' ? '#dc2626' : correlationGroups[0].severity === 'high' ? '#d97706' : '#6f2d8d' }}>
@@ -1220,6 +1249,17 @@ export default function CommandCenterPage() {
   const [connectorHealth, setConnectorHealth] = useState<ConnectorHealthDto | null>(null);
   const [ruleHits, setRuleHits] = useState<RuleHit[]>([]);
   const [correlationGroups, setCorrelationGroups] = useState<AlertCorrelationGroupDto[]>([]);
+  /**
+   * Which live sources FAILED to load.
+   *
+   * An empty list is a legitimate business state ("no alerts"), but a failed
+   * request is not. Collapsing the two would let a network failure render as
+   * "0 open alerts", i.e. as if everything were fine. Sources that fail are
+   * listed here so the UI can say "unavailable" instead.
+   */
+  const [unavailableSources, setUnavailableSources] = useState<string[]>([]);
+  const markUnavailable = (src: string) =>
+    setUnavailableSources((prev) => (prev.includes(src) ? prev : [...prev, src]));
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(DEFAULT_UI_PREFS);
 
   useEffect(() => {
@@ -1245,7 +1285,10 @@ export default function CommandCenterPage() {
             evaluateBusinessRules(rules, {
               openAlerts: summary.openAlerts || 0,
               openDecisions: summary.openDecisions || 0,
-              healthScore: summary.healthScore || 0,
+              // Pass health through unchanged: null means "not reported".
+              // Coercing to 0 here would make every health-based business rule
+              // fire as though the business were measured and critical.
+              healthScore: summary.healthScore,
               synced: summary.status === 'synced',
             }).filter((h) => {
               const rule = rules.find((r) => r.id === h.ruleId);
@@ -1254,17 +1297,30 @@ export default function CommandCenterPage() {
           );
         }
       })
-      .catch(() => setSummary(null));
+      .catch(() => {
+        setSummary(null);
+        markUnavailable('enterprise summary');
+      });
     if (isOrgAdminRole(s?.user.role) || s?.isPlatformAdmin) {
       listInstallations()
         .then(setInstallations)
-        .catch(() => setInstallations([]));
+        .catch(() => {
+          setInstallations([]);
+          markUnavailable('connector list');
+        });
       fetchAlertCorrelations()
         .then((res) => setCorrelationGroups(res.correlationGroups))
-        .catch(() => setCorrelationGroups([]));
+        .catch(() => {
+          // Do NOT present a failed alert load as "0 alerts".
+          setCorrelationGroups([]);
+          markUnavailable('alerts');
+        });
       fetchConnectorHealth()
         .then(setConnectorHealth)
-        .catch(() => setConnectorHealth(null));
+        .catch(() => {
+          setConnectorHealth(null);
+          markUnavailable('connector health');
+        });
     }
     return () => window.removeEventListener(UI_PREFS_EVENT, onPrefs);
   }, []);
@@ -1285,6 +1341,7 @@ export default function CommandCenterPage() {
         connectorHealth={connectorHealth}
         ruleHits={ruleHits}
         correlationGroups={correlationGroups}
+        unavailableSources={unavailableSources}
       />
     );
   }

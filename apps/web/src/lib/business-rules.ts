@@ -59,7 +59,8 @@ export type RuleHit = {
 
 export function evaluateBusinessRules(
   rules: BusinessRule[],
-  metrics: { openAlerts: number; openDecisions: number; healthScore: number; synced: boolean },
+  // healthScore may be null: no connected system reported a health metric.
+  metrics: { openAlerts: number; openDecisions: number; healthScore: number | null; synced: boolean },
 ): RuleHit[] {
   if (!metrics.synced) return [];
   const hits: RuleHit[] = [];
@@ -68,7 +69,13 @@ export function evaluateBusinessRules(
     let fire = false;
     if (rule.when === 'open_alerts_gte') fire = metrics.openAlerts >= rule.threshold;
     if (rule.when === 'open_decisions_gte') fire = metrics.openDecisions >= rule.threshold;
-    if (rule.when === 'health_lt') fire = metrics.healthScore < rule.threshold;
+    // A health threshold rule can only be evaluated against a real measurement.
+    // `null < threshold` is true in JavaScript, so without this guard an
+    // UNREPORTED health score would fire every "health below X" rule and
+    // fabricate a crisis out of missing data.
+    if (rule.when === 'health_lt') {
+      fire = typeof metrics.healthScore === 'number' && metrics.healthScore < rule.threshold;
+    }
     if (!fire) continue;
     hits.push({
       ruleId: rule.id,

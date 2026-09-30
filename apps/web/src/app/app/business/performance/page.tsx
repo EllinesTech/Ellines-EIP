@@ -9,15 +9,33 @@ export default function BusinessPerformancePage() {
   const router = useRouter();
   const [summary, setSummary] = useState<EnterpriseSummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Set when the summary request fails, so we can say so rather than show an empty page. */
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getSession()) { router.replace('/login'); return; }
-    fetchEnterpriseSummary().then(setSummary).catch(() => null).finally(() => setLoading(false));
+    fetchEnterpriseSummary()
+      .then(setSummary)
+      .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not reach the data source'))
+      .finally(() => setLoading(false));
   }, [router]);
 
   if (loading) return <div className={styles.page} style={{ padding: '2rem' }}><p style={{ color: '#8b95a8' }}>Loading…</p></div>;
 
   const timeline = summary?.timeline ?? [];
+
+  // A failed load is NOT an empty result set. Saying "no performance data" when
+  // the source was unreachable would present an outage as a business finding.
+  if (loadError) {
+    return (
+      <div className={styles.page} style={{ padding: '2rem' }}>
+        <p role="alert" style={{ color: '#d97706' }}>
+          Performance data is unavailable: {loadError}. No reading is being shown because none
+          could be retrieved.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
