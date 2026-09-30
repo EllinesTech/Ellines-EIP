@@ -68,18 +68,13 @@ interface ConnectorWizardProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SYSTEM_CATEGORIES = [
-  { value: 'ERP', label: 'ERP System' },
-  { value: 'POS', label: 'Point of Sale (POS)' },
-  { value: 'CRM', label: 'CRM System' },
-  { value: 'HR', label: 'HR System' },
-  { value: 'Accounting', label: 'Accounting' },
-  { value: 'Hospital_System', label: 'Hospital / Clinic System' },
-  { value: 'Website', label: 'Website / eCommerce' },
-  { value: 'Database', label: 'Database' },
-  { value: 'REST_API', label: 'REST API' },
-  { value: 'Other', label: "I don't see my system" },
-];
+// NOTE: EIP deliberately has no fixed list of system categories. A connected
+// system is not one of ERP/POS/CRM — it is one connection that may expose any
+// number of capabilities, and the source itself is the authority on which.
+// CATEGORIES_DISABLED: the previous hardcoded list (ERP, POS, CRM, HR,
+// Accounting, Hospital, Website, Database, REST API, Other) is intentionally
+// removed so a business is never asked to squeeze its system into a box.
+void 0;
 
 const ACCESS_METHODS = [
   { value: 'REST', label: 'REST / HTTP API' },
@@ -300,22 +295,25 @@ export function ConnectorWizard({ orgId, onSubmitted, onClose }: ConnectorWizard
             <h2 style={{ fontSize: 'var(--font-l2-size)', margin: '0 0 var(--space-4)' }}>
               What are you connecting?
             </h2>
-            <label htmlFor="system-type-select" style={labelStyle}>System category</label>
-            <select
+            <label htmlFor="system-type-select" style={labelStyle}>
+              What does this system call itself?
+            </label>
+            <input
               id="system-type-select"
+              type="text"
               value={systemType}
               onChange={(e) => setSystemType(e.target.value)}
-              style={selectStyle}
+              placeholder="e.g. Acme ERP, Salesworks POS, Clinic Manager"
+              style={inputStyle}
               aria-required="true"
-            >
-              <option value="">Select a category…</option>
-              {SYSTEM_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+            />
+            <p style={{ fontSize: 'var(--font-s1-size)', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+              This is only a label for your reference. EIP does not limit what this connection
+              can do — it discovers the capabilities the system actually exposes.
+            </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-6)', gap: 'var(--space-3)' }}>
               {onClose && <button style={secondaryBtn} onClick={onClose}>Cancel</button>}
-              <button style={primaryBtn} disabled={!systemType} onClick={() => next('STEP_2_ACCESS_METHOD')}>
+              <button style={primaryBtn} disabled={!systemType.trim()} onClick={() => next('STEP_2_ACCESS_METHOD')}>
                 Next →
               </button>
             </div>
