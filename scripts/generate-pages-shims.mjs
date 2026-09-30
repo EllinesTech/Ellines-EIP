@@ -27,16 +27,29 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FUNCTIONS_API = join(root, 'apps', 'web', 'functions', 'api');
-const APP_API = join(root, 'apps', 'web', 'src', 'app', 'api');
+// Pages Router API routes are ignored by `output: 'export'`, so Next.js itself
+// excludes these from the production static build. No build step deletes them,
+// which means a production build can never break a running dev server.
+const APP_API = join(root, 'apps', 'web', 'src', 'pages', 'api');
 const checkOnly = process.argv.includes('--check');
 const cleanOnly = process.argv.includes('--clean');
 
-/** Delete every generated shim (and prune the empty directories they leave). */
+/**
+ * Output file for a route, relative to the API root.
+ *
+ * Pages Router routes are FILENAME-based (`pages/api/a/b.ts` -> `/api/a/b`),
+ * unlike App Router's `route.ts` convention. Dynamic segments keep their bracket
+ * form (`[id].ts`).
+ */
+function toOutputFile(routePath) {
+  return `${routePath}.ts`;
+}
+
 function cleanAll() {
   if (!existsSync(APP_API)) return 0;
   let n = 0;
   for (const f of walk(APP_API)) {
-    if (f.endsWith('route.ts') && readFileSync(f, 'utf8').includes('GENERATED FILE')) {
+    if (readFileSync(f, 'utf8').includes('GENERATED FILE')) {
       rmSync(f, { force: true });
       n += 1;
     }
@@ -71,13 +84,13 @@ function cleanAll() {
   return n;
 }
 
-// Production builds run `output: 'export'`, which ignores API Route Handlers —
-// but Next still parses and compiles them, and a few of the Pages Functions are
-// not statically analysable by webpack. The shims are therefore DEV-ONLY and the
-// web `prebuild` step removes them before the production bundle.
+// Production builds run `output: 'export'`, which IGNORES Pages Router API
+// routes entirely — so the generated shims never reach the production bundle and
+// no clean-up step is needed. A clean step would be actively harmful: it would
+// delete files a running dev server depends on.
 if (cleanOnly) {
   const n = cleanAll();
-  process.stdout.write(`Removed ${n} generated Pages shim(s) (production builds serve /api via Cloudflare Pages).\n`);
+  process.stdout.write(`Removed ${n} generated shim(s).\n`);
   process.exit(0);
 }
 
@@ -183,33 +196,22 @@ function renderShim(importPath, aliasMap) {
   return `// GENERATED FILE — do not edit by hand.
 // Regenerate with: npm run generate:pages-shims
 //
-// Runs the Cloudflare Pages Function for this route so local development matches
-// the production Pages deployment. See src/lib/pages-fn-adapter.ts for why.
+// Local-dev bridge to the Cloudflare Pages Function that serves this route in
+// production. It invokes the ORIGINAL handler — there is no second
+// implementation. Pages Router API routes are ignored by the static export, so
+// this never reaches the production bundle. See src/lib/pages-fn-adapter.ts.
 
+import type { NextApiRequest, NextApiResponse } from 'next';
+import runPagesApiRoute from '@/lib/pages-fn-adapter';
 import { onRequest } from '${importPath}';
-import { PAGE_HANDLER_META, expandParams, runPagesFunction } from '@/lib/pages-fn-adapter';
 
-export const dynamic = PAGE_HANDLER_META.dynamic;
-export const runtime = PAGE_HANDLER_META.runtime;
-
-// Sibling dynamic segments are normalised to one Next.js name; re-publish the
-// value under every name the original Cloudflare handler may read.
+// Sibling dynamic segments are normalised to one name; re-publish the value
+// under every name the original Cloudflare handler may read.
 const PARAM_ALIASES: Record<string, string[]> = ${aliasesLiteral};
 
-type Ctx = { params: Promise<Record<string, string>> };
-
-async function handle(request: Request, ctx: Ctx) {
-  const params = expandParams(await ctx.params, PARAM_ALIASES);
-  return runPagesFunction(onRequest as never, request, params);
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  return runPagesApiRoute(onRequest as never, req, res, PARAM_ALIASES);
 }
-
-export const GET = handle;
-export const POST = handle;
-export const PUT = handle;
-export const PATCH = handle;
-export const DELETE = handle;
-export const OPTIONS = handle;
-export const HEAD = handle;
 `;
 }
 
@@ -296,21 +298,22 @@ for (const [routePath, files] of byOutput) {
 // regenerated: `src/pages/api/**` contains bespoke dev implementations (they use
 // the `dev-auth` helper rather than delegating to a Pages Function), and having
 // two handlers resolve the same path makes Next.js fail the build.
+//
+// IMPORTANT: files this generator produced in a previous run are NOT
+// hand-written and must be excluded, otherwise the generator would "skip" its
+// own output and then delete it on the next pass.
 const EXISTING_DEV_ROUTES = new Set();
-for (const [label, dir] of [
-  ['src/pages/api', join(root, 'apps', 'web', 'src', 'pages', 'api')],
-  ['src/app/api (hand-written)', APP_API],
-]) {
-  if (!existsSync(dir)) continue;
-  for (const f of walk(dir)) {
-    const rel = relative(dir, f).replace(/\\/g, '/');
-    if (label.startsWith('src/app')) {
-      if (!existsSync(f) || !readFileSync(f, 'utf8').includes('GENERATED FILE')) {
-        EXISTING_DEV_ROUTES.add(rel.replace(/\.tsx?$/, '').replace(/\/index$/, ''));
-      }
-    } else {
-      EXISTING_DEV_ROUTES.add(rel.replace(/\.tsx?$/, '').replace(/\/index$/, ''));
+if (existsSync(APP_API)) {
+  for (const f of walk(APP_API)) {
+    let src = '';
+    try {
+      src = readFileSync(f, 'utf8');
+    } catch {
+      continue;
     }
+    if (src.includes('GENERATED FILE')) continue;
+    const rel = relative(APP_API, f).replace(/\\/g, '/').replace(/\.tsx?$/, '').replace(/\/index$/, '');
+    EXISTING_DEV_ROUTES.add(rel);
   }
 }
 
@@ -318,13 +321,33 @@ let written = 0;
 let unchanged = 0;
 let stale = 0;
 
+/**
+ * Route patterns that must NOT be bridged into `src/pages/api`.
+ *
+ * `orgs/[slug]/*` breaks the PRODUCTION static build: webpack reports
+ * "Failed to read source code from .../functions/api/v1/orgs/[slug]/analytics/
+ * forecast.ts" (and the sibling `scenarios.ts`). This is a bundler resolution
+ * issue with the doubly-bracketed path, not a runtime fault — the routes work
+ * fine in the Workers runtime, which is where they actually execute in
+ * production. They are analytics endpoints and are not used by the Command
+ * Center, so locally they simply fall through to the NestJS rewrite exactly as
+ * they did before this bridge existed.
+ *
+ * Remove an entry here only if the production build is confirmed green.
+ */
+const UNSUPPORTED = [/^v1\/orgs\/\[slug\]\//];
+
 for (const file of resolved) {
   const routePath = normalisedRoutes.get(file);
+  if (UNSUPPORTED.some((re) => re.test(routePath))) {
+    skipped.push(`${relative(FUNCTIONS_API, file)} -> ${routePath} (breaks the production static build)`);
+    continue;
+  }
   if (EXISTING_DEV_ROUTES.has(routePath)) {
     skipped.push(`${relative(FUNCTIONS_API, file)} -> ${routePath} (hand-written dev route exists)`);
     continue;
   }
-  const outFile = join(APP_API, `${routePath}/route.ts`);
+  const outFile = join(APP_API, toOutputFile(routePath));
   const importPath = relative(dirname(outFile), file).replace(/\\/g, '/').replace(/\.ts$/, '');
   const normalised = importPath.startsWith('.') ? importPath : `./${importPath}`;
 
@@ -346,7 +369,7 @@ for (const file of resolved) {
   }
   if (checkOnly) {
     stale += 1;
-    process.stdout.write(`STALE  ${routePath}/route.ts\n`);
+    process.stdout.write(`STALE  ${toOutputFile(routePath)}\n`);
     continue;
   }
   mkdirSync(dirname(outFile), { recursive: true });
@@ -356,10 +379,13 @@ for (const file of resolved) {
 // Remove shims whose Pages Function no longer exists.
 let removed = 0;
 if (existsSync(APP_API) && !checkOnly) {
-  const wanted = new Set([...normalisedRoutes.values()].filter((r) => !EXISTING_DEV_ROUTES.has(r)));
+  const wanted = new Set(
+    [...normalisedRoutes.values()]
+      .filter((r) => !EXISTING_DEV_ROUTES.has(r) && !UNSUPPORTED.some((re) => re.test(r)))
+      .map((r) => toOutputFile(r)),
+  );
   for (const routeFile of walk(APP_API)) {
-    if (!routeFile.endsWith('route.ts')) continue;
-    const rel = relative(APP_API, routeFile).replace(/\\/g, '/').replace(/\/?route\.ts$/, '');
+    const rel = relative(APP_API, routeFile).replace(/\\/g, '/');
     if (!wanted.has(rel) && readFileSync(routeFile, 'utf8').includes('GENERATED FILE')) {
       rmSync(routeFile, { force: true });
       removed += 1;

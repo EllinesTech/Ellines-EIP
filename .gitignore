@@ -15,11 +15,25 @@ out/
 .dev.vars
 .dev.vars.*
 
-# Generated local-dev Route Handler shims (see scripts/generate-pages-shims.mjs).
-# They mirror the Cloudflare Pages Functions so `next dev` serves the real API,
-# and are regenerated on every `npm run dev`. They must never be committed:
-# production builds serve /api natively from Cloudflare Pages and remove them.
-apps/web/src/app/api/
+# Generated local-dev API bridges (see scripts/generate-pages-shims.mjs). They
+# invoke the real Cloudflare Pages Function so `next dev` serves the same API
+# production does, and are regenerated on every `npm run dev`. Never committed.
+# NOTE: this must not ignore the whole src/pages/api directory — it also holds
+# hand-written dev routes that ARE tracked.
+apps/web/src/pages/api/v1/dashboards/
+apps/web/src/pages/api/v1/connectors/
+apps/web/src/pages/api/v1/inbox/
+apps/web/src/pages/api/v1/orgs/
+apps/web/src/pages/api/v1/platform/
+apps/web/src/pages/api/v1/auth/
+apps/web/src/pages/api/v1/ellinea/
+apps/web/src/pages/api/v1/enterprise/
+apps/web/src/pages/api/v1/notifications/
+apps/web/src/pages/api/v1/webhooks/
+apps/web/src/pages/api/v1/workflows/
+apps/web/src/pages/api/v1/error-capture/
+apps/web/src/pages/api/v1/health/
+apps/web/src/pages/api/v1/agents-webhook-trigger.ts
 services/**/.env
 apps/**/.env
 

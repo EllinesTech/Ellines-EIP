@@ -1,25 +1,25 @@
 /**
- * Adapter that runs a Cloudflare Pages Function inside a Next.js Route Handler.
+ * Run a Cloudflare Pages Function from a Next.js **Pages Router** API route.
  *
- * WHY THIS EXISTS
- * ---------------
- * In production, Cloudflare Pages serves every `functions/api/**` route natively.
- * Locally, `apps/web/next.config.ts` rewrites all `/api/v1/*` to the NestJS
- * identity service, and `next.config.ts` assumes Next.js Route Handlers shadow
- * that rewrite. They never existed — so Pages-only routes (dashboards,
- * connector health, attention) returned 404 locally while working in production.
+ * WHY PAGES ROUTER (not App Router)
+ * ---------------------------------
+ * `src/pages/api/**` is this repo's established convention for LOCAL-ONLY API
+ * routes. The existing hand-written dev routes say so explicitly:
  *
- * This adapter lets generated Route Handlers reuse the EXACT same Pages Function
- * modules, so local behaviour matches production instead of diverging from it.
- * There is no second implementation: the handler under `functions/` stays the
- * single source of truth.
+ *   "Pages Router API routes are IGNORED during static export builds.
+ *    This only runs locally — production uses the real Cloudflare Pages Function."
  *
- * Next.js filesystem routes are matched BEFORE rewrites, so these shims take
- * precedence; any `/api/*` path with no Pages Function still falls through to
- * the NestJS rewrite, exactly as intended.
+ * Using that directory means the generated routes are excluded from the
+ * production static export by Next.js itself, so no build step has to delete
+ * them. An earlier App-Router version needed a `prebuild --clean` hook, which
+ * silently broke any dev server that happened to be running.
+ *
+ * CLOUDFLARE FUNCTIONS ARE THE SINGLE SOURCE OF TRUTH. Each generated route
+ * imports and invokes the ORIGINAL `functions/api/**` handler; there is no
+ * second implementation and no duplicated business logic.
  */
 
-import type { NextRequest } from 'next/server';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 type PagesHandler = (context: {
   request: Request;
@@ -32,73 +32,101 @@ type PagesHandler = (context: {
   passThroughOnException: () => void;
 }) => Response | Promise<Response>;
 
-/** Minimal shape of the Cloudflare Pages Functions context the handlers use. */
-export type PagesContext = Parameters<PagesHandler>[0];
+/** Expand normalised route params back into the names the Pages Function expects. */
+export function expandParams(
+  raw: Record<string, string | string[]>,
+  aliases: Record<string, string[]> = {},
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === 'string') out[k] = v;
+  }
+  for (const [canonical, names] of Object.entries(aliases)) {
+    const value = out[canonical];
+    if (value === undefined) continue;
+    for (const name of names) out[name] = value;
+  }
+  return out;
+}
+
+/** Build a fetch `Request` from a Next API request. */
+function toFetchRequest(req: NextApiRequest): Request {
+  const url = new URL(req.url ?? '/', 'http://localhost:3100');
+  // Re-serialise query params so the Pages Function sees the same URL.
+  for (const [key, value] of Object.entries(req.query ?? {})) {
+    if (key === 'id' || key === 'wid' || key === 'itemId' || key === 'execId') continue;
+    if (typeof value === 'string') url.searchParams.set(key, value);
+    else if (Array.isArray(value)) value.forEach((v) => url.searchParams.append(key, v));
+  }
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers ?? {})) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) value.forEach((v) => headers.append(key, v));
+    else headers.set(key, value);
+  }
+
+  const method = (req.method ?? 'GET').toUpperCase();
+  const init: RequestInit = { method, headers };
+  if (method !== 'GET' && method !== 'HEAD' && req.body !== undefined) {
+    if (typeof req.body === 'string' || Buffer.isBuffer(req.body)) {
+      init.body = req.body as string;
+    } else {
+      init.body = JSON.stringify(req.body);
+      if (!headers.has('content-type')) headers.set('content-type', 'application/json');
+    }
+  }
+  return new Request(url.toString(), init);
+}
+
+/** Write a fetch `Response` to a Next API response. */
+async function writeResponse(res: NextApiResponse, response: Response): Promise<void> {
+  res.status(response.status);
+  response.headers.forEach((value, key) => {
+    // Skip hop-by-hop / encoding headers Next manages itself.
+    if (['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(key)) return;
+    res.setHeader(key, value);
+  });
+  const text = await response.text();
+  res.end(text);
+}
 
 /**
- * Execute a Pages Function for a Next.js route handler.
- *
- * `env` is `process.env` in local dev (Next loads `.env.local`) and the Pages
- * bindings in production. Handlers fail closed on missing secrets, so a missing
- * key surfaces as a clear 500 rather than silently degraded behaviour.
+ * Default export for a generated `src/pages/api/**` route.
  */
-export async function runPagesFunction(
+export default async function runPagesApiRoute(
   handler: PagesHandler,
-  request: NextRequest | Request,
-  params: Record<string, string> = {},
-  env: Record<string, string | undefined> = process.env,
-): Promise<Response> {
-  // Pages Functions read `request` as a standard fetch Request. NextRequest is
-  // one, so it can be passed straight through.
-  const context: PagesContext = {
-    request: request as Request,
-    env,
+  req: NextApiRequest,
+  res: NextApiResponse,
+  aliases: Record<string, string[]> = {},
+): Promise<void> {
+  // `req.query` also carries the dynamic route params; split them from the
+  // query string so the function receives them in `context.params`.
+  const params = expandParams(
+    (req.query ?? {}) as Record<string, string | string[]>,
+    aliases,
+  );
+
+  const context = {
+    request: toFetchRequest(req),
+    env: process.env as Record<string, string | undefined>,
     params,
     next: async () => new Response('Not found', { status: 404 }),
-    functionPath: new URL((request as Request).url).pathname,
+    functionPath: req.url ?? '/',
     data: {},
     waitUntil: () => undefined,
     passThroughOnException: () => undefined,
   };
 
   try {
-    return await handler(context);
+    const response = await handler(context as never);
+    await writeResponse(res, response);
   } catch (err) {
-    // Never surface a stack trace or a secret to the client.
+    // Never leak a stack trace or a secret to the client.
     const message = err instanceof Error ? err.message : 'Unhandled function error';
     console.error('[pages-fn-adapter] handler threw:', message);
-    return new Response(
-      JSON.stringify({ statusCode: 500, message: 'Internal error' }),
-      { status: 500, headers: { 'content-type': 'application/json' } },
-    );
+    if (!res.headersSent) {
+      res.status(500).json({ statusCode: 500, message: 'Internal error' });
+    }
   }
-}
-
-/** Standard metadata for generated shims: always dynamic, Node runtime. */
-export const PAGE_HANDLER_META = {
-  dynamic: 'force-dynamic',
-  runtime: 'nodejs',
-} as const;
-
-/**
- * Expand normalised route params back into the names the Pages Function expects.
- *
- * Next.js forbids two different dynamic-segment names at the same path position
- * ("You cannot use different slug names for the same dynamic path"), whereas
- * Cloudflare Pages allows it — e.g. `inbox/[accountId]/*` and
- * `inbox/[messageId]/*` are siblings there. The generator therefore normalises
- * both to one folder name, and the raw value is re-published under every alias
- * so the original handler still finds `params.accountId` / `params.messageId`.
- */
-export function expandParams(
-  raw: Record<string, string>,
-  aliases: Record<string, string[]> = {},
-): Record<string, string> {
-  const out: Record<string, string> = { ...raw };
-  for (const [canonical, names] of Object.entries(aliases)) {
-    const value = raw[canonical];
-    if (value === undefined) continue;
-    for (const name of names) out[name] = value;
-  }
-  return out;
 }

@@ -6,10 +6,19 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/functions', '<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
-  // Exclude API endpoint files named test.ts from test runs (they're not test files)
-  testPathIgnorePatterns: ['/node_modules/', '/\\.next/', '/out/', '/functions/api/.*/test\\.ts$'],
+  // Exclude API endpoint files named test.ts from test runs (they're not test
+  // files). Two trees can hold such endpoints: the Cloudflare Pages Functions
+  // and the generated local-dev bridges under src/pages/api (which mirror them).
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/\\.next/',
+    '/out/',
+    '/functions/api/.*/test\\.ts$',
+    '/src/pages/api/.*/test\\.ts$',
+  ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^@ellines-eip/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     '^@ellines-eip/ellinea-ai$': '<rootDir>/../../packages/ellinea-ai/src/index.ts',
   },
