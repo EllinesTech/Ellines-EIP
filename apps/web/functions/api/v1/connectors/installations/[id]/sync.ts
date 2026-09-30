@@ -22,7 +22,15 @@ import {
   injectConfigContext,
   type InstallConfig,
 } from '../../../../../shared/connectors';
-import { buildInstallationRegistry, saveCapabilityRegistry } from '../../../../../shared/capability-store';
+import {
+  applyOutcomes,
+  buildInstallationRegistry,
+  saveCapabilityRegistry,
+} from '../../../../../shared/capability-store';
+import {
+  availableCapabilityCount,
+  deriveRegistryFromResponse,
+} from '@ellines-eip/shared';
 import { isOrganizationSuspended, mergeUemModels } from '@ellines-eip/shared';
 import {
   retrieveAllPages,
@@ -663,6 +671,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         );
       }
 
+      // The real first successful body, kept for capability derivation. This is
+      // the only thing discovery is allowed to learn from for this connector.
+      let discoveryBody: unknown = null;
+
       // Retrieve the FULL authorized result set, following pagination to the end.
       // retrieveAllPages reports completeness explicitly; we never assume page 1
       // is the whole dataset.
@@ -705,6 +717,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
                 : 'Endpoint returned a 200 response that is not valid JSON.',
             );
           }
+          // Keep the source's OWN body. Discovery must learn the real field names
+          // the publisher used, so a reconstructed or normalized shape is never
+          // substituted here.
+          if (discoveryBody === null) discoveryBody = parsed;
           return { status: res.status, body: parsed, headers };
         },
       });
@@ -762,6 +778,51 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const normalized = normalizeEnterprisePayload(raw);
       // recordCount must reflect what EIP retrieved, not what the API claimed.
       normalized.recordCount = retrieval.retrievedRecordCount;
+
+      // ── Phase 4: derive capabilities from the REAL response ──────────────
+      // Resources come only from collections that genuinely exist in the body
+      // the source returned. Nothing is inferred from the endpoint name, the
+      // connector name, or the HTTP status, and no path is probed speculatively
+      // against a customer's system.
+      const derived = deriveRegistryFromResponse({
+        systemName: config.systemLabel || displayName || 'REST API System',
+        payload: discoveryBody,
+        // Only claim paging the source actually demonstrated. A single-page
+        // walk proves the source served one response, not that paging exists.
+        paginationObserved:
+          retrieval.pagesFetched > 1 && retrieval.strategy !== 'single'
+            ? retrieval.strategy === 'token' || retrieval.strategy === 'next-link'
+              ? 'cursor'
+              : retrieval.strategy
+            : 'none',
+      });
+      // Only a real retrieval may move a resource out of NOT_YET_SUPPORTED.
+      const registry = applyOutcomes(derived.registry, [
+        {
+          resource: derived.discovered[0] ?? safeResourceName(endpoint),
+          ok: retrieval.errors.length === 0,
+          retrievedRecordCount: retrieval.retrievedRecordCount,
+          reportedRecordCount: retrieval.reportedRecordCount,
+          complete: retrieval.complete,
+          stopReason: retrieval.stopReason,
+        },
+      ]);
+      await saveCapabilityRegistry(context.env, {
+        installationId: id,
+        organizationId: auth.organizationId,
+        registry,
+      });
+      await supabase.from('connector_installations').update({
+        discovery_snapshot: {
+          discoveredAt: new Date().toISOString(),
+          method: 'response-analysis',
+          resources: registry.resources.length,
+          available: availableCapabilityCount(registry),
+          notes: derived.notes,
+        },
+      })
+        .eq('id', id)
+        .eq('organization_id', auth.organizationId);
 
       summary = await upsertSnapshot(
         context.env,

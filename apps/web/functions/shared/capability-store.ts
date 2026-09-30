@@ -39,6 +39,32 @@ function availabilityFor(o: ResourceRetrievalOutcome): CapabilityAvailability {
 }
 
 /**
+ * Fold real retrieval outcomes into a derived registry.
+ *
+ * This is the ONLY way a resource leaves NOT_YET_SUPPORTED. Outcomes naming a
+ * resource discovery never found are ignored rather than inventing an entry.
+ */
+export function applyOutcomes(
+  registry: CapabilityRegistry,
+  outcomes: ResourceRetrievalOutcome[],
+): CapabilityRegistry {
+  const known = new Set(registry.resources.map((r) => r.id));
+  let out = registry;
+  for (const o of outcomes) {
+    if (!known.has(o.resource)) continue;
+    out = applyRetrievalResult(out, {
+      resourceId: o.resource,
+      availability: availabilityFor(o),
+      reason: o.ok ? o.stopReason : o.error || o.stopReason,
+      retrievedRecordCount: o.retrievedRecordCount,
+      reportedRecordCount: o.reportedRecordCount,
+      complete: o.complete,
+    });
+  }
+  return out;
+}
+
+/**
  * Build the registry for one installation from a real OpenAPI document plus
  * the retrieval outcomes EIP actually observed.
  *
