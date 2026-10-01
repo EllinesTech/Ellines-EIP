@@ -147,3 +147,34 @@ Full codebase audit run by Kiro. Findings and fixes applied:
 | **IN PROGRESS** — 15 EIP 2.0 property test stubs committed but not verified against services | All `*.spec.ts` files in `services/identity/src/` | Tests reference real service implementations — verified imports are correct against existing service files; no missing service implementations found for the spec stubs |
 
 Build queue: P4 is now `next`. Its scope includes the Ellines Org Dashboard (spec at `.kiro/specs/ellines-org-dashboard/`) and DB-backed platform staff management.
+
+### 2026-09-30 — Real connector proof: source separation + timezone-safe freshness (`eip/real-haven-sync-and-source-separation`)
+
+Roadmap P1.6–P1.9 work: the real Ellines Haven connector's sync/freshness numbers were being measured with the reader's timezone, and the same connector read `STALE`/180 min on the connector surface while the registry beside it read `FRESH`/0 min. Root cause and the whole-tree defects found by this pass:
+
+| Defect | Evidence | Fix |
+|---|---|---|
+| **Freshness depended on the reader's timezone.** Prisma maps `DateTime` to Postgres `timestamp without time zone`; PostgREST returns it zone-less (`2026-10-01T04:24:10.027`), and `new Date(...)` reads a zone-less string as **local** time. On a UTC+3 host a sync that had completed seconds earlier measured 180 minutes old → false `STALE`; the registry JSON (written with `toISOString()`) carried `Z` → `FRESH`. | `new Date('2026-10-01 04:24:10.027')` → `01:24:10.027Z` on a UTC+3 host (reproduced against the live DB) | new `packages/shared/src/db-time.ts` (`toInstantMs` pins zone-less values to UTC, trusts explicit `Z`/offset, returns `null` — never `Date.now()` — for unparsable; `toUtcIso` emits explicit `Z`), exported from `packages/shared/src/index.ts`, wired into `packages/shared/src/source-graph.ts` (`freshnessFrom`, measurement sort, `summarise` last-retrieval now max-instant instead of lexicographic string sort) and `apps/web/functions/api/v1/connectors/health.ts` (`lastSyncAtUtc`/`lastSyncedAtUtc`, age/stale, evidence string, `freshness.lastSuccessfulSyncAt`) |
+| **Timeliness was fabricated as `0`** when no health metric existed, dragging the dimension average toward "maximally stale". | `deriveDimensions`/`computeScore` in `services/identity/src/data-quality/data-quality.service.ts` | `enterprise_snapshots.healthScore Int?` (migration `0007_snapshot_unknown_health`) and `DataQualityScore/DataQualityHistory.timelinessScore Float?` (migration `0008_quality_timeliness_unknown`); the `timeliness` dimension is **omitted** when `healthScore` is null and `computeScore` skips absent dimensions; `apps/web/functions/api/v1/orgs/[slug]/data-quality/summary.ts` widened to `number \| null` |
+| **Prisma schema was invalid** — `OrganizationSource.organization` and `SourceWebsiteMeasurement.organization` had no opposite field on `Organization` (P1012), so `db:generate`, `db:push` and the identity build were all broken. | `npx prisma validate` | added `Organization.sources` / `Organization.sourceMeasurements` back-relations |
+| `scripts/apply-0006-source-model.mjs` ran under bare `node` with no env loader → `Environment variable not found: DATABASE_URL`. | script output | `import 'dotenv/config'` (and `node --env-file=.env scripts/apply-pending-migrations.mjs --dry-run` verified the deploy path baselines 0001–0003 and leaves 0004–0008 to `prisma migrate deploy`) |
+| `toRegistryRow` narrowed payloads with an unexplained cast | `apps/web/functions/shared/capability-store.ts` | why-comment recording that the check is a shape check over EIP-written camelCase jsonb and returns `null` (skipped, not "discovered nothing") for foreign payloads |
+| `git diff --check` defect introduced in this pass | blank line at EOF in `services/identity/prisma/schema.prisma` | stripped |
+
+New surface in this slice: org source endpoints (`GET /orgs/me/sources`, `POST /orgs/me/sources/website/check`), source-graph UI (`apps/web/src/components/source-graph/`), `/app/connectors/systems`, `/app/connectors/inventory`, `/app/connected-website`, and `GET /connectors/capabilities`.
+
+| Check | Command | Result |
+|---|---|---|
+| Shared build | `npm run build:shared` | pass |
+| Identity build | `npm run build -w @ellines-eip/identity` | pass — `prisma generate && nest build` |
+| Web production build | `npm run build -w @ellines-eip/web` | pass — 81/81 static pages |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 242 files, 338 relative imports |
+| Shared tests | `npm run test -w @ellines-eip/shared` | pass — 10 suites / 282 tests |
+| Identity tests | `npm run test -w @ellines-eip/identity` | pass — 27 suites / 382 tests |
+| Web/Pages Functions tests | `npm run test -w @ellines-eip/web` | pass — 22 suites / 228 tests; new `functions/__tests__/db-timestamp-zone.spec.ts` pins zone-less→UTC parsing, FRESH-at-1-min vs STALE-at-181, null-not-now, and the explicit-UTC emission |
+| Whitespace/format check | `git diff --check` | pass |
+| Live connector reading (real Ellines Haven org) | dev servers + authenticated sync | connector freshness `ageMinutes: 0`, `state: FRESH` (was `180`/`STALE`), health `HEALTHY` with UTC evidence; health score stays `null` (never `0`) |
+
+**Gate note (do not re-learn this the hard way):** root `npx jest` is *not* a valid gate — it discovers every suite in the tree (including the nested `.kilo/worktrees/hissing-wormhole/` checkout) without the workspace jest configs, and reports 114 real-tree suites as failing (it has no `moduleNameMapper` for `@ellines-eip/shared`). Use the per-workspace gates in the table above (`npm run test -w @ellines-eip/<pkg>`), which is also what the root `npm test` runs.
+
+P4 remains `next` (DB-backed platform staff/roles/grants + Ellines Org Dashboard) — this slice landed the roadmap P1 connector-experiment groundwork, not P4.

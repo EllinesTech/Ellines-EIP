@@ -509,9 +509,12 @@ async function upsertSnapshot(
     organization_id: organizationId,
     connector_id: aggConnectorId,
     connector_name: aggConnectorName,
-    // Null means "no connector published a health metric" — surfaced as unknown,
-    // never silently rendered as 0 or as an invented baseline.
-    health_score: aggHealthScore ?? 0,
+    // `health_score` stores the SOURCE's own metric. It is null whenever no
+    // connector published one, and null is what the API layer reads back as
+    // UNKNOWN. Coercing it to 0 here — as this previously did — made an
+    // unmeasured system look like the worst possible one, and any consumer that
+    // treated a non-null score as "measured" would be reading a fabrication.
+    health_score: aggHealthScore,
     connected_systems: activeConnectorCount,
     record_count: totalRecordCount,
     retrieved_count: retrievedCount,
@@ -797,14 +800,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             : 'none',
       });
       // Only a real retrieval may move a resource out of NOT_YET_SUPPORTED.
+      // The evidence is bound to the resource DISCOVERY actually found, so the
+      // registry and the retrieval evidence can never describe different things.
+      // `retrieval.resourceName` is the source's own container name, which is
+      // what ties a record count to a capability; `derived.discovered[0]` is the
+      // fallback when the source published a bare array.
+      const retrievedResource =
+        (retrieval.resourceName && derived.discovered.includes(retrieval.resourceName)
+          ? retrieval.resourceName
+          : null) ?? derived.discovered[0] ?? safeResourceName(endpoint);
+
+      // A retrieval that produced no records is never a successful read, even
+      // when the request itself returned 200. The availability helper maps this
+      // to UNAVAILABLE so the registry cannot claim AVAILABLE over an empty read.
+      const retrievalOk = retrieval.errors.length === 0;
       const registry = applyOutcomes(derived.registry, [
         {
-          resource: derived.discovered[0] ?? safeResourceName(endpoint),
-          ok: retrieval.errors.length === 0,
+          resource: retrievedResource,
+          ok: retrievalOk,
           retrievedRecordCount: retrieval.retrievedRecordCount,
           reportedRecordCount: retrieval.reportedRecordCount,
           complete: retrieval.complete,
           stopReason: retrieval.stopReason,
+          ...(retrievalOk ? {} : { error: retrieval.errors.map((e) => e.reason).join('; ') }),
         },
       ]);
       await saveCapabilityRegistry(context.env, {
@@ -1112,12 +1130,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       .from('connector_installations')
       .update({
         status: 'synced',
+        // Both timestamps are written on purpose. `last_synced_at` is the
+        // historical record; `last_sync_at` is the column the health and
+        // capability endpoints read to decide freshness. Previously NO path
+        // wrote `last_sync_at`, so freshness could never be verified and every
+        // connector drifted to STALE no matter how recently it had synced.
         last_synced_at: now,
-        last_message: `Synced — health ${summary.healthScore}${fieldMapWarnSuffix}`,
+        last_sync_at: now,
+        last_message: `Synced — health ${summary.healthScore ?? 'unknown'}${fieldMapWarnSuffix}`,
+        // Clear the previous failure so a recovered connector does not keep
+        // advertising a stale error.
+        last_error: null,
+        error_count: 0,
         config: nextConfig,
         updated_at: now,
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', auth.organizationId);
 
     return json(summary);
   } catch (err) {
@@ -1128,13 +1157,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // SSRF policy violations are a 400, not a 500
     const statusCode = err instanceof SsrfError ? 400 : 500;
 
-    // Mark installation as error so the UI shows a clear status
+    // Record the real failure. `last_error` and `error_count` are maintained
+    // here so the Super Admin inventory can report an actual error state
+    // instead of inferring one from free text. `last_sync_at` is deliberately
+    // NOT touched: a failed attempt is not a successful retrieval, and writing
+    // it here would reset freshness and hide the failure behind a green light.
     try {
+      const { data: current } = await supabase
+        .from('connector_installations')
+        .select('error_count')
+        .eq('id', id)
+        .eq('organization_id', auth.organizationId)
+        .maybeSingle();
       await supabase
         .from('connector_installations')
         .update({
           status: 'error',
           last_message: msg.slice(0, 300),
+          last_error: msg.slice(0, 300),
+          error_count: (Number(current?.error_count) || 0) + 1,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

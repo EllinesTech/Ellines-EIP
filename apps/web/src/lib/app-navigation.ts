@@ -1060,11 +1060,31 @@ export const CLIENT_NAV_ITEMS: ClientNavItem[] = [
   },
 
   // ── INTEGRATIONS ──────────────────────────────────────────────────────────
+  // Three separate concepts, three separate destinations:
+  //   Connected Website  the org's actual website and its measured state
+  //   Connected Systems  the real business systems, and what each exposes
+  //   Connectors         the technical inventory (how EIP reaches them)
+  {
+    id: 'client-connected-website',
+    label: 'Connected Website',
+    href: '/app/connected-website',
+    icon: 'connected-systems',
+    group: 'client-integrations',
+    available: true,
+  },
   {
     id: 'client-connected-systems',
     label: 'Connected Systems',
-    href: '/app/connectors',
+    href: '/app/connectors/systems',
     icon: 'connected-systems',
+    group: 'client-integrations',
+    available: true,
+  },
+  {
+    id: 'client-connectors',
+    label: 'Connectors',
+    href: '/app/connectors/inventory',
+    icon: 'connector-health',
     group: 'client-integrations',
     available: true,
   },
@@ -1256,7 +1276,13 @@ export const CLIENT_NAV_GROUPS: ClientNavGroupDef[] = [
     label: 'INTEGRATIONS',
     collapsible: true,
     defaultOpen: true,
-    itemIds: ['client-connected-systems', 'client-connector-health', 'client-integration-requests'],
+    itemIds: [
+      'client-connected-website',
+      'client-connected-systems',
+      'client-connectors',
+      'client-connector-health',
+      'client-integration-requests',
+    ],
   },
   {
     id: 'client-automation',

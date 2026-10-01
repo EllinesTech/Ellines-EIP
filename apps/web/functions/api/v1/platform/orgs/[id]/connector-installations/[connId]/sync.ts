@@ -35,6 +35,9 @@ import {
   isFirestoreResponse,
   normalizeFirestoreResponse,
 } from '../../../../../../../shared/firestore-normalizer';
+import { retrieveAllPages } from '../../../../../../../shared/pagination';
+import { applyOutcomes, saveCapabilityRegistry } from '../../../../../../../shared/capability-store';
+import { availableCapabilityCount, deriveRegistryFromResponse } from '@ellines-eip/shared';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,6 +82,19 @@ async function upsertSnapshot(
   connectorId: string,
   connectorName: string,
   payload: ReturnType<typeof normalizeEnterprisePayload>,
+  /**
+   * Real retrieval evidence from this run, when the catalog type went through
+   * the retrieval engine. When absent the retrieval columns are written as
+   * unknown/incomplete rather than as a success — a payload that merely parsed
+   * is not evidence that records were read.
+   */
+  retrieval?: {
+    retrievedRecordCount: number;
+    reportedRecordCount: number;
+    complete: boolean;
+    stopReason: string;
+    resourceName: string | null;
+  },
 ) {
   const syncedAt = new Date().toISOString();
   const supabase = getAdminClient(env);
@@ -88,9 +104,27 @@ async function upsertSnapshot(
     organization_id: organizationId,
     connector_id: connectorId,
     connector_name: connectorName,
+    // null = the source published no health metric. Never coerced to 0.
     health_score: payload.healthScore,
     connected_systems: payload.connectedSystems,
     record_count: payload.recordCount,
+    // Retrieval evidence, or explicit unknowns when there is none.
+    retrieved_count: retrieval ? retrieval.retrievedRecordCount : 0,
+    reported_count: retrieval ? retrieval.reportedRecordCount : 0,
+    retrieval_complete: retrieval ? retrieval.complete : false,
+    retrieval_stop_reason: retrieval ? retrieval.stopReason : 'not-retrieved',
+    resources_retrieved: retrieval && retrieval.retrievedRecordCount > 0 ? 1 : 0,
+    resources_failed: retrieval && retrieval.retrievedRecordCount > 0 ? 0 : 1,
+    sync_status: !retrieval
+      ? 'idle'
+      : retrieval.complete && retrieval.retrievedRecordCount > 0
+        ? 'synced'
+        : 'partial',
+    sync_error: !retrieval
+      ? 'This connector type does not produce per-record retrieval evidence.'
+      : retrieval.complete && retrieval.retrievedRecordCount > 0
+        ? null
+        : `Retrieval stopped (${retrieval.stopReason}) after ${retrieval.retrievedRecordCount} record(s).`,
     open_alerts: payload.openAlerts,
     open_decisions: payload.openDecisions,
     brief_highlight: payload.briefHighlight,
@@ -115,6 +149,14 @@ async function upsertSnapshot(
         health_score: row.health_score,
         connected_systems: row.connected_systems,
         record_count: row.record_count,
+        retrieved_count: row.retrieved_count,
+        reported_count: row.reported_count,
+        retrieval_complete: row.retrieval_complete,
+        retrieval_stop_reason: row.retrieval_stop_reason,
+        resources_retrieved: row.resources_retrieved,
+        resources_failed: row.resources_failed,
+        sync_status: row.sync_status,
+        sync_error: row.sync_error,
         open_alerts: row.open_alerts,
         open_decisions: row.open_decisions,
         brief_highlight: row.brief_highlight,
@@ -184,14 +226,106 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const displayName = (install.display_name as string) || catalogId;
 
   let payload: ReturnType<typeof normalizeEnterprisePayload>;
+  // Real retrieval evidence from THIS run, or null when the catalog type does
+  // not go through the retrieval engine. Never synthesised.
+  let retrievalEvidence: {
+    retrievedRecordCount: number;
+    reportedRecordCount: number;
+    complete: boolean;
+    stopReason: string;
+    errors: string[];
+    resourceName: string | null;
+  } | null = null;
 
   try {
     switch (catalogId) {
       case 'rest-api': {
         const endpoint = (config.endpoint || '').trim();
         if (!endpoint) throw new Error('Connector has no endpoint configured');
-        const raw = await proxyFetch(endpoint, config);
-        payload = normalizeEnterprisePayload(raw);
+
+        // The Super Admin sync must use the SAME retrieval engine as the client
+        // sync. It previously called a bare proxyFetch, which meant a Super Admin
+        // sync persisted no retrieval evidence and never rebuilt the capability
+        // registry — so the org's Connected Systems view silently went stale even
+        // though a sync had just been run for it.
+        const retrieval = await retrieveAllPages({
+          startUrl: endpoint,
+          fetchPage: async (url) => {
+            const check = isSafeEgressTarget(url);
+            if (!check.safe) throw new SsrfError(check.reason ?? 'Egress policy blocked URL', url);
+            const res = await safeFetch(url, {
+              method: 'GET',
+              headers: {
+                Accept: 'application/json, text/plain, */*',
+                'User-Agent': 'EllineEIP-Proxy/1.0',
+                ...buildAuthHeaders(config),
+              },
+            });
+            const text = await res.text();
+            let parsed: unknown = null;
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              parsed = null;
+            }
+            const headers: Record<string, string> = {};
+            res.headers.forEach((v, k) => {
+              headers[k.toLowerCase()] = v;
+            });
+            return { body: parsed, headers, status: res.status };
+          },
+          strategy: config.paginationStrategy ?? 'auto',
+        });
+
+        const raw = retrieval.records.length
+          ? { [retrieval.resourceName ?? 'records']: retrieval.records }
+          : null;
+        payload = normalizeEnterprisePayload({
+          ...(raw ?? {}),
+          records: retrieval.records,
+          retrievedCount: retrieval.retrievedRecordCount,
+          systemName: displayName,
+        });
+
+        // Persist the real retrieval evidence, exactly as the org-scoped path
+        // does, so both paths produce comparable, verifiable state.
+        const derived = deriveRegistryFromResponse({
+          systemName: config.systemLabel || config.systemName || displayName,
+          payload: { [retrieval.resourceName ?? 'records']: retrieval.records },
+          paginationObserved:
+            retrieval.pagesFetched > 1 && retrieval.strategy !== 'single'
+              ? retrieval.strategy === 'token' || retrieval.strategy === 'next-link'
+                ? 'cursor'
+                : retrieval.strategy
+              : 'none',
+        });
+        const retrievedResource =
+          (retrieval.resourceName && derived.discovered.includes(retrieval.resourceName)
+            ? retrieval.resourceName
+            : null) ?? derived.discovered[0] ?? displayName;
+        const registry = applyOutcomes(derived.registry, [
+          {
+            resource: retrievedResource,
+            ok: retrieval.errors.length === 0,
+            retrievedRecordCount: retrieval.retrievedRecordCount,
+            reportedRecordCount: retrieval.reportedRecordCount,
+            complete: retrieval.complete,
+            stopReason: retrieval.stopReason,
+          },
+        ]);
+        await saveCapabilityRegistry(context.env, {
+          installationId: connId,
+          organizationId: orgId,
+          registry,
+        });
+        retrievalEvidence = {
+          retrievedRecordCount: retrieval.retrievedRecordCount,
+          reportedRecordCount: retrieval.reportedRecordCount,
+          complete: retrieval.complete,
+          stopReason: retrieval.stopReason,
+          errors: retrieval.errors.map((e) => e.reason),
+          resourceName: retrieval.resourceName,
+        };
         break;
       }
 
@@ -264,12 +398,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Update installation: mark active + record sync time.
     // Platform sync activates the connector — the client org can now use it.
+    // `last_sync_at` MUST be written here too: it is the column the health and
+    // capability endpoints read for freshness, and leaving it unset on the
+    // platform path is what made a just-synced connector read as STALE.
     const { data: updatedInstall } = await supabase
       .from('connector_installations')
       .update({
         status: 'active',
         last_synced_at: now,
-        last_message: `Synced by platform admin at ${new Date().toUTCString()}`,
+        last_sync_at: now,
+        last_message: `Synced by platform admin at ${new Date().toUTCString()}${
+          retrievalEvidence
+            ? ` — retrieved ${retrievalEvidence.retrievedRecordCount} record(s) from ${retrievalEvidence.resourceName ?? 'source'}`
+            : ''
+        }`,
+        last_error: null,
+        error_count: 0,
+        discovery_snapshot: retrievalEvidence
+          ? {
+              discoveredAt: now,
+              method: 'response-analysis',
+              resources: 1,
+              available: retrievalEvidence.complete && retrievalEvidence.retrievedRecordCount > 0 ? 1 : 0,
+              notes: [
+                `Retrieved ${retrievalEvidence.retrievedRecordCount} record(s) from "${retrievalEvidence.resourceName ?? 'source'}"; stop reason: ${retrievalEvidence.stopReason}.`,
+              ],
+            }
+          : undefined,
         updated_at: now,
       })
       .eq('id', connId)
@@ -294,6 +449,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       connId,
       displayName,
       { ...payload, connectedSystems: activeConnectorCount ?? 0 },
+      retrievalEvidence ?? undefined,
     );
 
     await supabase.from('audit_logs').insert(
@@ -315,15 +471,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     return json({
       ...summary,
+      // The real retrieval result from this run, so a caller can distinguish
+      // "synced" from "synced and actually read N records".
+      retrieval: retrievalEvidence,
       installation: updatedInstall ? toInstallationDto(updatedInstall as Record<string, unknown>) : null,
     });
   } catch (err) {
-    // Mark as error and return the message
+    // Mark as error and return the message.
+    // `last_sync_at` is deliberately NOT touched: a failed attempt is not a
+    // successful retrieval, and advancing it would make freshness look verified
+    // when nothing was read.
     await supabase
       .from('connector_installations')
       .update({
         status: 'error',
         last_message: err instanceof Error ? err.message.slice(0, 300) : 'Sync failed',
+        last_error: err instanceof Error ? err.message.slice(0, 300) : 'Sync failed',
         updated_at: new Date().toISOString(),
       })
       .eq('id', connId)

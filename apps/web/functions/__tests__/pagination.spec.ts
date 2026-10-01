@@ -173,16 +173,29 @@ describe('retrieveAllPages', () => {
     const fetchPage = async (): Promise<PageResult> => ({ status: 200, body: '<html>login</html>', headers: {} });
     const r = await retrieveAllPages({ startUrl: 'http://x/api', fetchPage });
     expect(r.retrievedRecordCount).toBe(0);
-    expect(r.complete).toBe(true);
     expect(r.records).toEqual([]);
+    // A 200 carrying a body EIP cannot read is NOT a complete read. Reporting it
+    // as complete is how a source with real records gets stored as "synced, 0".
+    expect(r.complete).toBe(false);
+    expect(r.errors.length).toBeGreaterThan(0);
   });
 
-  it('12. HTML instead of JSON produces zero records, not a fake sync', async () => {
+  it('12. an unparseable body produces zero records, not a fake sync', async () => {
     const fetchPage = async (): Promise<PageResult> => ({ status: 200, body: null, headers: {} });
+    const r = await retrieveAllPages({ startUrl: 'http://x/api', fetchPage });
+    expect(r.retrievedRecordCount).toBe(0);
+    expect(r.complete).toBe(false);
+    expect(r.stopReason).toBe('error');
+  });
+
+  it('12b. HTTP 204 is a real empty answer, not an unreadable body', async () => {
+    const fetchPage = async (): Promise<PageResult> => ({ status: 204, body: null, headers: {} });
     const r = await retrieveAllPages({ startUrl: 'http://x/api', fetchPage });
     expect(r.retrievedRecordCount).toBe(0);
     expect(r.complete).toBe(true);
     expect(r.stopReason).toBe('empty-page');
+    // Complete, but never presented as a capability that was actually read.
+    expect(r.errors).toEqual([]);
   });
 
   it('13. duplicate records across pages are de-duplicated and counted', async () => {

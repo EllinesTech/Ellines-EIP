@@ -1286,6 +1286,147 @@ export function listPublishedPacks() {
   return pagesRequest<ConnectorPackDto[]>('/api/v1/connectors/packs');
 }
 
+// ─── Source graph (the single source of truth for every dashboard) ───────────
+//
+// Organisation -> Website / Business Systems -> Connectors -> Resources.
+// Every value below is real or explicitly null; nothing is defaulted to 0 or to
+// a healthy state. See functions/api/v1/connectors/capabilities.ts.
+
+/** How fresh a measurement or retrieval is. UNKNOWN = never measured. */
+export type SourceFreshnessDto = {
+  lastSuccessfulSyncAt: string | null;
+  ageMinutes: number | null;
+  syncIntervalMinutes: number | null;
+  state: 'FRESH' | 'STALE' | 'UNKNOWN';
+};
+
+export type CapabilityAvailabilityDto =
+  | 'AVAILABLE'
+  | 'NOT_PROVIDED_BY_SOURCE'
+  | 'NOT_YET_SUPPORTED'
+  | 'NOT_AUTHORIZED'
+  | 'UNAVAILABLE'
+  | 'PARTIAL';
+
+/** One resource the real source actually exposed. */
+export interface SourceResourceDto {
+  id: string;
+  label: string;
+  path: string;
+  availability: CapabilityAvailabilityDto;
+  reason: string | null;
+  retrievedRecordCount: number | null;
+  reportedRecordCount: number | null;
+  complete: boolean | null;
+  lastRetrievedAt: string | null;
+  connectorId: string;
+  connectorName: string;
+}
+
+/** A technical connector, reported as a mechanism and never as the source. */
+export interface SourceConnectorDto {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  lifecycleState: string | null;
+  sourceId: string | null;
+  sourceName: string | null;
+  sourceType: 'WEBSITE' | 'BUSINESS_SYSTEM' | null;
+  authentication: {
+    authType: string;
+    hasCredential: boolean;
+    lastTestAt: string | null;
+  };
+  lastSuccessfulSyncAt: string | null;
+  lastAttemptAt: string | null;
+  lastMessage: string | null;
+  lastError: string | null;
+  errorCount: number;
+  freshness: SourceFreshnessDto;
+  resources: SourceResourceDto[];
+}
+
+/** The org's website, with only genuinely measured facts. */
+export interface SourceWebsiteDto {
+  id: string;
+  name: string;
+  url: string;
+  outcome: 'ONLINE' | 'OFFLINE' | 'DNS_FAILURE' | 'TLS_FAILURE' | 'TIMEOUT' | 'NOT_CHECKED' | null;
+  /** null = no response received. Never 0. */
+  httpStatus: number | null;
+  /** null = no request completed. Never 0. */
+  responseTimeMs: number | null;
+  redirected: boolean | null;
+  finalUrl: string | null;
+  tls: {
+    valid: boolean | null;
+    issuer: string | null;
+    subject: string | null;
+    validTo: string | null;
+  };
+  lastCheckedAt: string | null;
+  freshness: SourceFreshnessDto;
+  message: string | null;
+}
+
+/** A connected business system and what it actually provides. */
+export interface BusinessSystemDto {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'CONNECTED' | 'NOT_CONNECTED';
+  statusEvidence: string;
+  connectorIds: string[];
+  connectors: SourceConnectorDto[];
+  resources: SourceResourceDto[];
+  availableResourceCount: number | null;
+  totalResourceCount: number | null;
+  lastSuccessfulRetrievalAt: string | null;
+  freshness: SourceFreshnessDto;
+  completeness: 'COMPLETE' | 'PARTIAL' | 'UNKNOWN' | null;
+  errors: string[];
+}
+
+export interface OrganizationSourceGraphDto {
+  organizationId: string;
+  organizationName: string | null;
+  /** null when the org has not configured a website. Not a placeholder. */
+  website: SourceWebsiteDto | null;
+  businessSystems: BusinessSystemDto[];
+  connectors: SourceConnectorDto[];
+  counts: {
+    websites: number;
+    businessSystems: number;
+    connectors: number;
+    discoveredResources: number;
+    availableResources: number | null;
+  };
+}
+
+/** Platform admins may pass ?orgId= to inspect one org. Everyone else is pinned. */
+export function fetchOrganizationSources(orgId?: string) {
+  const qs = orgId ? `?orgId=${encodeURIComponent(orgId)}` : '';
+  return pagesRequest<OrganizationSourceGraphDto>(`/api/v1/orgs/me/sources${qs}`);
+}
+
+/** Run a REAL website probe and persist the measurement. */
+export function checkConnectedWebsite() {
+  return pagesRequest<{
+    state: 'CHECKED' | 'NOT_CONNECTED' | 'BLOCKED';
+    sourceId?: string;
+    url?: string;
+    outcome?: SourceWebsiteDto['outcome'];
+    httpStatus?: number | null;
+    responseTimeMs?: number | null;
+    redirected?: boolean | null;
+    finalUrl?: string | null;
+    tls?: SourceWebsiteDto['tls'];
+    checkedAt?: string;
+    message?: string | null;
+  }>('/api/v1/orgs/me/sources/website/check', { method: 'POST' });
+}
+
 export function listPlatformConnectorPacks() {
   return pagesRequest<ConnectorPackDto[]>('/api/v1/platform/connector-packs');
 }

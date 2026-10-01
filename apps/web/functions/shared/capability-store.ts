@@ -30,11 +30,21 @@ export interface ResourceRetrievalOutcome {
   error?: string;
 }
 
-/** Map a real retrieval outcome onto the honest availability state. */
+/**
+ * Map a real retrieval outcome onto the honest availability state.
+ *
+ * The guard that matters is the first one. A request that returns HTTP 200 is
+ * not a successful read: if EIP retained no records, there is no evidence the
+ * source holds anything, so the resource is UNAVAILABLE. Marking it AVAILABLE
+ * over an empty read is precisely how a source with 15 real books came to be
+ * reported as "AVAILABLE, 0 records" — a capability EIP could not actually use
+ * presented as one it could.
+ *
+ * A truncated read is PARTIAL, never AVAILABLE — the same rule the snapshot and
+ * the health endpoint use, so the three can never disagree.
+ */
 function availabilityFor(o: ResourceRetrievalOutcome): CapabilityAvailability {
-  if (!o.ok) return 'UNAVAILABLE';
-  // A truncated read is PARTIAL, never AVAILABLE — the same rule the snapshot
-  // and the health endpoint use, so the three can never disagree.
+  if (!o.ok || o.retrievedRecordCount <= 0) return 'UNAVAILABLE';
   return o.complete ? 'AVAILABLE' : 'PARTIAL';
 }
 

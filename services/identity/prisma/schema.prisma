@@ -76,6 +76,8 @@ model Organization {
   documents              Document[] // Org-scoped document library
   clientDashboards       ClientDashboard[]          @relation("ClientDashboards") // client-dashboard spec
   emailAccounts          EmailAccount[]             // Email Intelligence: per-org IMAP accounts
+  sources                OrganizationSource[]       // Source graph: websites + business systems
+  sourceMeasurements     SourceWebsiteMeasurement[] // Source graph: real website probes
 
   @@index([parentOrgId])
   @@map("organizations")
@@ -409,7 +411,10 @@ model EnterpriseSnapshot {
   organizationId   String   @unique @map("organization_id")
   connectorId      String   @map("connector_id")
   connectorName    String   @map("connector_name")
-  healthScore      Int      @map("health_score")
+  /// The SOURCE's own health metric, or null when no connector published one.
+  /// Null means UNKNOWN and must stay null: coercing it to 0 stores a measurement
+  /// that never happened (see migrations/0007_snapshot_unknown_health).
+  healthScore      Int?     @map("health_score")
   connectedSystems Int      @map("connected_systems")
   /// Count of records returned by the last synced connector (e.g. 15 books, 100 students).
   /// Distinct from connectedSystems — a catalogue with 15 records has 1 connected system.
@@ -1757,7 +1762,10 @@ model DataQualityScore {
   completenessScore Float @map("completeness_score") // % of required fields populated
   accuracyScore     Float @map("accuracy_score") // % of values matching validation rules
   consistencyScore  Float @map("consistency_score") // % data consistent across sources
-  timelinessScore   Float @map("timeliness_score") // % recent data (not stale)
+  /// % recent data (not stale). NULL means the source published no health metric,
+  /// so timeliness was never measured — it is not a percentage of zero
+  /// (see migrations/0008_quality_timeliness_unknown).
+  timelinessScore   Float? @map("timeliness_score")
   validityScore     Float @map("validity_score") // % passing format/type checks
 
   // Overall score (average of five dimensions)
@@ -1940,7 +1948,9 @@ model DataQualityHistory {
   completenessScore Float @map("completeness_score")
   accuracyScore     Float @map("accuracy_score")
   consistencyScore  Float @map("consistency_score")
-  timelinessScore   Float @map("timeliness_score")
+  /// NULL = timeliness was never measured at snapshot time (no health metric was
+  /// published). Distinct from 0, which would claim the data was fully stale.
+  timelinessScore   Float? @map("timeliness_score")
   validityScore     Float @map("validity_score")
   overallScore      Float @map("overall_score")
 
@@ -2582,4 +2592,65 @@ model ConnectorCapabilityRegistry {
 
   @@index([organizationId, isCurrent])
   @@map("connector_capability_registries")
+}
+
+/// What an organisation is actually connected to.
+///
+/// A CONNECTOR is the mechanism ("how does EIP reach it"); a SOURCE is the thing
+/// itself ("what is connected"). The dashboards need the second, because an
+/// organisation described only by its connectors says nothing about whether its
+/// business is connected.
+///
+/// WEBSITE and BUSINESS_SYSTEM are deliberately separate concepts: a website
+/// answers reachability (HTTP/latency/TLS) and a business system answers data
+/// capability. A site being online is not a site providing orders.
+model OrganizationSource {
+  id             String   @id
+  organizationId String   @map("organization_id")
+  /// WEBSITE | BUSINESS_SYSTEM — a closed vocabulary, enforced by a CHECK constraint.
+  sourceType     String   @map("source_type")
+  name           String
+  /// The configured website. NULL means "not configured" — never a placeholder URL.
+  websiteUrl     String?  @map("website_url")
+  description    String?
+  /// Origin and join keys only. Business capabilities are NOT stored here; they
+  /// come from connector_capability_registries via real retrievals.
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  measurements  SourceWebsiteMeasurement[]
+
+  @@index([organizationId])
+  @@map("organization_sources")
+}
+
+/// One real website probe. Every measurement column is nullable because a NULL
+/// is an honest "not measured" — http_status when no response arrived, latency
+/// when no request completed, TLS when it was not measurable. Writing 0 for any
+/// of these would be a fabricated reading.
+model SourceWebsiteMeasurement {
+  id             String   @id
+  sourceId       String   @map("source_id")
+  organizationId String   @map("organization_id")
+  checkedAt      DateTime @default(now()) @map("checked_at")
+  /// ONLINE | OFFLINE | DNS_FAILURE | TLS_FAILURE | TIMEOUT | NOT_CHECKED
+  outcome        String
+  httpStatus     Int?     @map("http_status")
+  responseTimeMs Int?     @map("response_time_ms")
+  redirected     Boolean?
+  finalUrl       String?  @map("final_url")
+  tlsValid       Boolean? @map("tls_valid")
+  tlsIssuer      String?  @map("tls_issuer")
+  tlsSubject     String?  @map("tls_subject")
+  tlsValidTo     DateTime? @map("tls_valid_to")
+  message        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  source       OrganizationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, checkedAt])
+  @@map("source_website_measurements")
 }

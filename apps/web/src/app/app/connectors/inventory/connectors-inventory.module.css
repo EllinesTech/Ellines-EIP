@@ -1,0 +1,57 @@
+/* Connectors inventory — the technical layer, presented on its own. */
+
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8795aa;
+  max-width: 68ch;
+}
+
+.emptyNote {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8795aa;
+}
+
+.errorText {
+  font-size: 13px;
+  color: #fca5a5;
+}
+
+.button {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(111, 45, 141, 0.55);
+  background: rgba(111, 45, 141, 0.2);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}

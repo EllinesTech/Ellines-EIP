@@ -27,6 +27,7 @@ import {
   type PlatformDocumentDto, type PlatformOrgProfileDto, type IntegrationRequestDto,
 } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { OrgSourceOverview } from '@/components/source-graph/OrgSourceOverview';
 import {
   activePlatformSection,
   PLATFORM_LIVE_SECTIONS,
@@ -1195,6 +1196,20 @@ function ClientWorkspace({
             <Kpi label="Integrations" value={tier?.rate_limit_tiers?.max_connectors!=null?`${installations.filter(c=>c.status==='active'||c.status==='synced').length} / ${tier.rate_limit_tiers.max_connectors}`:(installations.filter(c=>c.status==='active'||c.status==='synced').length??'—')} hint="active / allowed"/>
             <Kpi label="Connector errors" value={installations.filter(c=>c.status==='error').length} hint="need attention" cls={installations.filter(c=>c.status==='error').length?styles.warn:styles.ok}/>
           </div>
+
+          {/* ── ORG SOURCE OF TRUTH ─────────────────────────────────────────
+              "Connectors: 1" describes the technical connection and nothing
+              about whether this client's business is connected. This block shows
+              the real chain instead:
+
+                Organisation -> Website -> Business Systems
+                             -> Resources/Capabilities -> Connectors
+
+              Every value comes from GET /api/v1/orgs/me/sources, which is the
+              same endpoint the client's own Command Center reads, so the two
+              can never disagree. A connector row existing is never enough to
+              call a system connected. */}
+          <OrgSourceOverview orgId={orgId} />
           <div className={styles.grid4} style={{marginBottom:12}}>
             <Kpi label="Pending approvals" value={approvals.filter(a=>a.status==='pending').length} hint="awaiting decision" cls={approvals.filter(a=>a.status==='pending').length?styles.warn:styles.ok}/>
             <Kpi label="Active agents" value={agents.filter(a=>a.isActive&&!a.isPaused).length} hint="automation running"/>

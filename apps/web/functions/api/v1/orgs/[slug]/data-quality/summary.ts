@@ -37,7 +37,8 @@ interface DataQualityScoreRow {
   completeness_score: number;
   accuracy_score:     number;
   consistency_score:  number;
-  timeliness_score:   number;
+  /** NULL = never measured (no health metric published), not a zero score. */
+  timeliness_score:   number | null;
   validity_score:     number;
   overall_score:      number;
   quality_rating:     string;

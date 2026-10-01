@@ -11,12 +11,18 @@ import {
   askEllineaApi,
   fetchEllineaMemory,
   fetchEnterpriseSummary,
+  fetchOrganizationSources,
   getSession,
   listReportsApi,
   type EnterpriseSummaryDto,
   type EllineaMemoryNoteDto,
   type ScheduledReportDto,
+  type OrganizationSourceGraphDto,
 } from '@/lib/api';
+import {
+  ConnectorTable,
+  WebsiteSummaryCard,
+} from '@/components/source-graph/SourceModules';
 import {
   buildReportPreview,
   readScheduledReports,
@@ -85,6 +91,10 @@ export default function GlanceCompanionPage() {
   const [briefText, setBriefText] = useState('');
   const [briefBusy, setBriefBusy] = useState(false);
   const [memory, setMemory] = useState<EllineaMemoryNoteDto[]>([]);
+  // The real source graph: website, business systems, connectors. Loaded from the
+  // same endpoint every other surface uses, so the Command Center cannot show a
+  // connector count where a system should be.
+  const [sources, setSources] = useState<OrganizationSourceGraphDto | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function loadData(s: { organization: { id: string; name: string }; user: { role: string } }) {
@@ -96,11 +106,15 @@ export default function GlanceCompanionPage() {
       fetchEnterpriseSummary(),
       fetchEllineaMemory().catch(() => [] as EllineaMemoryNoteDto[]),
       listReportsApi().catch(() => [] as ScheduledReportDto[]),
+      // A failure here must not blank the whole Command Center, so it degrades
+      // to "no source data" rather than taking the KPI grid down with it.
+      fetchOrganizationSources().catch(() => null),
     ])
-      .then(([snap, mem, reports]) => {
+      .then(([snap, mem, reports, graph]) => {
         setSummary(snap);
         setMemory(mem);
         setServerReports(reports);
+        setSources(graph);
         setLastRefresh(new Date());
         const synced = snap.status === 'synced';
 
@@ -252,6 +266,134 @@ export default function GlanceCompanionPage() {
       </header>
 
       {error ? <p className={styles.lede} style={{ color: '#f87171' }}>{error}</p> : null}
+
+      {/* ── Connected Website / Connected Systems ──────────────────────────
+          Two separate cards because they are two separate facts. The website
+          card shows only measured technical facts; the systems card shows the
+          real business systems and the resources each one actually exposes.
+          Neither is derived from a connector count. */}
+      {sources ? (
+        <div
+          style={{
+            display: 'grid',
+            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            marginBottom: '1rem',
+          }}
+        >
+          <div>
+            <WebsiteSummaryCard website={sources.website} />
+            <Link
+              href="/app/connected-website"
+              className={styles.ghostBtn}
+              style={{ marginTop: '0.5rem', display: 'inline-block' }}
+            >
+              Open Connected Website
+            </Link>
+          </div>
+
+          <section
+            style={{
+              border: '1px solid rgba(148,163,184,0.18)',
+              borderRadius: 10,
+              padding: '1rem',
+              background: 'rgba(15,23,42,0.6)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+                marginBottom: '0.75rem',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--c-muted)',
+                  }}
+                >
+                  Connected systems
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginTop: 4 }}>
+                  {sources.businessSystems.length}{' '}
+                  {sources.businessSystems.length === 1 ? 'system' : 'systems'} connected
+                </div>
+              </div>
+              <Link href="/app/connectors/systems" className={styles.ghostBtn}>
+                Open
+              </Link>
+            </div>
+
+            {sources.businessSystems.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--c-muted)', lineHeight: 1.6 }}>
+                No business system is connected. EIP does not show a placeholder system, and does
+                not list modules this organisation may or may not have.
+              </p>
+            ) : (
+              sources.businessSystems.map((sys) => (
+                <div
+                  key={sys.id}
+                  style={{
+                    borderTop: '1px solid rgba(148,163,184,0.12)',
+                    paddingTop: '0.6rem',
+                    marginTop: '0.6rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      alignItems: 'baseline',
+                    }}
+                  >
+                    <strong style={{ fontSize: 13, color: '#f8fafc' }}>{sys.name}</strong>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: sys.status === 'CONNECTED' ? '#86efac' : '#94a3b8' }}>
+                      {sys.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 3 }}>
+                    {sys.statusEvidence}
+                  </div>
+                  {/* Only resources the source actually returned are listed. */}
+                  {sys.resources.length ? (
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {sys.resources.map((r) => (
+                        <span
+                          key={r.id}
+                          style={{
+                            fontSize: 10,
+                            padding: '3px 8px',
+                            borderRadius: 99,
+                            border: '1px solid rgba(148,163,184,0.3)',
+                            background: 'rgba(148,163,184,0.1)',
+                            color: '#cbd5e1',
+                          }}
+                          title={r.availability}
+                        >
+                          {r.label}
+                          {r.retrievedRecordCount === null ? '' : ` · ${r.retrievedRecordCount} records`}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 6, fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>
+                      NOT DISCOVERED
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {/* Last refresh indicator */}
       {lastRefresh ? (

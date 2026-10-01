@@ -70,6 +70,13 @@ export interface RetrievalResult {
   warnings: string[];
   duplicateCount: number;
   strategy: Exclude<PaginationStrategy, 'auto'>;
+  /**
+   * The source's OWN name for the collection that was read, when it publishes
+   * one. This is what binds retrieval evidence to a discovered resource: `books`
+   * from the real Haven payload, not an EIP-invented label. Null when the source
+   * returned a bare array with no container name.
+   */
+  resourceName: string | null;
 }
 
 export const DEFAULT_RETRIEVAL_LIMITS: Required<RetrievalLimits> = {
@@ -116,21 +123,102 @@ function firstString(source: Record<string, unknown>, keys: readonly string[]): 
 
 /**
  * Locate the record array inside an arbitrary API envelope.
- * Handles bare arrays, {data:[…]}, {results:{items:[…]}} and friends.
+ *
+ * Handles bare arrays and the conventional envelopes ({data:[…]}, {results:{items:[…]}}).
  * Returns null when the body contains no record array.
+ *
+ * WHY THIS IS NOT A KEY LOOKUP
+ * ----------------------------
+ * An earlier version searched a fixed list of container names (`data`, `items`,
+ * `results`, …). That list describes only the envelopes its author had seen. A
+ * source that publishes its catalogue under its own noun — `{count: 15, books:
+ * [ … ]}`, which is exactly what the real Ellines Haven API returns — matched
+ * nothing, so EIP received 15 real records, discarded every one of them, and
+ * reported a complete retrieval of zero. That is a silent data-loss bug, and it
+ * is invisible for any source that happens to use a familiar key.
+ *
+ * A key list is therefore only a FAST PATH. When none of those keys is present,
+ * the real record collection is located by EVIDENCE: an array whose elements are
+ * objects. The source's own field name is preserved so discovery, retrieval and
+ * the capability registry all agree on one resource identity instead of
+ * inventing a container name.
+ *
+ * A scalar array (ids, tags, labels) is never treated as records: it yields no
+ * records rather than a list of meaningless rows.
  */
 export function extractRecords(body: unknown): unknown[] | null {
-  if (Array.isArray(body)) return body;
-  const root = asRecord(body);
+  const found = findRecordArray(body);
+  // A bare array is the record set itself and has no container name; anything
+  // else without a recognisable collection is null, i.e. "no record array".
+  if (found.name === null && Array.isArray(body)) return found.records;
+  return found.name || found.records.length ? found.records : null;
+}
+
+/**
+ * True when the body names a collection that is present and EMPTY — e.g.
+ * `{ "books": [] }`. That is a real answer from the source ("none right now"),
+ * distinguishable from a body EIP could not interpret at all. Treating the two
+ * alike would either report a failure where the source answered correctly, or
+ * report a successful read of a body that contained nothing readable.
+ */
+export function declaresEmptyCollection(body: unknown): boolean {
+  if (Array.isArray(body)) return body.length === 0;
+  if (!body || typeof body !== 'object') return false;
+  return Object.values(body as Record<string, unknown>).some(
+    (v) => Array.isArray(v) && v.length === 0,
+  );
+}
+
+/**
+ * The record collection inside an API envelope, WITH the source's own name for
+ * it. Callers that must bind retrieval evidence to a discovered resource need
+ * that name; `extractRecords` is the same function for callers that do not.
+ */
+export function findRecordArray(
+  root: unknown,
+  depth = 0,
+): { name: string | null; records: unknown[] } {
+  if (Array.isArray(root)) {
+    // A bare array is the record set; it has no container name of its own.
+    return isRecordArray(root) ? { name: null, records: root } : { name: null, records: [] };
+  }
+  if (!root || typeof root !== 'object' || depth > 3) return { name: null, records: [] };
+
+  const obj = root as Record<string, unknown>;
+
+  // 1. Conventional envelopes first — unambiguous when present.
   for (const key of ARRAY_CONTAINER_KEYS) {
-    const v = root[key];
-    if (Array.isArray(v)) return v;
-    if (v && typeof v === 'object') {
-      const nested = extractRecords(v);
-      if (nested) return nested;
+    const v = obj[key];
+    if (Array.isArray(v) && isRecordArray(v)) return { name: key, records: v };
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const nested = findRecordArray(v, depth + 1);
+      if (nested.name || nested.records.length) return nested;
     }
   }
-  return null;
+
+  // 2. Evidence path: the source's OWN collection name. Every array of objects
+  //    in the body is a candidate; the largest is the record set. Ties are
+  //    broken by the body's key order so the result is deterministic.
+  let best: { name: string; records: unknown[] } | null = null;
+  for (const [key, value] of Object.entries(obj)) {
+    if (!Array.isArray(value) || !isRecordArray(value)) continue;
+    if (!best || value.length > best.records.length) best = { name: key, records: value };
+  }
+  if (best) return best;
+
+  // 3. Nothing recognisable. An object carrying no array at all is an empty
+  //    result set, not a failure — but the caller must still distinguish the two,
+  //    so this returns an empty list with no name rather than a synthetic one.
+  return { name: null, records: [] };
+}
+
+/**
+ * True when an array's elements are objects rather than scalars. A list of ids
+ * or tags is not a record set, and presenting it as one would manufacture rows
+ * the source never described.
+ */
+function isRecordArray(value: unknown[]): boolean {
+  return value.some((e) => e !== null && typeof e === 'object' && !Array.isArray(e));
 }
 
 /** Read a reported total from common envelope shapes. 0 = not reported. */
@@ -281,6 +369,7 @@ export async function retrieveAllPages(options: RetrieveOptions): Promise<Retrie
   let stopReason: RetrievalStopReason = 'complete';
   let complete = false;
   let terminated = false;
+  let resourceName: string | null = null;
 
   let url: string | null = options.startUrl;
   let pageNumber = 1;
@@ -326,23 +415,68 @@ export async function retrieveAllPages(options: RetrieveOptions): Promise<Retrie
     }
 
     const body = result.body;
-    const pageRecords = extractRecords(body);
+    // The named lookup is used rather than extractRecords so an unrecognisable
+    // body (name === null) stays distinguishable from a source that genuinely
+    // returned an empty collection.
+    const located = findRecordArray(body);
+    const pageRecords = located.records;
+    if (located.name) resourceName = resourceName ?? located.name;
 
     if (pagesFetched === 1 && !forced) {
       strategy = detectStrategy(body, result.headers, url);
     }
 
-    // A 200 with no record array is an empty result set — not a page of data.
-    if (pageRecords === null) {
-      stopReason = records.length === 0 ? 'empty-page' : 'no-more-indicator';
-      complete = reportedRecordCount === 0 || records.length >= reportedRecordCount;
+    // The first page's reported total is the best available expectation. It is
+    // read BEFORE any termination decision because it is the only evidence of
+    // how much the source says it holds. Reading it afterwards — as this
+    // previously did — threw away a real `count` published alongside the
+    // records, turning "the source says 15" into "the source said nothing".
+    if (reportedRecordCount === 0) {
+      reportedRecordCount = extractReportedTotal(body);
+    }
+
+    // A 200 whose body contains no record array at all is not an empty result
+    // set — it is a response EIP could not interpret. Claiming `complete` here
+    // is how a source with 15 real records gets reported as a successful
+    // retrieval of zero, so it is surfaced as a failure instead.
+    //
+    // A body that NAMES an empty collection (`{"books": []}`) is different: the
+    // source described the collection and said it holds nothing. That is a
+    // complete read of zero, not an interpretation failure.
+    if (
+      located.name === null &&
+      !Array.isArray(body) &&
+      !records.length &&
+      !declaresEmptyCollection(body) &&
+      // A deliberate 204 is the source saying "no content" — a real answer.
+      // A 200 whose body EIP could not parse is not.
+      !(result.status === 204 && body === null)
+    ) {
+      const reported = reportedRecordCount;
+      stopReason = 'error';
+      errors.push({
+        page: pageNumber,
+        reason:
+          reported > 0
+            ? `Source reported ${reported} record(s) but returned no readable record collection.`
+            : 'Source returned no readable record collection.',
+      });
+      complete = false;
       terminated = true;
       break;
     }
 
-    // The first page's reported total is the best available expectation.
-    if (reportedRecordCount === 0) {
-      reportedRecordCount = extractReportedTotal(body);
+    // A source that published records but whose total EIP could not reach is
+    // PARTIAL by definition — there is no evidence the set was exhausted.
+    if (pageRecords.length === 0 && reportedRecordCount > 0) {
+      stopReason = 'error';
+      errors.push({
+        page: pageNumber,
+        reason: `Source reported ${reportedRecordCount} record(s) but returned none.`,
+      });
+      complete = false;
+      terminated = true;
+      break;
     }
 
     const beforeIngest = records.length;
@@ -499,6 +633,7 @@ export async function retrieveAllPages(options: RetrieveOptions): Promise<Retrie
     warnings,
     duplicateCount,
     strategy,
+    resourceName,
   };
 }
 

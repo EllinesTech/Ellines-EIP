@@ -7,6 +7,7 @@ import {
   requirePermissionAsync,
   type Env,
 } from '../../../shared/auth';
+import { toInstantMs, toUtcIso } from '@ellines-eip/shared';
 
 /**
  * Evidence-based connector status.
@@ -113,7 +114,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Fetch all installations for the org — always scoped by organization_id
   const { data: rows, error } = await supabase
     .from('connector_installations')
-    .select('id, display_name, catalog_id, status, last_message, updated_at, last_payload, last_sync_at, sync_interval_seconds, lifecycle_state')
+    .select('id, display_name, catalog_id, status, last_message, updated_at, last_payload, last_sync_at, last_synced_at, config, sync_interval_seconds, lifecycle_state, last_error, error_count, last_test_at')
     .eq('organization_id', targetOrgId)
     .neq('status', 'deleted')
     .order('updated_at', { ascending: false });
@@ -162,11 +163,51 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         : storedStatus === 'synced' || storedStatus === 'active'
           ? (row.updated_at as string) ?? null
           : null;
+    // Emitted as explicit UTC: the column fallback is zone-less, and a client
+    // that re-parses it would otherwise shift the instant by its own offset.
+    const lastSyncedAtUtc = toUtcIso(lastSyncedAt);
 
-    const syncIntervalSeconds = Number(row.sync_interval_seconds ?? 3600);
-    const lastSyncAt = row.last_sync_at as string | null ?? (storedStatus === 'synced' ? row.updated_at as string : null);
-    const ageMs = lastSyncAt ? Date.now() - new Date(lastSyncAt).getTime() : null;
+    // The sync interval comes from the connector's OWN stored configuration
+    // first. `sync_interval_seconds` is a column that is frequently left at its
+    // 3600 default while the connector is actually configured for a different
+    // cadence — the real Ellines Haven connector stores
+    // `syncIntervalMinutes: 15` while its column still said 3600, so freshness
+    // was judged against an interval the operator never chose.
+    const configuredMinutes = (() => {
+      const cfg = (row.config || {}) as { syncIntervalMinutes?: unknown };
+      const v = Number(cfg.syncIntervalMinutes);
+      return Number.isFinite(v) && v > 0 ? v : null;
+    })();
+    const syncIntervalSeconds =
+      configuredMinutes !== null ? configuredMinutes * 60 : Number(row.sync_interval_seconds ?? 3600);
+    const syncIntervalSource =
+      configuredMinutes !== null ? 'connector configuration' : 'connector_installations.sync_interval_seconds';
+
+    // `last_sync_at` is the authoritative "a retrieval actually succeeded" time.
+    // It is written by the sync handler on success and deliberately left alone
+    // on failure, so it can only ever move forward on real evidence. The
+    // `last_synced_at` / `updated_at` fallbacks exist for rows written before
+    // this column was maintained, and are reported as such.
+    const authoritativeLastSyncAt = (row.last_sync_at as string | null) ?? null;
+    const lastSyncAt =
+      authoritativeLastSyncAt ??
+      (storedStatus === 'synced' || storedStatus === 'active'
+        ? ((row.last_synced_at as string | null) ?? (row.updated_at as string) ?? null)
+        : null);
+    const freshnessSource = authoritativeLastSyncAt
+      ? 'last_sync_at'
+      : storedStatus === 'synced' || storedStatus === 'active'
+        ? 'last_synced_at (fallback)'
+        : 'none';
+
+    // Parsed with toInstantMs, not `new Date(...)`: the column is a zone-less
+    // UTC timestamp, and reading it as local time made a sync that had just
+    // completed measure 180 minutes old on a UTC+3 host (→ false STALE).
+    const lastSyncMs = toInstantMs(lastSyncAt);
+    const ageMs = lastSyncMs === null ? null : Date.now() - lastSyncMs;
     const isStale = ageMs !== null && ageMs > syncIntervalSeconds * 2 * 1000;
+    // Same instant, stated as UTC for every consumer (evidence text, payload).
+    const lastSyncAtUtc = toUtcIso(lastSyncAt);
 
     // ── Status model ──────────────────────────────────────────────────────
     // Database state alone never proves the external system is reachable.
@@ -192,23 +233,28 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       evidence =
         `Last retrieval was incomplete (${retrieval.stopReason ?? 'unknown reason'}): ` +
         `${retrievedRecordCount} of ${reportedRecordCount || '?'} record(s) retrieved.`;
+    } else if (retrievedRecordCount <= 0) {
+      // A 200 that yielded no records is not a healthy read. Reporting it as one
+      // is how a connector that has never actually retrieved anything came to
+      // be shown as HEALTHY.
+      status = 'UNAVAILABLE';
+      evidence = reportedRecordCount > 0
+        ? `Source reported ${reportedRecordCount} record(s) but EIP retrieved none, so the read did not succeed.`
+        : 'The last sync completed without retrieving any records, so the source has no verified data.';
     } else if (isStale) {
       status = 'STALE';
       evidence =
         `Last successful sync was ${Math.round((ageMs as number) / 60000)} minutes ago, ` +
-        `more than 2× the ${Math.round(syncIntervalSeconds / 60)} minute sync interval. ` +
-        'Freshness is NOT verified — the source system has not been contacted.';
-      void supabase
-        .from('connector_installations')
-        .update({ status: 'degraded', updated_at: new Date().toISOString() })
-        .eq('id', row.id as string)
-        .eq('organization_id', targetOrgId);
+        `more than 2× the ${Math.round(syncIntervalSeconds / 60)} minute sync interval ` +
+        `(from ${syncIntervalSource}, freshness from ${freshnessSource}). ` +
+        'The source system has not been contacted since then.';
     } else {
-      // Last sync succeeded AND was complete. This is evidence of a *past*
-      // successful retrieval, not proof the system is reachable right now.
+      // Last sync succeeded AND was complete AND actually returned records. This
+      // is evidence of a *past* successful retrieval, not proof the system is
+      // reachable right now.
       status = 'HEALTHY';
       evidence =
-        `Last verified healthy at ${lastSyncedAt} (retrieved ${retrievedRecordCount} record(s), ` +
+        `Last verified healthy at ${lastSyncAtUtc ?? lastSyncedAtUtc} (retrieved ${retrievedRecordCount} record(s), ` +
         'pagination complete). Reachability has not been re-probed since.';
     }
 
@@ -218,14 +264,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       catalogId: row.catalog_id as string,
       status,
       evidence,
-      lastSyncedAt,
+      lastSyncedAt: lastSyncedAtUtc,
       // Distinguishes "healthy when we last looked" from "verified healthy now".
-      lastVerifiedHealthyAt: status === 'HEALTHY' ? lastSyncedAt : null,
+      lastVerifiedHealthyAt: status === 'HEALTHY' ? (lastSyncAtUtc ?? lastSyncedAtUtc) : null,
       currentlyVerified: false,
       recordCount: retrievedRecordCount,
       retrievedRecordCount,
       reportedRecordCount,
       retrievalComplete: retrieval.complete !== false,
+      // Freshness is reported as an explicit, inspectable object rather than a
+      // single derived boolean, so a consumer can never present an unverified
+      // age as if it were a verified one.
+      freshness: {
+        lastSuccessfulSyncAt: lastSyncAtUtc,
+        source: freshnessSource,
+        syncIntervalSeconds,
+        syncIntervalSource,
+        ageMinutes: ageMs === null ? null : Math.round(ageMs / 60000),
+        stale: isStale,
+        // Explicitly false: this endpoint performs no live probe.
+        currentlyVerified: false,
+      },
       healthScore,
       openAlerts,
       openDecisions,

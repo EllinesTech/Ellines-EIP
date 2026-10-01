@@ -46,9 +46,13 @@ export interface DimensionScores {
   completeness: number;
   accuracy:     number;
   consistency:  number;
-  timeliness:   number;
+  /**
+   * % recent data (not stale). Absent when the source published no health metric
+   * — an unmeasured dimension, NOT a zero. computeScore() skips absent entries.
+   */
+  timeliness?:  number;
   validity:     number;
-  [key: string]: number;
+  [key: string]: number | undefined;
 }
 
 export interface QualityAssessmentResult {
@@ -111,7 +115,7 @@ export class DataQualityService {
         completenessScore: dimensions.completeness,
         accuracyScore:     dimensions.accuracy,
         consistencyScore:  dimensions.consistency,
-        timelinessScore:   dimensions.timeliness,
+        timelinessScore:   dimensions.timeliness ?? null,
         validityScore:     dimensions.validity,
         overallScore:      overall,
         qualityRating:     rating,
@@ -127,7 +131,7 @@ export class DataQualityService {
         completenessScore: dimensions.completeness,
         accuracyScore:     dimensions.accuracy,
         consistencyScore:  dimensions.consistency,
-        timelinessScore:   dimensions.timeliness,
+        timelinessScore:   dimensions.timeliness ?? null,
         validityScore:     dimensions.validity,
         overallScore:      overall,
         qualityRating:     rating,
@@ -147,9 +151,13 @@ export class DataQualityService {
   /**
    * Weighted-average of five dimension scores, clamped to [0, 100].
    *
+   * Dimensions that are absent (undefined/null) are SKIPPED rather than counted
+   * as 0. An unmeasured dimension must not pull the average down towards a score
+   * nobody earned — a null health score makes timeliness unmeasured, not zero.
+   *
    * Requirement 18.2
    */
-  computeScore(dimensions: Record<string, number>): number {
+  computeScore(dimensions: Record<string, number | undefined | null>): number {
     let weighted = 0;
     let totalWeight = 0;
 
@@ -485,11 +493,12 @@ export class DataQualityService {
    *   completeness  = (1 − null_rate) × 100
    *   accuracy      = (1 − referential_gap_rate) × 100
    *   consistency   = (1 − duplicate_rate) × 100
-   *   timeliness    = health_score (already 0-100 in snapshot)
+   *   timeliness    = health_score (already 0-100 in snapshot) — only when the
+   *                   source actually published one; omitted when NULL
    *   validity      = (1 − format_mismatch_rate) × 100
    */
   private deriveDimensions(snapshot: {
-    healthScore: number;
+    healthScore: number | null;
     recordCount: number;
     openAlerts: number;
     openDecisions: number;
@@ -506,7 +515,13 @@ export class DataQualityService {
       completeness: Math.max(0, Math.min(100, (1 - nullRate) * 100)),
       accuracy:     Math.max(0, Math.min(100, (1 - referentialGaps) * 100)),
       consistency:  Math.max(0, Math.min(100, (1 - duplicateRate) * 100)),
-      timeliness:   Math.max(0, Math.min(100, snapshot.healthScore)),
+      // A NULL health score means no connector published a metric, so timeliness
+      // is UNMEASURED. Filling it with 0 would report "the data is entirely
+      // stale" — a reading nobody took — and would drag the overall score down
+      // with it. Omitting the key leaves it out of the weighted average.
+      ...(snapshot.healthScore === null
+        ? {}
+        : { timeliness: Math.max(0, Math.min(100, snapshot.healthScore)) }),
       validity:     Math.max(0, Math.min(100, (1 - formatMismatch) * 100)),
     };
   }
