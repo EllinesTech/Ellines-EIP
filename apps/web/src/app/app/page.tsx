@@ -10,6 +10,7 @@ import {
 import { fetchEnterpriseSummary, getSession, listInstallations, fetchAlertCorrelations, fetchAlertRootCause, listOrgUsers, fetchOrgDataWindow, pullEmailSync, fetchConnectorHealth, type ConnectorInstallationDto, type ConnectorHealthDto, type ConnectorHealthItemDto, type EnterpriseSummaryDto, type AlertCorrelationGroupDto, type OrgDataWindowDto, type EmailSyncResultDto } from '@/lib/api';
 import { evaluateBusinessRules, readBusinessRules, type RuleHit } from '@/lib/business-rules';
 import { DEFAULT_UI_PREFS, readUiPrefs, UI_PREFS_EVENT, type UiPrefs } from '@/lib/ui-prefs';
+import { SourceCards } from '@/components/source-graph/SourceCards';
 import styles from './command.module.css';
 
 /** Onboarding checklist — shown to Owner/IT until all 3 milestones are done or dismissed. */
@@ -409,32 +410,25 @@ function AdminOverview({
         </section>
       )}
 
-      {!synced ? (
-        <section className={styles.emptyCallout} role="status">
-          <div>
-            <strong>{isOwner ? 'Connect your first system' : 'Sync a connector'}</strong>
-            <p>
-              {isOwner
-                ? 'Open Connectors to install your first system — then Ellinea and live KPIs will activate.'
-                : 'Open Connectors and sync your first system to unlock live insights.'}
-            </p>
-          </div>
-          <Link href="/app/connectors" className={styles.aiBtn}>
-            Open Connectors
-          </Link>
-        </section>
-      ) : null}
+      {/* ── Connected sources ────────────────────────────────────────────────
+          The headline concepts are the organisation's SOURCES, not its
+          connectors: its website, its business systems, and (separately) the
+          connectors that read them. SourceCards also owns the honest "nothing
+          connected yet" invitation, so the banner below no longer decides from a
+          sync flag whether this organisation has any source at all. */}
+      <SourceCards />
 
       <OnboardingChecklist synced={synced} installations={installations} />
 
       {/* ── Connector Health Panel ────────────────────────────────────────────
           Data comes from GET /api/v1/connectors/health — live DB query, no
           hardcoded values. Falls back to the installations list (status only)
-          while the richer health fetch is in flight.                           */}
+          while the richer health fetch is in flight. This is TECHNICAL health
+          of the connections — the business view is above.                    */}
       {(connectorHealth?.connectors.length || installations.length) ? (
         <section className={styles.healthStrip} aria-label="Connector health">
           <div className={styles.panelLabel}>
-            Connector health
+            Connector health · technical connections
             {connectorHealth ? (
               <span
                 style={{

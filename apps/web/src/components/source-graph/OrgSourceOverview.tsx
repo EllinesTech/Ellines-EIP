@@ -279,6 +279,40 @@ export function OrgSourceOverview({ orgId }: { orgId: string }) {
           )}
         </div>
       </div>
+
+      {/* ── Source / capability summary ────────────────────────────────────
+          Counts come from the same graph as everything above. A null count means
+          "not established" and renders UNKNOWN; it is never coerced to 0 just
+          because a section happened to be empty. */}
+      <div>
+        <div className={styles.sectionTitle}>Source / Capability Summary</div>
+        <dl className={styles.grid} style={{ marginTop: 8 }}>
+          <Cell label="Websites">
+            <Measured value={graph.counts.websites} />
+          </Cell>
+          <Cell label="Business systems">
+            <Measured value={graph.counts.businessSystems} />
+          </Cell>
+          <Cell label="Connectors">
+            <Measured value={graph.counts.connectors} />
+          </Cell>
+          <Cell label="Resources discovered">
+            <Measured value={graph.counts.discoveredResources} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities total">
+            <Measured value={graph.counts.capabilities.total} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities available">
+            <Measured value={graph.counts.capabilities.available} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities partial">
+            <Measured value={graph.counts.capabilities.partial} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities unavailable">
+            <Measured value={graph.counts.capabilities.unavailable} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+        </dl>
+      </div>
     </section>
   );
 }

@@ -1401,6 +1401,13 @@ export interface OrganizationSourceGraphDto {
     connectors: number;
     discoveredResources: number;
     availableResources: number | null;
+    /** null values mean "not established", never a manufactured zero. */
+    capabilities: {
+      total: number | null;
+      available: number | null;
+      partial: number | null;
+      unavailable: number | null;
+    };
   };
 }
 

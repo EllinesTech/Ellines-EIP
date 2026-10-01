@@ -221,6 +221,17 @@ export interface OrganizationSourceGraph {
     connectors: number;
     discoveredResources: number;
     availableResources: number | null;
+    /**
+     * Capability availability, derived from the availability each DISCOVERED
+     * resource actually carries. `total` is null when nothing has been discovered,
+     * because "0 capabilities" and "we have not looked yet" are different facts.
+     */
+    capabilities: {
+      total: number | null;
+      available: number | null;
+      partial: number | null;
+      unavailable: number | null;
+    };
   };
 }
 
@@ -533,6 +544,24 @@ export function buildSourceGraph(input: {
       availableResources: allResources.length
         ? allResources.filter((r) => r.availability === 'AVAILABLE').length
         : null,
+      // Grouped by what discovery actually reported. A resource that exists in the
+      // source but that EIP cannot read yet is NOT a success, so it is counted as
+      // unavailable rather than folded into the available total.
+      capabilities: {
+        total: allResources.length ? allResources.length : null,
+        available: allResources.length
+          ? allResources.filter((r) => r.availability === 'AVAILABLE').length
+          : null,
+        partial: allResources.length
+          ? allResources.filter((r) => r.availability === 'PARTIAL').length
+          : null,
+        unavailable: allResources.length
+          ? allResources.filter(
+              (r) =>
+                r.availability !== 'AVAILABLE' && r.availability !== 'PARTIAL',
+            ).length
+          : null,
+      },
     },
   };
 }

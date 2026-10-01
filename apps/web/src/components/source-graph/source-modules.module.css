@@ -24,6 +24,43 @@
   color: #f8fafc;
 }
 
+/* Secondary line under a card title. */
+.cardHint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #8795aa;
+}
+
+/* Link/button affordance that opens the dedicated page for a card. */
+.cardLink {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #e2e8f0;
+  background: none;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cardLink:hover {
+  border-color: #6f2d8d;
+  color: #fff;
+}
+
+/* Unstyled list for capability/resource rows. */
+.plainList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .body {
   margin: 0;
   font-size: 13px;
