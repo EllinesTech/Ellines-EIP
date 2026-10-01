@@ -10,6 +10,7 @@
 
 import {
   buildSourceGraph,
+  countSourcesByType,
   type ConnectorRow,
   type RegistryRow,
   type SourceRow,
@@ -597,6 +598,62 @@ describe('website, system and connector counts are independent', () => {
     expect(g.counts.connectors).toBe(1);
     // Still visible, just not as a system.
     expect(g.connectors[0].sourceId).toBeNull();
+  });
+});
+
+/**
+ * The counting rule in isolation.
+ *
+ * `buildSourceGraph` is the whole picture; this is the one decision the picture
+ * rests on, so it is pinned directly. The bug this guards is a WEBSITE reached
+ * by an API connector being reported as a connected BUSINESS SYSTEM, which is
+ * how a website-only organisation came to read "1 system connected".
+ */
+describe('countSourcesByType counts each category from its own rows', () => {
+  it('counts a WEBSITE + API source as a website only', () => {
+    // The real Haven shape: one WEBSITE/API row and one API connector.
+    const counts = countSourcesByType([{ sourceType: 'WEBSITE' }]);
+    expect(counts).toEqual({ websites: 1, businessSystems: 0 });
+  });
+
+  it('counts a BUSINESS_SYSTEM row as a system only', () => {
+    expect(countSourcesByType([{ sourceType: 'BUSINESS_SYSTEM' }])).toEqual({
+      websites: 0,
+      businessSystems: 1,
+    });
+  });
+
+  it('never lets a website increment businessSystems, however many there are', () => {
+    const counts = countSourcesByType([
+      { sourceType: 'WEBSITE' },
+      { sourceType: 'WEBSITE' },
+      { sourceType: 'WEBSITE' },
+    ]);
+    expect(counts.businessSystems).toBe(0);
+    expect(counts.websites).toBe(3);
+  });
+
+  it('reports zero for an organisation with no source rows', () => {
+    expect(countSourcesByType([])).toEqual({ websites: 0, businessSystems: 0 });
+  });
+
+  it('is the same rule the graph itself uses', () => {
+    // The graph must not re-derive its own count by a second route.
+    const sources: SourceRow[] = [
+      {
+        id: 'src-web',
+        organizationId: 'org-1',
+        sourceType: 'WEBSITE',
+        sourceKind: 'API',
+        name: 'Haven API',
+        websiteUrl: 'https://api.example.test/catalogue',
+        metadata: { connectorId: 'conn-1' },
+      },
+    ];
+    const g = graph({ sources, connectors: [connector()], registries: [] });
+    expect(g.counts.websites).toBe(countSourcesByType(sources).websites);
+    expect(g.counts.businessSystems).toBe(countSourcesByType(sources).businessSystems);
+    expect(g.counts.businessSystems).toBe(0);
   });
 });
 

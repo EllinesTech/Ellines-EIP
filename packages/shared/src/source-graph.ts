@@ -279,6 +279,33 @@ export interface OrganizationSourceGraph {
   };
 }
 
+/**
+ * Count source rows by their PERSISTED classification.
+ *
+ * This is the ONE rule for the website and business-system counts. It reads
+ * `source_type` and nothing else:
+ *
+ *   - it never counts connectors (a connector is a mechanism, not a source)
+ *   - it never reads `source_kind`, the URL, the catalog id or the response shape
+ *   - it never applies a floor, so "0 business systems" stays 0
+ *
+ * Anything that needs a "how many systems is this org connected to" number —
+ * the graph, the summary API, a report, the Super Admin view — goes through
+ * here, so no two surfaces can disagree about the same organisation.
+ */
+export function countSourcesByType(
+  sources: ReadonlyArray<{ sourceType: SourceType }>,
+): { websites: number; businessSystems: number } {
+  let websites = 0;
+  let businessSystems = 0;
+  for (const source of sources) {
+    if (source.sourceType === 'WEBSITE') websites += 1;
+    // Anything that is not an explicit WEBSITE row is not counted as a website.
+    else if (source.sourceType === 'BUSINESS_SYSTEM') businessSystems += 1;
+  }
+  return { websites, businessSystems };
+}
+
 /** Default freshness window when a connector declares no interval. */
 const DEFAULT_FRESHNESS_MINUTES = 60;
 
@@ -399,6 +426,11 @@ export function buildSourceGraph(input: {
   now?: number;
 }): OrganizationSourceGraph {
   const now = input.now ?? Date.now();
+
+  // The one authoritative classification count. Every count below is derived
+  // from these two numbers rather than re-derived per surface, so the banner,
+  // the summary API and the Super Admin view cannot disagree.
+  const sourceCounts = countSourcesByType(input.sources);
 
   /** Which source a connector belongs to. Backfilled sources record the id in metadata. */
   const sourceIdForConnector = (connectorId: string): string | null => {
@@ -654,7 +686,7 @@ const allResources = [
       // Each number counts its own category of real rows. They are never derived
       // from one another: a website count does not fall out of the connector
       // count, and a business system is not a connector with a different label.
-      websites: input.sources.filter((s) => s.sourceType === 'WEBSITE').length,
+      websites: sourceCounts.websites,
       businessSystems: businessSystems.length,
       connectors: connectorViews.length,
       discoveredResources: allResources.length,

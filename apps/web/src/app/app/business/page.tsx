@@ -92,9 +92,22 @@ export default function BusinessOverviewPage() {
           />
           <MetricCard
             label="Connected Systems"
-            value={summary?.connectedSystems ?? '—'}
-            sub="Active connectors"
+            // Business systems only, from the persisted source classification.
+            // This is NOT the connector count: an organisation whose only source
+            // is a website reached by one API connector has 0 here.
+            value={summary?.connectedSystems ?? 0}
+            sub="Business systems (not connectors)"
             color={summary?.connectedSystems ? '#10b981' : '#8b95a8'}
+          />
+          <MetricCard
+            label="Websites"
+            value={summary?.sourceCounts?.websites ?? 0}
+            sub="Connected website sources"
+          />
+          <MetricCard
+            label="Connectors"
+            value={summary?.sourceCounts?.connectors ?? 0}
+            sub="Technical inventory"
           />
           <MetricCard
             label="Open Decisions"

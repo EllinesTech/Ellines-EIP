@@ -1235,7 +1235,12 @@ function ClientWorkspace({
                       value={typeof snapshot?.healthScore === 'number' ? `${snapshot.healthScore}/100` : 'Not measured'}
                       hint={typeof snapshot?.healthScore === 'number' ? 'enterprise health' : 'no source-published health metric'}
                     />
-                    <Kpi label="Connected systems" value={snapshot?.connectedSystems??0} hint="active integrations"/>
+                    {/* BUSINESS_SYSTEM source rows only, via the same authoritative
+                        count the client dashboard uses. The hint said "active
+                        integrations", which is the connector/system conflation:
+                        an org whose only source is a website served by one API
+                        connector has 0 connected systems, not 1. */}
+                    <Kpi label="Connected systems" value={snapshot?.connectedSystems??0} hint="business systems (not connectors)"/>
                     <Kpi label="Open alerts" value={snapshot?.openAlerts??0} hint="need attention" cls={snapshot?.openAlerts?styles.warn:styles.ok}/>
                     <Kpi label="Open decisions" value={snapshot?.openDecisions??0} hint="pending" cls={snapshot?.openDecisions?styles.warn:styles.ok}/>
                   </div>
@@ -1279,7 +1284,9 @@ function ClientWorkspace({
                   value={typeof snapshot.healthScore === 'number' ? `${snapshot.healthScore}/100` : 'Not measured'}
                   hint={typeof snapshot.healthScore === 'number' ? 'enterprise health' : 'no source-published health metric'}
                 />
-                <Kpi label="Connected systems" value={snapshot.connectedSystems??0} hint="active integrations"/>
+                {/* Business systems only — see the overview tab for why the
+                    connector count is not a system count. */}
+                <Kpi label="Connected systems" value={snapshot.connectedSystems??0} hint="business systems (not connectors)"/>
                 <Kpi label="Open alerts" value={snapshot.openAlerts??0} hint="need attention" cls={snapshot.openAlerts?styles.warn:styles.ok}/>
                 <Kpi label="Open decisions" value={snapshot.openDecisions??0} hint="pending decisions" cls={snapshot.openDecisions?styles.warn:styles.ok}/>
               </div>
@@ -1375,7 +1382,7 @@ function ClientWorkspace({
       {!loading && tab==='fleet' && (
         <div>
           <div className={styles.grid4} style={{marginBottom:12}}>
-            <Kpi label="Connected systems" value={snapshot?.connectedSystems??'—'} hint="from enterprise snapshot"/>
+            <Kpi label="Connected systems" value={snapshot?.connectedSystems??'—'} hint="business systems"/>
             {/* Unknown health stays "Not measured": `?? 0` rendered "0/100" for a
                 client that has published no health metric at all. */}
             <Kpi label="Health score" value={typeof snapshot?.healthScore==='number'?`${snapshot.healthScore}/100`:snapshot?'Not measured':'—'} hint={typeof snapshot?.healthScore==='number'?'enterprise health':'no source-published health metric'} cls={typeof snapshot?.healthScore==='number'?(snapshot.healthScore>=70?styles.ok:snapshot.healthScore>=40?styles.warn:styles.bad):undefined}/>

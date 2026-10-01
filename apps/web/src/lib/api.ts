@@ -745,7 +745,24 @@ export interface EnterpriseSummaryDto {
   connectorName: string;
   /** null = no connected system published a health metric (unknown, not zero). */
   healthScore: number | null;
+  /**
+   * The organisation's BUSINESS SYSTEM count, from the persisted source
+   * classification (`organization_sources.source_type = 'BUSINESS_SYSTEM'`).
+   *
+   * This is deliberately NOT a connector count. A connector is the mechanism
+   * that reaches a source; a WEBSITE served by an API connector is still a
+   * website, so such an organisation reports 0 connected business systems.
+   */
   connectedSystems: number;
+  /**
+   * All three counts, so no client has to derive one from another.
+   * `connectors` is independent technical inventory.
+   */
+  sourceCounts?: {
+    websites: number;
+    businessSystems: number;
+    connectors: number;
+  };
   openAlerts: number;
   openDecisions: number;
   briefHighlight: string;

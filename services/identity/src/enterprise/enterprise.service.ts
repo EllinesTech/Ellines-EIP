@@ -142,7 +142,50 @@ export class EnterpriseService {
     return out;
   }
 
+  /**
+   * The authoritative website / business-system / connector counts for one
+   * organisation, read from the classification it actually persisted.
+   *
+   * Classification is NEVER inferred from a connector catalog id, a URL, a URL
+   * path, an HTTP status, a response shape, an organisation name or a connector
+   * name, and no floor of 1 is applied — "no business system" is reported as 0.
+   * The connector count is independent of the source counts: it is technical
+   * inventory, and reading it never changes how many systems exist.
+   */
+  private async readSourceCounts(organizationId: string): Promise<{
+    websites: number;
+    businessSystems: number;
+    connectors: number;
+  }> {
+    if (!organizationId) return { websites: 0, businessSystems: 0, connectors: 0 };
+
+    const [websiteRows, businessSystemRows, connectors] = await Promise.all([
+      this.prisma.organizationSource.count({
+        where: { organizationId, sourceType: 'WEBSITE' },
+      }),
+      this.prisma.organizationSource.count({
+        where: { organizationId, sourceType: 'BUSINESS_SYSTEM' },
+      }),
+      this.prisma.connectorInstallation.count({
+        where: { organizationId, NOT: { status: 'deleted' } },
+      }),
+    ]);
+
+    return { websites: websiteRows, businessSystems: businessSystemRows, connectors };
+  }
+
   async getSummary(organizationId: string): Promise<EnterpriseSummary> {
+    /**
+     * The connected-systems count is the organisation's PERSISTED SOURCE
+     * CLASSIFICATION, not the snapshot's `connectedSystems` column.
+     *
+     * The snapshot column is written from the number of connector
+     * INSTALLATIONS, so reading it here reported a WEBSITE-only organisation
+     * (served by one API connector) as having one connected business system.
+     * A connector is the mechanism; the source is the thing that is connected.
+     */
+    const sourceCounts = await this.readSourceCounts(organizationId);
+
     const snap = await this.prisma.enterpriseSnapshot.findUnique({
       where: { organizationId },
     });
@@ -154,7 +197,9 @@ export class EnterpriseService {
         // No snapshot means no system has ever been read: health is UNKNOWN,
         // not 0.
         healthScore: null,
-        connectedSystems: 0,
+        // Still the real classification count. A configured business system is
+        // a fact about the organisation whether or not it has synced yet.
+        connectedSystems: sourceCounts.businessSystems,
         openAlerts: 0,
         openDecisions: 0,
         briefHighlight: 'No connector sync yet. Open Connectors and sync your first system.',
@@ -170,7 +215,7 @@ export class EnterpriseService {
       connectorId: snap.connectorId,
       connectorName: snap.connectorName,
       healthScore: snap.healthScore,
-      connectedSystems: snap.connectedSystems,
+      connectedSystems: sourceCounts.businessSystems,
       openAlerts: snap.openAlerts,
       openDecisions: snap.openDecisions,
       briefHighlight: snap.briefHighlight,

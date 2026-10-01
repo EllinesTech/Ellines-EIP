@@ -719,12 +719,27 @@ export class PlatformService {
       where: { organizationId: orgId },
     });
     if (!snap) return null;
+    // The Super Admin reads the SAME authoritative classification as the client
+    // dashboard, so two screens cannot disagree about one organisation.
+    const [websites, businessSystems, connectors] = await Promise.all([
+      this.prisma.organizationSource.count({
+        where: { organizationId: orgId, sourceType: 'WEBSITE' },
+      }),
+      this.prisma.organizationSource.count({
+        where: { organizationId: orgId, sourceType: 'BUSINESS_SYSTEM' },
+      }),
+      this.prisma.connectorInstallation.count({
+        where: { organizationId: orgId, NOT: { status: 'deleted' } },
+      }),
+    ]);
     return {
       organizationId: snap.organizationId,
       connectorId: snap.connectorId,
       connectorName: snap.connectorName,
       healthScore: snap.healthScore,
-      connectedSystems: snap.connectedSystems,
+      // Authoritative: BUSINESS_SYSTEM source rows only, never a connector count.
+      connectedSystems: businessSystems,
+      sourceCounts: { websites, businessSystems, connectors },
       openAlerts: snap.openAlerts,
       openDecisions: snap.openDecisions,
       briefHighlight: snap.briefHighlight,
