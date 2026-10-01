@@ -22,6 +22,12 @@ export interface FakeCall {
   payload?: unknown;
 }
 
+/** A recorded call to a Postgres function through PostgREST's /rpc endpoint. */
+export interface FakeRpcCall {
+  fn: string;
+  params: Record<string, unknown>;
+}
+
 export interface FakeResult {
   data: any;
   error: { message: string } | null;
@@ -225,7 +231,44 @@ export class FakeSupabase {
   readonly calls: FakeCall[] = [];
   readonly errors: Record<string, { message: string }> = {};
   readonly hangs = new Set<string>();
+  /** Recorded /rpc invocations (platform staff mutations run through these). */
+  readonly rpcCalls: FakeRpcCall[] = [];
+  private rpcResponses: Record<string, unknown> = {};
+  private rpcErrors: Record<string, { message: string }> = {};
   private idSeq = 0;
+
+  /**
+   * PostgREST function-call stand-in.
+   *
+   * It records the call so tests can assert on the EXACT arguments a handler sent.
+   * That is how the transactional staff mutations are verified here — the SQL
+   * itself is proven against the real database by the integration run, not by
+   * re-implementing plpgsql in a fake.
+   */
+  rpc(fn: string, params: Record<string, unknown>): Promise<{ data: any; error: { message: string } | null }> {
+    this.rpcCalls.push({ fn, params });
+    const failure = this.rpcErrors[fn];
+    if (failure) return Promise.resolve({ data: null, error: failure });
+    const data = fn in this.rpcResponses ? this.rpcResponses[fn] : {};
+    return Promise.resolve({ data, error: null });
+  }
+
+  /** Set the payload an /rpc call resolves with (defaults to `{}`). */
+  respondToRpc(fn: string, data: unknown): this {
+    this.rpcResponses[fn] = data;
+    return this;
+  }
+
+  /** Make an /rpc call fail with a Postgres-style error message. */
+  failRpc(fn: string, message = 'rpc failure'): this {
+    this.rpcErrors[fn] = { message };
+    return this;
+  }
+
+  /** All /rpc calls to one function, in order. */
+  rpcCallsTo(fn: string): FakeRpcCall[] {
+    return this.rpcCalls.filter((call) => call.fn === fn);
+  }
 
   nextId(table: string): string {
     this.idSeq += 1;

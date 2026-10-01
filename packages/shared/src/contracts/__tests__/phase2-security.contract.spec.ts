@@ -57,7 +57,11 @@ describe('Phase 2 platform security contracts', () => {
     expect(health).toMatch(/probeDatabase/);
     expect(health).toMatch(/status: database\.status/);
     expect(health).not.toMatch(/mailProviderLabel/);
-    expect(summary).toMatch(/platformAdminFromEnv/);
+    // P4: platform authorization is DB-backed (platform_staff_members), not the
+    // PLATFORM_ADMIN_EMAILS allowlist. The gate must stay; only its source moved.
+    expect(summary).toMatch(/platformStaffHas/);
+    expect(summary).toMatch(/platform\.system\.read/);
+    expect(summary).not.toMatch(/platformAdminFromEnv/);
     expect(summary).toMatch(/dependencies/);
   });
 

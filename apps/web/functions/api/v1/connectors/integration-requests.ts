@@ -2,10 +2,10 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../shared/auth';
+import { platformStaffHas } from '../../../shared/platform-staff';
 
 /**
  * POST /api/v1/connectors/integration-requests  — submit a new request
@@ -20,7 +20,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const supabase = getAdminClient(context.env);
-  const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
+  const isPlatformAdmin = await platformStaffHas(context.env, auth.email, 'platform.connectors.manage');
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (context.request.method === 'GET') {

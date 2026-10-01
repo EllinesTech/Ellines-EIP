@@ -6,10 +6,10 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../../shared/auth';
+import { platformStaffHas } from '../../../../../shared/platform-staff';
 
 function asObj(raw: unknown): Record<string, unknown> {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
@@ -22,7 +22,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.tenants.read')) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 

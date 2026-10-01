@@ -2,10 +2,10 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 /**
  * GET  /api/v1/connectors/:id/failed-records
@@ -23,7 +23,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Requires Platform Admin privileges' }, 403);
   }
 

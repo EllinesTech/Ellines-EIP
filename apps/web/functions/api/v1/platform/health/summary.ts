@@ -1,5 +1,6 @@
-import { getAdminClient, json, options, platformAdminFromEnv, requireAuth, type Env } from '../../../../shared/auth';
+import { getAdminClient, json, options, requireAuth, type Env } from '../../../../shared/auth';
 import { mailProviderLabel } from '../../../../shared/mail';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 const TIMEOUT_MS = 2000;
 async function probe(label: string, fn: () => Promise<unknown>) {
@@ -16,7 +17,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method !== 'GET') return json({ statusCode: 405, message: 'Method not allowed' }, 405);
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  if (!platformAdminFromEnv(context.env, auth.email)) return json({ statusCode: 403, message: 'Platform admin only' }, 403);
+  if (!await platformStaffHas(context.env, auth.email, 'platform.system.read')) return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   const supabase = getAdminClient(context.env);
   const database = await probe('database', async () => {
     const { error } = await supabase.from('organizations').select('id', { head: true, count: 'exact' });

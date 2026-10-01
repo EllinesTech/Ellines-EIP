@@ -8,7 +8,8 @@
  * TemplateController independently re-validates the same gate, providing
  * defence in depth.
  */
-import { platformAdminFromEnv, requireAuth, json, options, type Env } from '../../../shared/auth';
+import { requireAuth, json, options, type Env } from '../../../shared/auth';
+import { platformStaffHas } from '../../../shared/platform-staff';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -19,7 +20,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   // Gate: platform admin only
-  const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
+  const isPlatformAdmin = await platformStaffHas(context.env, auth.email, 'platform.connectors.manage');
   if (!isPlatformAdmin) {
     return json(
       {

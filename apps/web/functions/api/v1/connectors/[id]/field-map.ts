@@ -2,11 +2,11 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
 import { validateFieldMap, type FieldMapEntry } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 /**
  * GET    /api/v1/connectors/:id/field-map  — retrieve current field map
@@ -35,7 +35,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (fetchErr || !connector) return json({ statusCode: 404, message: 'Connector not found' }, 404);
 
   // Org isolation — ensure this org has access
-  if (connector.organization_id !== auth.organizationId && !platformAdminFromEnv(context.env, auth.email)) {
+  if (connector.organization_id !== auth.organizationId && !await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Access denied' }, 403);
   }
 
@@ -53,7 +53,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // ── PUT — save field map ──────────────────────────────────────────────────
   if (context.request.method === 'PUT') {
-    if (!platformAdminFromEnv(context.env, auth.email)) {
+    if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
       return json({ statusCode: 403, message: 'Field map changes require Platform Admin privileges' }, 403);
     }
 

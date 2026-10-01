@@ -15,11 +15,11 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../shared/auth';
 import { availableCapabilityCount, groupByDomain } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../shared/platform-staff';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -35,7 +35,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // A platform admin may inspect a specific org; everyone else is pinned to
   // their own. This is the same rule the other connector routes use.
   let organizationId = auth.organizationId;
-  if (platformAdminFromEnv(context.env, auth.email)) {
+  if (await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     const requested = new URL(context.request.url).searchParams.get('orgId');
     if (requested) organizationId = requested;
   }

@@ -4,11 +4,11 @@ import {
   getClientIp,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
 import { egressRequest } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 /**
  * POST /api/v1/connectors/:id/discovery
@@ -25,7 +25,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Discovery is a Platform Admin operation' }, 403);
   }
 

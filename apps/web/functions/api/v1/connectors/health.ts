@@ -2,12 +2,12 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   requirePermissionAsync,
   type Env,
 } from '../../../shared/auth';
 import { toInstantMs, toUtcIso } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../shared/platform-staff';
 
 /**
  * Evidence-based connector status.
@@ -88,7 +88,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
+  const isPlatformAdmin = await platformStaffHas(context.env, auth.email, 'platform.connectors.manage');
 
   // connector:read permission required for org users
   if (!isPlatformAdmin) {

@@ -7,11 +7,11 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   requirePermissionAsync,
   type Env,
 } from '../../../../shared/auth';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 type TimeFormat = OrgDateTimeSettings['timeFormat'];
 type DateStyle = OrgDateTimeSettings['dateStyle'];
@@ -56,7 +56,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (context.request.method === 'PATCH') {
     // org:manage_settings permission required (or platform admin)
-    const isPlatformAdmin = platformAdminFromEnv(context.env, auth.email);
+    const isPlatformAdmin = await platformStaffHas(context.env, auth.email, 'platform.tenants.read');
     if (!isPlatformAdmin) {
       const permErr = await requirePermissionAsync(
         context.env,

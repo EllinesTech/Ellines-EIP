@@ -3,10 +3,10 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   verifyAccessToken,
   type Env,
 } from '../../../shared/auth';
+import { loadPlatformStaff } from '../../../shared/platform-staff';
 
 const MAX_AVATAR_CHARS = 180_000;
 
@@ -135,7 +135,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({
         user: mapUser(updated as Record<string, unknown>),
         organization: { id: org.id, name: org.name, slug: org.slug },
-        isPlatformAdmin: platformAdminFromEnv(context.env, updated.email as string),
+        isPlatformAdmin: (await loadPlatformStaff(context.env, updated.email as string)).active,
       });
     }
 
@@ -168,7 +168,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         name: org.name,
         slug: org.slug,
       },
-      isPlatformAdmin: platformAdminFromEnv(context.env, user.email as string),
+      isPlatformAdmin: (await loadPlatformStaff(context.env, user.email as string)).active,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

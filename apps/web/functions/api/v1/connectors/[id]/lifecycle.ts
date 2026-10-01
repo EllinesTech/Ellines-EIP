@@ -4,10 +4,10 @@ import {
   getClientIp,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 /**
  * PATCH /api/v1/connectors/:id/lifecycle
@@ -45,7 +45,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   // Platform Admin only (Req 12.1)
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     await supabase
       .from('audit_logs')
       .insert(

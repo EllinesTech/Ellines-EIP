@@ -14,11 +14,11 @@
 import {
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
 import type { PagesFunction } from '@cloudflare/workers-types';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 function identityBase(env: Env): string {
   return env.IDENTITY_API_URL ?? 'http://localhost:3001';
@@ -38,7 +38,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   // Platform Super Admin gate (Connector Governance Rule: must be platformAdmin check)
-  if (!platformAdminFromEnv(env, auth.email)) {
+  if (!await platformStaffHas(env, auth.email, 'platform.system.read')) {
     return json({ statusCode: 403, message: 'Platform Super Admin access required' }, 403);
   }
 

@@ -19,12 +19,12 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../../../shared/auth';
 import { isSafeEgressTarget, safeFetch, SsrfError } from '../../../../../../shared/egress';
 import { probeWebsite, type WebsiteProbeOutcome } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../../../../shared/platform-staff';
 
 /** Map a real transport failure onto the outcome vocabulary. */
 function classify(err: unknown): { outcome: WebsiteProbeOutcome; message: string } {
@@ -62,7 +62,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const supabase = getAdminClient(context.env);
 
   let organizationId = auth.organizationId;
-  if (platformAdminFromEnv(context.env, auth.email)) {
+  if (await platformStaffHas(context.env, auth.email, 'platform.tenants.read')) {
     const requested = new URL(context.request.url).searchParams.get('orgId');
     if (requested) organizationId = requested;
   }

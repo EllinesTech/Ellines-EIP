@@ -2,7 +2,6 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   requirePermissionAsync,
   type Env,
@@ -13,6 +12,7 @@ import {
   encryptConnectorConfig,
   type InstallConfig,
 } from '../../../../shared/connectors';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -26,7 +26,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Mutations (PATCH, DELETE) are platform-admin only — connector installs belong to EIP, not client IT.
   // GET/read is allowed for org members with connector:read permission.
   if (context.request.method === 'DELETE' || context.request.method === 'PATCH') {
-    if (!platformAdminFromEnv(context.env, auth.email)) {
+    if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
       return json({ statusCode: 403, message: 'Connector modifications require platform admin access' }, 403);
     }
   } else {
@@ -44,7 +44,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   // For GET: scope to caller's org. For PATCH/DELETE: platform admin may act on any org's installation.
-  const orgFilter = platformAdminFromEnv(context.env, auth.email)
+  const orgFilter = await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')
     ? supabase.from('connector_installations').select('*').eq('id', id)
     : supabase.from('connector_installations').select('*').eq('id', id).eq('organization_id', auth.organizationId);
 

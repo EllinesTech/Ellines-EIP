@@ -37,6 +37,7 @@ export type PlatformStaffCapability =
   | 'platform.staff.manage'
   | 'platform.security.manage'
   | 'platform.settings.manage'
+  | 'platform.system.read'
   | 'platform.audit.read';
 
 /** Canonical capability list — the only strings that can be granted. */
@@ -47,6 +48,7 @@ export const PLATFORM_STAFF_CAPABILITIES: readonly PlatformStaffCapability[] = [
   'platform.staff.manage',
   'platform.security.manage',
   'platform.settings.manage',
+  'platform.system.read',
   'platform.audit.read',
 ];
 
@@ -58,6 +60,7 @@ export const PLATFORM_STAFF_CAPABILITY_LABELS: Record<PlatformStaffCapability, s
   'platform.staff.manage': 'Manage Ellines platform staff and grants',
   'platform.security.manage': 'Security operations (sessions, encryption, CORS)',
   'platform.settings.manage': 'Platform settings and feature flags',
+  'platform.system.read': 'View platform-wide health and metrics',
   'platform.audit.read': 'Read and export cross-tenant audit logs',
 };
 

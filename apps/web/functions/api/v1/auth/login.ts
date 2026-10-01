@@ -1,4 +1,4 @@
-import { getAdminClient, json, options, platformAdminFromEnv, signAccessToken, getClientIp, auditRow, hashToken, type Env } from '../../../shared/auth';
+import { getAdminClient, json, options, signAccessToken, getClientIp, auditRow, hashToken, type Env } from '../../../shared/auth';
 import { checkRateLimit, rateLimitResponse } from '../../../shared/rate-limit';
 import { checkLoginLockout, clearLoginFailures, lockoutResponse, recordLoginFailure } from '../../../shared/lockout';
 import { validateEmail, validatePassword, checkContentLength } from '../../../shared/validation';
@@ -8,6 +8,7 @@ import {
   parsePlatformAdminEmails,
   ttlToMs,
 } from '@ellines-eip/shared';
+import { loadPlatformStaff } from '../../../shared/platform-staff';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -136,7 +137,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       console.warn('[login] session registry write skipped:', err);
     }
 
-    const isPlatformAdmin = platformAdminFromEnv(context.env, user.email as string);
+    const isPlatformAdmin = (await loadPlatformStaff(context.env, user.email as string)).active;
 
     // Audit log every platform admin login — this is a privileged event.
     // Use try/catch rather than .catch() — Supabase insert() returns a PromiseLike,

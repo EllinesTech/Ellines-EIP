@@ -16,7 +16,6 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../../../../shared/auth';
@@ -38,6 +37,7 @@ import {
 import { retrieveAllPages } from '../../../../../../../shared/pagination';
 import { applyOutcomes, saveCapabilityRegistry } from '../../../../../../../shared/capability-store';
 import { availableCapabilityCount, deriveRegistryFromResponse } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../../../../../shared/platform-staff';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -198,7 +198,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 

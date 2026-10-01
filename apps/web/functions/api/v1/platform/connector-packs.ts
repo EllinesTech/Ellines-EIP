@@ -2,7 +2,6 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   enforceSafeguards,
   auditRow,
@@ -10,13 +9,14 @@ import {
   type Env,
 } from '../../../shared/auth';
 import { redactConfig, toPackDto, type InstallConfig } from '../../../shared/connectors';
+import { platformStaffHas } from '../../../shared/platform-staff';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 
@@ -155,7 +155,7 @@ export const onItemRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await platformStaffHas(context.env, auth.email, 'platform.connectors.manage')) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 

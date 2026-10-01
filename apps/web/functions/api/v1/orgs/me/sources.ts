@@ -22,7 +22,6 @@ import {
   getAdminClient,
   json,
   options,
-  platformAdminFromEnv,
   requireAuth,
   type Env,
 } from '../../../../shared/auth';
@@ -33,6 +32,7 @@ import {
   type SourceRow,
   type WebsiteMeasurementRow,
 } from '@ellines-eip/shared';
+import { platformStaffHas } from '../../../../shared/platform-staff';
 
 /**
  * PostgREST returns snake_case columns; the graph types are camelCase. Every row
@@ -147,7 +147,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // A platform admin may inspect one org; everyone else is pinned to their own.
   let organizationId = auth.organizationId;
-  if (platformAdminFromEnv(context.env, auth.email)) {
+  if (await platformStaffHas(context.env, auth.email, 'platform.tenants.read')) {
     const requested = new URL(context.request.url).searchParams.get('orgId');
     if (requested) organizationId = requested;
   }

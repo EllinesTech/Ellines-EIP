@@ -208,4 +208,67 @@ P4 remains `next` (DB-backed platform staff/roles/grants + Ellines Org Dashboard
 | Web production build | `npm run build -w @ellines-eip/web` | pass — 81/81 static pages |
 | Schema/nullability drift | `npm run verify:schema` | pass — 85 mapped models, 0 missing tables, 0 missing columns, **0 nullability mismatches** |
 
-**Remaining in P4 (not yet built, deliberately not claimed as done):** the `/api/v1/platform/staff*` endpoints (list/invite/grant/revoke/bootstrap with reason capture and audit rows), the control-plane staff UI, bootstrapping existing allowlisted operators into rows, and adopting the new resolver on the existing `/api/v1/platform/*` endpoints that still call `platformAdminFromEnv` directly. P4 is therefore **`in_progress`**, not `done`.
+**Remaining in P4 slice A:** the `/api/v1/platform/staff*` endpoints and the control-plane staff UI — delivered by slice B below.
+
+### 2026-09-30 — P4 slice B: platform staff API, audit contract, and the authorization migration
+
+Branch `eip/p4-slice-b-staff-api` (slice A is `9894849` on `main`).
+
+**Endpoints** (all under `/api/v1/platform/staff`, Next shims generated):
+
+| Route | Verb | Behaviour |
+|---|---|---|
+| `staff` | `GET` | list operators with grants, per-grant `effective` flag and `effectiveCapabilities`, plus the caller's `source` (`database` / `env_bootstrap`) |
+| `staff` | `POST` | invite an operator **and** their grants atomically; reason required; unknown capabilities rejected 400 before any write |
+| `staff/{id}` | `GET` | one operator with persisted state |
+| `staff/{id}` | `PATCH` | `grant` / `revoke_grant` / `suspend` / `activate` / `revoke`; reason required; self-lockout guard |
+| `staff/bootstrap` | `POST` | materialise `PLATFORM_ADMIN_EMAILS` into real rows; `dryRun` supported; idempotent |
+
+**Why Postgres functions (migration `0010`).** PostgREST makes one table atomic per request. An invite writes a staff row *and* grants; a bootstrap writes many rows. As a sequence of requests, a crash between calls leaves a half-applied authorization change — worse than a failed one, because it looks deliberate. `eip_platform_staff_invite`, `eip_platform_staff_set_grant`, `eip_platform_staff_set_status` and `eip_platform_staff_bootstrap` run in one transaction, validate the capability allow-list **database-side** (a caller bug cannot invent a capability), and return the persisted state. A mutation that returns nothing is treated as a failure (`empty_result`), never as success.
+
+**Safety properties carried forward.** Revoked is terminal (reinstating is a deliberate re-invite, so an accidental status flip cannot resurrect access); re-granting clears `revoked_at` and `expires_at` (an upsert that left them set would silently keep a grant revoked while reporting success); bootstrap reports `skippedInactive` and never revives a suspended/revoked operator; a self-lockout guard refuses to let an operator strip their own `platform.staff.manage`.
+
+**Authorization migration — 56 call sites across 45 files, all registry-backed.** `platformAdminFromEnv` is no longer called anywhere under `functions/api` (a source-level test asserts this, so it cannot regress):
+
+| Surface | Capability |
+|---|---|
+| `platform/audit-logs` | `platform.audit.read` |
+| `platform/metrics`, `platform/health/summary`, `platform/federated-learning/*` | `platform.system.read` (new) |
+| `platform/flags`, `platform/packages*`, `platform/packages/{id}` | `platform.settings.manage` |
+| `platform/security/migrate-encryption` | `platform.security.manage` |
+| `platform/connector-packs`, `platform/orgs/{id}/connector-installations*`, `platform/orgs/{id}/connectors`, `connectors/**` | `platform.connectors.manage` |
+| `platform/orgs` | `platform.tenants.read` |
+| `platform/orgs/create`, `platform/orgs/{id}` management routes (users, agents, approvals, rules, settings, snapshot, package, integration-requests) | `platform.tenants.manage` |
+| `platform/orgs/{id}` read-only views (index, stats, profile, reports, documents) | `platform.tenants.read` |
+| `orgs/me/settings`, `orgs/me/sources*` (cross-org bypass) | `platform.tenants.read` |
+| `auth/login`, `auth/me` (`isPlatformAdmin` flag) | registry **activity** (`loadPlatformStaff(...).active`) — an operator holding only a read capability is still an operator |
+
+Behaviour and tenant/org scoping are unchanged: the `403 'Platform admin only'` bodies are identical, and an allowlisted operator keeps every capability they had.
+
+**Real integration run** (dev server `:3100` → Pages Function → PostgREST → the configured Supabase project; real operator account, no fabricated data):
+
+| Step | Result |
+|---|---|
+| list before bootstrap | `200`, `source: env_bootstrap`, 0 rows |
+| bootstrap `dryRun` | `200`, `wouldCreate: [ellines.tech@gmail.com]`, **0 rows written** |
+| bootstrap | `200`, `created: [ellines.tech@gmail.com]` — one real row, `bootstrapped: true` |
+| bootstrap again | `200`, `created: []`, `skippedExisting: [ellines.tech@gmail.com]`; table still holds exactly 1 row |
+| list after | `200`, `source: database`, 1 row, 8 effective capabilities, `deniedReason: null` |
+| audit | 3 real `platform.staff.bootstrap` rows (2 success + 1 dry run) with `result`/`dryRun`/`report` |
+| real client user (`ellines.haven@gmail.com`, Ellines Haven org) | `403` on `/platform/staff` **and** on the migrated `/platform/metrics` |
+| operator on migrated route | `200` |
+
+**Tests** — `functions/__tests__/platform-staff-api.spec.ts` (32) and slice A's `platform-staff-access.spec.ts` (11): authorized-only listing; unauthorized, suspended, revoked, expired-grant, revoked-grant and org-scoped grants all denied; registry read failure denies; invite/grant/revoke/suspend call the transactional RPC exactly once with normalized arguments and return persisted state; reasons required before any database call; audit rows written on success *and* failure; a database refusal surfaces as 4xx/5xx instead of a silent success; bootstrap dry-run/idempotency/empty-allowlist/suspended-not-resurrected; a migrated route denies an allowlisted-but-suspended operator and serves an active one; zero `platformAdminFromEnv` call sites under `functions/api`.
+
+| Check | Command | Result |
+|---|---|---|
+| Shared tests | `npm run test -w @ellines-eip/shared` | pass — 11 suites / 293 tests |
+| Web/Pages Functions tests | `npm run test -w @ellines-eip/web` | pass — 24 suites / 271 tests (23/239 before slice B) |
+| Pages Functions typecheck | `npx tsc --noEmit -p apps/web/functions/tsconfig.json` | pass |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 248 files, 400 relative imports |
+| Identity build | `npm run build -w @ellines-eip/identity` | pass — dev server stopped first (Prisma engine DLL lock on Windows) |
+| Web production build | `npm run build -w @ellines-eip/web` | pass — 81/81 static pages |
+| Schema/nullability drift | `npm run verify:schema` | pass — 0 missing tables, 0 missing columns, 0 nullability mismatches |
+| Whitespace/format check | `git diff --check` | pass |
+
+**Still genuinely open in P4:** the control-plane **UI** for staff (the API is complete and tested, but nothing calls it from `/app/platform` yet), adopting the registry on `requirePermissionAsync`'s tenant-permission bypass in `shared/auth.ts` (left on the allowlist to avoid an `auth.ts` ↔ `platform-staff.ts` import cycle — a small refactor), and the Ellines Org Dashboard requirements (`.kiro/specs/ellines-org-dashboard/`, 9 requirements), which are a separate, larger surface. **P4 remains `in_progress`.**
