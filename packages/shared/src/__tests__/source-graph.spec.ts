@@ -86,6 +86,7 @@ function businessSystem(overrides: Partial<SourceRow> = {}): SourceRow {
     metadata: { connectorId: 'conn-1' },
     ...overrides,
   };
+
 }
 
 function graph(overrides: Partial<Parameters<typeof buildSourceGraph>[0]> = {}) {
@@ -411,6 +412,191 @@ describe('no invented values', () => {
     expect(g.connectors).toEqual([]);
     expect(g.counts.businessSystems).toBe(0);
     expect(g.counts.connectors).toBe(0);
+  });
+});
+
+/**
+ * A WEBSITE source may be that organisation's own web API. When it is, it is a
+ * WEBSITE (not a business system) AND it owns the capabilities it genuinely
+ * provides. These rules stop the same API being reported twice — once as a website
+ * and once as a system — or its data being copied between them.
+ */
+describe('WEBSITE + API is its own category, distinct from BUSINESS_SYSTEM', () => {
+  const webApi: SourceRow = {
+    id: 'src-web',
+    organizationId: 'org-1',
+    sourceType: 'WEBSITE',
+    sourceKind: 'API',
+    name: 'Haven API',
+    websiteUrl: 'https://api.example.test/catalogue',
+    // The connector that reaches it. This is technical provenance, not a category.
+    metadata: { connectorId: 'conn-1' },
+  };
+
+  it('reports the kind exactly as configured', () => {
+    const g = graph({ sources: [webApi] });
+    expect(g.website?.kind).toBe('API');
+    expect(g.businessSystems).toHaveLength(0);
+  });
+
+  it('never infers a kind from the URL, the connector catalog or the response', () => {
+    // A REST connector pointed at a URL containing "api" is still just WEBSITE
+    // until the organisation says otherwise.
+    const g = graph({
+      sources: [{ ...webApi, sourceKind: undefined, name: 'Api thing', websiteUrl: 'https://x.test/api/v1' }],
+    });
+    expect(g.website?.kind).toBeNull();
+    expect(g.businessSystems).toHaveLength(0);
+  });
+
+  it('gives the website the capabilities its own source really provides', () => {
+    const g = graph({
+      sources: [webApi],
+      // The SAME registry row the connector discovered through, now attributed to
+      // the source. Not a second copy.
+      registries: [{ installationId: 'conn-1', sourceId: 'src-web', registry: capabilityRegistry() }],
+    });
+    const ids = (g.website?.resources ?? []).map((r) => r.id);
+    expect(ids).toEqual(['books']);
+    const books = g.website!.resources[0];
+    expect(books.retrievedRecordCount).toBe(15);
+    expect(books.reportedRecordCount).toBe(15);
+    expect(books.availability).toBe('AVAILABLE');
+    expect(g.website?.completeness).toBe('COMPLETE');
+    expect(g.website?.totalResourceCount).toBe(1);
+    expect(g.website?.availableResourceCount).toBe(1);
+    expect(g.website?.lastSuccessfulRetrievalAt).toBe(iso(-5));
+  });
+
+  it('invents no capability when only the probe succeeded', () => {
+    // Online, HTTP 200, and still no resources: reachability is not capability.
+    const g = graph({
+      sources: [webApi],
+      registries: [],
+      measurements: [
+        {
+          sourceId: 'src-web',
+          checkedAt: iso(-1),
+          outcome: 'ONLINE',
+          httpStatus: 200,
+          responseTimeMs: 120,
+          redirected: false,
+          finalUrl: 'https://api.example.test/catalogue',
+          tlsValid: true,
+          tlsIssuer: 'CA',
+          tlsSubject: 'api.example.test',
+          tlsValidTo: null,
+          message: null,
+        },
+      ],
+    });
+    expect(g.website?.httpStatus).toBe(200);
+    expect(g.website?.resources).toEqual([]);
+    // null, not 0: nothing was discovered, which is not the same as "none exist".
+    expect(g.website?.totalResourceCount).toBeNull();
+    expect(g.website?.completeness).toBeNull();
+  });
+
+  it('keeps probe freshness and capability freshness as separate facts', () => {
+    const g = graph({
+      sources: [webApi],
+      registries: [{ installationId: 'conn-1', sourceId: 'src-web', registry: capabilityRegistry() }],
+      measurements: [
+        {
+          sourceId: 'src-web',
+          checkedAt: iso(-1),
+          outcome: 'ONLINE',
+          httpStatus: 200,
+          responseTimeMs: 90,
+          redirected: false,
+          finalUrl: null,
+          tlsValid: null,
+          tlsIssuer: null,
+          tlsSubject: null,
+          tlsValidTo: null,
+          message: null,
+        },
+      ],
+    });
+    expect(g.website?.freshness.state).toBe('FRESH');
+    // The registry was read 5 minutes before NOW against a 60 minute interval.
+    expect(g.website?.retrievalFreshness.state).toBe('FRESH');
+  });
+
+  it('reports unknown capability freshness as UNKNOWN, never FRESH', () => {
+    const stale = graph({
+      sources: [webApi],
+      registries: [{ installationId: 'conn-1', sourceId: 'src-web', registry: capabilityRegistry() }],
+      now: NOW + 48 * 60 * 60_000,
+    });
+    expect(stale.website?.retrievalFreshness.state).toBe('STALE');
+    const never = graph({ sources: [webApi], registries: [] });
+    expect(never.website?.retrievalFreshness.state).toBe('UNKNOWN');
+  });
+});
+
+describe('website, system and connector counts are independent', () => {
+  it('counts each category from its own rows', () => {
+    const g = graph({
+      sources: [
+        {
+          id: 'src-web',
+          organizationId: 'org-1',
+          sourceType: 'WEBSITE',
+          sourceKind: 'API',
+          name: 'Haven API',
+          websiteUrl: 'https://api.example.test/catalogue',
+          metadata: { connectorId: 'conn-1' },
+        },
+        {
+          id: 'src-biz',
+          organizationId: 'org-1',
+          sourceType: 'BUSINESS_SYSTEM',
+          name: 'Ledger',
+          websiteUrl: null,
+          metadata: { connectorId: 'conn-2' },
+        },
+      ],
+      connectors: [connector(), connector({ id: 'conn-2', displayName: 'Ledger feed' })],
+      registries: [
+        { installationId: 'conn-1', sourceId: 'src-web', registry: capabilityRegistry() },
+        { installationId: 'conn-2', sourceId: 'src-biz', registry: capabilityRegistry() },
+      ],
+    });
+    expect(g.counts.websites).toBe(1);
+    expect(g.counts.businessSystems).toBe(1);
+    expect(g.counts.connectors).toBe(2);
+  });
+
+  it('counts a capability once even when a source and its connector both reference it', () => {
+    const g = graph({
+      sources: [
+        {
+          id: 'src-web',
+          organizationId: 'org-1',
+          sourceType: 'WEBSITE',
+          sourceKind: 'API',
+          name: 'Haven API',
+          websiteUrl: 'https://api.example.test/catalogue',
+          metadata: { connectorId: 'conn-1' },
+        },
+      ],
+      connectors: [connector()],
+      registries: [{ installationId: 'conn-1', sourceId: 'src-web', registry: capabilityRegistry() }],
+    });
+    expect(g.counts.discoveredResources).toBe(1);
+    expect(g.counts.capabilities).toEqual({ total: 1, available: 1, partial: 0, unavailable: 0 });
+  });
+
+  it('does not promote an unassigned connector into a business system', () => {
+    // A connector with no source row is technical inventory, not a system. Presenting
+    // it as one is how an organisation ends up "having a system" it never configured.
+    const g = graph({ sources: [], connectors: [connector()], registries: [registry([])] });
+    expect(g.businessSystems).toHaveLength(0);
+    expect(g.counts.businessSystems).toBe(0);
+    expect(g.counts.connectors).toBe(1);
+    // Still visible, just not as a system.
+    expect(g.connectors[0].sourceId).toBeNull();
   });
 });
 

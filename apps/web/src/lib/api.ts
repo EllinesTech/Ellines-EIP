@@ -1352,6 +1352,12 @@ export interface SourceWebsiteDto {
   id: string;
   name: string;
   url: string;
+  /**
+   * Persisted classification. `API` means the organisation configured this source
+   * as a web API rather than a browsable HTML site. Never inferred from the URL or
+   * the connector; null when the row was never classified.
+   */
+  kind: 'HTML' | 'API' | null;
   outcome: 'ONLINE' | 'OFFLINE' | 'DNS_FAILURE' | 'TLS_FAILURE' | 'TIMEOUT' | 'NOT_CHECKED' | null;
   /** null = no response received. Never 0. */
   httpStatus: number | null;
@@ -1368,6 +1374,19 @@ export interface SourceWebsiteDto {
   lastCheckedAt: string | null;
   freshness: SourceFreshnessDto;
   message: string | null;
+  /**
+   * Capabilities this website/API source genuinely exposes. A web API can provide
+   * real business capabilities; they belong to THIS source because it is what was
+   * actually read, and they are never inferred from the probe result.
+   */
+  resources: SourceResourceDto[];
+  totalResourceCount: number | null;
+  availableResourceCount: number | null;
+  lastSuccessfulRetrievalAt: string | null;
+  /** Freshness of the capability evidence — separate from the probe's freshness. */
+  retrievalFreshness: SourceFreshnessDto;
+  completeness: 'COMPLETE' | 'PARTIAL' | 'UNKNOWN' | null;
+  errors: string[];
 }
 
 /** A connected business system and what it actually provides. */

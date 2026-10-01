@@ -123,6 +123,13 @@ function WebsiteCard({ website }: { website: OrganizationSourceGraphDto['website
         <Cell label="Website">
           <span className={styles.muted}>{website.url}</span>
         </Cell>
+        <Cell label="Kind">
+          {/* Persisted classification only. "REST" alone is not a kind: a company
+              website and an ERP can both be REST endpoints. */}
+          <span className={`${styles.badge} ${styles.toneMuted}`}>
+            {website.kind === 'API' ? 'WEBSITE API' : 'WEBSITE'}
+          </span>
+        </Cell>
         <Cell label="Status">
           <span className={`${styles.badge} ${tone}`}>
             {website.outcome ? website.outcome.replace(/_/g, ' ') : 'NOT CHECKED'}
@@ -154,6 +161,58 @@ function WebsiteCard({ website }: { website: OrganizationSourceGraphDto['website
           <FreshnessTag state={website.freshness.state} />
         </Cell>
       </dl>
+
+      {/* Capabilities belong to THIS source: a web API can genuinely expose business
+          resources. They are only ever what discovery actually read — a 200 never
+          implies a capability. */}
+      {website.resources.length ? (
+        <div style={{ marginTop: 10 }}>
+          <div className={styles.label} style={{ marginBottom: 4 }}>
+            Capabilities discovered on this source
+          </div>
+          <ul className={styles.plainList}>
+            {website.resources.map((resource) => (
+              <li
+                key={`${resource.connectorId}:${resource.id}`}
+                style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <AvailabilityBadge availability={resource.availability} />
+                <span className={styles.muted}>
+                  {resource.label}
+                  {resource.retrievedRecordCount === null
+                    ? ' · records UNKNOWN'
+                    : ` · ${resource.retrievedRecordCount} records`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <dl className={styles.grid} style={{ marginTop: 8 }}>
+            <Cell label="Capability freshness">
+              <FreshnessTag state={website.retrievalFreshness.state} />
+            </Cell>
+            <Cell label="Completeness">
+              {website.completeness ? (
+                <span className={styles.muted}>{website.completeness}</span>
+              ) : (
+                <span className={styles.unknown}>COMPLETENESS UNKNOWN</span>
+              )}
+            </Cell>
+            <Cell label="Last retrieval">
+              {website.lastSuccessfulRetrievalAt ? (
+                new Date(website.lastSuccessfulRetrievalAt).toLocaleString()
+              ) : (
+                <span className={styles.unknown}>NEVER</span>
+              )}
+            </Cell>
+          </dl>
+        </div>
+      ) : (
+        <p className={styles.reason} style={{ marginTop: 8 }}>
+          No capabilities discovered for this source yet. Reachability is not capability — a 200
+          from this endpoint does not create a resource here.
+        </p>
+      )}
+
       {website.message ? (
         <p className={styles.reason} style={{ marginTop: 8 }}>
           {website.message}

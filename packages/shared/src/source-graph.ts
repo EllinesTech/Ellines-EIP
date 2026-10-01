@@ -38,6 +38,21 @@ import { toInstantMs, toUtcIso } from './db-time';
 export type SourceType = 'WEBSITE' | 'BUSINESS_SYSTEM';
 
 /**
+ * How a WEBSITE source is consumed.
+ *
+ * `HTML` is a site a human browses; `API` is that brand's own API (catalogue,
+ * booking, ...). Both may be REST. This is persisted configuration — the product
+ * never guesses it from a catalog id, a URL path or a response shape, because
+ * "it speaks REST" says nothing about whether it belongs with the website or
+ * with the business systems.
+ */
+export type SourceKind = 'HTML' | 'API';
+
+export function isSourceKind(value: unknown): value is SourceKind {
+  return value === 'HTML' || value === 'API';
+}
+
+/**
  * How fresh a measurement or retrieval is.
  * `UNKNOWN` exists so "never checked" is representable without lying.
  */
@@ -48,6 +63,8 @@ export interface SourceRow {
   id: string;
   organizationId: string;
   sourceType: SourceType;
+  /** HTML | API for WEBSITE sources; null for BUSINESS_SYSTEM. Persisted config. */
+  sourceKind?: SourceKind | null;
   name: string;
   /** NULL = the organisation has not configured a website. */
   websiteUrl: string | null;
@@ -92,6 +109,12 @@ export interface WebsiteMeasurementRow {
 /** A capability registry as persisted for one connector. */
 export interface RegistryRow {
   installationId: string;
+  /**
+   * The SOURCE this evidence describes, when it is attributable to one. This is
+   * attribution, not a copy: the same row the connector discovered through is also
+   * the evidence the source genuinely provides.
+   */
+  sourceId?: string | null;
   registry: CapabilityRegistry;
   discoveredAt?: string | null;
 }
@@ -158,6 +181,11 @@ export interface WebsiteView {
   id: string;
   name: string;
   url: string;
+  /**
+   * HTML or API, as configured. null when the row predates explicit kinds; the UI
+   * shows "WEBSITE" then, never a guess about whether the endpoint is an API.
+   */
+  kind: SourceKind | null;
   /** The real probe outcome, or null when the site was never checked. */
   outcome: WebsiteMeasurementRow['outcome'] | null;
   /** null = no response was received. Never 0. */
@@ -176,6 +204,22 @@ export interface WebsiteView {
   lastCheckedAt: string | null;
   freshness: SourceFreshness;
   message: string | null;
+  /**
+   * What this website/API source genuinely exposes. Empty (not zero) when nothing
+   * has been discovered for it: reachability and capability are separate facts, so
+   * a 200 never implies a capability list.
+   */
+  resources: SourceResourceView[];
+  /** null until discovery has run for this source. */
+  totalResourceCount: number | null;
+  availableResourceCount: number | null;
+  /** null when this source has never been read. */
+  lastSuccessfulRetrievalAt: string | null;
+  /** Freshness of the capability evidence, judged against the reading connector. */
+  retrievalFreshness: SourceFreshness;
+  /** COMPLETE / PARTIAL / UNKNOWN / null — same rules as a business system. */
+  completeness: 'COMPLETE' | 'PARTIAL' | 'UNKNOWN' | null;
+  errors: string[];
 }
 
 /** A connected business system and everything actually reachable through it. */
@@ -406,39 +450,19 @@ export function buildSourceGraph(input: {
   });
 
   // ------ Website ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  // The WEBSITE view is assembled after the source-scoped evidence helpers below: a
+  // website/API source's capabilities come from its own attributed registries, not
+  // from whatever the web page happens to render.
   const websiteRow = input.sources.find((s) => s.sourceType === 'WEBSITE') ?? null;
   let website: WebsiteView | null = null;
-  if (websiteRow?.websiteUrl) {
-    const m = input.measurements
-      .filter((x) => x.sourceId === websiteRow.id)
-      .sort((a, b) => (toInstantMs(b.checkedAt) ?? 0) - (toInstantMs(a.checkedAt) ?? 0))[0];
-    website = {
-      id: websiteRow.id,
-      name: websiteRow.name,
-      url: websiteRow.websiteUrl,
-      // No measurement --- null outcome, and the UI must render NOT_CHECKED.
-      outcome: m?.outcome ?? null,
-      httpStatus: m?.httpStatus ?? null,
-      responseTimeMs: m?.responseTimeMs ?? null,
-      redirected: m?.redirected ?? null,
-      finalUrl: m?.finalUrl ?? null,
-      tls: {
-        valid: m?.tlsValid ?? null,
-        issuer: m?.tlsIssuer ?? null,
-        subject: m?.tlsSubject ?? null,
-        validTo: m?.tlsValidTo ?? null,
-      },
-      lastCheckedAt: m?.checkedAt ?? null,
-      freshness: freshnessFrom(m?.checkedAt ?? null, null, now),
-      message: m?.message ?? null,
-    };
-  }
 
   // ------ Business systems ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const systemRows = input.sources.filter((s) => s.sourceType === 'BUSINESS_SYSTEM');
 
-  const summarise = (serving: ConnectorView[]) => {
-    const resources = serving.flatMap((c) => c.resources);
+  const summarise = (serving: ConnectorView[], resources: SourceResourceView[]) => {
+    // `resources` are the evidence attributed to THIS source (see
+    // resourceViewsForRegistries), so a source's capabilities follow the source
+    // rather than the connection that happened to read it.
     // Newest retrieval across every resource any of these connectors read.
     // Compared as instants, not as strings: stored timestamps can carry a zone
     // (`...Z`) or not, and lexicographic sorting of mixed forms is wrong.
@@ -480,9 +504,102 @@ export function buildSourceGraph(input: {
     };
   };
 
+  /**
+   * Registries attributable to one source: explicitly attributed through
+   * `registry.source_id`, or read by a connector that serves that source. The same
+   * registry row can satisfy both, so a capability is never counted twice.
+   */
+  const registriesForSource = (sourceId: string): RegistryRow[] => {
+    const servingConnectorIds = new Set(
+      input.connectors
+        .filter((c) => sourceIdForConnector(c.id) === sourceId)
+        .map((c) => c.id),
+    );
+    const out: RegistryRow[] = [];
+    for (const reg of input.registries) {
+      const attributed = reg.sourceId === sourceId;
+      const viaServingConnector = servingConnectorIds.has(reg.installationId);
+      if (attributed || viaServingConnector) out.push(reg);
+    }
+    return out;
+  };
+
+  /** Project those registries into source-scoped resource views, de-duplicated. */
+  const resourceViewsForRegistries = (registries: RegistryRow[]): SourceResourceView[] => {
+    const seen = new Set<string>();
+    const out: SourceResourceView[] = [];
+    for (const reg of registries) {
+      const connector = input.connectors.find((c) => c.id === reg.installationId);
+      // Evidence whose connection no longer exists is not readable through this org.
+      if (!connector) continue;
+      for (const resource of reg.registry.resources) {
+        const view = resourceView(resource, connector);
+        const key = `${view.connectorId}:${view.id}:${view.path}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(view);
+      }
+    }
+    return out;
+  };
+
+  // ------ Website -----------------------------------------------------------------------------------------------------------------
+  // A WEBSITE source may be an HTML site or that brand's own API. The distinction is
+  // persisted configuration (`source_kind`), never inferred from the connector
+  // catalog, the URL shape or the response body.
+  if (websiteRow?.websiteUrl) {
+    const m = input.measurements
+      .filter((x) => x.sourceId === websiteRow.id)
+      .sort((a, b) => (toInstantMs(b.checkedAt) ?? 0) - (toInstantMs(a.checkedAt) ?? 0))[0];
+
+    // Capabilities belong to the SOURCE that actually provides them. For a
+    // website/API source that is the evidence attributed to this source — the same
+    // registry row the connector discovered through, never a copy of it.
+    const serving = connectorViews.filter((c) => c.sourceId === websiteRow.id);
+    const sum = summarise(serving, resourceViewsForRegistries(registriesForSource(websiteRow.id)));
+    // Freshness of the capability evidence is judged against the interval the
+    // reading connector was actually configured with.
+    const servingRows = input.connectors.filter((c) => sourceIdForConnector(c.id) === websiteRow.id);
+    const retrievalInterval = servingRows.length ? effectiveSyncIntervalMinutes(servingRows[0]) : null;
+
+    website = {
+      id: websiteRow.id,
+      name: websiteRow.name,
+      url: websiteRow.websiteUrl,
+      // Persisted kind only. An unclassified row stays null and renders "WEBSITE";
+      // inferring "it is REST so it must be an API" is exactly the guess this model
+      // refuses to make.
+      kind: isSourceKind(websiteRow.sourceKind) ? websiteRow.sourceKind : null,
+      // No measurement --- null outcome, and the UI must render NOT_CHECKED.
+      outcome: m?.outcome ?? null,
+      httpStatus: m?.httpStatus ?? null,
+      responseTimeMs: m?.responseTimeMs ?? null,
+      redirected: m?.redirected ?? null,
+      finalUrl: m?.finalUrl ?? null,
+      tls: {
+        valid: m?.tlsValid ?? null,
+        issuer: m?.tlsIssuer ?? null,
+        subject: m?.tlsSubject ?? null,
+        validTo: m?.tlsValidTo ?? null,
+      },
+      lastCheckedAt: m?.checkedAt ?? null,
+      // Probe freshness and capability freshness are different facts: a site can be
+      // reachable right now while its capability evidence is a week old.
+      freshness: freshnessFrom(m?.checkedAt ?? null, null, now),
+      message: m?.message ?? null,
+      resources: sum.resources,
+      totalResourceCount: sum.resources.length ? sum.resources.length : null,
+      availableResourceCount: sum.resources.length ? sum.available.length : null,
+      lastSuccessfulRetrievalAt: sum.lastRetrieval,
+      retrievalFreshness: freshnessFrom(sum.lastRetrieval, retrievalInterval, now),
+      completeness: sum.completeness,
+      errors: sum.errors,
+    };
+  }
+
   const businessSystems: BusinessSystemView[] = systemRows.map((s) => {
     const serving = connectorViews.filter((c) => c.sourceId === s.id);
-    const sum = summarise(serving);
+    const sum = summarise(serving, resourceViewsForRegistries(registriesForSource(s.id)));
     return {
       id: s.id,
       name: s.name,
@@ -502,32 +619,30 @@ export function buildSourceGraph(input: {
     };
   });
 
-  // Connectors with no owning source row would otherwise vanish from the
-  // inventory. They are surfaced as their own unassigned systems so the Super
-  // Admin can see them, rather than being silently hidden.
-  const assigned = new Set(businessSystems.flatMap((s) => s.connectorIds));
-  for (const c of connectorViews) {
-    if (assigned.has(c.id)) continue;
-    const sum = summarise([c]);
-    businessSystems.push({
-      id: `unassigned:${c.id}`,
-      name: c.name,
-      description: c.lastMessage ?? null,
-      status: sum.status,
-      statusEvidence: sum.statusEvidence,
-      connectorIds: [c.id],
-      connectors: [c],
-      resources: sum.resources,
-      availableResourceCount: sum.resources.length ? sum.available.length : null,
-      totalResourceCount: sum.resources.length ? sum.resources.length : null,
-      lastSuccessfulRetrievalAt: sum.lastRetrieval,
-      freshness: c.freshness,
-      completeness: sum.completeness,
-      errors: sum.errors,
-    });
-  }
+  // A connector with no owning source row is NOT promoted to a business system.
+  //
+  // It used to be: unassigned connectors were pushed into `businessSystems` as
+  // synthetic entries (`unassigned:<connectorId>`), which is precisely the
+  // "connector = system" conflation this model exists to prevent — a client with
+  // one configured API could be shown as having a business system that was never
+  // configured. Such a connector is still fully visible in the connector
+  // inventory with `source: UNASSIGNED`, so nothing is hidden; it simply is not
+  // counted or presented as a system. The system count is therefore exactly the
+  // number of real BUSINESS_SYSTEM source rows.
 
-  const allResources = connectorViews.flatMap((c) => c.resources);
+// Capability counts come from the evidence attributed to SOURCES (website and
+// business system), de-duplicated. Counting connector resources instead would
+// double-count a capability that a source and its reader both legitimately
+// reference, and would make the numbers move when a connection is added.
+const allResources = [
+  ...(website?.resources ?? []),
+  ...businessSystems.flatMap((s) => s.resources),
+].filter(
+  (resource, index, list) =>
+    list.findIndex(
+      (r) => `${r.connectorId}:${r.id}:${r.path}` === `${resource.connectorId}:${resource.id}:${resource.path}`,
+    ) === index,
+);
 
   return {
     organizationId: input.organizationId,
@@ -536,7 +651,10 @@ export function buildSourceGraph(input: {
     businessSystems,
     connectors: connectorViews,
     counts: {
-      websites: website ? 1 : 0,
+      // Each number counts its own category of real rows. They are never derived
+      // from one another: a website count does not fall out of the connector
+      // count, and a business system is not a connector with a different label.
+      websites: input.sources.filter((s) => s.sourceType === 'WEBSITE').length,
       businessSystems: businessSystems.length,
       connectors: connectorViews.length,
       discoveredResources: allResources.length,
