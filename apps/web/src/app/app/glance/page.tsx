@@ -224,6 +224,8 @@ export default function GlanceCompanionPage() {
       href: '/app/approvals',
     },
     {
+      // Business systems, from the persisted source classification. Never the
+      // connector count: a WEBSITE reached by an API connector is not a system.
       label: 'Systems',
       value: synced ? summary!.connectedSystems : null,
       unit: '',

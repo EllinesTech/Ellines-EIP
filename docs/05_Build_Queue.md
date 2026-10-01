@@ -209,3 +209,70 @@ P4 remains `next` (DB-backed platform staff/roles/grants + Ellines Org Dashboard
 | Schema/nullability drift | `npm run verify:schema` | pass — 85 mapped models, 0 missing tables, 0 missing columns, **0 nullability mismatches** |
 
 **Remaining in P4 (not yet built, deliberately not claimed as done):** the `/api/v1/platform/staff*` endpoints (list/invite/grant/revoke/bootstrap with reason capture and audit rows), the control-plane staff UI, bootstrapping existing allowlisted operators into rows, and adopting the new resolver on the existing `/api/v1/platform/*` endpoints that still call `platformAdminFromEnv` directly. P4 is therefore **`in_progress`**, not `done`.
+
+### 2026-09-30 — Source-separated dashboard (client Command Center + Super Admin overview)
+
+Branch `feat/source-separated-dashboard`, based on `main` @ `9894849` (deliberately NOT based on the P4 slice-B branch).
+
+**The defect.** The client Command Center led with `Connector health → Ellines Haven Main → Connected Systems 1`, which answers "how is EIP connected?" rather than "what is my organisation connected to?". A connector is the *mechanism*; an organisation's things are its **website** and its **business systems**. Super Admin showed `Connect your first system` to a client that already had a live system, because that banner keyed off a `!synced` flag instead of actual source state.
+
+**Real Ellines Haven facts this was built against** (queried, not assumed):
+
+| Fact | Value |
+|---|---|
+| Website source | **none configured** — the single source row is `BUSINESS_SYSTEM` with `website_url: null`, and `source_website_measurements` is empty |
+| Business system | `Ellines Haven Main`, `BUSINESS_SYSTEM`, CONNECTED with real retrieval evidence |
+| Discovered resources | **`books` only** — AVAILABLE, complete, 15 reported / 15 retrieved, openapi discovery |
+| Connector | `Ellines Haven Main`, `rest-api`, status `synced`, auth `none` (no credential stored), serves that `BUSINESS_SYSTEM` source |
+| Last successful sync | `2026-10-01T04:29:44Z` → freshness **STALE** against its own 60-minute interval |
+| Enterprise health | `null` — no source published a metric, so it stays unknown |
+
+Because no website is configured, the website card renders an explicit **WEBSITE NOT CONFIGURED** state. No URL was invented, no probe was faked, and no website figure was derived from the catalogue API.
+
+**What changed**
+
+| File | Change |
+|---|---|
+| `components/source-graph/SourceCards.tsx` (new) | Client source section: real summary counts + **Connected website** / **Connected systems** / **Connectors** cards. The website card renders only probe facts (HTTP status, response time, TLS, last check, freshness); the systems card only retrieval facts (resources, availability, record counts, completeness, errors); the connectors card only technical facts (type, source served, auth, attempts, sync, resources discovered). A failed read renders UNAVAILABLE — never "nothing connected". |
+| `app/app/page.tsx` | Removed the `!synced`-gated "Connect your first system" banner; `<SourceCards />` renders above the connector strip, which is relabelled `Connector health · technical connections`. |
+| `app/app/platform/page.tsx` | Removed three `healthScore ?? 0` fabrications that rendered **"0/100"** for a client with no health metric; unknown now renders **"Not measured"**. Also genericised two wizard placeholders that embedded a real tenant slug/name. |
+| `components/source-graph/OrgSourceOverview.tsx` | Super Admin overview gained the **Source / Capability Summary** (websites, systems, connectors, resources, capability total/available/partial/unavailable), all null-aware. |
+| `packages/shared/src/source-graph.ts` | `counts.capabilities { total, available, partial, unavailable }`, derived from each discovered resource's real availability; `null` (UNKNOWN) when nothing was discovered, never `0`. |
+| `lib/api.ts` | DTO extended to match. |
+
+**Tests** — `packages/shared/src/__tests__/source-graph.spec.ts` (20) pins the architecture at the data layer: website/system are separate types; a connector names the source it serves and is never typed WEBSITE; one connector yields many resources with `PARTIAL` completeness and a 401-derived error; capability counts by real availability and `null` when nothing was discovered; FRESH/STALE/UNKNOWN from real timestamps (including zone-less-as-UTC); no manufactured zeros. `apps/web/functions/__tests__/source-separation.ui.spec.ts` (18) pins the presentation: sources render above the connector strip, the website card contains no record counts, the systems card contains no HTTP/TLS, "connect your first system" is gated on `hasAnySource`, no `healthScore ?? 0`, no hardcoded Haven values, no demo/proof tenants.
+
+**Live verification (real `ellines-haven`, dev server → Pages Function → PostgREST → production DB): 14/14 checks passed** — website is its own fact (`null`), the system has its own identity distinct from the connector (`source.id=src_5f71…`, `connector.id=7d90d8…`, `connector.sourceId=src_5f71…`), source type explicit, connector reports the source it serves, resources exactly `["books"]`, no invented capability categories, `retrieved=15`, capability counts `{total:1, available:1, partial:0, unavailable:0}`, freshness STALE, Super Admin cross-org read returns the same graph, and `/app`, `/app/connected-website`, `/app/connectors/systems`, `/app/connectors/inventory` all return 200.
+
+One check was corrected during verification rather than forced: the source and its connector legitimately share the display name "Ellines Haven Main" (the source row was backfilled from that connector), so *name inequality* was a bad proxy for identity separation. Separation is now asserted by distinct ids plus the connector's explicit `sourceId`.
+
+| Check | Command | Result |
+|---|---|---|
+| Shared build + tests | `npm run build:shared`, `npm run test -w @ellines-eip/shared` | pass — 12 suites / 313 tests |
+| Web/Pages Functions tests | `npm run test -w @ellines-eip/web` | pass — 24 suites / 257 tests |
+| Functions typecheck | `npx tsc --noEmit -p apps/web/functions/tsconfig.json` | pass |
+| Web app typecheck | `npx tsc --noEmit -p apps/web/tsconfig.json` | pass (after clearing a stale `.next` artifact left by the P4 branch) |
+| Pages Functions import check | `npm run verify:pages-functions` | pass — 245 files, 342 relative imports |
+| Web production build | `npm run build -w @ellines-eip/web` | pass — 81/81 static pages |
+| Schema/nullability drift | `npm run verify:schema` | pass — 85 mapped models, 0 missing tables, 0 missing columns, **0 nullability mismatches** |
+| Identity build | — | not required: no `services/identity` or Prisma schema change in this slice |
+| Whitespace/format check | `git diff --check` | pass |
+
+**Still open (honest list):** Haven has no website configured, so the website card can only show the not-configured state until an operator configures a real site — the monitoring engine itself is unchanged and already proven by `website-engine.spec.ts`. The three client pages load their own data from the same endpoint but were **not** visually re-laid-out (Connected Website / Connected Systems / Connectors already existed from slice A); this slice changed the Command Center and the Super Admin overview. Super Admin's cross-org `?orgId=` read still authorizes via `platformAdminFromEnv` on `main` (the registry-backed version lives on the unmerged P4 slice-B branch).
+## Source classification — a web/API source is not a business system
+
+**Status:** `done` (branch `feat/source-separated-dashboard`, applied to the real database)
+
+**The rule.** "It speaks REST" is not a source category. A company's public catalogue API and its ERP are both REST endpoints, but one belongs under **Connected Website** and the other under **Connected Systems** — and only the organisation knows which. So the category is persisted configuration: `source_type` (`WEBSITE` | `BUSINESS_SYSTEM`) plus `source_kind` (`HTML` | `API`, non-null only for a website, enforced by CHECK). Nothing infers it from the catalog id, the URL path, the response shape or the organisation name. A REST connector pointed at `/api/...` is still just `WEBSITE` until an operator says `API`.
+
+**Capabilities belong to the source.** `connector_capability_registries.source_id` attributes real discovery evidence to the SOURCE it describes, via `metadata.connectorId` provenance within the same organisation. It is attribution, not duplication: the one registry row the connector discovered through is also the evidence the source genuinely provides, so reclassifying a source moves its capabilities *with* it and cannot double-count them.
+
+**Authorized path.** `PATCH /api/v1/orgs/me/sources/{id}` (owner/IT Admin; platform operator only with an explicit `?orgId=`) requires a reason, validates before writing, mutates transactionally through `eip_classify_source`, audits success **and** refusal, and returns the row that was persisted — a cross-tenant id answers "not found", never "forbidden". Migrations `0011`/`0012` add the column, the attribution backfill and the function; they reclassify **no** existing row (pinned by test).
+
+**Removed conflation.** Unassigned connectors were being pushed into `businessSystems` as synthetic `unassigned:<id>` entries — i.e. a client with one API was shown as having a business system nobody configured. They now stay purely in connector inventory, so `counts.businessSystems` is exactly the number of real `BUSINESS_SYSTEM` rows, and the website / system / connector counts are computed from three independent sets.
+
+**Real `ellines-haven` verification (15/15):** classified through the endpoint as `WEBSITE` + `API` with its real endpoint and the name "Ellines Haven API"; `PATCH 200`, then a real probe: `ONLINE`, HTTP 200 in ~2.0 s (measured, not assumed). It appears under Connected Website with `kind: API`, `books` **15 reported / 15 retrieved**, `AVAILABLE`, `COMPLETE`; it does **not** appear under Connected Systems (`[]`); the connector stays under Connectors as `rest-api` with `sourceType: WEBSITE`; counts `{websites: 1, businessSystems: 0, connectors: 1}`; the Super Admin cross-org read returns the identical classification. `retrievalFreshness` is honestly **STALE** (last real read `2026-10-01T04:29:41Z`) — no sync was run merely to move the timestamp.
+
+**Tests.** `source-graph.spec.ts` (+9) pins: kind passthrough; no kind inference from URL/catalog/response; website capabilities from its own attributed registry; `null` rather than `0` when only the probe succeeded; probe freshness and capability freshness as separate facts; UNKNOWN never FRESH; independent counts; no unassigned-connector-as-system. `source-separation.ui.spec.ts` pins the vocabulary constraint, the authorized + audited path, the probe-never-creates-a-capability rule, and that the website card never reads from `businessSystems`. The old "website card must contain no record counts" assertion was deliberately **revised**, not deleted: a `WEBSITE`+`API` source can own real capabilities, so the invariant is now narrower and stricter — those counts come from `website.resources` and nowhere else.
+
+**Operator note.** The endpoint was supplied by the operator to a local throwaway script and persisted through the product endpoint. No application code, migration, test fixture or fallback contains it; `verify-schema-sync` reports 85 models in sync.

@@ -7,6 +7,7 @@ import {
   type Env,
 } from '../../../../../shared/auth';
 import { unpackTimelineStorage } from '../../../../../shared/uem';
+import { readAuthoritativeSourceCounts } from '../../../../../shared/source-counts';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -24,6 +25,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const orgId = context.params.id as string;
   const supabase = getAdminClient(context.env);
 
+  // The Super Admin reads the SAME authoritative classification the client
+  // dashboard does. A platform view that re-derived its own count from connector
+  // rows would let two screens disagree about the same organisation, which is
+  // the specific confusion this separation exists to remove.
+  const counts = await readAuthoritativeSourceCounts(supabase, orgId);
+
   // Read the real enterprise snapshot for this client org
   const { data: snap, error } = await supabase
     .from('enterprise_snapshots')
@@ -39,7 +46,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       connectorId: 'none',
       connectorName: '',
       healthScore: 0,
-      connectedSystems: 0,
+      connectedSystems: counts.businessSystems,
+      sourceCounts: counts,
       openAlerts: 0,
       openDecisions: 0,
       briefHighlight: 'No connector sync yet for this organization.',
@@ -57,7 +65,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     connectorId: snap.connector_id,
     connectorName: snap.connector_name,
     healthScore: snap.health_score,
-    connectedSystems: snap.connected_systems,
+    // Same authoritative classification count as the client dashboard.
+    connectedSystems: counts.businessSystems,
+    sourceCounts: counts,
     openAlerts: snap.open_alerts,
     openDecisions: snap.open_decisions,
     briefHighlight: snap.brief_highlight,

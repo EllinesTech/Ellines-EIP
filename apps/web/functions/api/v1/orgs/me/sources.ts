@@ -61,10 +61,14 @@ const asObject = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 
 export function toSourceRow(r: DbRow): SourceRow {
+  const kind = asString(r.source_kind);
   return {
     id: String(r.id),
     organizationId: String(r.organization_id),
     sourceType: asString(r.source_type) === 'WEBSITE' ? 'WEBSITE' : 'BUSINESS_SYSTEM',
+    // Persisted classification only. An unrecognised value degrades to null so the
+    // UI shows "WEBSITE" rather than guessing a kind from the URL or connector.
+    sourceKind: kind === 'HTML' || kind === 'API' ? kind : null,
     name: asString(r.name) ?? '(unnamed source)',
     websiteUrl: asString(r.website_url),
     description: asString(r.description),
@@ -98,6 +102,9 @@ export function toRegistryRow(r: DbRow): RegistryRow | null {
   if (!registry || !Array.isArray(registry.resources)) return null;
   return {
     installationId: String(r.installation_id),
+    // Attribution: the SOURCE this evidence describes. Null for rows that predate
+    // explicit attribution — those keep their connector-scoped reading.
+    sourceId: asString(r.source_id),
     // Unlike the row columns, this jsonb payload is written by EIP itself
     // (saveCapabilityRegistry) as camelCase JSON, so no rename can be lost here.
     // The shape check above is what justifies the narrowing. A resource carrying
@@ -163,7 +170,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // ── Sources ───────────────────────────────────────────────────────────────
   const { data: sourceRows, error: sourceErr } = await supabase
     .from('organization_sources')
-    .select('id, organization_id, source_type, name, website_url, description, metadata')
+    .select('id, organization_id, source_type, source_kind, name, website_url, description, metadata')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: true });
   if (sourceErr) {
@@ -191,7 +198,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { data: registryRows, error: regErr } = ids.length
     ? await supabase
         .from('connector_capability_registries')
-        .select('installation_id, registry, discovered_at')
+        .select('installation_id, source_id, registry, discovered_at')
         .in('installation_id', ids)
         .eq('organization_id', organizationId)
     : { data: [], error: null };

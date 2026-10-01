@@ -211,8 +211,29 @@ export class MultiOrgService {
     });
     const snapByOrg = new Map(snapshots.map((s) => [s.organizationId, s]));
 
+    // "Systems" is a per-business count, so each organisation is counted from its
+    // OWN persisted source classification. The snapshot column is a connector
+    // count, which is why a website-only business with one API connector used
+    // to read as "1 connected system" in this group table.
+    const countPromises = group.map(async (org) => {
+      const [websites, businessSystems, connectors] = await Promise.all([
+        this.prisma.organizationSource.count({
+          where: { organizationId: org.id, sourceType: 'WEBSITE' },
+        }),
+        this.prisma.organizationSource.count({
+          where: { organizationId: org.id, sourceType: 'BUSINESS_SYSTEM' },
+        }),
+        this.prisma.connectorInstallation.count({
+          where: { organizationId: org.id, NOT: { status: 'deleted' } },
+        }),
+      ]);
+      return [org.id, { websites, businessSystems, connectors }] as const;
+    });
+    const countsByOrg = new Map(await Promise.all(countPromises));
+
     return group.map((org) => {
       const snap = snapByOrg.get(org.id);
+      const counts = countsByOrg.get(org.id);
       return {
         id: org.id,
         name: org.name,
@@ -220,7 +241,10 @@ export class MultiOrgService {
         isCurrent: org.id === currentOrgId,
         isChild: org.parentOrgId === currentOrgId,
         healthScore: snap?.healthScore ?? null,
-        connectedSystems: snap?.connectedSystems ?? null,
+        // Authoritative: BUSINESS_SYSTEM source rows only. 0 is a real answer.
+        connectedSystems: counts?.businessSystems ?? 0,
+        websites: counts?.websites ?? 0,
+        connectors: counts?.connectors ?? 0,
         openAlerts: snap?.openAlerts ?? null,
         openDecisions: snap?.openDecisions ?? null,
         briefHighlight: snap?.briefHighlight ?? null,

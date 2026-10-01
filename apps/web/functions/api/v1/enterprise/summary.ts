@@ -6,6 +6,10 @@ import {
   type Env,
 } from '../../../shared/auth';
 import { unpackTimelineStorage } from '../../../shared/uem';
+import {
+  readAuthoritativeSourceCounts,
+  type AuthoritativeSourceCounts,
+} from '../../../shared/source-counts';
 
 /**
  * Explicit sync state. `unknown` and `reported` are deliberately distinct:
@@ -32,6 +36,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const supabase = getAdminClient(context.env);
+
+  /**
+   * The connected-systems count comes from the organisation's PERSISTED SOURCE
+   * CLASSIFICATION, never from the snapshot.
+   *
+   * `enterprise_snapshots.connected_systems` is written by the sync path from the
+   * number of connector INSTALLATIONS, so reading it here reported a
+   * WEBSITE-only organisation (one API connector) as having "1 system connected".
+   * A connector is the mechanism; the source is the thing. The count therefore
+   * reads `organization_sources.source_type` through one shared rule, so this
+   * endpoint, the Connected Systems page and the Super Admin view cannot disagree.
+   */
+  const counts: AuthoritativeSourceCounts = await readAuthoritativeSourceCounts(
+    supabase,
+    auth.organizationId,
+  );
+
   const { data: snap, error } = await supabase
     .from('enterprise_snapshots')
     .select('*')
@@ -50,7 +71,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // No snapshot means no connected system has ever been read. Every metric
       // is honestly zero/unknown rather than a plausible-looking placeholder.
       healthScore: null,
-      connectedSystems: 0,
+      // Still the real classification count: a configured business system is a
+      // fact about the organisation whether or not it has synced yet.
+      connectedSystems: counts.businessSystems,
+      sourceCounts: counts,
       openAlerts: 0,
       openDecisions: 0,
       briefHighlight: 'No connector sync yet. Open Connectors and sync your first system to unlock live KPIs.',
@@ -80,7 +104,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // The DB column is non-nullable, so 0 with no connector reporting a score
     // means "unknown" — surfaced as null rather than a misleading 0.
     healthScore: snap.health_score > 0 ? snap.health_score : null,
-    connectedSystems: snap.connected_systems,
+    // The AUTHORITATIVE business-system count, from the persisted source
+    // classification. The snapshot column is deliberately not used here: it
+    // counts connector installations, which is inventory, not systems.
+    connectedSystems: counts.businessSystems,
+    // The three counts together, so a client never has to infer one from another.
+    sourceCounts: counts,
     openAlerts: snap.open_alerts,
     openDecisions: snap.open_decisions,
     briefHighlight: snap.brief_highlight,

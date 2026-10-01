@@ -61,6 +61,14 @@ function WebsiteBlock({ website }: { website: OrganizationSourceGraphDto['websit
         <Cell label="Website">
           <span className={styles.muted}>{website.url}</span>
         </Cell>
+        <Cell label="Kind">
+          {/* Persisted classification. The same endpoint may legitimately be a
+              business system for one organisation and a web API for another, so this
+              is read, never guessed from the URL or the connector. */}
+          <span className={`${styles.badge} ${styles.toneMuted}`}>
+            {website.kind === 'API' ? 'WEBSITE API' : 'WEBSITE'}
+          </span>
+        </Cell>
         <Cell label="Status">
           <span className={`${styles.badge} ${tone}`}>
             {website.outcome ? website.outcome.replace(/_/g, ' ') : 'NOT CHECKED'}
@@ -92,6 +100,51 @@ function WebsiteBlock({ website }: { website: OrganizationSourceGraphDto['websit
           <FreshnessTag state={website.freshness.state} />
         </Cell>
       </dl>
+
+      {/* What this source genuinely provides, for a Super Admin asking "what is this
+          organisation actually connected to?". Empty means not discovered — it is
+          never derived from the probe result or copied from a system. */}
+      <div style={{ marginTop: 8 }}>
+        <div className={styles.label} style={{ marginBottom: 4 }}>
+          Capabilities on this source
+        </div>
+        {website.resources.length ? (
+          <ul className={styles.plainList}>
+            {website.resources.map((resource) => (
+              <li
+                key={`${resource.connectorId}:${resource.id}`}
+                style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <span className={styles.muted}>
+                  {resource.label}
+                  {resource.retrievedRecordCount === null
+                    ? ' · records UNKNOWN'
+                    : ` · ${resource.retrievedRecordCount} records`}
+                </span>
+                <span className={styles.muted}>{resource.availability}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={styles.reason}>
+            Nothing discovered on this source yet. A reachable endpoint does not imply a
+            capability.
+          </p>
+        )}
+        <dl className={styles.grid} style={{ marginTop: 6 }}>
+          <Cell label="Capability freshness">
+            <FreshnessTag state={website.retrievalFreshness.state} />
+          </Cell>
+          <Cell label="Completeness">
+            {website.completeness ? (
+              <span className={styles.muted}>{website.completeness}</span>
+            ) : (
+              <span className={styles.unknown}>COMPLETENESS UNKNOWN</span>
+            )}
+          </Cell>
+        </dl>
+      </div>
+
       {website.message ? (
         <p className={styles.reason} style={{ marginTop: 8 }}>
           {website.message}
@@ -278,6 +331,40 @@ export function OrgSourceOverview({ orgId }: { orgId: string }) {
             <p className={styles.body}>No connectors are installed for this organisation.</p>
           )}
         </div>
+      </div>
+
+      {/* ── Source / capability summary ────────────────────────────────────
+          Counts come from the same graph as everything above. A null count means
+          "not established" and renders UNKNOWN; it is never coerced to 0 just
+          because a section happened to be empty. */}
+      <div>
+        <div className={styles.sectionTitle}>Source / Capability Summary</div>
+        <dl className={styles.grid} style={{ marginTop: 8 }}>
+          <Cell label="Websites">
+            <Measured value={graph.counts.websites} />
+          </Cell>
+          <Cell label="Business systems">
+            <Measured value={graph.counts.businessSystems} />
+          </Cell>
+          <Cell label="Connectors">
+            <Measured value={graph.counts.connectors} />
+          </Cell>
+          <Cell label="Resources discovered">
+            <Measured value={graph.counts.discoveredResources} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities total">
+            <Measured value={graph.counts.capabilities.total} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities available">
+            <Measured value={graph.counts.capabilities.available} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities partial">
+            <Measured value={graph.counts.capabilities.partial} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+          <Cell label="Capabilities unavailable">
+            <Measured value={graph.counts.capabilities.unavailable} unknownLabel="NOT DISCOVERED" />
+          </Cell>
+        </dl>
       </div>
     </section>
   );

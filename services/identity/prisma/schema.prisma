@@ -2577,6 +2577,8 @@ model ConnectorCapabilityRegistry {
   id             String   @id @default(cuid())
   installationId String   @unique @map("installation_id")
   organizationId String   @map("organization_id")
+  /// The source this evidence describes (nullable; see the relation below).
+  sourceId       String?  @map("source_id")
   /// True for the current inventory; older rows are kept for history.
   isCurrent      Boolean  @default(true) @map("is_current")
   /// Number of resources whose retrieval genuinely completed.
@@ -2590,8 +2592,14 @@ model ConnectorCapabilityRegistry {
 
   installation ConnectorInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The SOURCE this evidence describes. Set when the registry is attributable to
+  /// a configured source (a website/API or a business system); NULL keeps the
+  /// older connector-scoped reading. This is attribution, not duplication — the
+  /// row is still the same row the connector discovered through.
+  source       OrganizationSource?  @relation("RegistrySource", fields: [sourceId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, isCurrent])
+  @@index([sourceId])
   @@map("connector_capability_registries")
 }
 
@@ -2610,6 +2618,13 @@ model OrganizationSource {
   organizationId String   @map("organization_id")
   /// WEBSITE | BUSINESS_SYSTEM — a closed vocabulary, enforced by a CHECK constraint.
   sourceType     String   @map("source_type")
+  /// HTML | API for a WEBSITE source; NULL for BUSINESS_SYSTEM.
+  ///
+  /// "It speaks REST" is not a category: a company's public catalogue API and its
+  /// ERP API are both REST endpoints but belong to different sections of the
+  /// product. This is persisted configuration, never inferred from a catalog id, a
+  /// URL path, a response shape or an organisation name.
+  sourceKind     String?  @map("source_kind")
   name           String
   /// The configured website. NULL means "not configured" — never a placeholder URL.
   websiteUrl     String?  @map("website_url")
@@ -2622,6 +2637,9 @@ model OrganizationSource {
 
   organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   measurements  SourceWebsiteMeasurement[]
+  /// Capability evidence attributed to THIS source. One registry row, referenced by
+  /// both the source it describes and the connector that read it — never copied.
+  capabilityRegistries ConnectorCapabilityRegistry[] @relation("RegistrySource")
 
   @@index([organizationId])
   @@map("organization_sources")
