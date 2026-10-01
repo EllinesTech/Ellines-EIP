@@ -299,6 +299,68 @@ export const OPERATION_REGISTRY: OperationRegistryEntry[] = [
       operationClass: 'C-5',
     },
   },
+
+  // C-5: Platform staff & grants (Phase 4 — internal Ellines operations).
+  // These replace the "every allowlisted email holds every capability" model:
+  // access becomes a DB row that can be scoped, expired and revoked.
+  {
+    id: 'platform.staff.invite',
+    label: 'Invite Ellines platform staff',
+    operationClass: 'C-5',
+    endpoint: '/api/v1/platform/staff',
+    method: 'POST',
+    safeguards: {
+      tier: 'C-5',
+      safeguards: ['reason_required', 'confirmation_required', 'audit_always', 'result_enforced'],
+      description: 'Adds an Ellines operator to the platform staff registry. The invite grants no capability until grants are attached.',
+      operationClass: 'C-5',
+    },
+    reasonPlaceholder: 'Business justification for platform staff access',
+  },
+  {
+    id: 'platform.staff.grant',
+    label: 'Grant platform capability',
+    operationClass: 'C-5',
+    endpoint: '/api/v1/platform/staff/{id}',
+    method: 'PATCH',
+    safeguards: {
+      tier: 'C-5',
+      safeguards: ['reason_required', 'confirmation_required', 'audit_always', 'result_enforced'],
+      description: 'Grants one platform capability to an operator, optionally scoped to a single organization and/or with an expiry.',
+      operationClass: 'C-5',
+    },
+    reasonPlaceholder: 'Why this operator needs this capability (and scope)',
+  },
+  {
+    id: 'platform.staff.revoke',
+    label: 'Revoke platform access',
+    operationClass: 'C-5',
+    endpoint: '/api/v1/platform/staff/{id}',
+    method: 'PATCH',
+    safeguards: {
+      tier: 'C-5',
+      safeguards: ['reason_required', 'confirmation_required', 'audit_always', 'result_enforced'],
+      description: 'Revokes a capability grant, or suspends/revokes the operator entirely. Takes effect on the next request.',
+      operationClass: 'C-5',
+    },
+    // dryRun is intentionally NOT advertised: revoke executes unconditionally.
+    reasonPlaceholder: 'Reason for revoking access (role change, offboarding, incident)',
+  },
+  {
+    id: 'platform.staff.bootstrap',
+    label: 'Bootstrap platform staff from allowlist',
+    operationClass: 'C-5',
+    endpoint: '/api/v1/platform/staff/bootstrap',
+    method: 'POST',
+    safeguards: {
+      tier: 'C-5',
+      safeguards: ['reason_required', 'confirmation_required', 'dry_run_supported', 'audit_always', 'result_enforced'],
+      description: 'Materialises PLATFORM_ADMIN_EMAILS into staff rows with the bootstrap capability set so grants can be narrowed afterwards. Supports dry-run.',
+      operationClass: 'C-5',
+    },
+    dryRun: true,
+    reasonPlaceholder: 'Reason for the migration (initial phase-4 bootstrap, allowlist change)',
+  },
 ];
 
 /**

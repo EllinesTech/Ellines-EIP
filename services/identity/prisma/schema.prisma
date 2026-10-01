@@ -145,6 +145,7 @@ model User {
   contextProfile      UserContextProfile? // v2.0: Personalization context
   shortcutSuggestions ShortcutSuggestion[]     @relation("ShortcutSuggestions") // v2.0: Personalization shortcuts
   integrationRequests IntegrationRequest[]     @relation("IntegrationRequestedBy") // TASK-09
+  platformStaff      PlatformStaffMember? // Phase 4: internal Ellines staff row (1:1 with the account)
 
   @@index([organizationId])
   @@map("users")
@@ -2653,4 +2654,82 @@ model SourceWebsiteMeasurement {
 
   @@index([sourceId, checkedAt])
   @@map("source_website_measurements")
+}
+
+// ─── Phase 4 — Internal Ellines Operations: platform staff & grants ─────────
+
+/**
+ * PlatformStaffMember — an Ellines Tech operator in the platform staff registry.
+ *
+ * Before this table, platform Super Admin access was decided solely by the
+ * PLATFORM_ADMIN_EMAILS environment variable: every listed email implicitly held
+ * every platform capability, with no record of who granted it, no scope, no
+ * expiry, and no way to revoke one operator without editing a secret and
+ * redeploying. This row is the operator; PlatformStaffGrant rows are what they
+ * may actually do, and both can be suspended, scoped, expired and revoked.
+ *
+ * `bootstrapped` records rows materialised from the allowlist so the historical
+ * behaviour is auditable while access is progressively narrowed in the DB.
+ */
+enum PlatformStaffStatus {
+  active
+  suspended
+  revoked
+}
+
+model PlatformStaffMember {
+  id             String              @id @default(cuid())
+  /// Lowercased on write; the same normalisation the allowlist comparison uses.
+  email          String              @unique
+  fullName       String?             @map("full_name")
+  title          String?
+  status         PlatformStaffStatus @default(active)
+  /// Set when the operator also has an EIP user account. Null for an invite that
+  /// has not been accepted yet — the row is still authoritative for access.
+  userId         String?             @unique @map("user_id")
+  /// Optional hard stop for temporary operators (incident support, contractors).
+  expiresAt      DateTime?           @map("expires_at")
+  revokedAt      DateTime?           @map("revoked_at")
+  revokedReason  String?             @map("revoked_reason")
+  invitedByEmail String?             @map("invited_by_email")
+  bootstrapped   Boolean             @default(false)
+  notes          String?             @db.Text
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  user   User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  grants PlatformStaffGrant[]
+
+  @@index([status])
+  @@map("platform_staff_members")
+}
+
+/**
+ * PlatformStaffGrant — one capability held by one operator, optionally narrowed
+ * to a single organization (`scopeOrgId`) and/or to a time window (`expiresAt`).
+ *
+ * `scopeOrgId` is `''` (never NULL) for a platform-wide grant so the composite
+ * unique index actually prevents duplicate platform-wide grants — in Postgres a
+ * NULL would make every duplicate row distinct and the constraint toothless.
+ *
+ * A revoked or expired grant is kept, not deleted: the grant history is the
+ * audit trail of who could do what, and when.
+ */
+model PlatformStaffGrant {
+  id             String    @id @default(cuid())
+  staffId        String    @map("staff_id")
+  capability     String
+  scopeOrgId     String    @default("") @map("scope_org_id")
+  expiresAt      DateTime? @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  grantedByEmail String?   @map("granted_by_email")
+  reason         String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  staff PlatformStaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, capability, scopeOrgId])
+  @@index([staffId])
+  @@map("platform_staff_grants")
 }

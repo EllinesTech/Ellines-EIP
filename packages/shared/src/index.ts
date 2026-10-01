@@ -430,6 +430,7 @@ export * from './source-discovery';
 export * from './source-capabilities';
 export * from './source-graph';
 export * from './db-time';
+export * from './platform-staff';
 
 /**
  * Convert a JWT-style TTL (`24h`, `3600s`, `15m`, `7d`) to milliseconds.
