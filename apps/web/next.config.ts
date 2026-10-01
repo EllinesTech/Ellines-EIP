@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         'socket.io-client': false,
+        // Node-only modules used by @ellines-eip/shared (encryption, egress).
+        // These are never called from browser code; stub them so webpack does
+        // not fail the client bundle when it encounters the imports.
+        'crypto': false,
+        'dns': false,
       };
     }
 
