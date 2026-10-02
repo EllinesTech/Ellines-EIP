@@ -3796,3 +3796,73 @@ export function testConnectorConnection(url: string, authConfig?: Record<string,
     body: JSON.stringify({ url, authConfig }),
   });
 }
+
+// ─── Platform Staff Management (Phase 4) ─────────────────────────────────────
+
+export interface PlatformStaffGrantDto {
+  id: string;
+  staff_id: string;
+  capability: string;
+  scope_org_id: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  granted_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformStaffMemberDto {
+  id: string;
+  email: string;
+  full_name: string | null;
+  title: string | null;
+  status: string;
+  bootstrapped: boolean;
+  invited_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+  platform_staff_grants: PlatformStaffGrantDto[];
+}
+
+/** Platform admin only — list all Ellines platform staff members with their grants. */
+export function listPlatformStaff(): Promise<{ staff: PlatformStaffMemberDto[] }> {
+  return pagesRequest<{ staff: PlatformStaffMemberDto[] }>('/api/v1/platform/staff');
+}
+
+/** Platform admin only — invite a new platform staff member. */
+export function invitePlatformStaff(body: {
+  email: string;
+  name: string;
+  capabilities: string[];
+}): Promise<PlatformStaffMemberDto> {
+  return pagesRequest<PlatformStaffMemberDto>('/api/v1/platform/staff', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Platform admin only — update capability grants for an existing staff member. */
+export function updatePlatformStaffGrants(
+  memberId: string,
+  body: { add?: string[]; remove?: string[] },
+): Promise<{ ok: boolean; grants: PlatformStaffGrantDto[] }> {
+  return pagesRequest<{ ok: boolean; grants: PlatformStaffGrantDto[] }>(
+    `/api/v1/platform/staff/${memberId}/grants`,
+    { method: 'PATCH', body: JSON.stringify(body) },
+  );
+}
+
+/** Platform admin only — soft-delete (revoke) a staff member. */
+export function removePlatformStaff(memberId: string): Promise<{ ok: boolean }> {
+  return pagesRequest<{ ok: boolean }>(`/api/v1/platform/staff/${memberId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** Platform admin only — bootstrap staff rows from PLATFORM_ADMIN_EMAILS env var. */
+export function bootstrapPlatformStaff(): Promise<{ created: number; skipped: number }> {
+  return pagesRequest<{ created: number; skipped: number }>(
+    '/api/v1/platform/staff/bootstrap',
+    { method: 'POST', body: '{}' },
+  );
+}

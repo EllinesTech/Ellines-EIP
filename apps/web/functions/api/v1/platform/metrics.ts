@@ -6,6 +6,17 @@ import {
   requireAuth,
   type Env,
 } from '../../../shared/auth';
+import { loadPlatformStaff } from '../../../shared/platform-staff';
+
+async function isPlatformAdmin(env: Env, email: string): Promise<boolean> {
+  if (platformAdminFromEnv(env, email)) return true;
+  try {
+    const staffCtx = await loadPlatformStaff(env, email);
+    return staffCtx.active;
+  } catch {
+    return false;
+  }
+}
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
@@ -13,7 +24,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await isPlatformAdmin(context.env, auth.email)) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 

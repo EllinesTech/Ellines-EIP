@@ -358,8 +358,7 @@ const PLATFORM_ITEMS: NavItem[] = [
     icon: 'access-control',
     section: 'access-control',
     group: 'platform',
-    available: false,
-    note: 'Reserved — internal Ellines staff roles and grants (Phase 4). Client-organization access is live under Client Organizations → Users & Access.',
+    available: true,
   },
   {
     id: 'platform-health',

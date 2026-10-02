@@ -9,7 +9,18 @@ import {
   getClientIp,
   type Env,
 } from '../../../shared/auth';
+import { loadPlatformStaff } from '../../../shared/platform-staff';
 import type { PagesFunction } from '@cloudflare/workers-types';
+
+async function isPlatformAdmin(env: Env, email: string): Promise<boolean> {
+  if (platformAdminFromEnv(env, email)) return true;
+  try {
+    const staffCtx = await loadPlatformStaff(env, email);
+    return staffCtx.active;
+  } catch {
+    return false;
+  }
+}
 
 interface FeatureFlag {
   key: string;
@@ -116,7 +127,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.env, context.request);
   if (auth instanceof Response) return auth;
 
-  if (!platformAdminFromEnv(context.env, auth.email)) {
+  if (!await isPlatformAdmin(context.env, auth.email)) {
     return json({ statusCode: 403, message: 'Platform admin only' }, 403);
   }
 

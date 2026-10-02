@@ -19,13 +19,19 @@ import {
   listPlatformOrgDocuments, uploadPlatformOrgDocument, deletePlatformOrgDocument,
   fetchPlatformOrgProfile, updatePlatformOrgProfile, parseOpenApi,
   listPlatformOrgIntegrationRequests, reviewPlatformOrgIntegrationRequest,
+  listPlatformStaff, invitePlatformStaff, updatePlatformStaffGrants, removePlatformStaff, bootstrapPlatformStaff,
   type ConnectorPackDto, type FeatureFlag, type HealthDto, type OrgDateTimeSettingsDto, type PlatformHealthSummaryDto,
   type OrgMember, type PlatformAuditRow, type PlatformOrg, type PlatformPackage, type PlatformMetrics,
   type PlatformOrgConnectorDto, type PlatformOrgApprovalDto, type PlatformOrgRuleDto,
   type PlatformOrgReportDto, type PlatformOrgAgentDto, type PlatformOrgSnapshotDto,
   type ConnectorInstallationDto, type ConnectorInstallConfigDto, type OpenApiParseResult,
   type PlatformDocumentDto, type PlatformOrgProfileDto, type IntegrationRequestDto,
+  type PlatformStaffMemberDto,
 } from '@/lib/api';
+import {
+  PLATFORM_STAFF_CAPABILITIES,
+  PLATFORM_STAFF_CAPABILITY_LABELS,
+} from '@ellines-eip/shared';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { OrgSourceOverview } from '@/components/source-graph/OrgSourceOverview';
 import {
@@ -108,6 +114,15 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
   const [pkgEdit,setPkgEdit]=useState<{displayName:string;maxUsers:number;maxConnectors:number;requestsPerDay:number;monthlyPrice:number}|null>(null);
   const [packEdit,setPackEdit]=useState<{name:string;description:string}|null>(null);
   const [safeguardOp,setSafeguardOp]=useState<string|null>(null);
+
+  // ── Platform Staff state (access-control section) ──────────────────────────
+  const [platformStaff,setPlatformStaff]=useState<PlatformStaffMemberDto[]>([]);
+  const [staffLoading,setStaffLoading]=useState(false);
+  const [staffError,setStaffError]=useState('');
+  const [staffNotice,setStaffNotice]=useState('');
+  const [inviteForm,setInviteForm]=useState({email:'',name:'',capabilities:[] as string[]});
+  const [inviteBusy,setInviteBusy]=useState(false);
+  const [editGrantsMember,setEditGrantsMember]=useState<PlatformStaffMemberDto|null>(null);
 
   function pickPackage(id:string){const p=packages.find(x=>x.id===id)||null;setSelectedPkg(p);setPkgEdit(p?{displayName:p.display_name,maxUsers:p.max_users??0,maxConnectors:p.max_connectors??0,requestsPerDay:p.requests_per_day,monthlyPrice:p.monthly_price}:null)}
   function pickPack(id:string){const p=packs.find(x=>x.id===id)||null;setSelectedPack(p);setPackEdit(p?{name:p.name,description:p.description||''}:null)}
@@ -238,6 +253,16 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
    listPlatformOrgUsers(orgId).then(setEllinesOrgUsers).catch(e=>setError(e instanceof Error?e.message:'Failed to load internal users'));
  },[allowed,activeSection]);
 
+ // Load platform staff when navigating to access-control section
+ useEffect(()=>{
+   if(!allowed||activeSection!=='access-control')return;
+   setStaffLoading(true);
+   listPlatformStaff()
+     .then(r=>setPlatformStaff(r.staff))
+     .catch(e=>setStaffError(e instanceof Error?e.message:'Failed to load platform staff'))
+     .finally(()=>setStaffLoading(false));
+ },[allowed,activeSection]);
+
  async function open(o:PlatformOrg){setSelected(o);setError('');try{const[s,u,p,d]=await Promise.all([fetchPlatformOrgStats(o.id),listPlatformOrgUsers(o.id),fetchPlatformOrgPackage(o.id),fetchPlatformOrgDateTimeSettings(o.id)]);setStats(s);setUsers(u);setTier(p);setSettings(d)}catch(e){setError(e instanceof Error?e.message:'Failed to load business control data')}} async function toggle(o:PlatformOrg){const next=o.status==='suspended'?'active':'suspended';if(!window.confirm(next==='suspended'?'Disconnect / suspend “'+o.name+'”? This blocks tenant access.':'Reconnect “'+o.name+'”?'))return;setBusy(true);try{const u=await updatePlatformOrgStatus(o.id,next);setOrgs(x=>x.map(v=>v.id===u.id?u:v));if(selected?.id===o.id)setSelected(u);setNotice(next==='suspended'?o.name+' disconnected.':o.name+' reconnected.')}catch(e){setError(e instanceof Error?e.message:'Status update failed')}finally{setBusy(false)}}
  async function deleteOrg(o:PlatformOrg){const reason=window.prompt('DELETE "'+o.name+'" permanently?\n\nThis cannot be undone u2014 all users, connectors, and data for this organization will be removed.\n\nEnter a reason to confirm deletion:');if(!reason||!reason.trim())return;if(!window.confirm('Final confirmation: permanently delete "'+o.name+'" ('+o.slug+')?'))return;setBusy(true);try{await deletePlatformOrg(o.id,reason.trim());setOrgs(x=>x.filter(v=>v.id!==o.id));if(selected?.id===o.id)setSelected(null);setNotice('"'+o.name+'" has been permanently deleted.');navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Delete failed')}finally{setBusy(false)}}
  async function register(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await createPlatformOrg({name:business.name,slug:business.slug||undefined,ownerEmail:business.ownerEmail||undefined,ownerFullName:business.ownerFullName||undefined,ownerPassword:business.ownerPassword||undefined});setNotice('Business “'+r.name+'” registered.');setBusiness({name:'',slug:'',ownerEmail:'',ownerFullName:'',ownerPassword:''});await load();navigate('businesses')}catch(e){setError(e instanceof Error?e.message:'Registration failed')}finally{setBusy(false)}}
@@ -246,6 +271,42 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
  async function toggleUser(u:OrgMember){if(!selected)return;setBusy(true);try{const x=await updatePlatformOrgUser(selected.id,u.id,{isActive:!u.isActive});setUsers(v=>v.map(z=>z.id===x.id?x:z))}catch(e){setError(e instanceof Error?e.message:'User update failed')}finally{setBusy(false)}}
  async function saveDate(){if(!selected)return;setBusy(true);try{await updatePlatformOrgDateTimeSettings(selected.id,settings);setNotice('Tenant settings saved.')}catch(e){setError(e instanceof Error?e.message:'Settings update failed')}finally{setBusy(false)}}
  async function loadAudit(page = auditPageIndex){try{const r=await listPlatformAuditLogs({action:auditQuery||undefined,orgId:auditOrg||undefined,from:auditFrom||undefined,to:auditTo||undefined,limit:50,offset:page*50});setAudit(r.rows);setAuditTotal(r.total);setAuditPageIndex(page)}catch(e){setError(e instanceof Error?e.message:'Audit load failed')}}
+
+ async function handleInviteStaff(e:React.FormEvent){
+   e.preventDefault();
+   if(!inviteForm.email||!inviteForm.name||inviteForm.capabilities.length===0)return;
+   setInviteBusy(true);setStaffError('');
+   try{
+     await invitePlatformStaff({email:inviteForm.email,name:inviteForm.name,capabilities:inviteForm.capabilities});
+     setInviteForm({email:'',name:'',capabilities:[]});
+     const r=await listPlatformStaff();setPlatformStaff(r.staff);
+     setStaffNotice('Staff member invited.');setTimeout(()=>setStaffNotice(''),5000);
+   }catch(ex){setStaffError(ex instanceof Error?ex.message:'Invite failed')}
+   finally{setInviteBusy(false)}
+ }
+
+ async function handleRemoveStaff(id:string){
+   if(!window.confirm('Revoke access for this staff member?'))return;
+   setInviteBusy(true);setStaffError('');
+   try{
+     await removePlatformStaff(id);
+     setPlatformStaff(s=>s.filter(m=>m.id!==id));
+     if(editGrantsMember?.id===id)setEditGrantsMember(null);
+     setStaffNotice('Staff member removed.');setTimeout(()=>setStaffNotice(''),5000);
+   }catch(ex){setStaffError(ex instanceof Error?ex.message:'Remove failed')}
+   finally{setInviteBusy(false)}
+ }
+
+ async function handleBootstrap(){
+   setInviteBusy(true);setStaffError('');
+   try{
+     const r=await bootstrapPlatformStaff();
+     setStaffNotice('Bootstrap complete: '+r.created+' created, '+r.skipped+' skipped.');
+     setTimeout(()=>setStaffNotice(''),8000);
+     const reload=await listPlatformStaff();setPlatformStaff(reload.staff);
+   }catch(ex){setStaffError(ex instanceof Error?ex.message:'Bootstrap failed')}
+   finally{setInviteBusy(false)}
+ }
  async function exportAudit(){try{const blob=await exportPlatformAuditLogs({action:auditQuery||undefined,orgId:auditOrg||undefined,from:auditFrom||undefined,to:auditTo||undefined});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='eip-platform-audit.csv';a.click();URL.revokeObjectURL(url)}catch(e){setError(e instanceof Error?e.message:'Audit export failed')}} async function migrateEncryption(dryRun:boolean){setBusy(true);try{const r=await migratePlatformEncryption(dryRun,selected?.id);setNotice((dryRun?'Dry run: ':'')+'scanned '+r.scanned+', migrated '+r.migrated+', current '+r.alreadyCurrent+', failed '+r.failed+'.')}catch(e){setError(e instanceof Error?e.message:'Encryption migration failed')}finally{setBusy(false)}}
  async function askAI(e:React.FormEvent){e.preventDefault();if(!aiQ.trim())return;setAiBusy(true);try{const r=await askEllineaApi({question:aiQ,summary:null,memory:[],templateAnswer:'Use only live platform evidence; state when evidence is unavailable.',role:'platform_super_admin',organizationName:'Ellines EIP Platform'});setAiA(r.answer)}catch(e){setAiA(e instanceof Error?e.message:'AI request failed')}finally{setAiBusy(false)}}
 
@@ -712,6 +773,110 @@ const [pkg,setPkg]=useState({name:'',displayName:'',maxUsers:25,maxConnectors:5,
       case 'org-data':         return orgDataPage;
       case 'org-system':       return orgSystemPage;
       case 'org-admin':        return orgAdminPage;
+      case 'access-control': {
+        const capLabels = PLATFORM_STAFF_CAPABILITY_LABELS as Record<string,string>;
+        const accessControlContent=(
+          <div className={styles.card}>
+            <div className={styles.cardHeader}><div><h3 className={styles.cardTitle}>Platform Staff & Access Control</h3><p className={styles.cardHint}>Ellines internal operators only. Client-organization users are managed under each client workspace.</p></div></div>
+            {staffError&&<p style={{color:'#f87171',fontSize:13,margin:'8px 0'}}>{staffError}</p>}
+            {staffNotice&&<p style={{color:'#34d399',fontSize:13,margin:'8px 0'}}>{staffNotice}</p>}
+
+            {/* Bootstrap from env */}
+            <div style={{marginBottom:16,padding:12,background:'rgba(255,255,255,0.04)',borderRadius:6,border:'1px solid rgba(255,255,255,0.08)'}}>
+              <strong style={{fontSize:13}}>Bootstrap from environment</strong>
+              <p style={{fontSize:12,color:'#8b95a8',margin:'4px 0 8px'}}>Reads PLATFORM_ADMIN_EMAILS and creates staff rows for any email not already registered. Safe to run multiple times — already-registered emails are skipped.</p>
+              <button className={styles.button} disabled={inviteBusy} onClick={()=>void handleBootstrap()}>Bootstrap from env</button>
+            </div>
+
+            {/* KPIs */}
+            <div className={styles.grid4} style={{marginBottom:16}}>
+              <div className={styles.kpi}><span>Total staff</span><strong>{platformStaff.length}</strong><small>registered</small></div>
+              <div className={styles.kpi}><span>Active</span><strong className={styles.ok}>{platformStaff.filter(m=>m.status==='active').length}</strong><small>with access</small></div>
+              <div className={styles.kpi}><span>Revoked</span><strong className={platformStaff.filter(m=>m.status==='revoked').length?styles.warn:''}>{platformStaff.filter(m=>m.status==='revoked').length}</strong><small>no access</small></div>
+              <div className={styles.kpi}><span>Bootstrapped</span><strong>{platformStaff.filter(m=>m.bootstrapped).length}</strong><small>from env</small></div>
+            </div>
+
+            {/* Staff table */}
+            {staffLoading?(
+              <p>Loading platform staff…</p>
+            ):platformStaff.length===0?(
+              <p className={styles.muted}>No platform staff configured yet. Use Bootstrap to import from the environment allowlist, or use the Invite form below.</p>
+            ):(
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Name</th><th>Email</th><th>Active capabilities</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {platformStaff.map(m=>(
+                      <tr key={m.id}>
+                        <td>{m.full_name||'—'}</td>
+                        <td style={{fontSize:12}}>{m.email}</td>
+                        <td style={{fontSize:11}}>{m.platform_staff_grants.filter(g=>!g.revoked_at).map(g=>capLabels[g.capability]||g.capability).join(', ')||'—'}</td>
+                        <td><span className={styles.status+' '+statusClass(m.status)}>{m.status}</span></td>
+                        <td style={{fontSize:11}}>{new Date(m.created_at).toLocaleDateString()}</td>
+                        <td>
+                          <button className={styles.button} onClick={()=>setEditGrantsMember(m)} style={{marginRight:4}}>Edit grants</button>
+                          <button className={styles.button+' '+styles.danger} disabled={inviteBusy} onClick={()=>void handleRemoveStaff(m.id)}>Revoke</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Edit grants inline panel */}
+            {editGrantsMember&&(
+              <div style={{marginTop:16,padding:12,border:'1px solid rgba(255,255,255,0.12)',borderRadius:6}}>
+                <strong style={{fontSize:13}}>Edit grants for {editGrantsMember.full_name||editGrantsMember.email}</strong>
+                <div style={{marginTop:8}}>
+                  {PLATFORM_STAFF_CAPABILITIES.map(cap=>{
+                    const active=editGrantsMember.platform_staff_grants.some(g=>g.capability===cap&&!g.revoked_at);
+                    return(
+                      <label key={cap} style={{display:'block',fontSize:12,margin:'4px 0',cursor:'pointer'}}>
+                        <input type="checkbox" checked={active} style={{marginRight:6}} onChange={async()=>{
+                          try{
+                            await updatePlatformStaffGrants(editGrantsMember.id,active?{remove:[cap]}:{add:[cap]});
+                            const r=await listPlatformStaff();
+                            setPlatformStaff(r.staff);
+                            setEditGrantsMember(r.staff.find(x=>x.id===editGrantsMember.id)||null);
+                          }catch(ex){setStaffError(ex instanceof Error?ex.message:'Failed to update grants')}
+                        }}/>{capLabels[cap]||cap}
+                      </label>
+                    );
+                  })}
+                </div>
+                <button className={styles.button} style={{marginTop:8}} onClick={()=>setEditGrantsMember(null)}>Close</button>
+              </div>
+            )}
+
+            {/* Invite form */}
+            <form style={{marginTop:20}} onSubmit={e=>void handleInviteStaff(e)}>
+              <strong style={{fontSize:13}}>Invite staff member</strong>
+              <div className={styles.form} style={{marginTop:8}}>
+                <label className={styles.field}><span>Full name</span><input className={styles.input} value={inviteForm.name} onChange={e=>setInviteForm(f=>({...f,name:e.target.value}))}/></label>
+                <label className={styles.field}><span>Email</span><input className={styles.input} type="email" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/></label>
+                <div className={styles.full}>
+                  <label style={{fontSize:12,fontWeight:500,display:'block',marginBottom:4}}>Capabilities</label>
+                  {PLATFORM_STAFF_CAPABILITIES.map(cap=>(
+                    <label key={cap} style={{display:'block',fontSize:12,margin:'4px 0 4px 8px',cursor:'pointer'}}>
+                      <input type="checkbox" style={{marginRight:6}}
+                        checked={inviteForm.capabilities.includes(cap)}
+                        onChange={e=>setInviteForm(f=>({...f,capabilities:e.target.checked?[...f.capabilities,cap]:f.capabilities.filter(c=>c!==cap)}))}
+                      />{capLabels[cap]||cap}
+                    </label>
+                  ))}
+                </div>
+                <div className={styles.full}>
+                  <button className={styles.button+' '+styles.primary} disabled={inviteBusy||!inviteForm.email||!inviteForm.name||inviteForm.capabilities.length===0}>
+                    {inviteBusy?'Inviting…':'Invite staff member'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        );
+        return accessControlContent;
+      }
       case 'client':           return <ClientWorkspace
           org={wsOrg}
           orgId={clientOrgId}
