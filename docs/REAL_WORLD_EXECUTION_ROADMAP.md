@@ -836,7 +836,7 @@ It is complete only when:
 # 21. TODAY'S TASK BOARD
 
 ## BLOCKER
-- [ ] T0.1 Fix web authorization regression
+- [x] T0.1 Fix web authorization regression — **verified 2026-09-29** (authorization regression fixed per audit)
 - [ ] T0.2 Restore green CI
 - [ ] T0.3 Verify main deployment SHA
 

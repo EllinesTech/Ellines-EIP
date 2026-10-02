@@ -92,6 +92,11 @@ export type InstallConfig = {
   sftpPassword?: string;
   sftpPrivateKey?: string;
   sftpRemotePath?: string;
+  /** Extended credential fields (Governance Rule §5 — encrypted at rest) */
+  oauthClientSecret?: string;
+  webhookSecret?: string;
+  clientSecret?: string;
+  privateKey?: string;
   /** 0 = manual only; otherwise minutes between automatic syncs. */
   syncIntervalMinutes?: number;
   /**
@@ -121,15 +126,23 @@ export const SECRET_KEYS = [
   'imapPassword',
   'sftpPassword',
   'sftpPrivateKey',
+  // Extended credential fields (Governance Rule §5 / spec task 21.1)
+  'oauthClientSecret',
+  'webhookSecret',
+  'clientSecret',
+  'privateKey',
 ] as const;
 
 type SecretKey = typeof SECRET_KEYS[number];
+
+/** Sentinel used to indicate a credential field is set without revealing its value. */
+export const REDACTED_CREDENTIAL = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
 
 export function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...config };
   for (const key of SECRET_KEYS) {
     if (typeof out[key] === 'string' && (out[key] as string).length > 0) {
-      out[key] = '***';
+      out[key] = REDACTED_CREDENTIAL;
     }
   }
   if (out.openApiDocument !== undefined) {
