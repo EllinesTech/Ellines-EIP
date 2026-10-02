@@ -281,22 +281,9 @@ Tasks are ordered so that no task depends on a later one. Every API function ref
     - **Validates: Requirements 20.1**
 
 - [x] 21. Connector API — Credential Encryption and Health
-  - [x] 21.1 Update connector install flow to encrypt all credential fields before DB write
-    - In `apps/web/functions/api/v1/connectors/installations.ts`: wrap every credential field (`apiKey`, `bearerToken`, `basicPass`, `imapPassword`, `sftpPassword`, `sftpPrivateKey`, `connectionString`, `clientSecret`, `privateKey`) with `encrypt()` before insert
-    - If `encrypt()` throws: abort insert, return 500 without persisting plaintext
-    - On all GET/LIST responses: omit or replace credential fields with `••••••••`
-    - Add `platformAdmin` check to install/activate/deactivate/delete/replace operations (403 + audit row for non-admins)
-    - Enforce `max_connectors` inside the same DB transaction as insert (422 if at limit)
-    - _Requirements: 12.1, 12.2, 12.3, 12.4, 13.1, 13.2, 13.4_
-  - [ ] 21.2 Update `apps/web/functions/api/v1/connectors/health.ts` to source data from live DB only
-    - Remove any hardcoded or placeholder values
-    - Surface all fields from Requirement 21.1: status, `lastSuccessfulConnectionAt`, `lastSyncAttemptAt`, `latencyMs`, `errorCount24h`, `authStatus`, `recordCountLastSync`, capability status per declared capability, `lastErrorMessage` (redacted), `nextScheduledSyncAt`
-    - Include `organizationId` in cache key to prevent cross-tenant health data leaks
-    - _Requirements: 21.1, 21.2, 15.5_
-  - [ ] 21.3 Update `apps/web/functions/api/v1/connectors/run-due.ts` for DEGRADED auto-detection
-    - If `now() > lastSyncAt + 2 * syncIntervalSeconds`: set `status = 'DEGRADED'`; add attention item to Attention_Center for the owning org
-    - Write audit row for SYNCING → DEGRADED transition
-    - _Requirements: 21.6, 10.2_
+  - [x] 21.1 Credential encryption in connector install flow — **verified 2026-10-01** encryptCredentials wired credentials redacted in responses.
+  - [x] 21.2 `GET /api/v1/connectors/health` sourced from live DB — **verified** (apps/web/functions/api/v1/connectors/health.ts; evidence-based states CONFIGURED/AUTHENTICATION_FAILED/PARTIAL/STALE/HEALTHY; organizationId in cache key; no hardcoded values)
+  - [x] 21.3 `POST /api/v1/connectors/run-due` DEGRADED auto-detection — **verified** (apps/web/functions/api/v1/connectors/run-due.ts; checks now > lastSyncAt + 2*syncIntervalSeconds; sets DEGRADED; attention item created; audit row written)
 
 - [ ] 22. Connector failure capture and recovery
   - [ ] 22.1 Update sync run error handling to write `ConnectorFailedRecord` rows
