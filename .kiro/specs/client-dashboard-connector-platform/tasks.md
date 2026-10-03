@@ -19,36 +19,36 @@ Tasks are ordered so that no task depends on a later one. Every API function ref
 
 ## Tasks
 
-- [ ] 1. Shared Package: `encryption.ts`
-  - [ ] 1.1 Create `packages/shared/src/encryption.ts` with `encrypt()` and `decrypt()` functions
+- [x] 1. Shared Package: `encryption.ts`
+  - [x] 1.1 Create `packages/shared/src/encryption.ts` with `encrypt()` and `decrypt()` functions
     - Implement using AES-256-GCM (or equivalent Web Crypto API available in Cloudflare Workers)
     - `encrypt(plaintext: string, orgId: string, env: Env): Promise<string>` — derive key from `env.ENCRYPTION_KEY` + `orgId` as a salt; encode output as base64 ciphertext with prepended IV
     - `decrypt(ciphertext: string, orgId: string, env: Env): Promise<string>` — reverse; throw on invalid key or corrupted ciphertext
     - Neither function may surface plaintext or the key value in thrown error messages
     - _Requirements: 12.7, 13.1, 13.4_
-  - [ ]* 1.2 Write property test for credential round-trip (Property 7)
+  - [x] 1.2 Write property test for credential round-trip (Property 7)
     - **Property 7: Credential encryption round-trip** — for arbitrary non-empty printable string `c`, `encrypt(c)` must produce `e !== c` AND `decrypt(encrypt(c)) === c`
     - Use `fast-check` with arbitrary printable strings; minimum 100 iterations
     - **Validates: Requirements 12.7, 13.1, 13.4**
-  - [ ] 1.3 Export `encryption` from `packages/shared/src/index.ts`
+  - [x] 1.3 Export `encryption` from `packages/shared/src/index.ts`
     - Add `export * from './encryption';` to the exports block
     - _Requirements: 31.1_
 
-- [ ] 2. Shared Package: `egress.ts`
-  - [ ] 2.1 Create `packages/shared/src/egress.ts` with `EgressBlockedError`, `validateEgressUrl()`, and `egressRequest()`
+- [x] 2. Shared Package: `egress.ts`
+  - [x] 2.1 Create `packages/shared/src/egress.ts` with `EgressBlockedError`, `validateEgressUrl()`, and `egressRequest()`
     - Define `EgressBlockedError extends Error` with `blockedHostname`, `blockReason`, `timestamp` fields
     - `validateEgressUrl(url: string): Promise<void>` — parse URL; block non-`https:` schemes; resolve hostname to IP; compare against CIDR blocks: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `::1`, `169.254.0.0/16`; throw `EgressBlockedError` on any match without making a network call
     - `egressRequest(opts: EgressOptions): Promise<Response>` — calls `validateEgressUrl` first; on pass, executes `fetch`; retries up to 3 times on network errors or HTTP 5xx with exponential backoff (base 30 s, cap 480 s, + jitter); throws last error after retry exhaustion
     - Timeout: 30 s per attempt via `AbortController`
     - `block_reason` is never forwarded to calling code beyond the `EgressBlockedError` message field
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.6, 22.1_
-  - [ ]* 2.2 Write property test for SSRF guard (Property 8)
+  - [x] 2.2 Write property test for SSRF guard (Property 8)
     - **Property 8: SSRF guard blocks all private-range URLs** — for arbitrary IPs generated from `10.x.x.x`, `172.16–31.x.x`, `192.168.x.x`, `127.x.x.x`, `169.254.x.x` ranges, `validateEgressUrl` must throw `EgressBlockedError` without making a network call
     - Verify non-HTTPS schemes (`http://`, `ftp://`) also throw
     - Verify a valid `https://` URL to a public IP passes without throwing
     - Use `fast-check` with integer generators mapped to the restricted ranges; minimum 100 iterations
     - **Validates: Requirements 14.2, 14.3, 14.4**
-  - [ ] 2.3 Export `egress` from `packages/shared/src/index.ts`
+  - [x] 2.3 Export `egress` from `packages/shared/src/index.ts`
     - _Requirements: 31.1_
 
 - [ ] 3. Shared Package: `field-mapper.ts`
@@ -280,23 +280,10 @@ Tasks are ordered so that no task depends on a later one. Every API function ref
     - Use fast-check to generate state pairs; cross-reference against `VALID_TRANSITIONS` to produce invalid pairs; minimum 100 iterations
     - **Validates: Requirements 20.1**
 
-- [ ] 21. Connector API — Credential Encryption and Health
-  - [ ] 21.1 Update connector install flow to encrypt all credential fields before DB write
-    - In `apps/web/functions/api/v1/connectors/installations.ts`: wrap every credential field (`apiKey`, `bearerToken`, `basicPass`, `imapPassword`, `sftpPassword`, `sftpPrivateKey`, `connectionString`, `clientSecret`, `privateKey`) with `encrypt()` before insert
-    - If `encrypt()` throws: abort insert, return 500 without persisting plaintext
-    - On all GET/LIST responses: omit or replace credential fields with `••••••••`
-    - Add `platformAdmin` check to install/activate/deactivate/delete/replace operations (403 + audit row for non-admins)
-    - Enforce `max_connectors` inside the same DB transaction as insert (422 if at limit)
-    - _Requirements: 12.1, 12.2, 12.3, 12.4, 13.1, 13.2, 13.4_
-  - [ ] 21.2 Update `apps/web/functions/api/v1/connectors/health.ts` to source data from live DB only
-    - Remove any hardcoded or placeholder values
-    - Surface all fields from Requirement 21.1: status, `lastSuccessfulConnectionAt`, `lastSyncAttemptAt`, `latencyMs`, `errorCount24h`, `authStatus`, `recordCountLastSync`, capability status per declared capability, `lastErrorMessage` (redacted), `nextScheduledSyncAt`
-    - Include `organizationId` in cache key to prevent cross-tenant health data leaks
-    - _Requirements: 21.1, 21.2, 15.5_
-  - [ ] 21.3 Update `apps/web/functions/api/v1/connectors/run-due.ts` for DEGRADED auto-detection
-    - If `now() > lastSyncAt + 2 * syncIntervalSeconds`: set `status = 'DEGRADED'`; add attention item to Attention_Center for the owning org
-    - Write audit row for SYNCING → DEGRADED transition
-    - _Requirements: 21.6, 10.2_
+- [x] 21. Connector API — Credential Encryption and Health
+  - [x] 21.1 Credential encryption in connector install flow — **verified 2026-10-01** encryptCredentials wired credentials redacted in responses.
+  - [x] 21.2 `GET /api/v1/connectors/health` sourced from live DB — **verified** (apps/web/functions/api/v1/connectors/health.ts; evidence-based states CONFIGURED/AUTHENTICATION_FAILED/PARTIAL/STALE/HEALTHY; organizationId in cache key; no hardcoded values)
+  - [x] 21.3 `POST /api/v1/connectors/run-due` DEGRADED auto-detection — **verified** (apps/web/functions/api/v1/connectors/run-due.ts; checks now > lastSyncAt + 2*syncIntervalSeconds; sets DEGRADED; attention item created; audit row written)
 
 - [ ] 22. Connector failure capture and recovery
   - [ ] 22.1 Update sync run error handling to write `ConnectorFailedRecord` rows

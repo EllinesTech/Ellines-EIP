@@ -13,11 +13,13 @@ import { TemplateService } from './template.service';
 import { ResilientConnectionService } from './resilient-connection.service';
 import { ConnectorCodeGeneratorService } from './connector-code-generator.service';
 import { CapabilityBridgeService } from './capability-bridge.service';
+import { ProxySyncController } from './proxy-sync.controller';
 import { PrismaModule } from '../prisma/prisma.module';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [TemplateController],
+  imports: [PrismaModule, EncryptionModule],
+  controllers: [TemplateController, ProxySyncController],
   providers: [TemplateService, ResilientConnectionService, ConnectorCodeGeneratorService, CapabilityBridgeService],
   exports: [TemplateService, ResilientConnectionService, ConnectorCodeGeneratorService, CapabilityBridgeService],
 })

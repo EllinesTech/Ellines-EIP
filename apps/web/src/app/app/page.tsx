@@ -795,7 +795,7 @@ function AdminOverview({
           <div className={styles.chartTall} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {synced
               ? <p style={{ color: 'var(--c-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
-                  Historical trend tracking coming soon. Sync daily to build your baseline.
+                  Trend history builds automatically as you sync connectors.
                 </p>
               : <p style={{ color: 'var(--c-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
                   Sync a connector to start recording pulse data.
