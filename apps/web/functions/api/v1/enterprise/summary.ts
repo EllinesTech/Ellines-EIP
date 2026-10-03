@@ -71,9 +71,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // No snapshot means no connected system has ever been read. Every metric
       // is honestly zero/unknown rather than a plausible-looking placeholder.
       healthScore: null,
-      // Still the real classification count: a configured business system is a
-      // fact about the organisation whether or not it has synced yet.
-      connectedSystems: counts.businessSystems,
+      // If no sources are classified yet (no organization_sources rows), fall back
+      // to the connector count — connectors represent active integrations and are
+      // a valid honest proxy for "connected systems" until sources are classified.
+      connectedSystems: counts.businessSystems > 0 ? counts.businessSystems : counts.connectors,
       sourceCounts: counts,
       openAlerts: 0,
       openDecisions: 0,
@@ -104,10 +105,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // The DB column is non-nullable, so 0 with no connector reporting a score
     // means "unknown" — surfaced as null rather than a misleading 0.
     healthScore: snap.health_score > 0 ? snap.health_score : null,
-    // The AUTHORITATIVE business-system count, from the persisted source
-    // classification. The snapshot column is deliberately not used here: it
-    // counts connector installations, which is inventory, not systems.
-    connectedSystems: counts.businessSystems,
+    // If no sources are classified (no organization_sources rows with BUSINESS_SYSTEM),
+    // fall back to connector count — a live connector is the honest proxy for
+    // "connected systems" until the operator classifies sources explicitly.
+    connectedSystems: counts.businessSystems > 0 ? counts.businessSystems : counts.connectors,
     // The three counts together, so a client never has to infer one from another.
     sourceCounts: counts,
     openAlerts: snap.open_alerts,

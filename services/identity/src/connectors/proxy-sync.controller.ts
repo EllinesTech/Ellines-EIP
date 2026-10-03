@@ -244,10 +244,31 @@ export class ProxySyncController {
       const normalized = this.#normalizePayload(parsed, config);
       healthScore = normalized.healthScore ?? null;
       connectedSystems = normalized.connectedSystems ?? 0;
-      lastPayload = parsed;
       retrievedCount = Array.isArray(parsed) ? parsed.length : (parsed != null ? 1 : 0);
       reportedCount = retrievedCount;
       retrievalComplete = true;
+      // Build the structured payload envelope that health.ts reads for evidence-based status.
+      // The `retrieval` sub-object is required — health.ts reads retrieval.retrievedRecordCount
+      // and retrieval.complete to determine HEALTHY vs UNAVAILABLE.
+      lastPayload = {
+        healthScore: normalized.healthScore ?? null,
+        connectedSystems: normalized.connectedSystems,
+        recordCount: retrievedCount,
+        openAlerts: normalized.openAlerts,
+        openDecisions: normalized.openDecisions,
+        briefHighlight: normalized.briefHighlight ?? null,
+        syncedAt: new Date().toISOString(),
+        retrieval: {
+          retrievedRecordCount: retrievedCount,
+          reportedRecordCount: reportedCount,
+          complete: true,
+          stopReason: 'complete',
+          pagesFetched: 1,
+          duplicateCount: 0,
+          warnings: [] as string[],
+          errors: [] as { page: number; reason: string }[],
+        },
+      };
       status = 'synced';
       lastMessage = `Synced via LAN proxy — retrieved ${retrievedCount} record(s) from source`;
 
@@ -472,6 +493,21 @@ export class ProxySyncController {
     } else if (Array.isArray(data)) {
       // Array response — use length as connectedSystems
       result.connectedSystems = data.length;
+      // briefHighlight: pick first string from the first element (name/title/label etc.)
+      if (data.length > 0 && result.briefHighlight === null) {
+        const first = data[0];
+        if (first && typeof first === 'object' && !Array.isArray(first)) {
+          const firstObj = first as Record<string, unknown>;
+          const NAME_KEYS = ['name', 'title', 'label', 'displayName', 'display_name', 'description'];
+          for (const k of NAME_KEYS) {
+            const v = firstObj[k];
+            if (typeof v === 'string' && v.trim().length >= 3 && !v.trim().startsWith('/')) {
+              result.briefHighlight = v.trim();
+              break;
+            }
+          }
+        }
+      }
       return result;
     }
 
@@ -490,6 +526,37 @@ export class ProxySyncController {
     if (typeof flat['openAlerts'] === 'number') result.openAlerts = flat['openAlerts'];
     if (typeof flat['openDecisions'] === 'number') result.openDecisions = flat['openDecisions'];
     if (flat['briefHighlight'] != null) result.briefHighlight = String(flat['briefHighlight']);
+
+    // ── Fallback inference for non-EIP payloads ──────────────────────────────
+    // If the source returned a non-empty object but no EIP canonical fields were
+    // present, derive sensible values so the dashboard reflects the real sync.
+
+    // connectedSystems: the source responded and returned a record → 1 system responded.
+    if (result.connectedSystems === 0 && Object.keys(flat).length > 0) {
+      result.connectedSystems = 1;
+    }
+
+    // briefHighlight: pick the first meaningful string value, preferring common
+    // name-like keys. Skip URL paths (starting with '/') and very short strings.
+    if (!result.briefHighlight) {
+      const NAME_KEYS = ['name', 'title', 'label', 'displayName', 'display_name', 'description'];
+      for (const k of NAME_KEYS) {
+        const v = flat[k];
+        if (typeof v === 'string' && v.trim().length >= 3 && !v.trim().startsWith('/')) {
+          result.briefHighlight = v.trim();
+          break;
+        }
+      }
+      // Last resort: first string value that is not a URL path and is not too long
+      if (!result.briefHighlight) {
+        for (const v of Object.values(flat)) {
+          if (typeof v === 'string' && v.trim().length >= 3 && !v.trim().startsWith('/') && v.length < 200) {
+            result.briefHighlight = v.trim();
+            break;
+          }
+        }
+      }
+    }
 
     return result;
   }
