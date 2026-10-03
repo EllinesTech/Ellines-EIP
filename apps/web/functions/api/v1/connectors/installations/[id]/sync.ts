@@ -695,7 +695,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!egressCheck.safe) {
         // If the identity service is available (same LAN as on-prem systems),
         // delegate the entire sync through it instead of blocking.
-        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        // Falls back to process.env for local Next.js dev (context.env only
+        // exists in the Cloudflare Workers runtime).
+        const identityApiUrl =
+          (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'] ||
+          (typeof process !== 'undefined' ? process.env['IDENTITY_API_URL'] : undefined);
         if (identityApiUrl) {
           const proxyRes = await delegateToProxy(
             identityApiUrl,
@@ -924,7 +928,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       const egressCheck = isSafeEgressTarget(gqlEndpoint);
       if (!egressCheck.safe) {
-        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        const identityApiUrl =
+          (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'] ||
+          (typeof process !== 'undefined' ? process.env['IDENTITY_API_URL'] : undefined);
         if (identityApiUrl) {
           const proxyRes = await delegateToProxy(
             identityApiUrl,

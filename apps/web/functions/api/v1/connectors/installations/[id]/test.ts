@@ -96,7 +96,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const egressCheck = isSafeEgressTarget(endpoint);
         if (!egressCheck.safe) {
           // Delegate to identity proxy if available (on-prem / LAN endpoints)
-          const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+          const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'] ||
+          (typeof process !== 'undefined' ? process.env['IDENTITY_API_URL'] : undefined);
           if (identityApiUrl) {
             const result = await delegateTestToProxy(
               identityApiUrl,
@@ -123,7 +124,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const egressCheck = isSafeEgressTarget(endpoint);
       if (!egressCheck.safe) {
         // Delegate to identity proxy if available (on-prem / LAN endpoints)
-        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'] ||
+          (typeof process !== 'undefined' ? process.env['IDENTITY_API_URL'] : undefined);
         if (identityApiUrl) {
           const result = await delegateTestToProxy(
             identityApiUrl,
