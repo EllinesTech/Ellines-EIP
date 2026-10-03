@@ -16,6 +16,39 @@ import {
 import { sendOutboundEmail } from '../../../../../shared/mail';
 import { isSafeEgressTarget, safeFetch, isSafeTcpHost, isSafeTcpPort, SsrfError } from '../../../../../shared/egress';
 
+/**
+ * Delegate a connection test to the identity service proxy endpoint.
+ * Called when isSafeEgressTarget blocks the endpoint (private IP / http://)
+ * but IDENTITY_API_URL is configured — the identity service runs on the same
+ * LAN and can reach the on-prem system.
+ */
+async function delegateTestToProxy(
+  identityApiUrl: string,
+  installationId: string,
+  authHeader: string,
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(`${identityApiUrl}/api/v1/connectors/proxy-test`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ installationId }),
+    });
+    const body = await res.json() as { success?: boolean; message?: string };
+    return {
+      ok: Boolean(body.success),
+      message: body.message ?? (body.success ? 'Connection OK via LAN proxy' : 'Connection failed via LAN proxy'),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'Proxy test failed',
+    };
+  }
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   if (context.request.method === 'OPTIONS') return options();
   if (context.request.method !== 'POST') {
@@ -62,29 +95,57 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       else {
         const egressCheck = isSafeEgressTarget(endpoint);
         if (!egressCheck.safe) {
-          throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
+          // Delegate to identity proxy if available (on-prem / LAN endpoints)
+          const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+          if (identityApiUrl) {
+            const result = await delegateTestToProxy(
+              identityApiUrl,
+              id,
+              context.request.headers.get('Authorization') || '',
+            );
+            ok = result.ok;
+            message = result.message;
+          } else {
+            throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
+          }
+        } else {
+          const res = await safeFetch(endpoint, {
+            method: 'GET',
+            headers: buildAuthHeaders(config),
+          });
+          ok = res.ok;
+          if (!ok) message = `HTTP ${res.status}`;
         }
-        const res = await safeFetch(endpoint, {
-          method: 'GET',
-          headers: buildAuthHeaders(config),
-        });
-        ok = res.ok;
-        if (!ok) message = `HTTP ${res.status}`;
       }
     } else if (catalogId === 'graphql') {
       const endpoint = (config.endpoint || '').trim();
       if (!endpoint) throw new Error('GraphQL endpoint is required');
       const egressCheck = isSafeEgressTarget(endpoint);
-      if (!egressCheck.safe) throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
-      const query = config.graphqlQuery?.trim() || '{ __typename }';
-      const res = await safeFetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...buildAuthHeaders(config) },
-        body: JSON.stringify({ query }),
-      });
-      // 400 = bad query but server is reachable; 401/403 = auth issue but server is up
-      ok = res.ok || [400, 401, 403].includes(res.status);
-      message = ok ? `GraphQL endpoint reachable (HTTP ${res.status})` : `HTTP ${res.status} — check endpoint`;
+      if (!egressCheck.safe) {
+        // Delegate to identity proxy if available (on-prem / LAN endpoints)
+        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        if (identityApiUrl) {
+          const result = await delegateTestToProxy(
+            identityApiUrl,
+            id,
+            context.request.headers.get('Authorization') || '',
+          );
+          ok = result.ok;
+          message = result.message;
+        } else {
+          throw new Error(egressCheck.reason ?? 'Endpoint blocked by egress policy');
+        }
+      } else {
+        const query = config.graphqlQuery?.trim() || '{ __typename }';
+        const res = await safeFetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...buildAuthHeaders(config) },
+          body: JSON.stringify({ query }),
+        });
+        // 400 = bad query but server is reachable; 401/403 = auth issue but server is up
+        ok = res.ok || [400, 401, 403].includes(res.status);
+        message = ok ? `GraphQL endpoint reachable (HTTP ${res.status})` : `HTTP ${res.status} — check endpoint`;
+      }
     } else if (catalogId === 'webhook-inbound') {
       message = 'Webhook receiver ready. Get your webhook URL + HMAC secret from the Webhook section, then configure your external system.';
       ok = true;

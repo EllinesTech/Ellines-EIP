@@ -7,6 +7,31 @@ import {
   type Env,
 } from '../../../../../shared/auth';
 import { isSafeEgressTarget, safeFetch, SsrfError, isSafeTcpHost, isSafeTcpPort } from '../../../../../shared/egress';
+
+/**
+ * Delegate a sync to the identity service proxy endpoint.
+ * Called when isSafeEgressTarget blocks the connector's URL (private/LAN IP or http://)
+ * but IDENTITY_API_URL is set, meaning the identity service runs on the same LAN
+ * and CAN reach the private endpoint.
+ *
+ * Only the installationId is sent — no raw credentials or URLs travel over the wire.
+ * The identity service reads config from DB, decrypts credentials, makes the call,
+ * and writes enterprise_snapshots itself.
+ */
+async function delegateToProxy(
+  identityApiUrl: string,
+  installationId: string,
+  authHeader: string,
+): Promise<Response> {
+  return fetch(`${identityApiUrl}/api/v1/connectors/proxy-sync`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ installationId }),
+  });
+}
 import {
   buildAuthHeaders,
   decryptConnectorConfig,
@@ -668,6 +693,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // Egress policy check before fetch
       const egressCheck = isSafeEgressTarget(endpoint);
       if (!egressCheck.safe) {
+        // If the identity service is available (same LAN as on-prem systems),
+        // delegate the entire sync through it instead of blocking.
+        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        if (identityApiUrl) {
+          const proxyRes = await delegateToProxy(
+            identityApiUrl,
+            id,
+            context.request.headers.get('Authorization') || '',
+          );
+          const proxyBody = await proxyRes.text();
+          return new Response(proxyBody, {
+            status: proxyRes.status,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
         return json(
           { statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' },
           400,
@@ -884,6 +924,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       const egressCheck = isSafeEgressTarget(gqlEndpoint);
       if (!egressCheck.safe) {
+        const identityApiUrl = (context.env as unknown as Record<string, string>)['IDENTITY_API_URL'];
+        if (identityApiUrl) {
+          const proxyRes = await delegateToProxy(
+            identityApiUrl,
+            id,
+            context.request.headers.get('Authorization') || '',
+          );
+          const proxyBody = await proxyRes.text();
+          return new Response(proxyBody, {
+            status: proxyRes.status,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
         return json({ statusCode: 400, message: egressCheck.reason ?? 'Endpoint blocked by egress policy' }, 400);
       }
       const gqlRes = await safeFetch(gqlEndpoint, {
